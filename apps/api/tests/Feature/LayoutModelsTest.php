@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Layout;
+use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -25,6 +26,21 @@ class LayoutModelsTest extends TestCase
 
         $layouts = $this->actingAs($user)->getJson("/api/v1/projects/{$projectId}/layouts");
         $layouts->assertOk()->assertJsonCount(1)->assertJsonPath('0.name', 'Layout');
+    }
+
+    public function test_a_project_without_a_layout_gets_one_backfilled_on_first_fetch(): void
+    {
+        $user = User::factory()->create();
+        // Simulate a project created before layout auto-creation existed (bypasses the
+        // controller's ->layouts()->create() side effect).
+        $project = Project::factory()->for($user, 'owner')->create(['name' => 'Legacy Show']);
+        $this->assertCount(0, $project->layouts);
+
+        $response = $this->actingAs($user)->getJson("/api/v1/projects/{$project->id}/layouts");
+        $response->assertOk()->assertJsonCount(1)->assertJsonPath('0.name', 'Layout');
+
+        // Idempotent: fetching again doesn't create a second one.
+        $this->actingAs($user)->getJson("/api/v1/projects/{$project->id}/layouts")->assertJsonCount(1);
     }
 
     public function test_bulk_upsert_imports_models_and_is_idempotent_by_name(): void

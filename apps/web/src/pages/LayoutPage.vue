@@ -22,7 +22,11 @@ async function loadLayout(): Promise<void> {
 async function handleFileChange(e: Event): Promise<void> {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
-  if (!file || !layout.value) return;
+  if (!file) return;
+  if (!layout.value) {
+    importMessage.value = "Layout isn't loaded yet — try again in a moment.";
+    return;
+  }
 
   importing.value = true;
   importMessage.value = "";
