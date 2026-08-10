@@ -16,15 +16,13 @@ Work milestone by milestone, in order. Each milestone: deployed to Render, CHANG
 - [x] **M7** — Versioning, sharing, polish (reduced scope — see DECISIONS.md). Sequence snapshot/restore with history UI; project sharing (viewer/editor roles) via a shared `Project::authorize()` gate used by every controller; ETag-based autosave conflict detection with a keep-mine/take-theirs UI; "Package show" as a client-side zip (webXLights-native format, not xLights XML) that re-imports cleanly into a fresh project. Also fixed a real, previously-untested 500 in logout and added a logout button. Reverb live presence and quota guards are deferred — see DECISIONS.md.
 - [x] **M8** — FPP Connect (Chromium path). Per SPEC ch16 §3.2 / ch13 §2.1/§2.4 exactly: Chromium detection (Client Hints + UA fallback, includes Edge), user-entered-host "discovery" (browsers can't receive FPP's UDP multicast ping), legacy `POST /api/file/uploads/<name>` + `GET /api/file/move/<name>` upload (Content-Type only, no custom headers), GET-merge-POST playlist sync matching FPP's exact JSON shape. Non-Chromium browsers get a guided-download message instead of a broken upload button. Feature-flagged (`FPP_CONNECT_ENABLED`); Export .fseq is untouched. Verified live against a mock FPP HTTP server (no real hardware available) — see DECISIONS.md.
 - [x] **M9** — Hardening + parity harness + docs (reduced scope — see DECISIONS.md). Fixed a real O(n²) full-export perf bug (stateful effects replayed from start every frame — now a proper sequential renderer, ~6.2s for the 20k-channel/3.6k-frame budget vs. a 60s ceiling); grid virtualization (fixed-viewport canvas, only visible rows drawn); a last-resort error banner for uncaught errors; an onboarding sample project (synthesized demo audio + pre-built layout/sequence) reachable from a first-time signup with zero manual file handling; `/docs` (import guide + an effect reference generated from the param registry); `PARITY.md`. OPFS spill, the worker-pool/SAB render architecture, and a real `xLights --headless` parity harness are honest, documented gaps, not attempted — see DECISIONS.md.
+- [x] **M10** — Sequencer interaction parity (see DECISIONS.md). Timing marks rendered on a pinned ruler row (click-to-add, right-click-to-delete); left-edge resize handle mirroring the existing right-edge one; snap-to-timing-mark on move/resize; a right-click context menu (copy/cut/paste/duplicate/delete). Plus two real bugs fixed in the same code: horizontal zoom/scroll (canvas now sizes to real content width instead of clipping at the container edge) and undo snapshotting per pointermove during a drag (now snapshots once at drag start). A CSS `overflow-x` quirk (an unset axis silently computing to `auto` when its sibling isn't `visible`) was caught only by live verification, not code review — see DECISIONS.md. Effect-type glyphs and multi-select/multi-drag are stated cuts, not silent gaps.
 
-## Planned next: M10-M12
+## Planned next: M11-M12
 
-Not started. Full spec, reviewed three ways (technical feasibility, xLights UX-parity,
+Full spec, reviewed three ways (technical feasibility, xLights UX-parity,
 scope discipline) before being written down: `NEXT-MILESTONES.md`.
 
-- **M10** — Sequencer interaction parity: render timing marks (stored since M2, never drawn),
-  left-edge effect resize, right-click context menu, plus two real bugs found in the same
-  code (broken horizontal zoom/scroll, undo snapshotting every pointermove during a drag).
 - **M11** — Controllers: a real controller/output model (DDP first, E1.31 deferred), a
   Controllers page matching the reference screenshot, and an `.fseq` export rewrite that
   routes through actual controller channel allocation instead of import-order concatenation.

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import type { PeakBucket } from "../lib/audio";
 
 const props = defineProps<{
@@ -13,6 +13,9 @@ const emit = defineEmits<{ seek: [ms: number] }>();
 
 const ROW_LABEL_WIDTH = 140; // stays aligned with SequencerGrid's row-label gutter
 const canvasRef = ref<HTMLCanvasElement | null>(null);
+// Full content width, same formula as SequencerGrid - both live inside the page's shared
+// .h-scroll wrapper so they scroll horizontally together, staying aligned at any zoom level.
+const totalWidth = computed(() => ROW_LABEL_WIDTH + props.durationMs * props.pxPerMs);
 
 function draw(): void {
   const canvas = canvasRef.value;
@@ -61,16 +64,15 @@ onMounted(() => {
   draw();
   window.addEventListener("resize", draw);
 });
-watch(() => [props.peaks, props.playheadMs, props.pxPerMs], draw);
+watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs], draw);
 </script>
 
 <template>
-  <canvas ref="canvasRef" class="waveform" @click="onClick"></canvas>
+  <canvas ref="canvasRef" class="waveform" :style="{ width: `${totalWidth}px` }" @click="onClick"></canvas>
 </template>
 
 <style scoped>
 .waveform {
-  width: 100%;
   height: 64px;
   display: block;
   cursor: pointer;

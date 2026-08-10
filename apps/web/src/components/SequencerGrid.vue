@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import type { SequenceBody, SequenceEffect } from "../lib/api";
 
 export interface GridRow {
@@ -7,6 +7,11 @@ export interface GridRow {
   elementId: number;
   name: string;
 }
+
+export type ContextMenuTarget =
+  | { kind: "effect"; row: GridRow; effect: SequenceEffect; ms: number; x: number; y: number }
+  | { kind: "mark"; trackIndex: number; ms: number; x: number; y: number }
+  | { kind: "ruler-empty"; trackIndex: number; ms: number; x: number; y: number };
 
 const props = defineProps<{
   rows: GridRow[];
@@ -23,24 +28,54 @@ const emit = defineEmits<{
   place: [row: GridRow, startMs: number, endMs: number];
   move: [effectId: string, startMs: number, endMs: number];
   seek: [ms: number];
+  dragStart: [];
+  addMark: [trackIndex: number, ms: number];
+  contextmenu: [target: ContextMenuTarget];
 }>();
 
 const ROW_HEIGHT = 28;
 const ROW_LABEL_WIDTH = 140;
+const HEADER_HEIGHT = 24; // pinned timing-track ruler, drawn every frame regardless of scrollTop
 const VIEWPORT_HEIGHT = 420; // fixed canvas height - only visible rows are drawn (M9 perf budget: 100 rows / 5k effects)
+const EDGE_PX = 6;
+const SNAP_PX = 6;
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const scrollRef = ref<HTMLDivElement | null>(null);
 const scrollTop = ref(0);
+const hoverCursor = ref("crosshair");
 let dragState:
   | { kind: "place"; row: GridRow; startMs: number }
   | { kind: "move"; effect: SequenceEffect; grabOffsetMs: number }
-  | { kind: "resize"; effect: SequenceEffect }
+  | { kind: "resize"; effect: SequenceEffect; edge: "left" | "right" }
   | null = null;
+
+// Full content width, not container width - at zoom > baseline this is wider than the
+// viewport on purpose; the parent page wraps this component in an overflow-x:auto element
+// so the extra width becomes reachable by scroll instead of clipped and unreachable.
+const totalWidth = computed(() => ROW_LABEL_WIDTH + props.durationMs * props.pxPerMs);
 
 function effectsForRow(row: GridRow): SequenceEffect[] {
   const found = props.body.rows.find((r) => r.elementType === row.elementType && r.elementId === row.elementId);
   return found?.effects ?? [];
+}
+
+function allMarks(): number[] {
+  return props.body.timingTracks.flatMap((t) => t.marks);
+}
+
+function snapMs(ms: number): number {
+  const toleranceMs = SNAP_PX / props.pxPerMs;
+  let closest = ms;
+  let closestDist = toleranceMs;
+  for (const mark of allMarks()) {
+    const dist = Math.abs(mark - ms);
+    if (dist <= closestDist) {
+      closest = mark;
+      closestDist = dist;
+    }
+  }
+  return closest;
 }
 
 function msToX(ms: number): number {
@@ -50,11 +85,6 @@ function xToMs(x: number): number {
   return Math.max(0, Math.round((x - ROW_LABEL_WIDTH) / props.pxPerMs));
 }
 
-// Canvas is a fixed-height viewport, not sized to all rows - only rows within
-// [scrollTop, scrollTop+viewport] are ever iterated/drawn, so cost stays flat regardless of
-// total row count (M9 perf budget: 100 visible rows / 5k total effects). A spacer div below
-// gives the wrapper real scroll range; the canvas draws with a `-scrollTop` offset so content
-// appears to scroll under it.
 function draw(): void {
   const canvas = canvasRef.value;
   if (!canvas) return;
@@ -70,12 +100,13 @@ function draw(): void {
   ctx.fillStyle = "#16161b";
   ctx.fillRect(0, 0, rect.width, rect.height);
 
+  const rowsAreaHeight = rect.height - HEADER_HEIGHT;
   const firstRow = Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT));
-  const lastRow = Math.min(props.rows.length, Math.ceil((scrollTop.value + rect.height) / ROW_HEIGHT));
+  const lastRow = Math.min(props.rows.length, Math.ceil((scrollTop.value + rowsAreaHeight) / ROW_HEIGHT));
 
   for (let i = firstRow; i < lastRow; i++) {
     const row = props.rows[i]!;
-    const y = i * ROW_HEIGHT - scrollTop.value;
+    const y = HEADER_HEIGHT + i * ROW_HEIGHT - scrollTop.value;
     ctx.fillStyle = i % 2 === 0 ? "#1a1a20" : "#18181d";
     ctx.fillRect(0, y, rect.width, ROW_HEIGHT);
 
@@ -99,6 +130,33 @@ function draw(): void {
     }
   }
 
+  // pinned timing-track ruler - always drawn at y=0..HEADER_HEIGHT regardless of scrollTop
+  ctx.fillStyle = "#20202a";
+  ctx.fillRect(0, 0, rect.width, HEADER_HEIGHT);
+  ctx.fillStyle = "#777";
+  ctx.font = "10px system-ui";
+  ctx.fillText("Marks", 8, HEADER_HEIGHT / 2 + 3);
+  for (const ms of allMarks()) {
+    const x = msToX(ms);
+    ctx.strokeStyle = "#e8c468";
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, HEADER_HEIGHT);
+    ctx.stroke();
+    ctx.fillStyle = "#e8c468";
+    ctx.beginPath();
+    ctx.moveTo(x - 4, 0);
+    ctx.lineTo(x + 4, 0);
+    ctx.lineTo(x, 6);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.strokeStyle = "#333";
+  ctx.beginPath();
+  ctx.moveTo(0, HEADER_HEIGHT);
+  ctx.lineTo(rect.width, HEADER_HEIGHT);
+  ctx.stroke();
+
   // row label divider
   ctx.strokeStyle = "#333";
   ctx.beginPath();
@@ -115,15 +173,37 @@ function draw(): void {
   ctx.stroke();
 }
 
-function hitTest(x: number, y: number): { row: GridRow; effect: SequenceEffect } | null {
-  const rowIndex = Math.floor((y + scrollTop.value) / ROW_HEIGHT);
+type HitResult =
+  | { kind: "effect"; row: GridRow; effect: SequenceEffect; edge: "left" | "right" | null }
+  | { kind: "mark"; trackIndex: number; ms: number }
+  | { kind: "ruler-empty"; trackIndex: number; ms: number }
+  | { kind: "row-empty"; row: GridRow }
+  | { kind: "none" };
+
+function hitTest(x: number, y: number): HitResult {
+  if (x < ROW_LABEL_WIDTH) return { kind: "none" };
+
+  if (y < HEADER_HEIGHT) {
+    const ms = xToMs(x);
+    for (const mark of allMarks()) {
+      if (Math.abs(msToX(mark) - x) < EDGE_PX) return { kind: "mark", trackIndex: 0, ms: mark };
+    }
+    return { kind: "ruler-empty", trackIndex: 0, ms };
+  }
+
+  const rowIndex = Math.floor((y - HEADER_HEIGHT + scrollTop.value) / ROW_HEIGHT);
   const row = props.rows[rowIndex];
-  if (!row) return null;
+  if (!row) return { kind: "none" };
+
   const ms = xToMs(x);
   for (const effect of effectsForRow(row)) {
-    if (ms >= effect.startMs && ms <= effect.endMs) return { row, effect };
+    if (ms >= effect.startMs && ms <= effect.endMs) {
+      const nearLeft = Math.abs(msToX(effect.startMs) - x) < EDGE_PX;
+      const nearRight = Math.abs(msToX(effect.endMs) - x) < EDGE_PX;
+      return { kind: "effect", row, effect, edge: nearRight ? "right" : nearLeft ? "left" : null };
+    }
   }
-  return null;
+  return { kind: "row-empty", row };
 }
 
 function onScroll(): void {
@@ -132,20 +212,47 @@ function onScroll(): void {
   draw();
 }
 
-function onPointerDown(e: PointerEvent): void {
+function onContextMenu(e: MouseEvent): void {
+  e.preventDefault();
   const canvas = canvasRef.value;
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  if (x < ROW_LABEL_WIDTH) return;
-
   const hit = hitTest(x, y);
-  if (hit) {
+
+  if (hit.kind === "effect") {
+    emit("contextmenu", { kind: "effect", row: hit.row, effect: hit.effect, ms: xToMs(x), x: e.clientX, y: e.clientY });
+  } else if (hit.kind === "mark") {
+    emit("contextmenu", { kind: "mark", trackIndex: hit.trackIndex, ms: hit.ms, x: e.clientX, y: e.clientY });
+  } else if (hit.kind === "ruler-empty") {
+    emit("contextmenu", { kind: "ruler-empty", trackIndex: hit.trackIndex, ms: hit.ms, x: e.clientX, y: e.clientY });
+  }
+  // row-empty / none: no menu (placement already has its own gesture - armed palette + drag)
+}
+
+function onPointerDown(e: PointerEvent): void {
+  if (e.button !== 0) return;
+  const canvas = canvasRef.value;
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const hit = hitTest(x, y);
+
+  if (hit.kind === "ruler-empty") {
+    emit("addMark", hit.trackIndex, hit.ms);
+    return;
+  }
+  if (hit.kind === "mark") {
+    return; // marks aren't draggable in this milestone; right-click deletes
+  }
+
+  if (hit.kind === "effect") {
     emit("select", hit.effect.id);
-    const nearRightEdge = Math.abs(msToX(hit.effect.endMs) - x) < 6;
-    if (nearRightEdge) {
-      dragState = { kind: "resize", effect: hit.effect };
+    emit("dragStart");
+    if (hit.edge) {
+      dragState = { kind: "resize", effect: hit.effect, edge: hit.edge };
     } else {
       dragState = { kind: "move", effect: hit.effect, grabOffsetMs: xToMs(x) - hit.effect.startMs };
     }
@@ -153,21 +260,32 @@ function onPointerDown(e: PointerEvent): void {
   }
 
   emit("select", null);
-  const rowIndex = Math.floor((y + scrollTop.value) / ROW_HEIGHT);
-  const row = props.rows[rowIndex];
-  if (row && props.pendingEffectName) {
-    dragState = { kind: "place", row, startMs: xToMs(x) };
+  if (hit.kind === "row-empty" && props.pendingEffectName) {
+    dragState = { kind: "place", row: hit.row, startMs: xToMs(x) };
   } else {
     emit("seek", xToMs(x));
   }
 }
 
+function updateHoverCursor(x: number, y: number): void {
+  const hit = hitTest(x, y);
+  if (hit.kind === "effect") hoverCursor.value = hit.edge ? "col-resize" : "grab";
+  else if (hit.kind === "mark") hoverCursor.value = "pointer";
+  else hoverCursor.value = "crosshair";
+}
+
 function onPointerMove(e: PointerEvent): void {
-  if (!dragState) return;
   const canvas = canvasRef.value;
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  if (!dragState) {
+    updateHoverCursor(x, y);
+    return;
+  }
+
   const ms = xToMs(x);
 
   if (dragState.kind === "place") {
@@ -175,12 +293,20 @@ function onPointerMove(e: PointerEvent): void {
     return;
   }
   if (dragState.kind === "resize") {
-    const clamped = Math.max(dragState.effect.startMs + 50, ms);
-    emit("move", dragState.effect.id, dragState.effect.startMs, clamped);
+    hoverCursor.value = "col-resize";
+    const snapped = snapMs(ms);
+    if (dragState.edge === "right") {
+      const clamped = Math.max(dragState.effect.startMs + 50, snapped);
+      emit("move", dragState.effect.id, dragState.effect.startMs, clamped);
+    } else {
+      const clamped = Math.max(0, Math.min(dragState.effect.endMs - 50, snapped));
+      emit("move", dragState.effect.id, clamped, dragState.effect.endMs);
+    }
   }
   if (dragState.kind === "move") {
+    hoverCursor.value = "grabbing";
     const duration = dragState.effect.endMs - dragState.effect.startMs;
-    const newStart = Math.max(0, ms - dragState.grabOffsetMs);
+    const newStart = Math.max(0, snapMs(ms - dragState.grabOffsetMs));
     emit("move", dragState.effect.id, newStart, newStart + duration);
   }
 }
@@ -207,7 +333,7 @@ onMounted(() => {
 // flush: "post" - draw() reads getBoundingClientRect(), which must run after Vue applies
 // any template-derived inline sizing, not before (pre-flush default risks a stale 0px read
 // on the same tick rows go from empty to populated - see DECISIONS.md M2 bug note).
-watch(() => [props.rows, props.body, props.playheadMs, props.selectedEffectId, props.pxPerMs], draw, { deep: true, flush: "post" });
+watch(() => [props.rows, props.body, props.playheadMs, props.selectedEffectId, props.pxPerMs, props.durationMs], draw, { deep: true, flush: "post" });
 </script>
 
 <template>
@@ -216,10 +342,11 @@ watch(() => [props.rows, props.body, props.playheadMs, props.selectedEffectId, p
       <canvas
         ref="canvasRef"
         class="grid-canvas"
-        :style="{ height: `${VIEWPORT_HEIGHT}px` }"
+        :style="{ width: `${totalWidth}px`, height: `${VIEWPORT_HEIGHT}px`, cursor: hoverCursor }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
+        @contextmenu="onContextMenu"
       ></canvas>
     </div>
   </div>
@@ -228,16 +355,18 @@ watch(() => [props.rows, props.body, props.playheadMs, props.selectedEffectId, p
 <style scoped>
 .grid-scroll-viewport {
   overflow-y: auto;
-  overflow-x: hidden;
+  /* explicit, not the default - if overflow-x is left unset, the CSS spec computes it to
+     "auto" too whenever overflow-y isn't visible, silently turning this into a second,
+     narrower horizontal scroll container that clips the wide canvas to its own box before
+     the page's shared .h-scroll wrapper ever gets a chance to scroll it. */
+  overflow-x: visible;
   position: relative;
 }
 .grid-spacer {
   position: relative;
 }
 .grid-canvas {
-  width: 100%;
   display: block;
-  cursor: crosshair;
   position: sticky;
   top: 0;
 }

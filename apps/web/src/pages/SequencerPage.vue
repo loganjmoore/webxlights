@@ -8,7 +8,8 @@ import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
-import SequencerGrid, { type GridRow } from "../components/SequencerGrid.vue";
+import SequencerGrid, { type ContextMenuTarget, type GridRow } from "../components/SequencerGrid.vue";
+import EffectContextMenu from "../components/EffectContextMenu.vue";
 import Waveform from "../components/Waveform.vue";
 import EffectPropsPanel from "../components/EffectPropsPanel.vue";
 import HousePreview from "../components/HousePreview.vue";
@@ -31,6 +32,7 @@ const ZOOM_STEPS = [0.5, 1, 2];
 const clipboard = ref<SequenceEffect | null>(null);
 const versions = ref<SequenceVersion[]>([]);
 const showHistory = ref(false);
+const contextMenu = ref<{ x: number; y: number; items: { label: string; action: string }[]; target: ContextMenuTarget } | null>(null);
 
 const showFppPanel = ref(false);
 const fppChromiumCapable = isChromiumLanCapable();
@@ -138,11 +140,66 @@ function handlePlace(row: GridRow, startMs: number, endMs: number): void {
 }
 
 function handleMove(effectId: string, startMs: number, endMs: number): void {
-  store.updateEffect(effectId, { startMs, endMs });
+  // Live update during a pointermove-driven drag - store.snapshot() already ran once via
+  // handleDragStart, so this must not snapshot again per move or the undo stack fills with
+  // intermediate drag frames (see DECISIONS.md).
+  store.updateEffectLive(effectId, { startMs, endMs });
+}
+
+function handleDragStart(): void {
+  store.snapshot();
 }
 
 function handleSelect(effectId: string | null): void {
   store.selectedEffectId = effectId;
+}
+
+function handleAddMark(trackIndex: number, ms: number): void {
+  store.ensureDefaultTimingTrack();
+  store.addTimingMark(trackIndex, ms);
+}
+
+function handleContextMenu(target: ContextMenuTarget): void {
+  const items =
+    target.kind === "effect"
+      ? [
+          { label: "Copy", action: "copy" },
+          { label: "Cut", action: "cut" },
+          { label: "Paste", action: "paste" },
+          { label: "Duplicate", action: "duplicate" },
+          { label: "Delete", action: "delete" },
+        ]
+      : target.kind === "mark"
+        ? [{ label: "Delete Mark", action: "delete-mark" }]
+        : [{ label: "Add Timing Mark Here", action: "add-mark" }];
+  contextMenu.value = { x: target.x, y: target.y, items, target };
+}
+
+function handleContextAction(action: string): void {
+  const target = contextMenu.value?.target;
+  contextMenu.value = null;
+  if (!target) return;
+
+  if (target.kind === "effect") {
+    const { row, effect, ms } = target;
+    if (action === "copy") {
+      clipboard.value = store.copyEffect(effect.id);
+    } else if (action === "cut") {
+      clipboard.value = store.copyEffect(effect.id);
+      store.deleteEffect(effect.id);
+    } else if (action === "paste") {
+      if (clipboard.value) store.pasteEffectAt(row.elementType, row.elementId, clipboard.value, ms);
+    } else if (action === "duplicate") {
+      const copy = store.copyEffect(effect.id);
+      if (copy) store.pasteEffectAt(row.elementType, row.elementId, copy, effect.endMs);
+    } else if (action === "delete") {
+      store.deleteEffect(effect.id);
+    }
+  } else if (target.kind === "mark" && action === "delete-mark") {
+    store.deleteTimingMark(target.trackIndex, target.ms);
+  } else if (target.kind === "ruler-empty" && action === "add-mark") {
+    handleAddMark(target.trackIndex, target.ms);
+  }
 }
 
 function handleParamsUpdate(params: Record<string, number | boolean | string>): void {
@@ -320,7 +377,7 @@ watch(sequenceId, async (id) => {
     </div>
 
     <div v-if="!audioLoaded" class="reselect-audio">
-      <p>Re-select the audio file for this sequence (audio isn't stored server-side yet — see DECISIONS.md).</p>
+      <p>Select the audio file for this sequence.</p>
       <input type="file" accept="audio/*" @change="onAudioFilePicked" />
     </div>
 
@@ -352,8 +409,8 @@ watch(sequenceId, async (id) => {
         <div class="preview-wrap">
           <HousePreview :models="modelRecords" :body="store.body" :playhead-ms="playheadMs" :frame-ms="store.sequence?.frame_ms ?? 50" />
         </div>
-        <Waveform :peaks="peaks" :duration-ms="store.sequence?.duration_ms ?? 0" :px-per-ms="pxPerMs" :playhead-ms="playheadMs" @seek="seekTo" />
-        <div class="grid-scroll">
+        <div class="h-scroll">
+          <Waveform :peaks="peaks" :duration-ms="store.sequence?.duration_ms ?? 0" :px-per-ms="pxPerMs" :playhead-ms="playheadMs" @seek="seekTo" />
           <SequencerGrid
             :rows="rows"
             :body="store.body"
@@ -366,6 +423,9 @@ watch(sequenceId, async (id) => {
             @place="handlePlace"
             @move="handleMove"
             @seek="seekTo"
+            @drag-start="handleDragStart"
+            @add-mark="handleAddMark"
+            @contextmenu="handleContextMenu"
           />
         </div>
       </div>
@@ -373,6 +433,15 @@ watch(sequenceId, async (id) => {
         <EffectPropsPanel :effect="selectedEffect" @update="handleParamsUpdate" />
       </aside>
     </div>
+
+    <EffectContextMenu
+      v-if="contextMenu"
+      :x="contextMenu.x"
+      :y="contextMenu.y"
+      :items="contextMenu.items"
+      @action="handleContextAction"
+      @close="contextMenu = null"
+    />
   </main>
 </template>
 
@@ -511,7 +580,7 @@ header h1 {
   height: 220px;
   border-bottom: 1px solid #333;
 }
-.grid-scroll {
+.h-scroll {
   overflow-x: auto;
 }
 .props {

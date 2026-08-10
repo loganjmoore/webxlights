@@ -87,12 +87,24 @@ export const useSequencerStore = defineStore("sequencer", () => {
     ensureRow(elementType, elementId).effects.push(effect);
   }
 
-  function updateEffect(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params">>): void {
-    pushUndoSnapshot();
+  function applyEffectPatch(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params">>): void {
     for (const row of body.value.rows) {
       const effect = row.effects.find((e) => e.id === effectId);
       if (effect) Object.assign(effect, patch);
     }
+  }
+
+  function updateEffect(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params">>): void {
+    pushUndoSnapshot();
+    applyEffectPatch(effectId, patch);
+  }
+
+  // Same mutation as updateEffect but no snapshot - a pointermove-driven drag calls this on
+  // every move event, so snapshotting here fills the 100-entry undo stack with intermediate
+  // drag frames (Ctrl+Z nudges by a pixel instead of undoing the drag). The caller snapshots
+  // once via snapshot() at drag start instead (see SequencerGrid's dragStart emit).
+  function updateEffectLive(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params">>): void {
+    applyEffectPatch(effectId, patch);
   }
 
   function deleteEffect(effectId: string): void {
@@ -130,6 +142,13 @@ export const useSequencerStore = defineStore("sequencer", () => {
       track.marks.push(ms);
       track.marks.sort((a, b) => a - b);
     }
+  }
+
+  function deleteTimingMark(trackIndex: number, ms: number): void {
+    pushUndoSnapshot();
+    const track = body.value.timingTracks[trackIndex];
+    if (!track) return;
+    track.marks = track.marks.filter((m) => m !== ms);
   }
 
   function ensureDefaultTimingTrack(): void {
@@ -206,12 +225,15 @@ export const useSequencerStore = defineStore("sequencer", () => {
     redo,
     addEffect,
     updateEffect,
+    updateEffectLive,
     deleteEffect,
     findEffect,
     copyEffect,
     pasteEffectAt,
     addTimingMark,
+    deleteTimingMark,
     ensureDefaultTimingTrack,
+    snapshot: pushUndoSnapshot,
     saveNow,
   };
 });

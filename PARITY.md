@@ -23,13 +23,14 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 
 | Feature | Status | Notes |
 |---|---|---|
-| Timeline grid, effect place/select/move/resize | ✅ | Canvas-based, virtualized to a fixed viewport (M9) |
-| Undo/redo | ⚠️ | Whole-body snapshots, not command-pattern inverses |
+| Timeline grid, effect place/select/move/resize | ✅ | Canvas-based, virtualized to a fixed viewport (M9); resize from either edge with snap-to-timing-mark, right-click context menu (copy/cut/paste/duplicate/delete) (M10) |
+| Horizontal zoom/scroll | ✅ | Fixed M10 — canvas now sizes to the real content width instead of clipping at the container edge |
+| Undo/redo | ⚠️ | Whole-body snapshots, not command-pattern inverses; a drag now snapshots once at drag start, not per pointermove (M10) |
 | Autosave | ✅ | With ETag-based conflict detection (M7) |
-| Timing tracks | ⚠️ | Manual marks only; no fixed-interval/beat-bar generators, no lyric tracks |
-| Copy/paste effects | ✅ | |
+| Timing tracks | ⚠️ | Rendered on a pinned ruler row, click-to-add/right-click-to-delete (M10); manual marks only, no fixed-interval/beat-bar generators, no lyric tracks |
+| Copy/paste effects | ✅ | Via right-click context menu (M10); Cut and Duplicate too |
 | Waveform + playback | ✅ | Native `AudioContext`, peaks computed on main thread |
-| Audio persistence | ⚠️ | Client-side only — not R2-backed; re-select the file after a reload |
+| Audio persistence | ✅ | Server-side, a Render persistent disk-backed Laravel disk; auto-restores on sequencer load, no manual re-select |
 
 ## Effects (SPEC ch7-9)
 
