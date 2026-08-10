@@ -134,3 +134,99 @@ export function renderRowAtMs(row: RenderableRow, atMs: number, frameMs: number,
   const composited = renderLayerStack(row.geometry.width, row.geometry.height, layers);
   return bufferToNodeColors(composited, row.geometry);
 }
+
+export interface RowSequencer {
+  renderFrameAt(atMs: number): RGBA[];
+}
+
+// Sequential-sweep variant of renderRowAtMs for full exports (fseq render etc). renderRowAtMs
+// is correct for random-access scrubbing (a live preview seeking the playhead) but replays
+// every stateful effect (Fire/Meteors/Snowflakes/Strobe) from its start on every call - fine
+// for one-off queries, but a full N-frame sweep calling it N times is O(N^2) since frame k
+// replays k inner frames. This carries each stateful effect's state incrementally across
+// sequential calls instead, turning that into O(N) - see DECISIONS.md M9 perf note. The
+// state lives entirely in each effect's own State object (buffer passed to render*() is a
+// fresh per-call scratch canvas either way, not where physics persists), so replaying frames
+// 0..N one-at-a-time via stored state produces byte-identical output to the original
+// replay-from-start loop, just without redoing frames 0..(k-1) on every call.
+// Caller MUST call renderFrameAt with strictly increasing atMs, one call per frame, in order.
+export function createRowSequencer(row: RenderableRow, frameMs: number, seed: number, palette: RGBA[]): RowSequencer {
+  const statefulStates = new Map<number, unknown>(); // keyed by index into row.effects
+
+  function renderFrameAt(atMs: number): RGBA[] {
+    const activeWithIndex = row.effects
+      .map((effect, index) => ({ effect, index }))
+      .filter(({ effect }) => atMs >= effect.startMs && atMs < effect.endMs)
+      .slice(-MAX_LAYERS);
+
+    if (activeWithIndex.length === 0) {
+      return row.geometry.nodes.map(() => rgba(0, 0, 0, 0));
+    }
+
+    const layers: LayerSpec[] = activeWithIndex.map(({ effect, index }) => ({
+      render: (buffer: RenderBuffer) => {
+        if (STATEFUL_EFFECTS.has(effect.name)) {
+          renderStatefulIncremental(buffer, palette, effect, atMs, frameMs, seed, index, statefulStates);
+        } else {
+          renderStateless(buffer, palette, effect, atMs, seed);
+        }
+        if (effect.transition) applyFadeTransition(buffer, effect, atMs, effect.transition);
+      },
+      blendMode: "Normal" as BlendMode,
+      effectMixThreshold: 0,
+    }));
+
+    const composited = renderLayerStack(row.geometry.width, row.geometry.height, layers);
+    return bufferToNodeColors(composited, row.geometry);
+  }
+
+  return { renderFrameAt };
+}
+
+function renderStatefulIncremental(
+  buffer: RenderBuffer,
+  palette: RGBA[],
+  effect: RenderableEffect,
+  atMs: number,
+  frameMs: number,
+  seed: number,
+  key: number,
+  states: Map<number, unknown>,
+): void {
+  const duration = effect.endMs - effect.startMs || 1;
+  const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
+
+  if (effect.name === "Fire") {
+    const params = effect.params as unknown as FireParams;
+    let state = states.get(key) as ReturnType<typeof createFireState> | undefined;
+    if (!state) {
+      state = createFireState(buffer.width, buffer.height, seed);
+      states.set(key, state);
+    }
+    renderFire(buffer, params, { frameIndexInEffect: framesElapsed, positionInEffect01: (framesElapsed * frameMs) / duration, seed }, state);
+  } else if (effect.name === "Meteors") {
+    const params = effect.params as unknown as MeteorsParams;
+    let state = states.get(key) as ReturnType<typeof createMeteorsState> | undefined;
+    if (!state) {
+      state = createMeteorsState(seed);
+      states.set(key, state);
+    }
+    renderMeteors(buffer, palette, params, state);
+  } else if (effect.name === "Snowflakes") {
+    const params = effect.params as unknown as SnowflakesParams;
+    let state = states.get(key) as ReturnType<typeof createSnowflakesState> | undefined;
+    if (!state) {
+      state = createSnowflakesState(buffer.width, buffer.height, 5, seed);
+      states.set(key, state);
+    }
+    renderSnowflakes(buffer, palette, params, state);
+  } else if (effect.name === "Strobe") {
+    const params = effect.params as unknown as StrobeParams;
+    let state = states.get(key) as ReturnType<typeof createStrobeState> | undefined;
+    if (!state) {
+      state = createStrobeState(seed);
+      states.set(key, state);
+    }
+    renderStrobe(buffer, palette, params, state);
+  }
+}

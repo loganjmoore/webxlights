@@ -27,8 +27,11 @@ const emit = defineEmits<{
 
 const ROW_HEIGHT = 28;
 const ROW_LABEL_WIDTH = 140;
+const VIEWPORT_HEIGHT = 420; // fixed canvas height - only visible rows are drawn (M9 perf budget: 100 rows / 5k effects)
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
+const scrollRef = ref<HTMLDivElement | null>(null);
+const scrollTop = ref(0);
 let dragState:
   | { kind: "place"; row: GridRow; startMs: number }
   | { kind: "move"; effect: SequenceEffect; grabOffsetMs: number }
@@ -47,6 +50,11 @@ function xToMs(x: number): number {
   return Math.max(0, Math.round((x - ROW_LABEL_WIDTH) / props.pxPerMs));
 }
 
+// Canvas is a fixed-height viewport, not sized to all rows - only rows within
+// [scrollTop, scrollTop+viewport] are ever iterated/drawn, so cost stays flat regardless of
+// total row count (M9 perf budget: 100 visible rows / 5k total effects). A spacer div below
+// gives the wrapper real scroll range; the canvas draws with a `-scrollTop` offset so content
+// appears to scroll under it.
 function draw(): void {
   const canvas = canvasRef.value;
   if (!canvas) return;
@@ -62,8 +70,12 @@ function draw(): void {
   ctx.fillStyle = "#16161b";
   ctx.fillRect(0, 0, rect.width, rect.height);
 
-  props.rows.forEach((row, i) => {
-    const y = i * ROW_HEIGHT;
+  const firstRow = Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT));
+  const lastRow = Math.min(props.rows.length, Math.ceil((scrollTop.value + rect.height) / ROW_HEIGHT));
+
+  for (let i = firstRow; i < lastRow; i++) {
+    const row = props.rows[i]!;
+    const y = i * ROW_HEIGHT - scrollTop.value;
     ctx.fillStyle = i % 2 === 0 ? "#1a1a20" : "#18181d";
     ctx.fillRect(0, y, rect.width, ROW_HEIGHT);
 
@@ -85,13 +97,13 @@ function draw(): void {
         ctx.fillText(effect.name, x1 + 3, y + ROW_HEIGHT / 2 + 3, x2 - x1 - 6);
       }
     }
-  });
+  }
 
   // row label divider
   ctx.strokeStyle = "#333";
   ctx.beginPath();
   ctx.moveTo(ROW_LABEL_WIDTH, 0);
-  ctx.lineTo(ROW_LABEL_WIDTH, props.rows.length * ROW_HEIGHT);
+  ctx.lineTo(ROW_LABEL_WIDTH, rect.height);
   ctx.stroke();
 
   // playhead
@@ -99,12 +111,12 @@ function draw(): void {
   ctx.strokeStyle = "#e74c3c";
   ctx.beginPath();
   ctx.moveTo(px, 0);
-  ctx.lineTo(px, props.rows.length * ROW_HEIGHT);
+  ctx.lineTo(px, rect.height);
   ctx.stroke();
 }
 
 function hitTest(x: number, y: number): { row: GridRow; effect: SequenceEffect } | null {
-  const rowIndex = Math.floor(y / ROW_HEIGHT);
+  const rowIndex = Math.floor((y + scrollTop.value) / ROW_HEIGHT);
   const row = props.rows[rowIndex];
   if (!row) return null;
   const ms = xToMs(x);
@@ -112,6 +124,12 @@ function hitTest(x: number, y: number): { row: GridRow; effect: SequenceEffect }
     if (ms >= effect.startMs && ms <= effect.endMs) return { row, effect };
   }
   return null;
+}
+
+function onScroll(): void {
+  if (!scrollRef.value) return;
+  scrollTop.value = scrollRef.value.scrollTop;
+  draw();
 }
 
 function onPointerDown(e: PointerEvent): void {
@@ -135,7 +153,7 @@ function onPointerDown(e: PointerEvent): void {
   }
 
   emit("select", null);
-  const rowIndex = Math.floor(y / ROW_HEIGHT);
+  const rowIndex = Math.floor((y + scrollTop.value) / ROW_HEIGHT);
   const row = props.rows[rowIndex];
   if (row && props.pendingEffectName) {
     dragState = { kind: "place", row, startMs: xToMs(x) };
@@ -187,26 +205,40 @@ onMounted(() => {
   window.addEventListener("resize", draw);
 });
 // flush: "post" - draw() reads getBoundingClientRect(), which must run after Vue applies
-// the template's rows.length-derived inline height, not before (pre-flush default would
-// read a stale 0px height on the same tick rows go from empty to populated).
+// any template-derived inline sizing, not before (pre-flush default risks a stale 0px read
+// on the same tick rows go from empty to populated - see DECISIONS.md M2 bug note).
 watch(() => [props.rows, props.body, props.playheadMs, props.selectedEffectId, props.pxPerMs], draw, { deep: true, flush: "post" });
 </script>
 
 <template>
-  <canvas
-    ref="canvasRef"
-    class="grid-canvas"
-    :style="{ height: `${rows.length * ROW_HEIGHT}px` }"
-    @pointerdown="onPointerDown"
-    @pointermove="onPointerMove"
-    @pointerup="onPointerUp"
-  ></canvas>
+  <div ref="scrollRef" class="grid-scroll-viewport" :style="{ height: `${VIEWPORT_HEIGHT}px` }" @scroll="onScroll">
+    <div class="grid-spacer" :style="{ height: `${rows.length * ROW_HEIGHT}px` }">
+      <canvas
+        ref="canvasRef"
+        class="grid-canvas"
+        :style="{ height: `${VIEWPORT_HEIGHT}px` }"
+        @pointerdown="onPointerDown"
+        @pointermove="onPointerMove"
+        @pointerup="onPointerUp"
+      ></canvas>
+    </div>
+  </div>
 </template>
 
 <style scoped>
+.grid-scroll-viewport {
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+}
+.grid-spacer {
+  position: relative;
+}
 .grid-canvas {
   width: 100%;
   display: block;
   cursor: crosshair;
+  position: sticky;
+  top: 0;
 }
 </style>

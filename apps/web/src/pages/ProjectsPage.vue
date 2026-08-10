@@ -5,6 +5,7 @@ import { useProjectsStore } from "../stores/projects";
 import { useAuthStore } from "../stores/auth";
 import { api, type Project, type ProjectMember } from "../lib/api";
 import { downloadPackage, exportPackage, importPackage } from "../lib/packageShow";
+import { createSampleProject } from "../lib/demoProject";
 
 const projects = useProjectsStore();
 const auth = useAuthStore();
@@ -84,13 +85,32 @@ async function logout(): Promise<void> {
   await auth.logout();
   router.push("/auth");
 }
+
+const sampleBusy = ref(false);
+const sampleError = ref("");
+
+async function loadSampleProject(): Promise<void> {
+  sampleBusy.value = true;
+  sampleError.value = "";
+  try {
+    const { projectId, sequenceId } = await createSampleProject();
+    router.push({ name: "sequencer", params: { projectId, sequenceId } });
+  } catch (err) {
+    sampleError.value = err instanceof Error ? `Couldn't create the sample project: ${err.message}` : "Couldn't create the sample project";
+  } finally {
+    sampleBusy.value = false;
+  }
+}
 </script>
 
 <template>
   <main class="projects">
     <header class="page-header">
       <h1>Your projects</h1>
-      <button class="logout-btn" @click="logout">Log out ({{ auth.user?.name }})</button>
+      <nav class="header-nav">
+        <router-link to="/docs" class="docs-nav-link">Docs</router-link>
+        <button class="logout-btn" @click="logout">Log out ({{ auth.user?.name }})</button>
+      </nav>
     </header>
     <form @submit.prevent="createProject">
       <input v-model="newName" placeholder="New project name" required />
@@ -101,6 +121,14 @@ async function logout(): Promise<void> {
       <input type="file" accept=".zip" @change="onImportPackage" :disabled="packageBusy" hidden />
     </label>
     <p v-if="packageMessage" class="package-message">{{ packageMessage }}</p>
+
+    <div v-if="projects.projects.length === 0" class="onboarding">
+      <p>New here? Load a sample show to see how layouts, effects, and export work — no files needed.</p>
+      <button :disabled="sampleBusy" @click="loadSampleProject">{{ sampleBusy ? "Building sample show..." : "Load sample project" }}</button>
+      <p v-if="sampleError" class="error">{{ sampleError }}</p>
+      <p class="docs-link"><router-link to="/docs">Import guide &amp; effect reference &rarr;</router-link></p>
+    </div>
+
     <ul>
       <li v-for="p in projects.projects" :key="p.id">
         <router-link :to="`/projects/${p.id}/layout`">{{ p.name }}</router-link>
@@ -145,12 +173,35 @@ form input {
 }
 .page-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.5rem 1rem;
+}
+.header-nav {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
 }
 .logout-btn {
   font-size: 0.8rem;
+}
+.docs-nav-link {
+  font-size: 0.85rem;
+}
+.onboarding {
+  margin: 1rem 0 1.5rem;
+  padding: 1rem;
+  border: 1px dashed #999;
+  border-radius: 6px;
+  background: #f9f7f0;
+}
+.onboarding p {
+  margin: 0 0 0.5rem;
+}
+.docs-link {
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
 }
 li {
   margin-bottom: 0.5rem;

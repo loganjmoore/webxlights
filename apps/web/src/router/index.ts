@@ -4,6 +4,7 @@ import ProjectsPage from "../pages/ProjectsPage.vue";
 import LayoutPage from "../pages/LayoutPage.vue";
 import SequencesListPage from "../pages/SequencesListPage.vue";
 import SequencerPage from "../pages/SequencerPage.vue";
+import DocsPage from "../pages/DocsPage.vue";
 import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({
@@ -11,6 +12,7 @@ const router = createRouter({
   routes: [
     { path: "/", redirect: "/projects" },
     { path: "/auth", component: AuthPage },
+    { path: "/docs", component: DocsPage },
     { path: "/projects", component: ProjectsPage, meta: { requiresAuth: true } },
     { path: "/projects/:projectId/layout", component: LayoutPage, meta: { requiresAuth: true } },
     { path: "/projects/:projectId/sequences", component: SequencesListPage, meta: { requiresAuth: true } },

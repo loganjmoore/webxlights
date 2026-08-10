@@ -1,5 +1,5 @@
 import { writeFseqV2 } from "@webxlights/formats";
-import { computeGeometryFromAttrs, nodeColorsToChannelBytes, renderRowAtMs, type ModelGeometry } from "@webxlights/engine";
+import { computeGeometryFromAttrs, createRowSequencer, nodeColorsToChannelBytes, type ModelGeometry } from "@webxlights/engine";
 import type { ModelRecord, SequenceBody, SequenceRecord } from "./api";
 
 // ponytail: same fixed default palette as the live preview (HousePreview.vue) - no palette
@@ -35,16 +35,28 @@ export function exportSequenceToFseq(models: ModelRecord[], body: SequenceBody, 
   const rgbOrders = supported.map((m) => extractRgbOrder(m.string_type));
   const channelCount = geometries.reduce((sum, g) => sum + (g ? g.nodes.length * 3 : 0), 0);
 
+  // One sequencer per model, created once and called in strictly increasing atMs order -
+  // O(frames) instead of the O(frames^2) a fresh renderRowAtMs-per-frame call would cost for
+  // any stateful effect (Fire/Meteors/Snowflakes/Strobe), which replays from the effect's
+  // start every call (correct for scrubbing, wrong for a full sequential export). See
+  // DECISIONS.md M9 perf note - this is the fix that keeps full-length exports with those
+  // effects inside the ROADMAP's 60s budget instead of stalling the tab.
+  const sequencers = supported.map((model, i) => {
+    const geo = geometries[i];
+    if (!geo) return null;
+    const rowEffects = body.rows.filter((r) => r.elementType === "model" && r.elementId === model.id).flatMap((r) => r.effects);
+    return createRowSequencer({ geometry: geo, effects: rowEffects }, frameMs, SEED, DEFAULT_PALETTE);
+  });
+
   const frames: Uint8Array[] = [];
   for (let f = 0; f < frameCount; f++) {
     const atMs = f * frameMs;
     const frame = new Uint8Array(channelCount);
     let offset = 0;
-    supported.forEach((model, i) => {
-      const geo = geometries[i];
-      if (!geo) return;
-      const rowEffects = body.rows.filter((r) => r.elementType === "model" && r.elementId === model.id).flatMap((r) => r.effects);
-      const nodeColors = renderRowAtMs({ geometry: geo, effects: rowEffects }, atMs, frameMs, SEED, DEFAULT_PALETTE);
+    supported.forEach((_model, i) => {
+      const sequencer = sequencers[i];
+      if (!sequencer) return;
+      const nodeColors = sequencer.renderFrameAt(atMs);
       const bytes = nodeColorsToChannelBytes(nodeColors, rgbOrders[i]);
       frame.set(bytes, offset);
       offset += bytes.length;

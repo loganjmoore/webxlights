@@ -6,6 +6,7 @@ import { api, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
+import { takePendingDemoAudio } from "../lib/demoProject";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type GridRow } from "../components/SequencerGrid.vue";
 import Waveform from "../components/Waveform.vue";
@@ -221,6 +222,8 @@ function onKeydown(e: KeyboardEvent): void {
 
 onMounted(async () => {
   await Promise.all([store.load(sequenceId.value), loadRows()]);
+  const demoAudio = takePendingDemoAudio(sequenceId.value);
+  if (demoAudio) await loadAudioFile(demoAudio);
   window.addEventListener("keydown", onKeydown);
 });
 onBeforeUnmount(() => {

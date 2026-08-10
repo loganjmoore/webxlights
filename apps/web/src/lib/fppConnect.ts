@@ -3,7 +3,7 @@
 // building a config service for one flag.
 export const FPP_CONNECT_ENABLED = true;
 
-// M8: FPP Connect (Chromium path), per SPEC ch16 §3.2 + ch14 §1.4/2.1/2.4 exactly.
+// M8: FPP Connect (Chromium path), per SPEC ch16 §3.2 + ch13 §1.4/2.1/2.4 exactly.
 // Browsers can't do the UDP-based instance discovery xLights uses (multicast ping on
 // 239.70.80.80:32320) - "discover FPP" here means the user enters a host and we verify
 // it's really an FPP via GET /api/system/info, same as the SPEC's documented fallback.
@@ -38,7 +38,7 @@ export async function getFppSystemInfo(host: string): Promise<FppSystemInfo> {
   return res.json();
 }
 
-// Legacy upload path (SPEC ch16 §3.2 / ch14 §2.1): passes FPP's CORS preflight because it's
+// Legacy upload path (SPEC ch16 §3.2 / ch13 §2.1): passes FPP's CORS preflight because it's
 // a plain POST with only Content-Type set - no custom headers (X-Requested-With is dropped
 // per the goal prompt's exact instruction, since Allow-Headers doesn't include it).
 export async function uploadFseqToFpp(host: string, filename: string, bytes: Uint8Array): Promise<void> {
@@ -71,7 +71,7 @@ interface FppPlaylist {
   [key: string]: unknown;
 }
 
-// SPEC ch14 §2.4: GET-merge-POST - appends one entry to mainPlaylist, recomputes
+// SPEC ch13 §2.4: GET-merge-POST - appends one entry to mainPlaylist, recomputes
 // playlistInfo.total_items/total_duration, preserves/creates random:0.
 export async function syncPlaylist(host: string, playlistName: string, sequenceName: string, durationSec: number, mediaName?: string): Promise<void> {
   const getRes = await fetch(fppUrl(host, `/api/playlist/${encodeURIComponent(playlistName)}`));
