@@ -36,3 +36,41 @@ export function hsvToRgb(h: number, s: number, v: number, a = 255): RGBA {
     h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
   return rgba(Math.round((r1 + m) * 255), Math.round((g1 + m) * 255), Math.round((b1 + m) * 255), a);
 }
+
+// Full-saturation pure hue (Rainbow color schemes in Butterfly/Meteors). hue01 in [0,1).
+export function h2rgb(hue01: number): RGBA {
+  return hsvToRgb(((hue01 % 1) + 1) % 1 * 360, 1, 1);
+}
+
+export function lerpColor(a: RGBA, b: RGBA, t: number): RGBA {
+  const clamped = Math.max(0, Math.min(1, t));
+  return rgba(
+    Math.round(a.r + (b.r - a.r) * clamped),
+    Math.round(a.g + (b.g - a.g) * clamped),
+    Math.round(a.b + (b.b - a.b) * clamped),
+    Math.round(a.a + (b.a - a.a) * clamped),
+  );
+}
+
+// SPEC "GetMultiColorBlend": blend across the whole palette by position t in [0,1).
+// circular=true wraps the last color back into the first (seamless loop); otherwise the
+// last segment holds palette[N-1] fixed at t=1 (no wrap).
+export function multiColorBlend(palette: RGBA[], t: number, circular = false): RGBA {
+  const n = palette.length;
+  if (n === 0) return rgba(0, 0, 0, 0);
+  if (n === 1) return palette[0]!;
+  const segments = circular ? n : n - 1;
+  const wrapped = ((t % 1) + 1) % 1;
+  const scaled = wrapped * segments;
+  const idx = Math.floor(scaled) % n;
+  const nextIdx = (idx + 1) % n;
+  const frac = scaled - Math.floor(scaled);
+  return lerpColor(palette[idx]!, palette[nextIdx]!, frac);
+}
+
+// SPEC "Get2ColorBlend": blend between two explicit palette indices by pct in [0,1].
+export function twoColorBlend(palette: RGBA[], idx1: number, idx2: number, pct: number): RGBA {
+  const c1 = palette[idx1 % palette.length]!;
+  const c2 = palette[idx2 % palette.length]!;
+  return lerpColor(c1, c2, pct);
+}

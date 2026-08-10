@@ -45,6 +45,22 @@ Locked technical decisions (goal prompt §4). Do not relitigate without recordin
 - Only the "On" effect has a param schema (`EFFECT_SCHEMAS`) since it's the only effect implemented so far; the palette will grow with M3/M6.
 - Timing tracks support manual marks only (hotkey `t`); fixed-interval/beat-bar generators are unimplemented.
 
+## M3 simplifications (documented ceilings, not silent gaps)
+
+Each effect implements its default/most-common render path faithfully to the SPEC math; rarer option combinations are deferred. All are cheap to extend later since the param shape is already SPEC-accurate:
+
+- **Bars**: 8 of 14 directions (up/down/left/right/expand/compress/h-expand/h-compress). The 4 `Alternate *` (whole-bar snap) and 2 `Custom *` (static offset) directions are unimplemented.
+- **Butterfly**: Style 1 only (the classic interference pattern). Styles 2-5 (other integer-math variants) and 6-10 (plasma variants) are unimplemented.
+- **Fire**: Old Render Method only (fully serial, deterministic). New Render Method (frame-to-frame top-down coherent flame), Grow-with-music, and Location remap (Top/Left/Right) are unimplemented — always renders Bottom-anchored.
+- **Meteors**: Effect=Down only. Up/Left/Right/Implode/Explode/Icicles(+bkg) are unimplemented. The frame-time-based speed accumulator is simplified to a flat per-frame step (no `frameTimeMs` in `FrameContext` yet).
+- **SingleStrand**: Chase tab only, single chase (Number Chases=1), Left-Right direction, Palette color scheme, Fade=None. The Skips and FX (WS2812FX) tabs are entirely unimplemented, as are Mirror/Dual/Static/Bounce chase types.
+- **Snowflakes**: Type=1 (single pixel) + Falling mode only. Shapes 0/2-9 (plus/diamond/cluster/etc) and Driving/Accumulating modes are unimplemented.
+- **Spirals**: core arm/thickness/rotation/Blend math is faithful; 3D shading and Grow/Shrink thickness modulation are unimplemented.
+- **Twinkle**: Old Render Method, no Re-Randomize, no Strobe. New Render Method's dynamic re-placement is unimplemented.
+- **Layer blending**: 10 of 24 `Layer Method` modes (Normal, Effect 1, Effect 2, Average, Additive, Subtractive, Max, Min, 1 reveals 2, 2 reveals 1) per the goal prompt's explicit M3 list. The other 14 (masks, shadow, highlight, split-screen, brightness-multiply, layered) are unimplemented.
+- **No worker pool / SharedArrayBuffer frame store yet**: the engine package is pure TS with no DOM dependency (matches the "testable in Node/Vitest" ground rule) and every effect function is a plain synchronous call — it can be dropped into a Web Worker as-is. The actual worker-pool wiring, SAB frame store, and "render dirty ranges" scheduler are deferred to M4, where a live preview first makes off-main-thread rendering necessary to verify.
+- **No value curves**: every VC-eligible param (marked in `EFFECT_SCHEMAS` with a `VC` badge) takes a flat value for now; the value-curve editor and per-frame VC evaluation are explicitly an M6 deliverable per the goal prompt.
+
 ## Bugs found only by actually running the UI (not caught by typecheck/lint)
 
 - **Stale canvas height on first data load**: `SequencerGrid`'s canvas height is bound via an inline `style` derived from `rows.length`, and its `watch(..., draw)` read `getBoundingClientRect()` on the same tick rows went from empty to populated — Vue's default pre-flush timing meant `draw()` ran *before* the DOM's new inline height was applied, so the grid rendered at 0px height (invisible) the first time real data arrived. Fixed with `{ flush: "post" }`. Same risk applies to any canvas component that both derives its own size from reactive data *and* redraws on that data changing.

@@ -9,7 +9,7 @@ Work milestone by milestone, in order. Each milestone: deployed to Render, CHANG
 - [x] **M0** — Skeleton + deploy. Monorepo, Docker, render.yaml, Sanctum auth, project CRUD, CI, COOP/COEP verified. Live: https://webxlights-web.onrender.com. R2 presign deferred to M2 (first milestone that needs media upload) — see DECISIONS.md.
 - [x] **M1** — Layout MVP + rgbeffects import. 12 model types, node-coordinate math, groups, importer. Canvas is read-only render (drag-to-reposition + background photo underlay deferred — see DECISIONS.md).
 - [x] **M2** — Sequencer shell + audio. Waveform, transport, canvas grid, timing tracks, effect placement/select/delete, undo/redo, autosave. Audio is client-side only (not R2-backed yet, re-select after reload) — see DECISIONS.md.
-- [ ] **M3** — Render engine v1. RenderBuffer, blend modes, 10 effects, worker pool, golden-frame tests.
+- [x] **M3** — Render engine v1. RenderBuffer, 10 blend modes, 10 effects (On + Bars/ColorWash/Fire/Meteors/Butterfly/SingleStrand/Snowflakes/Spirals/Twinkle), layer stack, node/channel mapping, 75 golden-frame + determinism tests. Worker pool deferred to M4 (needed once there's a live preview to keep off the main thread) — see DECISIONS.md.
 - [ ] **M4** — Live preview. Three.js Points from SAB, per-model mini-preview.
 - [ ] **M5** — fseq export + xsq import. fseq v2 writer, .xsq importer with placeholder fallback.
 - [ ] **M6** — Effects wave 2 + curves + transitions. 15 more effects, value curves, layer transitions.

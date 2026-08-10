@@ -4,11 +4,11 @@ import { EFFECT_SCHEMAS } from "@webxlights/engine";
 import type { SequenceEffect } from "../lib/api";
 
 const props = defineProps<{ effect: SequenceEffect | null }>();
-const emit = defineEmits<{ update: [params: Record<string, number | boolean>] }>();
+const emit = defineEmits<{ update: [params: Record<string, number | boolean | string>] }>();
 
 const schema = computed(() => (props.effect ? EFFECT_SCHEMAS[props.effect.name] : undefined));
 
-function setParam(key: string, value: number | boolean): void {
+function setParam(key: string, value: number | boolean | string): void {
   if (!props.effect) return;
   emit("update", { ...props.effect.params, [key]: value });
 }
@@ -52,6 +52,13 @@ function setParam(key: string, value: number | boolean): void {
           :checked="Boolean(effect.params[p.key] ?? p.default)"
           @change="setParam(p.key, ($event.target as HTMLInputElement).checked)"
         />
+        <select
+          v-else-if="p.type === 'choice'"
+          :value="effect.params[p.key] ?? p.default"
+          @change="setParam(p.key, ($event.target as HTMLSelectElement).value)"
+        >
+          <option v-for="opt in p.options" :key="opt" :value="opt">{{ opt }}</option>
+        </select>
         <span class="value">{{ effect.params[p.key] ?? p.default }}</span>
       </div>
     </template>

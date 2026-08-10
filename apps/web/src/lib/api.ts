@@ -88,7 +88,7 @@ export interface SequenceEffect {
   name: string;
   startMs: number;
   endMs: number;
-  params: Record<string, number | boolean>;
+  params: Record<string, number | boolean | string>;
 }
 
 export interface SequenceRow {

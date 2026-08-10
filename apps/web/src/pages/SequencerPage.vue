@@ -111,7 +111,7 @@ function handleSelect(effectId: string | null): void {
   store.selectedEffectId = effectId;
 }
 
-function handleParamsUpdate(params: Record<string, number | boolean>): void {
+function handleParamsUpdate(params: Record<string, number | boolean | string>): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { params });
 }
 
