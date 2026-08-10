@@ -54,7 +54,36 @@ export interface ModelRecord {
   nodes_per_string: number | null;
   string_type: string | null;
   start_channel: string | null;
+  channel_count: number | null;
+  controller_id: number | null;
+  controller_offset: number | null;
   order: number;
+}
+
+export type ControllerProtocol = "ddp" | "ethernet" | "null" | "usb";
+
+export interface ControllerRecord {
+  id: number;
+  project_id: number;
+  name: string;
+  protocol: ControllerProtocol;
+  ip_address: string | null;
+  start_channel: number;
+  channel_count: number;
+  vendor: string | null;
+  model: string | null;
+  active: boolean;
+}
+
+export interface ControllerUpsertPayload {
+  name: string;
+  protocol: ControllerProtocol;
+  ip_address?: string | null;
+  start_channel?: number;
+  channel_count?: number;
+  vendor?: string | null;
+  model?: string | null;
+  active?: boolean;
 }
 
 export interface ModelGroupRecord {
@@ -75,6 +104,9 @@ export interface ModelUpsertPayload {
   nodes_per_string?: number | null;
   string_type?: string | null;
   start_channel?: string | null;
+  channel_count?: number;
+  controller_id?: number | null;
+  controller_offset?: number | null;
   order?: number;
 }
 
@@ -167,6 +199,12 @@ export const api = {
     request<ModelRecord[]>(`/v1/layouts/${layoutId}/models/bulk`, { method: "POST", body: JSON.stringify({ models }) }),
   updateModel: (layoutId: number, modelId: number, patch: Partial<ModelUpsertPayload>) =>
     request<ModelRecord>(`/v1/layouts/${layoutId}/models/${modelId}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  listControllers: (projectId: number) => request<ControllerRecord[]>(`/v1/projects/${projectId}/controllers`),
+  createController: (projectId: number, data: ControllerUpsertPayload) =>
+    request<ControllerRecord>(`/v1/projects/${projectId}/controllers`, { method: "POST", body: JSON.stringify(data) }),
+  updateController: (controllerId: number, patch: Partial<ControllerUpsertPayload>) =>
+    request<ControllerRecord>(`/v1/controllers/${controllerId}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  deleteController: (controllerId: number) => request<void>(`/v1/controllers/${controllerId}`, { method: "DELETE" }),
   listModelGroups: (layoutId: number) => request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups`),
   bulkUpsertModelGroups: (layoutId: number, groups: GroupUpsertPayload[]) =>
     request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups/bulk`, { method: "POST", body: JSON.stringify({ groups }) }),

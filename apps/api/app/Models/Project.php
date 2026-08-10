@@ -38,6 +38,11 @@ class Project extends Model
         return $this->hasMany(ProjectMember::class);
     }
 
+    public function controllers(): HasMany
+    {
+        return $this->hasMany(Controller::class);
+    }
+
     // 'owner' (full control), 'editor' (read/write), 'viewer' (read-only), or null (no access).
     public function accessLevel(User $user): ?string
     {

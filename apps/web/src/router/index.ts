@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import AuthPage from "../pages/AuthPage.vue";
 import ProjectsPage from "../pages/ProjectsPage.vue";
 import LayoutPage from "../pages/LayoutPage.vue";
+import ControllersPage from "../pages/ControllersPage.vue";
 import SequencesListPage from "../pages/SequencesListPage.vue";
 import SequencerPage from "../pages/SequencerPage.vue";
 import DocsPage from "../pages/DocsPage.vue";
@@ -15,6 +16,7 @@ const router = createRouter({
     { path: "/docs", component: DocsPage },
     { path: "/projects", component: ProjectsPage, meta: { requiresAuth: true } },
     { path: "/projects/:projectId/layout", component: LayoutPage, meta: { requiresAuth: true } },
+    { path: "/projects/:projectId/controllers", component: ControllersPage, meta: { requiresAuth: true } },
     { path: "/projects/:projectId/sequences", component: SequencesListPage, meta: { requiresAuth: true } },
     {
       path: "/projects/:projectId/sequences/:sequenceId",

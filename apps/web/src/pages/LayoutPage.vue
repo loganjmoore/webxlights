@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import { api, type Layout, type ModelRecord } from "../lib/api";
+import { api, type ControllerRecord, type Layout, type ModelRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
+import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas from "../components/LayoutCanvas.vue";
 
 const route = useRoute();
@@ -10,13 +11,52 @@ const projectId = computed(() => Number(route.params.projectId));
 
 const layout = ref<Layout | null>(null);
 const models = ref<ModelRecord[]>([]);
+const controllers = ref<ControllerRecord[]>([]);
+const assignErrors = ref<Record<number, string>>({});
 const importing = ref(false);
 const importMessage = ref("");
 
 async function loadLayout(): Promise<void> {
-  const layouts = await api.listLayouts(projectId.value);
+  const [layouts, controllerList] = await Promise.all([api.listLayouts(projectId.value), api.listControllers(projectId.value)]);
   layout.value = layouts[0] ?? null;
+  controllers.value = controllerList;
   if (layout.value) models.value = await api.listModels(layout.value.id);
+}
+
+// M11: controller_id/controller_offset live on the model, but ModelEntityController::update
+// deep-merges only top-level fields (unlike screen, which it replaces wholesale) - a plain
+// patch of just these three keys is correct here, no need to resend the whole model.
+async function assignController(model: ModelRecord, controllerIdRaw: string): Promise<void> {
+  if (!layout.value) return;
+  delete assignErrors.value[model.id];
+  const controllerId = controllerIdRaw === "" ? null : Number(controllerIdRaw);
+  try {
+    const updated = await api.updateModel(layout.value.id, model.id, {
+      controller_id: controllerId,
+      controller_offset: controllerId === null ? null : (model.controller_offset ?? 0),
+      ...(controllerId !== null ? { channel_count: channelCountForModel(model) } : {}),
+    });
+    const idx = models.value.findIndex((m) => m.id === model.id);
+    if (idx !== -1) models.value[idx] = updated;
+  } catch (err) {
+    assignErrors.value[model.id] = err instanceof Error ? err.message : "Assignment failed";
+  }
+}
+
+async function updateOffset(model: ModelRecord, offsetRaw: string): Promise<void> {
+  if (!layout.value || model.controller_id == null) return;
+  delete assignErrors.value[model.id];
+  try {
+    const updated = await api.updateModel(layout.value.id, model.id, {
+      controller_id: model.controller_id,
+      controller_offset: Number(offsetRaw) || 0,
+      channel_count: channelCountForModel(model),
+    });
+    const idx = models.value.findIndex((m) => m.id === model.id);
+    if (idx !== -1) models.value[idx] = updated;
+  } catch (err) {
+    assignErrors.value[model.id] = err instanceof Error ? err.message : "Assignment failed";
+  }
 }
 
 async function handleFileChange(e: Event): Promise<void> {
@@ -53,6 +93,7 @@ onMounted(loadLayout);
     <header>
       <router-link to="/projects">&larr; Projects</router-link>
       <h1>Layout</h1>
+      <router-link :to="`/projects/${projectId}/controllers`" class="controllers-link">Controllers &rarr;</router-link>
       <router-link :to="`/projects/${projectId}/sequences`" class="sequences-link">Sequences &rarr;</router-link>
       <label class="import-btn">
         {{ importing ? "Importing..." : "Import xlights_rgbeffects.xml" }}
@@ -67,6 +108,22 @@ onMounted(loadLayout);
           <li v-for="m in models" :key="m.id" :class="{ unsupported: !m.supported }">
             {{ m.name }} <span class="type">{{ m.type }}</span>
             <span v-if="m.start_channel" class="channel">ch {{ m.start_channel }}</span>
+            <div class="controller-assign">
+              <select :value="m.controller_id ?? ''" @change="assignController(m, ($event.target as HTMLSelectElement).value)">
+                <option value="">No controller</option>
+                <option v-for="c in controllers" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
+              <input
+                v-if="m.controller_id != null"
+                type="number"
+                min="0"
+                class="offset-input"
+                :value="m.controller_offset ?? 0"
+                title="Channel offset within the controller's span"
+                @change="updateOffset(m, ($event.target as HTMLInputElement).value)"
+              />
+            </div>
+            <p v-if="assignErrors[m.id]" class="assign-error">{{ assignErrors[m.id] }}</p>
           </li>
         </ul>
         <p v-if="models.length === 0" class="empty">No models yet — import a show to get started.</p>
@@ -92,7 +149,7 @@ header {
   align-items: baseline;
   gap: 1rem;
 }
-.sequences-link {
+.controllers-link {
   margin-left: auto;
 }
 .import-btn {
@@ -148,6 +205,25 @@ header {
 .model-list .empty {
   color: #666;
   font-size: 0.8rem;
+}
+.controller-assign {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0.2rem 0 0.4rem;
+}
+.controller-assign select {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
+}
+.offset-input {
+  width: 3.5rem;
+  font-size: 0.75rem;
+}
+.assign-error {
+  margin: 0 0 0.4rem;
+  color: #e57373;
+  font-size: 0.7rem;
 }
 .canvas-wrap {
   flex: 1;

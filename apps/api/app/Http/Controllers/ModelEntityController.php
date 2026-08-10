@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Controller as ControllerModel;
 use App\Models\Layout;
 use App\Models\ModelEntity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ModelEntityController extends Controller
 {
@@ -73,7 +75,27 @@ class ModelEntityController extends Controller
             'screen' => ['sometimes', 'array'],
             'params' => ['sometimes', 'array'],
             'order' => ['sometimes', 'integer'],
+            'controller_id' => ['sometimes', 'nullable', 'integer', 'exists:controllers,id'],
+            'controller_offset' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            // Channel geometry lives in packages/engine (TS-only) - the client computes this
+            // the same way fseqExport.ts does and submits it here. The server doesn't re-derive
+            // node counts, it just enforces the size constraint arithmetically - see DECISIONS.md M11.
+            'channel_count' => ['sometimes', 'integer', 'min:0'],
         ]);
+
+        $controllerId = array_key_exists('controller_id', $data) ? $data['controller_id'] : $model->controller_id;
+        if ($controllerId !== null) {
+            $offset = $data['controller_offset'] ?? $model->controller_offset ?? 0;
+            $channelCount = $data['channel_count'] ?? $model->channel_count ?? 0;
+            $controller = ControllerModel::findOrFail($controllerId);
+            abort_unless($controller->project_id === $layout->project_id, 404);
+
+            if ($offset + $channelCount > $controller->channel_count) {
+                throw ValidationException::withMessages([
+                    'controller_offset' => ["This assignment (offset {$offset} + {$channelCount} channels) exceeds the controller's {$controller->channel_count}-channel span."],
+                ]);
+            }
+        }
 
         $model->update($data);
 

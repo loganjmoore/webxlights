@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ControllerController;
 use App\Http\Controllers\LayoutController;
 use App\Http\Controllers\ModelEntityController;
 use App\Http\Controllers\ModelGroupController;
@@ -42,5 +43,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('projects/{project}/members', [ProjectMemberController::class, 'index']);
         Route::post('projects/{project}/members', [ProjectMemberController::class, 'store']);
         Route::delete('projects/{project}/members/{user}', [ProjectMemberController::class, 'destroy']);
+
+        Route::get('projects/{project}/controllers', [ControllerController::class, 'index']);
+        Route::post('projects/{project}/controllers', [ControllerController::class, 'store']);
+        Route::patch('controllers/{controller}', [ControllerController::class, 'update']);
+        Route::delete('controllers/{controller}', [ControllerController::class, 'destroy']);
     });
 });

@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { EFFECT_SCHEMAS, defaultParamsFor } from "@webxlights/engine";
-import { api, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
+import { api, type ControllerRecord, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
@@ -20,6 +20,8 @@ const store = useSequencerStore();
 
 const rows = ref<GridRow[]>([]);
 const modelRecords = ref<ModelRecord[]>([]);
+const controllers = ref<ControllerRecord[]>([]);
+const exportError = ref<string | null>(null);
 const peaks = ref<PeakBucket[]>([]);
 const audioEl = ref<HTMLAudioElement | null>(null);
 const audioUrl = ref<string | null>(null);
@@ -64,6 +66,7 @@ async function loadRows(): Promise<void> {
     ...groups.map((g) => ({ elementType: "group" as const, elementId: g.id, name: g.name })),
   ];
   modelRecords.value = models;
+  controllers.value = await api.listControllers(Number(route.params.projectId));
 }
 
 function onAudioFilePicked(e: Event): void {
@@ -213,8 +216,13 @@ function addTimingMarkAtPlayhead(): void {
 
 function exportFseq(): void {
   if (!store.sequence) return;
-  const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence);
-  downloadFseq(bytes, store.sequence.name);
+  exportError.value = null;
+  try {
+    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, controllers.value);
+    downloadFseq(bytes, store.sequence.name);
+  } catch (err) {
+    exportError.value = err instanceof Error ? err.message : "Export failed";
+  }
 }
 
 async function toggleHistory(): Promise<void> {
@@ -254,7 +262,7 @@ async function fppUpload(): Promise<void> {
   fppBusy.value = true;
   fppStatus.value = "Uploading...";
   try {
-    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence);
+    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, controllers.value);
     const filename = `${store.sequence.name}.fseq`;
     await uploadFseqToFpp(fppHost.value.trim(), filename, bytes);
     fppStatus.value = `Uploaded ${filename} to ${fppSystemInfo.value.HostName}.`;
@@ -332,6 +340,7 @@ watch(sequenceId, async (id) => {
         <option :value="2">2x</option>
       </select>
       <button @click="exportFseq" :disabled="!store.sequence">Export .fseq</button>
+      <span v-if="exportError" class="export-error">{{ exportError }}</span>
       <button @click="snapshotNow" :disabled="!store.sequence">Snapshot</button>
       <button @click="toggleHistory" :disabled="!store.sequence">History</button>
       <button v-if="FPP_CONNECT_ENABLED" @click="showFppPanel = !showFppPanel" :disabled="!store.sequence">FPP Connect</button>
@@ -478,6 +487,10 @@ header h1 {
   font-size: 0.75rem;
   color: #666;
   text-transform: capitalize;
+}
+.export-error {
+  color: #e57373;
+  font-size: 0.8rem;
 }
 .reselect-audio {
   padding: 0.75rem 1rem;

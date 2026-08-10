@@ -64,6 +64,17 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Live presence ("locked by", avatars) | ❌ | Would need a paid Reverb service; the ETag conflict mechanism covers "collaborate without clobbering" without it |
 | "Package show" | ⚠️ | Client-side zip in a webXLights-native format (manifest + sequence JSON), not xLights' rgbeffects/xsq zip — re-imports cleanly into a fresh webXLights project, not into xLights itself |
 
+## Controllers (SPEC ch3)
+
+| Feature | Status | Notes |
+|---|---|---|
+| Controller CRUD | ✅ | `ControllersPage.vue`, DDP/Ethernet/USB/Null protocols; "Add Ethernet" defaults to DDP (M11) |
+| Per-model controller assignment | ✅ | From the Layout page's model sidebar; `controller_offset` + `channel_count` validated server-side (422 if it overflows the controller's span) |
+| `.fseq` export channel allocation | ✅ | Real `controller.start_channel - 1 + controller_offset` addressing; unassigned models write sequentially after the highest controller-routed span — not import-order concatenation anymore (M11) |
+| E1.31/Art-Net universe math | ❌ | Deferred with DDP-first — see DECISIONS.md M11 |
+| `xlights_networks.xml` import | ❌ | No parser exists in `packages/formats`; manual entry only |
+| Live network output (DDP/E1.31 over the wire) | ❌ | Non-goal for v1 — browsers can't open raw UDP sockets, same ceiling as FPP Connect below |
+
 ## Output & FPP integration (SPEC ch13, ch16)
 
 | Feature | Status | Notes |

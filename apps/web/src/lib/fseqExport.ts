@@ -1,6 +1,6 @@
 import { writeFseqV2 } from "@webxlights/formats";
 import { computeGeometryFromAttrs, createRowSequencer, nodeColorsToChannelBytes, type ModelGeometry } from "@webxlights/engine";
-import type { ModelRecord, SequenceBody, SequenceRecord } from "./api";
+import type { ControllerRecord, ModelRecord, SequenceBody, SequenceRecord } from "./api";
 
 // ponytail: same fixed default palette as the live preview (HousePreview.vue) - no palette
 // editor exists yet (M6/M7).
@@ -15,11 +15,31 @@ function extractRgbOrder(stringType: string | null): string {
   return match ? match[1]!.toUpperCase() : "RGB";
 }
 
-// Concatenates supported models' channel bytes in layout order - a placeholder channel
-// layout, not a real controller/universe allocation (SPEC ch3's "channels/universes/
-// controllers" is display + export math only in v1 per the goal prompt; a proper per-
-// controller channel map is out of scope until that's built).
-export function exportSequenceToFseq(models: ModelRecord[], body: SequenceBody, sequence: SequenceRecord): Uint8Array {
+// Same geometry call the M11 controller-assignment UI uses to validate an offset against a
+// controller's channel_count before saving - one source of truth for "how many bytes does
+// this model need" instead of two.
+export function channelCountForModel(model: Pick<ModelRecord, "type" | "raw_attrs">): number {
+  try {
+    const geo = computeGeometryFromAttrs(model.type, model.raw_attrs);
+    return geo ? geo.nodes.length * 3 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+// M11: real controller-routed addressing, not layout-order concatenation. controller.start_channel
+// is user-authoritative (not auto-allocated - the reference screenshot shows it hand-edited
+// directly), so a controller-assigned model's byte position is controller.start_channel - 1 +
+// controller_offset. Unassigned models keep writing sequentially, starting right after the
+// highest controller-routed span - this is a real, stated behavior change: the moment any
+// controller exists and has models assigned, unassigned models' byte positions shift from the
+// pre-M11 offset-0 start. See DECISIONS.md M11.
+export function exportSequenceToFseq(
+  models: ModelRecord[],
+  body: SequenceBody,
+  sequence: SequenceRecord,
+  controllers: ControllerRecord[] = [],
+): Uint8Array {
   const frameMs = sequence.frame_ms;
   const frameCount = Math.max(1, Math.ceil(sequence.duration_ms / frameMs));
 
@@ -31,9 +51,23 @@ export function exportSequenceToFseq(models: ModelRecord[], body: SequenceBody, 
       return null;
     }
   });
-
   const rgbOrders = supported.map((m) => extractRgbOrder(m.string_type));
-  const channelCount = geometries.reduce((sum, g) => sum + (g ? g.nodes.length * 3 : 0), 0);
+  const byteCounts = geometries.map((g) => (g ? g.nodes.length * 3 : 0));
+
+  const activeControllers = controllers.filter((c) => c.active);
+  const controllerSpanEnd = activeControllers.reduce((max, c) => Math.max(max, c.start_channel - 1 + c.channel_count), 0);
+
+  let unassignedCursor = controllerSpanEnd;
+  const byteOffsets = supported.map((m, i) => {
+    const controller = m.controller_id != null ? controllers.find((c) => c.id === m.controller_id) : undefined;
+    if (controller && m.controller_offset != null) {
+      return controller.start_channel - 1 + m.controller_offset;
+    }
+    const offset = unassignedCursor;
+    unassignedCursor += byteCounts[i]!;
+    return offset;
+  });
+  const channelCount = unassignedCursor;
 
   // One sequencer per model, created once and called in strictly increasing atMs order -
   // O(frames) instead of the O(frames^2) a fresh renderRowAtMs-per-frame call would cost for
@@ -52,14 +86,16 @@ export function exportSequenceToFseq(models: ModelRecord[], body: SequenceBody, 
   for (let f = 0; f < frameCount; f++) {
     const atMs = f * frameMs;
     const frame = new Uint8Array(channelCount);
-    let offset = 0;
-    supported.forEach((_model, i) => {
+    supported.forEach((model, i) => {
       const sequencer = sequencers[i];
       if (!sequencer) return;
       const nodeColors = sequencer.renderFrameAt(atMs);
       const bytes = nodeColorsToChannelBytes(nodeColors, rgbOrders[i]);
-      frame.set(bytes, offset);
-      offset += bytes.length;
+      try {
+        frame.set(bytes, byteOffsets[i]!);
+      } catch (err) {
+        throw new Error(`Couldn't place "${model.name}" at channel ${byteOffsets[i]! + 1}`, { cause: err });
+      }
     });
     frames.push(frame);
   }
