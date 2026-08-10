@@ -47,6 +47,16 @@ return [
             'report' => false,
         ],
 
+        // Sequence audio, served through SequenceController@audio (auth-gated), never
+        // public. root points at the Render persistent disk's mount path in prod.
+        'audio' => [
+            'driver' => 'local',
+            'root' => env('AUDIO_STORAGE_PATH', storage_path('app/audio')),
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

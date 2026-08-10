@@ -32,6 +32,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('projects/{project}/sequences', [SequenceController::class, 'store']);
         Route::get('sequences/{sequence}', [SequenceController::class, 'show']);
         Route::put('sequences/{sequence}/body', [SequenceController::class, 'updateBody']);
+        Route::post('sequences/{sequence}/audio', [SequenceController::class, 'uploadAudio']);
+        Route::get('sequences/{sequence}/audio', [SequenceController::class, 'audio']);
 
         Route::get('sequences/{sequence}/versions', [SequenceVersionController::class, 'index']);
         Route::post('sequences/{sequence}/versions', [SequenceVersionController::class, 'store']);

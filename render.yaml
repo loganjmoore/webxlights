@@ -12,7 +12,13 @@ services:
     plan: starter
     healthCheckPath: /up
     preDeployCommand: php artisan migrate --force
+    disk:
+      name: webxlights-audio
+      mountPath: /var/data
+      sizeGB: 5
     envVars:
+      - key: AUDIO_STORAGE_PATH
+        value: /var/data/audio
       - key: APP_NAME
         value: webXLights
       - key: APP_ENV

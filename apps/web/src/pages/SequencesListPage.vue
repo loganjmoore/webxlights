@@ -46,6 +46,7 @@ async function createSequence(): Promise<void> {
       duration_ms: durationMs,
       audio_filename: audioFile.value.name,
     });
+    await api.uploadSequenceAudio(record.id, audioFile.value);
     router.push({ name: "sequencer", params: { projectId: projectId.value, sequenceId: record.id } });
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Could not create sequence";

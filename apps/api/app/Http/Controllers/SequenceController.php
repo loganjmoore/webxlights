@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\Sequence;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class SequenceController extends Controller
@@ -60,6 +61,35 @@ class SequenceController extends Controller
         $sequence->update(['body' => $data['body'], 'revision' => $sequence->revision + 1]);
 
         return $this->withEtag($sequence->fresh());
+    }
+
+    // Persists the raw audio file the browser already decoded (M2's AudioContext.decodeAudioData
+    // flow is unchanged — this just adds server-side storage so the sequencer doesn't need to
+    // re-prompt for the file after a reload). Stored on the 'audio' disk, never public; served
+    // back only through audio() below, which re-checks project access.
+    public function uploadAudio(Request $request, Sequence $sequence)
+    {
+        $this->authorizeSequence($request, $sequence, 'editor');
+
+        $request->validate(['audio' => ['required', 'file', 'max:51200']]); // 50MB
+
+        if ($sequence->audio_path) {
+            Storage::disk('audio')->delete($sequence->audio_path);
+        }
+
+        $path = $request->file('audio')->store("sequences/{$sequence->id}", 'audio');
+        $sequence->update(['audio_path' => $path]);
+
+        return $this->withEtag($sequence->fresh());
+    }
+
+    public function audio(Request $request, Sequence $sequence)
+    {
+        $this->authorizeSequence($request, $sequence);
+
+        abort_if(!$sequence->audio_path || !Storage::disk('audio')->exists($sequence->audio_path), 404);
+
+        return Storage::disk('audio')->response($sequence->audio_path);
     }
 
     private function etag(Sequence $sequence): string

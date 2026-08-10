@@ -69,6 +69,9 @@ function onAudioFilePicked(e: Event): void {
   const file = input.files?.[0];
   if (!file) return;
   loadAudioFile(file);
+  // Re-selecting manually (old sequence created before server-side storage, or the
+  // stored copy failed to fetch) — persist it so this doesn't happen again next time.
+  void api.uploadSequenceAudio(sequenceId.value, file);
 }
 
 async function loadAudioFile(file: File): Promise<void> {
@@ -76,6 +79,21 @@ async function loadAudioFile(file: File): Promise<void> {
   peaks.value = computePeaks(buffer, 800);
   audioUrl.value = URL.createObjectURL(file);
   audioLoaded.value = true;
+}
+
+// Fetches the copy SequenceController@audio serves back and feeds it through the same
+// decode path as a manual file pick — the sequencer doesn't care where the File came from.
+async function loadStoredAudio(): Promise<boolean> {
+  try {
+    const res = await fetch(api.sequenceAudioUrl(sequenceId.value), { credentials: "include" });
+    if (!res.ok) return false;
+    const blob = await res.blob();
+    const file = new File([blob], store.sequence?.audio_filename ?? "audio", { type: blob.type });
+    await loadAudioFile(file);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function togglePlay(): void {
@@ -224,6 +242,7 @@ onMounted(async () => {
   await Promise.all([store.load(sequenceId.value), loadRows()]);
   const demoAudio = takePendingDemoAudio(sequenceId.value);
   if (demoAudio) await loadAudioFile(demoAudio);
+  else if (store.sequence?.audio_path) await loadStoredAudio();
   window.addEventListener("keydown", onKeydown);
 });
 onBeforeUnmount(() => {

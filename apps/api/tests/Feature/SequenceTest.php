@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class SequenceTest extends TestCase
@@ -78,5 +80,57 @@ class SequenceTest extends TestCase
 
         $this->actingAs($intruder)->getJson("/api/v1/sequences/{$seq->id}")->assertForbidden();
         $this->actingAs($intruder)->putJson("/api/v1/sequences/{$seq->id}/body", ['body' => []])->assertForbidden();
+    }
+
+    public function test_a_user_can_upload_and_fetch_back_sequence_audio(): void
+    {
+        Storage::fake('audio');
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+        $seq = $project->sequences()->create(['name' => 'Show', 'frame_ms' => 50, 'duration_ms' => 60000]);
+
+        $upload = $this->actingAs($user)->post("/api/v1/sequences/{$seq->id}/audio", [
+            'audio' => UploadedFile::fake()->create('carol.mp3', 500, 'audio/mpeg'),
+        ]);
+        $upload->assertOk();
+        $this->assertNotNull($seq->fresh()->audio_path);
+        Storage::disk('audio')->assertExists($seq->fresh()->audio_path);
+
+        $fetch = $this->actingAs($user)->get("/api/v1/sequences/{$seq->id}/audio");
+        $fetch->assertOk();
+    }
+
+    public function test_re_uploading_audio_replaces_the_stored_file_and_deletes_the_old_one(): void
+    {
+        Storage::fake('audio');
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+        $seq = $project->sequences()->create(['name' => 'Show', 'frame_ms' => 50, 'duration_ms' => 60000]);
+
+        $this->actingAs($user)->post("/api/v1/sequences/{$seq->id}/audio", [
+            'audio' => UploadedFile::fake()->create('first.mp3', 100, 'audio/mpeg'),
+        ]);
+        $firstPath = $seq->fresh()->audio_path;
+
+        $this->actingAs($user)->post("/api/v1/sequences/{$seq->id}/audio", [
+            'audio' => UploadedFile::fake()->create('second.mp3', 100, 'audio/mpeg'),
+        ]);
+
+        Storage::disk('audio')->assertMissing($firstPath);
+        Storage::disk('audio')->assertExists($seq->fresh()->audio_path);
+    }
+
+    public function test_a_user_cannot_upload_or_fetch_audio_for_another_users_sequence(): void
+    {
+        Storage::fake('audio');
+        $owner = User::factory()->create();
+        $intruder = User::factory()->create();
+        $project = Project::factory()->for($owner, 'owner')->create();
+        $seq = $project->sequences()->create(['name' => 'Show', 'frame_ms' => 50, 'duration_ms' => 60000]);
+
+        $this->actingAs($intruder)->post("/api/v1/sequences/{$seq->id}/audio", [
+            'audio' => UploadedFile::fake()->create('carol.mp3', 100, 'audio/mpeg'),
+        ])->assertForbidden();
+        $this->actingAs($intruder)->get("/api/v1/sequences/{$seq->id}/audio")->assertForbidden();
     }
 }

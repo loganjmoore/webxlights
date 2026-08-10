@@ -1,5 +1,13 @@
 # Changelog
 
+## Audio persistence (pre-M10)
+
+- `apps/api`: a Laravel `audio` filesystem disk (auth-gated, `serve: false`, never public), a `sequences.audio_path` column, `POST /v1/sequences/{sequence}/audio` (replaces any prior file, deletes the old one) and `GET /v1/sequences/{sequence}/audio` (re-checks project access before streaming). Fixes the real R2 blocker noted in M9's handoff: a Render persistent disk (`webxlights-audio`, 5GB, mounted at `/var/data`) replaces the abandoned R2 plan, `AUDIO_STORAGE_PATH=/var/data/audio` on the live service.
+- `apps/web`: creating a sequence and manually re-picking a file both auto-upload to the new endpoint; on sequencer load, a stored `audio_path` is fetched and fed through the existing `decodeAudioData` path so the browser never needs to re-prompt for the file after a reload.
+- Dockerfile: the persistent disk mounts owned by root on a fresh container, so the entrypoint now `chown`s `/var/data` to `www-data` before starting php-fpm, or the audio disk write fails.
+- 3 new PHPUnit tests (upload + fetch, re-upload replaces and deletes the old file, cross-user access denied) — 21 total, green.
+- Verified live: opened a sequence with a stored `audio_path`, no manual file picker shown, waveform rendered, `<audio>` element sourced from the fetched blob with a real nonzero duration.
+
 ## M9 — Hardening + parity harness + docs (reduced scope)
 
 - `packages/engine`: fixed a real O(n²) perf bug found while writing the M9 perf test — full-sequence rendering replayed every stateful effect (Fire/Meteors/Snowflakes/Strobe) from its start on every frame, so a full export with one of those effects redid all prior frames on every step. `createRowSequencer()` carries each effect's own state incrementally across a sequential sweep instead (byte-identical output, verified against the old function frame-by-frame in `test/rowSequencer.test.ts`), turning the ROADMAP's 20k-channel/3-minute benchmark from a near-timeout into ~6.2s (`test/perf.test.ts`, a permanent regression guard). Wired into `apps/web/src/lib/fseqExport.ts`, replacing the old per-frame call — every real "Export .fseq" click now benefits.

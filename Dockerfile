@@ -33,4 +33,6 @@ COPY apps/api/docker/supervisord.conf /etc/supervisord.conf
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 10000
-CMD ["supervisord", "-c", "/etc/supervisord.conf"]
+# /var/data is the Render persistent disk's mount path (render.yaml) - owned by root on a
+# fresh mount, so php-fpm (www-data) can't write until this runs on every container start.
+CMD ["sh", "-c", "mkdir -p /var/data/audio && chown -R www-data:www-data /var/data && exec supervisord -c /etc/supervisord.conf"]

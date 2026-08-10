@@ -114,6 +114,7 @@ export interface SequenceRecord {
   frame_ms: number;
   duration_ms: number;
   audio_filename: string | null;
+  audio_path: string | null;
   body: SequenceBody;
   revision: number;
   etag?: string;
@@ -173,6 +174,19 @@ export const api = {
   createSequence: (projectId: number, data: { name: string; frame_ms: number; duration_ms: number; audio_filename?: string }) =>
     request<SequenceRecord>(`/v1/projects/${projectId}/sequences`, { method: "POST", body: JSON.stringify(data) }),
   getSequence: (sequenceId: number) => request<SequenceRecord>(`/v1/sequences/${sequenceId}`),
+  sequenceAudioUrl: (sequenceId: number) => `/api/v1/sequences/${sequenceId}/audio`,
+  async uploadSequenceAudio(sequenceId: number, file: File): Promise<SequenceRecord> {
+    const form = new FormData();
+    form.append("audio", file);
+    const res = await fetch(`/api/v1/sequences/${sequenceId}/audio`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json" }, // no Content-Type: fetch sets the multipart boundary itself
+      body: form,
+    });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    return res.json();
+  },
   // Returns { ok:false, current } on a 409 (someone else saved since this etag was read)
   // instead of throwing, so the sequencer store can offer "keep mine" / "take theirs" rather
   // than silently clobbering or crashing.

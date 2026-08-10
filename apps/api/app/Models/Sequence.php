@@ -11,7 +11,7 @@ class Sequence extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'frame_ms', 'duration_ms', 'audio_filename', 'body', 'revision'];
+    protected $fillable = ['name', 'frame_ms', 'duration_ms', 'audio_filename', 'audio_path', 'body', 'revision'];
 
     protected function casts(): array
     {
