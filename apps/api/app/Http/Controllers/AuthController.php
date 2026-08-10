@@ -48,7 +48,10 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        Auth::logout();
+        // Auth::logout() resolves to the request-scoped Sanctum RequestGuard here, which
+        // has no logout() method - the session was established via the 'web' guard
+        // (Auth::login/Auth::attempt above), so that's the one that needs to forget it.
+        Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

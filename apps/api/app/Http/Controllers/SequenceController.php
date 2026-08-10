@@ -18,7 +18,7 @@ class SequenceController extends Controller
 
     public function store(Request $request, Project $project)
     {
-        $this->authorizeProject($request, $project);
+        $this->authorizeProject($request, $project, 'editor');
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -36,31 +36,49 @@ class SequenceController extends Controller
     {
         $this->authorizeSequence($request, $sequence);
 
-        return $sequence;
+        return $this->withEtag($sequence);
     }
 
-    // Autosave target: PUT the whole body document. No ETag/optimistic-locking yet
-    // (M7 hardens this) - last write wins, fine for a single-editor MVP.
+    // Autosave target: PUT the whole body document. Optimistic-locking via
+    // If-Match: the client must send back the etag it last read; a stale etag
+    // means someone else saved since, so we 409 with the current state instead
+    // of silently clobbering their edit (the "collaborate without clobbering" fix).
     public function updateBody(Request $request, Sequence $sequence)
     {
-        $this->authorizeSequence($request, $sequence);
+        $this->authorizeSequence($request, $sequence, 'editor');
 
         $data = $request->validate([
             'body' => ['required', 'array'],
+            'if_match' => ['nullable', 'string'],
         ]);
 
-        $sequence->update(['body' => $data['body']]);
+        $ifMatch = $data['if_match'] ?? null;
+        if ($ifMatch !== null && $ifMatch !== $this->etag($sequence)) {
+            return response()->json(['message' => 'conflict', 'current' => $this->withEtag($sequence)], 409);
+        }
 
-        return $sequence->fresh();
+        $sequence->update(['body' => $data['body'], 'revision' => $sequence->revision + 1]);
+
+        return $this->withEtag($sequence->fresh());
     }
 
-    private function authorizeProject(Request $request, Project $project): void
+    private function etag(Sequence $sequence): string
     {
-        abort_unless($project->owner_id === $request->user()->id, 403);
+        return (string) $sequence->revision;
     }
 
-    private function authorizeSequence(Request $request, Sequence $sequence): void
+    private function withEtag(Sequence $sequence): array
     {
-        abort_unless($sequence->project->owner_id === $request->user()->id, 403);
+        return $sequence->toArray() + ['etag' => $this->etag($sequence)];
+    }
+
+    private function authorizeProject(Request $request, Project $project, string $need = 'viewer'): void
+    {
+        $project->authorize($request->user(), $need);
+    }
+
+    private function authorizeSequence(Request $request, Sequence $sequence, string $need = 'viewer'): void
+    {
+        $sequence->project->authorize($request->user(), $need);
     }
 }

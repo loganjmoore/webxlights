@@ -19,7 +19,7 @@ class ModelGroupController extends Controller
     // importer can create groups + memberships in the same pass it creates models.
     public function bulkUpsert(Request $request, Layout $layout)
     {
-        $this->authorizeLayout($request, $layout);
+        $this->authorizeLayout($request, $layout, 'editor');
 
         $data = $request->validate([
             'groups' => ['required', 'array'],
@@ -54,8 +54,8 @@ class ModelGroupController extends Controller
         return response()->json($result, 201);
     }
 
-    private function authorizeLayout(Request $request, Layout $layout): void
+    private function authorizeLayout(Request $request, Layout $layout, string $need = 'viewer'): void
     {
-        abort_unless($layout->project->owner_id === $request->user()->id, 403);
+        $layout->project->authorize($request->user(), $need);
     }
 }

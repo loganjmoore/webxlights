@@ -26,7 +26,10 @@ export const useSequencerStore = defineStore("sequencer", () => {
   const sequence = ref<SequenceRecord | null>(null);
   const body = ref<SequenceBody>(emptyBody());
   const selectedEffectId = ref<string | null>(null);
-  const saveStatus = ref<"idle" | "saving" | "saved" | "error">("idle");
+  const saveStatus = ref<"idle" | "saving" | "saved" | "error" | "conflict">("idle");
+  // Set when a save lost a race (someone else saved since our etag was read) - the UI
+  // offers "keep mine" / "take theirs" instead of the store silently picking one.
+  const conflictRemote = ref<SequenceRecord | null>(null);
 
   // ponytail: full-body snapshots, not true command-pattern inverses. Sequence bodies stay
   // small through M2 (a handful of rows/effects), so this is cheap; revisit if per-action
@@ -143,11 +146,39 @@ export const useSequencerStore = defineStore("sequencer", () => {
     }
     saveStatus.value = "saving";
     try {
-      await api.saveSequenceBody(sequence.value.id, body.value);
-      saveStatus.value = "saved";
+      const result = await api.saveSequenceBody(sequence.value.id, body.value, sequence.value.etag);
+      if (result.ok) {
+        sequence.value = result.data;
+        saveStatus.value = "saved";
+      } else {
+        conflictRemote.value = result.current;
+        saveStatus.value = "conflict";
+      }
     } catch {
       saveStatus.value = "error";
     }
+  }
+
+  // Overwrite the other writer's save with what's in this tab right now.
+  function keepMine(): void {
+    if (!sequence.value || !conflictRemote.value) return;
+    sequence.value.etag = conflictRemote.value.etag;
+    conflictRemote.value = null;
+    saveStatus.value = "idle";
+    void saveNow();
+  }
+
+  // Discard local changes and load what the other writer saved.
+  function takeTheirs(): void {
+    if (!conflictRemote.value) return;
+    suppressAutosave = true;
+    sequence.value = conflictRemote.value;
+    body.value = conflictRemote.value.body;
+    undoStack.value = [];
+    redoStack.value = [];
+    conflictRemote.value = null;
+    saveStatus.value = "saved";
+    suppressAutosave = false;
   }
 
   watch(
@@ -165,6 +196,9 @@ export const useSequencerStore = defineStore("sequencer", () => {
     body,
     selectedEffectId,
     saveStatus,
+    conflictRemote,
+    keepMine,
+    takeTheirs,
     canUndo,
     canRedo,
     load,

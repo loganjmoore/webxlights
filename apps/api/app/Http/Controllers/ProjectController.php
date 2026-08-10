@@ -9,7 +9,10 @@ class ProjectController extends Controller
 {
     public function index(Request $request)
     {
-        return $request->user()->projects()->latest()->get();
+        $owned = $request->user()->projects()->latest()->get();
+        $shared = $request->user()->sharedProjects()->latest()->get();
+
+        return $owned->concat($shared)->values();
     }
 
     public function store(Request $request)
@@ -26,7 +29,7 @@ class ProjectController extends Controller
 
     public function show(Request $request, Project $project)
     {
-        abort_unless($project->owner_id === $request->user()->id, 403);
+        $project->authorize($request->user());
 
         return $project;
     }

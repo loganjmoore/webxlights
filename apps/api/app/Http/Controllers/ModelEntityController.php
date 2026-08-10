@@ -20,7 +20,7 @@ class ModelEntityController extends Controller
     // everything it parsed client-side in one request instead of one per model.
     public function bulkUpsert(Request $request, Layout $layout)
     {
-        $this->authorizeLayout($request, $layout);
+        $this->authorizeLayout($request, $layout, 'editor');
 
         $data = $request->validate([
             'models' => ['required', 'array'],
@@ -65,7 +65,7 @@ class ModelEntityController extends Controller
 
     public function update(Request $request, Layout $layout, ModelEntity $model)
     {
-        $this->authorizeLayout($request, $layout);
+        $this->authorizeLayout($request, $layout, 'editor');
         abort_unless($model->layout_id === $layout->id, 404);
 
         $data = $request->validate([
@@ -80,8 +80,8 @@ class ModelEntityController extends Controller
         return $model;
     }
 
-    private function authorizeLayout(Request $request, Layout $layout): void
+    private function authorizeLayout(Request $request, Layout $layout, string $need = 'viewer'): void
     {
-        abort_unless($layout->project->owner_id === $request->user()->id, 403);
+        $layout->project->authorize($request->user(), $need);
     }
 }

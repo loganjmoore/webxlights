@@ -9,7 +9,7 @@ class LayoutController extends Controller
 {
     public function index(Request $request, Project $project)
     {
-        abort_unless($project->owner_id === $request->user()->id, 403);
+        $project->authorize($request->user());
 
         // Backfill for projects created before layout auto-creation existed.
         if ($project->layouts()->doesntExist()) {

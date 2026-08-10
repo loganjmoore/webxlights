@@ -5,7 +5,9 @@ use App\Http\Controllers\LayoutController;
 use App\Http\Controllers\ModelEntityController;
 use App\Http\Controllers\ModelGroupController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectMemberController;
 use App\Http\Controllers\SequenceController;
+use App\Http\Controllers\SequenceVersionController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -30,5 +32,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('projects/{project}/sequences', [SequenceController::class, 'store']);
         Route::get('sequences/{sequence}', [SequenceController::class, 'show']);
         Route::put('sequences/{sequence}/body', [SequenceController::class, 'updateBody']);
+
+        Route::get('sequences/{sequence}/versions', [SequenceVersionController::class, 'index']);
+        Route::post('sequences/{sequence}/versions', [SequenceVersionController::class, 'store']);
+        Route::post('sequences/{sequence}/versions/{version}/restore', [SequenceVersionController::class, 'restore']);
+
+        Route::get('projects/{project}/members', [ProjectMemberController::class, 'index']);
+        Route::post('projects/{project}/members', [ProjectMemberController::class, 'store']);
+        Route::delete('projects/{project}/members/{user}', [ProjectMemberController::class, 'destroy']);
     });
 });

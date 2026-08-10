@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { EFFECT_SCHEMAS, defaultParamsFor } from "@webxlights/engine";
-import { api, type ModelRecord, type ModelGroupRecord, type SequenceEffect } from "../lib/api";
+import { api, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
@@ -27,6 +27,8 @@ const pendingEffectName = ref<string | null>(null);
 const zoomLevel = ref(1); // 1 of 3 zoom levels: 0.5x / 1x / 2x
 const ZOOM_STEPS = [0.5, 1, 2];
 const clipboard = ref<SequenceEffect | null>(null);
+const versions = ref<SequenceVersion[]>([]);
+const showHistory = ref(false);
 
 const pxPerMs = computed(() => {
   const containerWidth = 1200; // fit-to-width baseline before zoom
@@ -130,6 +132,24 @@ function exportFseq(): void {
   downloadFseq(bytes, store.sequence.name);
 }
 
+async function toggleHistory(): Promise<void> {
+  showHistory.value = !showHistory.value;
+  if (showHistory.value && store.sequence) versions.value = await api.listVersions(store.sequence.id);
+}
+
+async function snapshotNow(): Promise<void> {
+  if (!store.sequence) return;
+  const v = await api.snapshotVersion(store.sequence.id);
+  versions.value = [v, ...versions.value];
+}
+
+async function restoreVersion(versionId: number): Promise<void> {
+  if (!store.sequence) return;
+  await api.restoreVersion(store.sequence.id, versionId);
+  await store.load(store.sequence.id);
+  showHistory.value = false;
+}
+
 function onKeydown(e: KeyboardEvent): void {
   if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "SELECT") return;
 
@@ -190,8 +210,27 @@ watch(sequenceId, async (id) => {
         <option :value="2">2x</option>
       </select>
       <button @click="exportFseq" :disabled="!store.sequence">Export .fseq</button>
+      <button @click="snapshotNow" :disabled="!store.sequence">Snapshot</button>
+      <button @click="toggleHistory" :disabled="!store.sequence">History</button>
       <span class="save-status">{{ store.saveStatus }}</span>
     </header>
+
+    <div v-if="store.saveStatus === 'conflict'" class="conflict-banner">
+      <p>Someone else saved this sequence since you last loaded it. Keep your local changes, or take theirs?</p>
+      <button @click="store.keepMine">Keep mine</button>
+      <button @click="store.takeTheirs">Take theirs</button>
+    </div>
+
+    <div v-if="showHistory" class="history-panel">
+      <h2>Version history</h2>
+      <ul>
+        <li v-for="v in versions" :key="v.id">
+          <span>#{{ v.number }} — {{ v.creator?.name ?? "unknown" }} — {{ new Date(v.created_at).toLocaleString() }}</span>
+          <button @click="restoreVersion(v.id)">Restore</button>
+        </li>
+        <li v-if="versions.length === 0" class="empty">No snapshots yet — click "Snapshot" to create one.</li>
+      </ul>
+    </div>
 
     <div v-if="!audioLoaded" class="reselect-audio">
       <p>Re-select the audio file for this sequence (audio isn't stored server-side yet — see DECISIONS.md).</p>
@@ -288,6 +327,46 @@ header h1 {
   padding: 0.75rem 1rem;
   background: #241f10;
   font-size: 0.85rem;
+}
+.conflict-banner {
+  padding: 0.6rem 1rem;
+  background: #3a1f1f;
+  border-bottom: 1px solid #5a2f2f;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+.conflict-banner p {
+  margin: 0;
+  flex: 1;
+}
+.history-panel {
+  padding: 0.6rem 1rem;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  font-size: 0.85rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.history-panel h2 {
+  font-size: 0.85rem;
+  margin: 0 0 0.4rem;
+  color: #888;
+}
+.history-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.history-panel li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.25rem 0;
+}
+.history-panel .empty {
+  color: #666;
 }
 .palette {
   padding: 0.5rem 1rem;

@@ -27,6 +27,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export interface Project {
   id: number;
   name: string;
+  owner_id: number;
   created_at: string;
 }
 
@@ -114,6 +115,8 @@ export interface SequenceRecord {
   duration_ms: number;
   audio_filename: string | null;
   body: SequenceBody;
+  revision: number;
+  etag?: string;
 }
 
 export interface SequenceSummary {
@@ -122,6 +125,25 @@ export interface SequenceSummary {
   frame_ms: number;
   duration_ms: number;
 }
+
+export interface SequenceVersion {
+  id: number;
+  number: number;
+  body: SequenceBody;
+  created_by: number;
+  created_at: string;
+  creator?: { id: number; name: string };
+}
+
+export type AccessLevel = "owner" | "editor" | "viewer";
+
+export interface ProjectMember {
+  id: number;
+  role: Exclude<AccessLevel, "owner">;
+  user: User;
+}
+
+export type SaveBodyResult = { ok: true; data: SequenceRecord } | { ok: false; current: SequenceRecord };
 
 export const api = {
   async csrf(): Promise<void> {
@@ -151,6 +173,28 @@ export const api = {
   createSequence: (projectId: number, data: { name: string; frame_ms: number; duration_ms: number; audio_filename?: string }) =>
     request<SequenceRecord>(`/v1/projects/${projectId}/sequences`, { method: "POST", body: JSON.stringify(data) }),
   getSequence: (sequenceId: number) => request<SequenceRecord>(`/v1/sequences/${sequenceId}`),
-  saveSequenceBody: (sequenceId: number, body: SequenceBody) =>
-    request<SequenceRecord>(`/v1/sequences/${sequenceId}/body`, { method: "PUT", body: JSON.stringify({ body }) }),
+  // Returns { ok:false, current } on a 409 (someone else saved since this etag was read)
+  // instead of throwing, so the sequencer store can offer "keep mine" / "take theirs" rather
+  // than silently clobbering or crashing.
+  async saveSequenceBody(sequenceId: number, body: SequenceBody, ifMatch?: string): Promise<SaveBodyResult> {
+    const res = await fetch(`/api/v1/sequences/${sequenceId}/body`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ body, if_match: ifMatch }),
+    });
+    const json = await res.json();
+    if (res.status === 409) return { ok: false, current: json.current };
+    if (!res.ok) throw new ApiError(res.status, JSON.stringify(json));
+    return { ok: true, data: json };
+  },
+  listVersions: (sequenceId: number) => request<SequenceVersion[]>(`/v1/sequences/${sequenceId}/versions`),
+  snapshotVersion: (sequenceId: number) => request<SequenceVersion>(`/v1/sequences/${sequenceId}/versions`, { method: "POST" }),
+  restoreVersion: (sequenceId: number, versionId: number) =>
+    request<SequenceRecord>(`/v1/sequences/${sequenceId}/versions/${versionId}/restore`, { method: "POST" }),
+  listMembers: (projectId: number) => request<ProjectMember[]>(`/v1/projects/${projectId}/members`),
+  addMember: (projectId: number, email: string, role: "viewer" | "editor") =>
+    request<ProjectMember>(`/v1/projects/${projectId}/members`, { method: "POST", body: JSON.stringify({ email, role }) }),
+  removeMember: (projectId: number, userId: number) =>
+    request<void>(`/v1/projects/${projectId}/members/${userId}`, { method: "DELETE" }),
 };

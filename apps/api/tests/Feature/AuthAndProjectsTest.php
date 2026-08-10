@@ -33,6 +33,22 @@ class AuthAndProjectsTest extends TestCase
         $this->assertAuthenticated();
     }
 
+    // Regression: Auth::logout() (no guard arg) resolves to Sanctum's request-scoped
+    // RequestGuard here, which has no logout() method and 500s instead of clearing the
+    // session. Verified end-to-end against a real dev server too (register -> me:200 ->
+    // logout:204 -> me:401); asserting only 204 here since SESSION_DRIVER=array in tests
+    // plus Auth::shouldUse() persisting across simulated requests in one test method makes
+    // a same-test post-logout /me check an unreliable proxy for real guard state.
+    public function test_a_user_can_log_out(): void
+    {
+        $this->postJson('/api/auth/register', [
+            'name' => 'Logan', 'email' => 'logan@example.com',
+            'password' => 'correct-horse', 'password_confirmation' => 'correct-horse',
+        ])->assertCreated();
+
+        $this->postJson('/api/auth/logout')->assertNoContent();
+    }
+
     public function test_projects_endpoint_requires_authentication(): void
     {
         $this->getJson('/api/v1/projects')->assertUnauthorized();
