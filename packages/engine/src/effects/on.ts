@@ -1,11 +1,12 @@
 import type { RGBA } from "../color";
 import { hsvToRgb, rgbToHsv } from "../color";
 import type { RenderBuffer } from "../renderBuffer";
+import { resolveParam, type CurvedNumber } from "../valueCurve";
 
 export interface OnParams {
   startIntensity: number; // 0-100
   endIntensity: number; // 0-100
-  transparencyPct: number; // 0-100, 100 = fully transparent
+  transparencyPct: CurvedNumber; // 0-100, 100 = fully transparent; VC-eligible (SPEC ch9)
   cycles: number; // ramp repeats N times per effect (sawtooth)
   shimmer: boolean;
 }
@@ -15,7 +16,7 @@ export interface OnFrameContext {
   positionInEffect01: number; // 0..1 across effect duration (start->end ramp)
 }
 
-// SPEC ch8 "On": stateless per-frame fill. Spatial/value-curve color branch deferred to M6.
+// SPEC ch8 "On": stateless per-frame fill. Spatial color branch deferred to a later milestone.
 export function renderOn(buffer: RenderBuffer, palette: RGBA[], params: OnParams, ctx: OnFrameContext): void {
   let cidx = 0;
   if (params.shimmer) {
@@ -36,8 +37,9 @@ export function renderOn(buffer: RenderBuffer, palette: RGBA[], params: OnParams
     color = hsvToRgb(hsv.h, hsv.s, hsv.v * d, base.a);
   }
 
-  if (params.transparencyPct > 0) {
-    color = { ...color, a: Math.round(255 - (params.transparencyPct * 255) / 100) };
+  const transparencyPct = resolveParam(params.transparencyPct, ctx.positionInEffect01);
+  if (transparencyPct > 0) {
+    color = { ...color, a: Math.round(255 - (transparencyPct * 255) / 100) };
   }
 
   buffer.fill(color);

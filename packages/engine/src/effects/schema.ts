@@ -115,6 +115,60 @@ export const TWINKLE_EFFECT_SCHEMA: EffectSchema = {
   ],
 };
 
+export const STROBE_EFFECT_SCHEMA: EffectSchema = {
+  name: "Strobe",
+  params: [
+    { key: "numberStrobes", label: "Number Strobes", type: "intSlider", min: 1, max: 300, default: 3 },
+    { key: "duration", label: "Strobe Duration", type: "intSlider", min: 1, max: 100, default: 10 },
+    { key: "type", label: "Strobe Type", type: "intSlider", min: 1, max: 4, default: 1 },
+  ],
+};
+
+export const RIPPLE_EFFECT_SCHEMA: EffectSchema = {
+  name: "Ripple",
+  params: [
+    { key: "movement", label: "Movement", type: "choice", options: ["explode", "implode"], default: "explode" },
+    { key: "cycles", label: "Cycle Cnt", type: "floatSlider", min: 0, max: 30, step: 0.1, default: 1, valueCurve: true },
+    { key: "thickness", label: "Ripples", type: "intSlider", min: 1, max: 100, default: 3, valueCurve: true },
+  ],
+};
+
+export const WAVE_EFFECT_SCHEMA: EffectSchema = {
+  name: "Wave",
+  params: [
+    { key: "numberOfWavesDeg", label: "Number of Waves", type: "intSlider", min: 180, max: 3600, default: 900, valueCurve: true },
+    { key: "thicknessPct", label: "Thickness of Wave", type: "intSlider", min: 0, max: 100, default: 5, valueCurve: true },
+    { key: "heightPct", label: "Scale Height of Wave", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "speed", label: "Speed", type: "floatSlider", min: 0, max: 50, step: 0.1, default: 10, valueCurve: true },
+    { key: "leftToRight", label: "Left to Right", type: "checkbox", default: false },
+  ],
+};
+
+export const PINWHEEL_EFFECT_SCHEMA: EffectSchema = {
+  name: "Pinwheel",
+  params: [
+    { key: "arms", label: "#Arms", type: "intSlider", min: 1, max: 20, default: 3 },
+    { key: "armSizePct", label: "Size", type: "intSlider", min: 0, max: 400, default: 100, valueCurve: true },
+    { key: "thicknessPct", label: "Thick", type: "intSlider", min: 0, max: 100, default: 0, valueCurve: true },
+    { key: "speed", label: "Speed", type: "intSlider", min: 0, max: 50, default: 10, valueCurve: true },
+    { key: "counterClockwise", label: "Rotation (CCW)", type: "checkbox", default: true },
+  ],
+};
+
+export const SHOCKWAVE_EFFECT_SCHEMA: EffectSchema = {
+  name: "Shockwave",
+  params: [
+    { key: "centerXPct", label: "Center X", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "centerYPct", label: "Center Y", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "startRadius", label: "Radius1", type: "intSlider", min: 0, max: 750, default: 1, valueCurve: true },
+    { key: "endRadius", label: "Radius2", type: "intSlider", min: 0, max: 750, default: 10, valueCurve: true },
+    { key: "startWidth", label: "Width1", type: "intSlider", min: 0, max: 255, default: 5, valueCurve: true },
+    { key: "endWidth", label: "Width2", type: "intSlider", min: 0, max: 255, default: 10, valueCurve: true },
+    { key: "cycles", label: "Cycles", type: "intSlider", min: 1, max: 100, default: 1 },
+    { key: "blendEdges", label: "Blend Edges", type: "checkbox", default: true },
+  ],
+};
+
 export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   On: ON_EFFECT_SCHEMA,
   Bars: BARS_EFFECT_SCHEMA,
@@ -126,6 +180,11 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Snowflakes: SNOWFLAKES_EFFECT_SCHEMA,
   Spirals: SPIRALS_EFFECT_SCHEMA,
   Twinkle: TWINKLE_EFFECT_SCHEMA,
+  Strobe: STROBE_EFFECT_SCHEMA,
+  Ripple: RIPPLE_EFFECT_SCHEMA,
+  Wave: WAVE_EFFECT_SCHEMA,
+  Pinwheel: PINWHEEL_EFFECT_SCHEMA,
+  Shockwave: SHOCKWAVE_EFFECT_SCHEMA,
 };
 
 export function defaultParamsFor(effectName: string): Record<string, number | boolean | string> {

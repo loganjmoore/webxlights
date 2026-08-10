@@ -15,12 +15,19 @@ import { renderSingleStrandChase, type SingleStrandChaseParams } from "./effects
 import { createFireState, renderFire, type FireParams } from "./effects/fire";
 import { createMeteorsState, renderMeteors, type MeteorsParams } from "./effects/meteors";
 import { createSnowflakesState, renderSnowflakes, type SnowflakesParams } from "./effects/snowflakes";
+import { renderStrobe, createStrobeState, type StrobeParams } from "./effects/strobe";
+import { renderRipple, type RippleParams } from "./effects/ripple";
+import { renderWave, type WaveParams } from "./effects/wave";
+import { renderPinwheel, type PinwheelParams } from "./effects/pinwheel";
+import { renderShockwave, type ShockwaveParams } from "./effects/shockwave";
+import { applyFadeTransition, type TransitionSpec } from "./transition";
 
 export interface RenderableEffect {
   name: string;
   startMs: number;
   endMs: number;
   params: Record<string, unknown>;
+  transition?: TransitionSpec;
 }
 
 export interface RenderableRow {
@@ -33,7 +40,7 @@ const MAX_LAYERS = 5;
 // Effects with per-frame state (heat map / particle list) that must be simulated forward
 // frame-by-frame from the effect's start to reach `atMs` - correct for a scrubbing preview
 // (not a real-time constraint), cheap at typical effect lengths (a few hundred frames).
-const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes"]);
+const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe"]);
 
 function renderStateless(buffer: RenderBuffer, palette: RGBA[], effect: RenderableEffect, atMs: number, seed: number): void {
   const duration = effect.endMs - effect.startMs || 1;
@@ -63,6 +70,18 @@ function renderStateless(buffer: RenderBuffer, palette: RGBA[], effect: Renderab
     case "SingleStrand":
       renderSingleStrandChase(buffer, palette, effect.params as unknown as SingleStrandChaseParams, ctx);
       break;
+    case "Ripple":
+      renderRipple(buffer, palette, effect.params as unknown as RippleParams, ctx);
+      break;
+    case "Wave":
+      renderWave(buffer, palette, effect.params as unknown as WaveParams, ctx);
+      break;
+    case "Pinwheel":
+      renderPinwheel(buffer, palette, effect.params as unknown as PinwheelParams, ctx);
+      break;
+    case "Shockwave":
+      renderShockwave(buffer, palette, effect.params as unknown as ShockwaveParams, ctx);
+      break;
     default:
       break; // unknown effect name: leave the layer transparent rather than throw
   }
@@ -86,6 +105,10 @@ function renderStateful(buffer: RenderBuffer, palette: RGBA[], effect: Renderabl
     const params = effect.params as unknown as SnowflakesParams;
     const state = createSnowflakesState(buffer.width, buffer.height, 5, seed);
     for (let f = 0; f <= framesElapsed; f++) renderSnowflakes(buffer, palette, params, state);
+  } else if (effect.name === "Strobe") {
+    const params = effect.params as unknown as StrobeParams;
+    const state = createStrobeState(seed);
+    for (let f = 0; f <= framesElapsed; f++) renderStrobe(buffer, palette, params, state);
   }
 }
 
@@ -102,6 +125,7 @@ export function renderRowAtMs(row: RenderableRow, atMs: number, frameMs: number,
     render: (buffer: RenderBuffer) => {
       if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(buffer, palette, effect, atMs, frameMs, seed);
       else renderStateless(buffer, palette, effect, atMs, seed);
+      if (effect.transition) applyFadeTransition(buffer, effect, atMs, effect.transition);
     },
     blendMode: "Normal" as BlendMode,
     effectMixThreshold: 0,
