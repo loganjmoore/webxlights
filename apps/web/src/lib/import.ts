@@ -15,6 +15,7 @@ function extractScreenPosition(attrs: Record<string, string>) {
   return {
     x: attrs.WorldPosX ? parseFloat(attrs.WorldPosX) : 0,
     y: attrs.WorldPosY ? parseFloat(attrs.WorldPosY) : 0,
+    z: attrs.WorldPosZ ? parseFloat(attrs.WorldPosZ) : 0,
     scale: attrs.ScaleX ? parseFloat(attrs.ScaleX) : 1,
     rotate: attrs.RotateZ ? parseFloat(attrs.RotateZ) : 0,
   };

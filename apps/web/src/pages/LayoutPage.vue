@@ -5,6 +5,7 @@ import { api, type ControllerRecord, type Layout, type ModelRecord } from "../li
 import { importRgbEffects } from "../lib/import";
 import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas from "../components/LayoutCanvas.vue";
+import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
 
 const route = useRoute();
 const projectId = computed(() => Number(route.params.projectId));
@@ -15,6 +16,35 @@ const controllers = ref<ControllerRecord[]>([]);
 const assignErrors = ref<Record<number, string>>({});
 const importing = ref(false);
 const importMessage = ref("");
+const selectedModelId = ref<number | null>(null);
+const viewMode = ref<"2d" | "3d">("2d");
+const selectedModel = computed(() => models.value.find((m) => m.id === selectedModelId.value) ?? null);
+
+// First real caller of api.updateModel() (previously unused anywhere in the app) - the
+// persist path M12 exists to prove. ModelEntityController::update replaces `screen` wholesale,
+// it does not deep-merge, so this must always spread the model's existing screen values and
+// override only the changed keys, or a drag silently wipes scale/rotate/z. See DECISIONS.md.
+async function updateScreen(modelId: number, patch: Partial<{ x: number; y: number; z: number; scale: number; rotate: number }>): Promise<void> {
+  if (!layout.value) return;
+  const model = models.value.find((m) => m.id === modelId);
+  if (!model) return;
+  const updated = await api.updateModel(layout.value.id, modelId, { screen: { ...model.screen, ...patch } });
+  const idx = models.value.findIndex((m) => m.id === modelId);
+  if (idx !== -1) models.value[idx] = updated;
+}
+
+function handleMove(modelId: number, x: number, y: number): void {
+  void updateScreen(modelId, { x, y });
+}
+function handleMove3D(modelId: number, x: number, y: number, z: number): void {
+  void updateScreen(modelId, { x, y, z });
+}
+function handlePositionField(field: "x" | "y" | "z" | "scale" | "rotate", raw: string): void {
+  if (!selectedModel.value) return;
+  const value = Number(raw);
+  if (Number.isNaN(value)) return;
+  void updateScreen(selectedModel.value.id, { [field]: value });
+}
 
 async function loadLayout(): Promise<void> {
   const [layouts, controllerList] = await Promise.all([api.listLayouts(projectId.value), api.listControllers(projectId.value)]);
@@ -93,6 +123,10 @@ onMounted(loadLayout);
     <header>
       <router-link to="/projects">&larr; Projects</router-link>
       <h1>Layout</h1>
+      <div class="view-toggle">
+        <button :class="{ active: viewMode === '2d' }" @click="viewMode = '2d'">2D</button>
+        <button :class="{ active: viewMode === '3d' }" @click="viewMode = '3d'">3D</button>
+      </div>
       <router-link :to="`/projects/${projectId}/controllers`" class="controllers-link">Controllers &rarr;</router-link>
       <router-link :to="`/projects/${projectId}/sequences`" class="sequences-link">Sequences &rarr;</router-link>
       <label class="import-btn">
@@ -105,7 +139,12 @@ onMounted(loadLayout);
       <aside class="model-list">
         <h2>Models ({{ models.length }})</h2>
         <ul>
-          <li v-for="m in models" :key="m.id" :class="{ unsupported: !m.supported }">
+          <li
+            v-for="m in models"
+            :key="m.id"
+            :class="{ unsupported: !m.supported, selected: m.id === selectedModelId }"
+            @click="selectedModelId = m.id"
+          >
             {{ m.name }} <span class="type">{{ m.type }}</span>
             <span v-if="m.start_channel" class="channel">ch {{ m.start_channel }}</span>
             <div class="controller-assign">
@@ -127,9 +166,52 @@ onMounted(loadLayout);
           </li>
         </ul>
         <p v-if="models.length === 0" class="empty">No models yet — import a show to get started.</p>
+
+        <div v-if="selectedModel" class="position-panel">
+          <h2>Position</h2>
+          <label>
+            X
+            <input type="number" :value="selectedModel.screen.x ?? 0" @change="handlePositionField('x', ($event.target as HTMLInputElement).value)" />
+          </label>
+          <label>
+            Y
+            <input type="number" :value="selectedModel.screen.y ?? 0" @change="handlePositionField('y', ($event.target as HTMLInputElement).value)" />
+          </label>
+          <label>
+            Z
+            <input type="number" :value="selectedModel.screen.z ?? 0" @change="handlePositionField('z', ($event.target as HTMLInputElement).value)" />
+          </label>
+          <label>
+            Scale
+            <input
+              type="number"
+              step="0.1"
+              min="0.1"
+              :value="selectedModel.screen.scale ?? 1"
+              @change="handlePositionField('scale', ($event.target as HTMLInputElement).value)"
+            />
+          </label>
+          <label>
+            Rotate
+            <input type="number" :value="selectedModel.screen.rotate ?? 0" @change="handlePositionField('rotate', ($event.target as HTMLInputElement).value)" />
+          </label>
+        </div>
       </aside>
       <div class="canvas-wrap">
-        <LayoutCanvas :models="models" />
+        <LayoutCanvas
+          v-if="viewMode === '2d'"
+          :models="models"
+          :selected-model-id="selectedModelId"
+          @select="selectedModelId = $event"
+          @move="handleMove"
+        />
+        <LayoutCanvas3D
+          v-else
+          :models="models"
+          :selected-model-id="selectedModelId"
+          @select="selectedModelId = $event"
+          @move="handleMove3D"
+        />
       </div>
     </div>
   </main>
@@ -148,6 +230,19 @@ header {
   display: flex;
   align-items: baseline;
   gap: 1rem;
+}
+.view-toggle {
+  display: flex;
+  gap: 0.25rem;
+}
+.view-toggle button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}
+.view-toggle button.active {
+  background: #e8c468;
+  color: #111;
+  border-color: #e8c468;
 }
 .controllers-link {
   margin-left: auto;
@@ -188,7 +283,16 @@ header {
   font-size: 0.85rem;
 }
 .model-list li {
-  padding: 0.25rem 0;
+  padding: 0.25rem 0.3rem;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.model-list li:hover {
+  background: #1a1a20;
+}
+.model-list li.selected {
+  background: #2c2712;
+  outline: 1px solid #e8c468;
 }
 .model-list li.unsupported {
   opacity: 0.5;
@@ -224,6 +328,29 @@ header {
   margin: 0 0 0.4rem;
   color: #e57373;
   font-size: 0.7rem;
+}
+.position-panel {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #333;
+}
+.position-panel h2 {
+  font-size: 0.9rem;
+  font-weight: normal;
+  color: #888;
+  margin: 0 0 0.5rem;
+}
+.position-panel label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #aaa;
+  margin-bottom: 0.4rem;
+}
+.position-panel input {
+  width: 5rem;
+  font-size: 0.8rem;
 }
 .canvas-wrap {
   flex: 1;

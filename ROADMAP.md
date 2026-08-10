@@ -18,17 +18,7 @@ Work milestone by milestone, in order. Each milestone: deployed to Render, CHANG
 - [x] **M9** — Hardening + parity harness + docs (reduced scope — see DECISIONS.md). Fixed a real O(n²) full-export perf bug (stateful effects replayed from start every frame — now a proper sequential renderer, ~6.2s for the 20k-channel/3.6k-frame budget vs. a 60s ceiling); grid virtualization (fixed-viewport canvas, only visible rows drawn); a last-resort error banner for uncaught errors; an onboarding sample project (synthesized demo audio + pre-built layout/sequence) reachable from a first-time signup with zero manual file handling; `/docs` (import guide + an effect reference generated from the param registry); `PARITY.md`. OPFS spill, the worker-pool/SAB render architecture, and a real `xLights --headless` parity harness are honest, documented gaps, not attempted — see DECISIONS.md.
 - [x] **M10** — Sequencer interaction parity (see DECISIONS.md). Timing marks rendered on a pinned ruler row (click-to-add, right-click-to-delete); left-edge resize handle mirroring the existing right-edge one; snap-to-timing-mark on move/resize; a right-click context menu (copy/cut/paste/duplicate/delete). Plus two real bugs fixed in the same code: horizontal zoom/scroll (canvas now sizes to real content width instead of clipping at the container edge) and undo snapshotting per pointermove during a drag (now snapshots once at drag start). A CSS `overflow-x` quirk (an unset axis silently computing to `auto` when its sibling isn't `visible`) was caught only by live verification, not code review — see DECISIONS.md. Effect-type glyphs and multi-select/multi-drag are stated cuts, not silent gaps.
 - [x] **M11** — Controllers (see DECISIONS.md). A real `controllers` table + CRUD, `ControllersPage.vue`, per-model controller assignment from the Layout page (server-validated: an assignment that overflows the controller's channel span 422s at save time), and an `.fseq` export rewrite through real `controller.start_channel`-based addressing instead of import-order concatenation — unassigned models' byte positions now shift once any controller has models assigned, a real stated behavior change. DDP first; E1.31 universe math and `xlights_networks.xml` import are deferred together with one reason. Verified live by parsing the actual exported bytes back: two controller-assigned models land at their exact computed offsets with a clean non-overlapping boundary, and the unassigned third model's bytes start right after the controller-routed span.
-
-## Planned next: M12
-
-Full spec, reviewed three ways (technical feasibility, xLights UX-parity,
-scope discipline) before being written down: `NEXT-MILESTONES.md`.
-
-- **M12** — Layout editing, 2D first then 3D: this repo has never shipped 2D drag-to-
-  reposition (documented ceiling since M1) — M12 builds that first (proves the `updateModel()`
-  persist path, which currently has zero callers), then adds a 3D editing mode. **Reverses
-  the 3D non-goal below** for editing only — 3D live-preview rendering fidelity (textures,
-  mesh objects) stays out of scope, see NEXT-MILESTONES.md.
+- [x] **M12** — Layout editing, 2D first then 3D (see DECISIONS.md). `LayoutCanvas.vue`'s pure read-only `draw()` (a ceiling since M1) now supports drag-to-reposition — the first real caller of `api.updateModel()` anywhere in the app. `screen` grows a `z` field; `LayoutPage.vue` gets a 2D/3D toggle, a 3D `LayoutCanvas3D.vue` (OrbitControls + DragControls, per-model picking via invisible pick meshes rather than raycasting the shared `Points` cloud directly), and an X/Y/Z/Scale/Rotate position panel. The model-list sidebar stays the primary selection mechanism in 3D, synced both ways with canvas clicks. Verified live end-to-end including a full page reload: 2D drag moved a model by the exact expected world-space delta with scale/rotate untouched; 3D orbit, list-and-canvas selection sync (with a visible wireframe highlight), `DragControls` drag, and direct position-panel edits all persisted correctly. Also fixed a real production blocker reported live mid-milestone: nginx's default 1MB upload limit 413'd real show-file imports — see DECISIONS.md.
 
 ## Non-goals for v1 (hard scope fence)
 
@@ -38,9 +28,9 @@ Deferred, each has a SPEC chapter for later:
 - xSchedule / scheduling / show-player features (SPEC ch13)
 - AC/ramp mode (SPEC ch1 LOR legacy)
 - DMX moving-head/servo/skull model family (SPEC ch4 §5)
-- 3D layout *editing* — reversed by planned M12 above (2D drag-to-reposition, then 3D
-  orbit/pan/zoom + drag-to-move). Mesh/GDTF objects and per-preview cameras remain out of
-  scope, and M12 does not add textured/image-mapped 3D rendering fidelity (SPEC ch5)
+- 3D layout *editing* is shipped (M12 above) — this line is now only about rendering fidelity.
+  Mesh/GDTF objects, per-preview cameras, and textured/image-mapped 3D rendering (SPEC ch5)
+  remain out of scope; `HousePreview.vue` stays a flat, untextured `THREE.Points` cloud
 - Shader (ISF), Liquid (physics), Glediator/Guitar/Piano/Video effects (SPEC ch7-8)
 - Lyric tracks + phoneme faces — Faces effect ships as static-matrix subset only if trivial, else defer (SPEC ch1 §2c)
 - Papagayo/LOR/Vixen imports — only native xLights .xsq/.rgbeffects/.xmap in v1 (SPEC ch14)

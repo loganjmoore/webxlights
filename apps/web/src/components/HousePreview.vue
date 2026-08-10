@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as THREE from "three";
 import { computeGeometryFromAttrs, renderRowAtMs, type ModelGeometry } from "@webxlights/engine";
 import type { ModelRecord, SequenceBody } from "../lib/api";
+import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 
 const props = defineProps<{
   models: ModelRecord[];
@@ -21,9 +22,7 @@ const SEED = 12345;
 const NODE_SPACING = 4; // matches LayoutCanvas's local-unit-to-px scale
 
 const containerRef = ref<HTMLDivElement | null>(null);
-let renderer: THREE.WebGLRenderer | null = null;
-let scene: THREE.Scene | null = null;
-let camera: THREE.PerspectiveCamera | null = null;
+let setup: SceneSetup | null = null;
 let points: THREE.Points | null = null;
 let rafId: number | null = null;
 
@@ -95,7 +94,7 @@ function updateColors(): void {
 }
 
 function fitCameraToScene(): void {
-  if (!camera) return;
+  if (!setup) return;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const entry of rowEntries) {
     const mx = entry.model.screen.x ?? 0;
@@ -109,6 +108,7 @@ function fitCameraToScene(): void {
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
   const span = Math.max(maxX - minX, maxY - minY, 10);
+  const { camera } = setup;
   camera.position.set(cx, cy, span * 1.3);
   camera.lookAt(cx, cy, 0);
   camera.near = 1;
@@ -120,12 +120,7 @@ function initScene(): void {
   const container = containerRef.value;
   if (!container) return;
 
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0a0d);
-  camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 1, 5000);
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(container.clientWidth, container.clientHeight);
-  container.appendChild(renderer.domElement);
+  setup = createScene(container);
 
   buildGeometryCache();
   const positions = buildPositions();
@@ -136,13 +131,13 @@ function initScene(): void {
   geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   const material = new THREE.PointsMaterial({ size: 3, vertexColors: true, sizeAttenuation: false });
   points = new THREE.Points(geo, material);
-  scene.add(points);
+  setup.scene.add(points);
 
   fitCameraToScene();
   updateColors();
 
   const animate = () => {
-    if (renderer && scene && camera) renderer.render(scene, camera);
+    if (setup) setup.renderer.render(setup.scene, setup.camera);
     rafId = requestAnimationFrame(animate);
   };
   animate();
@@ -150,10 +145,8 @@ function initScene(): void {
 
 function handleResize(): void {
   const container = containerRef.value;
-  if (!container || !renderer || !camera) return;
-  renderer.setSize(container.clientWidth, container.clientHeight);
-  camera.aspect = container.clientWidth / container.clientHeight;
-  camera.updateProjectionMatrix();
+  if (!container || !setup) return;
+  resizeScene(setup, container);
 }
 
 onMounted(() => {
@@ -163,7 +156,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener("resize", handleResize);
   if (rafId) cancelAnimationFrame(rafId);
-  renderer?.dispose();
+  if (setup && containerRef.value) disposeScene(setup, containerRef.value);
 });
 
 watch(() => [props.playheadMs, props.body], updateColors, { deep: true });
