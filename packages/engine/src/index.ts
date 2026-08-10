@@ -14,3 +14,4 @@ export * from "./models/wreath";
 export * from "./models/custom";
 export * from "./models/fromAttrs";
 export * from "./effects/on";
+export * from "./effects/schema";

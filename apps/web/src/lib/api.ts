@@ -83,6 +83,46 @@ export interface GroupUpsertPayload {
   memberNames: string[];
 }
 
+export interface SequenceEffect {
+  id: string;
+  name: string;
+  startMs: number;
+  endMs: number;
+  params: Record<string, number | boolean>;
+}
+
+export interface SequenceRow {
+  elementType: "model" | "group";
+  elementId: number;
+  effects: SequenceEffect[];
+}
+
+export interface TimingTrack {
+  name: string;
+  marks: number[];
+}
+
+export interface SequenceBody {
+  timingTracks: TimingTrack[];
+  rows: SequenceRow[];
+}
+
+export interface SequenceRecord {
+  id: number;
+  name: string;
+  frame_ms: number;
+  duration_ms: number;
+  audio_filename: string | null;
+  body: SequenceBody;
+}
+
+export interface SequenceSummary {
+  id: number;
+  name: string;
+  frame_ms: number;
+  duration_ms: number;
+}
+
 export const api = {
   async csrf(): Promise<void> {
     await fetch("/sanctum/csrf-cookie", { credentials: "include" });
@@ -107,4 +147,10 @@ export const api = {
   listModelGroups: (layoutId: number) => request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups`),
   bulkUpsertModelGroups: (layoutId: number, groups: GroupUpsertPayload[]) =>
     request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups/bulk`, { method: "POST", body: JSON.stringify({ groups }) }),
+  listSequences: (projectId: number) => request<SequenceSummary[]>(`/v1/projects/${projectId}/sequences`),
+  createSequence: (projectId: number, data: { name: string; frame_ms: number; duration_ms: number; audio_filename?: string }) =>
+    request<SequenceRecord>(`/v1/projects/${projectId}/sequences`, { method: "POST", body: JSON.stringify(data) }),
+  getSequence: (sequenceId: number) => request<SequenceRecord>(`/v1/sequences/${sequenceId}`),
+  saveSequenceBody: (sequenceId: number, body: SequenceBody) =>
+    request<SequenceRecord>(`/v1/sequences/${sequenceId}/body`, { method: "PUT", body: JSON.stringify({ body }) }),
 };

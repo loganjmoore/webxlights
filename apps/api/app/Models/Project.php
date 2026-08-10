@@ -27,4 +27,9 @@ class Project extends Model
     {
         return $this->hasMany(Layout::class);
     }
+
+    public function sequences(): HasMany
+    {
+        return $this->hasMany(Sequence::class);
+    }
 }

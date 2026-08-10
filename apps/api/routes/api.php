@@ -5,6 +5,7 @@ use App\Http\Controllers\LayoutController;
 use App\Http\Controllers\ModelEntityController;
 use App\Http\Controllers\ModelGroupController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\SequenceController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -24,5 +25,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('layouts/{layout}/model-groups', [ModelGroupController::class, 'index']);
         Route::post('layouts/{layout}/model-groups/bulk', [ModelGroupController::class, 'bulkUpsert']);
+
+        Route::get('projects/{project}/sequences', [SequenceController::class, 'index']);
+        Route::post('projects/{project}/sequences', [SequenceController::class, 'store']);
+        Route::get('sequences/{sequence}', [SequenceController::class, 'show']);
+        Route::put('sequences/{sequence}/body', [SequenceController::class, 'updateBody']);
     });
 });

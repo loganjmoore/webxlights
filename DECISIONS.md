@@ -37,6 +37,19 @@ Locked technical decisions (goal prompt §4). Do not relitigate without recordin
 - Screen placement on import uses `WorldPosX/Y` (+`ScaleX` for Boxed types) only — gives correct *relative* positions between models but not exact per-type rotation/shear (3pt Angle/Shear/Height, 2pt X2/Y2 endpoints).
 - Layout canvas is read-only render for M1 — no drag-to-reposition, no background photo underlay (needs R2, deferred to M2).
 
+## M2 simplifications (documented ceilings, not silent gaps)
+
+- Audio is not persisted server-side (R2 still blocked, see M0 note above). Sequences store `audio_filename` + `duration_ms` only; the browser holds the decoded `AudioBuffer` in memory for the session and prompts to re-select the file after a reload. Effect placements/timing tracks persist normally via autosave.
+- Undo/redo snapshots the whole `SequenceBody` per action (capped at 100) rather than xLights' true command-pattern inverses — simpler and cheap at M2's data scale (a handful of rows/effects); revisit if per-action memory becomes real once shows have thousands of effects.
+- Grid virtualization is architecturally canvas-based (satisfies the "no DOM timeline libs" decision) but not yet optimized for the M9 perf budget (100 visible rows / 5k effects) — it draws every row every frame, fine at M2's scale.
+- Only the "On" effect has a param schema (`EFFECT_SCHEMAS`) since it's the only effect implemented so far; the palette will grow with M3/M6.
+- Timing tracks support manual marks only (hotkey `t`); fixed-interval/beat-bar generators are unimplemented.
+
+## Bugs found only by actually running the UI (not caught by typecheck/lint)
+
+- **Stale canvas height on first data load**: `SequencerGrid`'s canvas height is bound via an inline `style` derived from `rows.length`, and its `watch(..., draw)` read `getBoundingClientRect()` on the same tick rows went from empty to populated — Vue's default pre-flush timing meant `draw()` ran *before* the DOM's new inline height was applied, so the grid rendered at 0px height (invisible) the first time real data arrived. Fixed with `{ flush: "post" }`. Same risk applies to any canvas component that both derives its own size from reactive data *and* redraws on that data changing.
+- **`structuredClone()` throws on Pinia-reactive objects**: the sequencer store's undo/copy/paste helpers called `structuredClone()` directly on `body.value` (a Vue reactive Proxy), which throws `DataCloneError: could not be cloned` in Chrome. Because `pushUndoSnapshot()` runs *before* the actual mutation in every store action, this silently aborted every single effect placement/move/resize/delete — the UI looked completely inert (arm an effect, drag, nothing happens) with no visible error unless you were watching the console. Fixed by cloning via `JSON.parse(JSON.stringify(...))` instead, which reads through the proxy fine for our plain-JSON `SequenceBody` shape. General lesson: never call `structuredClone()` directly on a Pinia/Vue reactive ref's value — unwrap with `toRaw()` or JSON round-trip first.
+
 ## Deviation log
 
 - 2026-08-10: `composer create-project laravel/laravel` installs Laravel 13.x (goal prompt said "12.x-ish LTS"). Laravel 12 is not what `laravel/laravel` resolves to as of this date; using current stable 13 instead of pinning back to an EOL-adjacent 12.

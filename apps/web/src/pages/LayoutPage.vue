@@ -53,6 +53,7 @@ onMounted(loadLayout);
     <header>
       <router-link to="/projects">&larr; Projects</router-link>
       <h1>Layout</h1>
+      <router-link :to="`/projects/${projectId}/sequences`" class="sequences-link">Sequences &rarr;</router-link>
       <label class="import-btn">
         {{ importing ? "Importing..." : "Import xlights_rgbeffects.xml" }}
         <input type="file" accept=".xml" @change="handleFileChange" :disabled="importing" hidden />
@@ -91,8 +92,10 @@ header {
   align-items: baseline;
   gap: 1rem;
 }
-.import-btn {
+.sequences-link {
   margin-left: auto;
+}
+.import-btn {
   cursor: pointer;
   padding: 0.4rem 0.8rem;
   border: 1px solid #555;
