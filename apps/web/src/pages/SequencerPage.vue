@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { EFFECT_SCHEMAS, defaultParamsFor } from "@webxlights/engine";
-import { api, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
+import { EFFECT_SCHEMAS, defaultParamsFor, type AudioSeries, type TransitionSpec } from "@webxlights/engine";
+import { api, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
+import { analyzeAudioBuffer } from "../lib/audioAnalysis";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
@@ -23,8 +24,11 @@ const peaks = ref<PeakBucket[]>([]);
 const audioEl = ref<HTMLAudioElement | null>(null);
 const audioUrl = ref<string | null>(null);
 const audioLoaded = ref(false);
+const audioSeries = ref<AudioSeries | undefined>(undefined);
+const analysingAudio = ref(false);
 const playheadMs = ref(0);
 const playing = ref(false);
+const previewExpanded = ref(false);
 const pendingEffectName = ref<string | null>(null);
 const zoomLevel = ref(1); // 1 of 3 zoom levels: 0.5x / 1x / 2x
 const ZOOM_STEPS = [0.5, 1, 2];
@@ -76,6 +80,17 @@ async function loadAudioFile(file: File): Promise<void> {
   peaks.value = computePeaks(buffer, 800);
   audioUrl.value = URL.createObjectURL(file);
   audioLoaded.value = true;
+
+  // Per-frame level + spectrum for the audio-reactive effects, analysed once here so the
+  // preview and the .fseq export read the same numbers. It's a synchronous sweep over the
+  // whole track (a second or so for a full song), so the UI says what it's doing first.
+  analysingAudio.value = true;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  try {
+    audioSeries.value = analyzeAudioBuffer(buffer, store.sequence?.frame_ms ?? 50);
+  } finally {
+    analysingAudio.value = false;
+  }
 }
 
 function togglePlay(): void {
@@ -99,7 +114,28 @@ function seekTo(ms: number): void {
   if (el) el.currentTime = ms / 1000;
 }
 
+// The <audio> element's own timeupdate event only fires about four times a second, which is
+// fine for a clock readout and far too coarse for a 3D preview - the visualizer would step
+// through the show in visible jumps. While playing, the playhead is driven off rAF instead and
+// timeupdate is only used to catch up after a seek or a pause.
+let playheadRaf: number | null = null;
+
 function onTimeUpdate(): void {
+  if (!playing.value && audioEl.value) playheadMs.value = Math.round(audioEl.value.currentTime * 1000);
+}
+
+function startPlayheadTracking(): void {
+  if (playheadRaf !== null) return;
+  const tick = (): void => {
+    if (audioEl.value) playheadMs.value = Math.round(audioEl.value.currentTime * 1000);
+    playheadRaf = requestAnimationFrame(tick);
+  };
+  playheadRaf = requestAnimationFrame(tick);
+}
+
+function stopPlayheadTracking(): void {
+  if (playheadRaf !== null) cancelAnimationFrame(playheadRaf);
+  playheadRaf = null;
   if (audioEl.value) playheadMs.value = Math.round(audioEl.value.currentTime * 1000);
 }
 
@@ -127,8 +163,12 @@ function handleSelect(effectId: string | null): void {
   store.selectedEffectId = effectId;
 }
 
-function handleParamsUpdate(params: Record<string, number | boolean | string>): void {
+function handleParamsUpdate(params: Record<string, EffectParamValue>): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { params });
+}
+
+function handleTransitionUpdate(transition: TransitionSpec): void {
+  if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { transition });
 }
 
 function addTimingMarkAtPlayhead(): void {
@@ -138,7 +178,7 @@ function addTimingMarkAtPlayhead(): void {
 
 function exportFseq(): void {
   if (!store.sequence) return;
-  const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence);
+  const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, audioSeries.value);
   downloadFseq(bytes, store.sequence.name);
 }
 
@@ -179,7 +219,7 @@ async function fppUpload(): Promise<void> {
   fppBusy.value = true;
   fppStatus.value = "Uploading...";
   try {
-    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence);
+    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, audioSeries.value);
     const filename = `${store.sequence.name}.fseq`;
     await uploadFseqToFpp(fppHost.value.trim(), filename, bytes);
     fppStatus.value = `Uploaded ${filename} to ${fppSystemInfo.value.HostName}.`;
@@ -228,11 +268,17 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
+  stopPlayheadTracking();
   if (audioUrl.value) URL.revokeObjectURL(audioUrl.value);
 });
 watch(sequenceId, async (id) => {
   await store.load(id);
   audioLoaded.value = false;
+  audioSeries.value = undefined;
+});
+watch(playing, (isPlaying) => {
+  if (isPlaying) startPlayheadTracking();
+  else stopPlayheadTracking();
 });
 </script>
 
@@ -304,6 +350,9 @@ watch(sequenceId, async (id) => {
       <p>Re-select the audio file for this sequence (audio isn't stored server-side yet — see DECISIONS.md).</p>
       <input type="file" accept="audio/*" @change="onAudioFilePicked" />
     </div>
+    <div v-else-if="analysingAudio" class="reselect-audio">
+      <p>Analysing the track for the audio-reactive effects…</p>
+    </div>
 
     <audio
       v-if="audioUrl"
@@ -330,8 +379,16 @@ watch(sequenceId, async (id) => {
 
     <div class="editor">
       <div class="timeline">
-        <div class="preview-wrap">
-          <HousePreview :models="modelRecords" :body="store.body" :playhead-ms="playheadMs" :frame-ms="store.sequence?.frame_ms ?? 50" />
+        <div class="preview-wrap" :class="{ expanded: previewExpanded }">
+          <HousePreview
+            :models="modelRecords"
+            :body="store.body"
+            :playhead-ms="playheadMs"
+            :frame-ms="store.sequence?.frame_ms ?? 50"
+            :audio="audioSeries"
+            :expanded="previewExpanded"
+            @toggle-expand="previewExpanded = !previewExpanded"
+          />
         </div>
         <Waveform :peaks="peaks" :duration-ms="store.sequence?.duration_ms ?? 0" :px-per-ms="pxPerMs" :playhead-ms="playheadMs" @seek="seekTo" />
         <div class="grid-scroll">
@@ -351,7 +408,12 @@ watch(sequenceId, async (id) => {
         </div>
       </div>
       <aside class="props">
-        <EffectPropsPanel :effect="selectedEffect" @update="handleParamsUpdate" />
+        <EffectPropsPanel
+          :effect="selectedEffect"
+          :has-audio="!!audioSeries"
+          @update="handleParamsUpdate"
+          @update-transition="handleTransitionUpdate"
+        />
       </aside>
     </div>
   </main>
@@ -491,6 +553,11 @@ header h1 {
 .preview-wrap {
   height: 220px;
   border-bottom: 1px solid #333;
+}
+/* Expanded gives the visualizer most of the window, for watching a sequence play back rather
+   than editing it - the grid is still there underneath, just scrolled out of the way. */
+.preview-wrap.expanded {
+  height: calc(100vh - 220px);
 }
 .grid-scroll {
   overflow-x: auto;

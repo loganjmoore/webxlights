@@ -1,3 +1,5 @@
+import type { PictureImage, TransitionSpec, ValueCurve } from "@webxlights/engine";
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -84,12 +86,18 @@ export interface GroupUpsertPayload {
   memberNames: string[];
 }
 
+// A param is a flat value, a ValueCurve that animates it across the effect (valueCurve.ts),
+// or - for Pictures - a decoded image. All JSON-safe, so they survive autosave, snapshots and
+// the package-show export like any other param.
+export type EffectParamValue = number | boolean | string | ValueCurve | PictureImage;
+
 export interface SequenceEffect {
   id: string;
   name: string;
   startMs: number;
   endMs: number;
-  params: Record<string, number | boolean | string>;
+  params: Record<string, EffectParamValue>;
+  transition?: TransitionSpec;
 }
 
 export interface SequenceRow {

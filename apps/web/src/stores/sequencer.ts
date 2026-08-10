@@ -53,7 +53,24 @@ export const useSequencerStore = defineStore("sequencer", () => {
     suppressAutosave = false;
   }
 
-  function pushUndoSnapshot(): void {
+  // Dragging a slider or a value-curve point fires an update per pointer event. Snapshotting
+  // each one would bury every earlier action under a hundred one-pixel steps (and blow the
+  // undo limit), so consecutive updates of the same kind, to the same effect, within
+  // COALESCE_WINDOW_MS reuse the first snapshot - which is the state the user actually wants
+  // to get back to. Passing no key always snapshots (discrete actions: place, delete, paste).
+  const COALESCE_WINDOW_MS = 700;
+  let lastUndoKey: string | null = null;
+  let lastUndoAt = 0;
+
+  function pushUndoSnapshot(coalesceKey?: string): void {
+    const now = Date.now();
+    if (coalesceKey && coalesceKey === lastUndoKey && now - lastUndoAt < COALESCE_WINDOW_MS) {
+      lastUndoAt = now;
+      return;
+    }
+    lastUndoKey = coalesceKey ?? null;
+    lastUndoAt = now;
+
     undoStack.value.push(cloneBody(body.value));
     if (undoStack.value.length > UNDO_LIMIT) undoStack.value.shift();
     redoStack.value = [];
@@ -87,8 +104,10 @@ export const useSequencerStore = defineStore("sequencer", () => {
     ensureRow(elementType, elementId).effects.push(effect);
   }
 
-  function updateEffect(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params">>): void {
-    pushUndoSnapshot();
+  function updateEffect(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params" | "transition">>): void {
+    // key on what changed as well as which effect, so a param drag and a timeline drag on the
+    // same effect stay separately undoable
+    pushUndoSnapshot(`${Object.keys(patch).sort().join(",")}:${effectId}`);
     for (const row of body.value.rows) {
       const effect = row.effects.find((e) => e.id === effectId);
       if (effect) Object.assign(effect, patch);

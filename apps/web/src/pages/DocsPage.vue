@@ -1,14 +1,22 @@
 <script setup lang="ts">
-import { EFFECT_SCHEMAS } from "@webxlights/engine";
+import { AUDIO_REACTIVE_EFFECTS, EFFECT_SCHEMAS, TRANSITION_TYPES, VALUE_CURVE_TYPES } from "@webxlights/engine";
 
 const effectNames = Object.keys(EFFECT_SCHEMAS);
+const valueCurveTypes = VALUE_CURVE_TYPES.join(", ");
+const transitionTypes = TRANSITION_TYPES.join(", ");
 
 function paramTypeLabel(type: string): string {
   if (type === "intSlider") return "integer";
   if (type === "floatSlider") return "decimal";
   if (type === "checkbox") return "on/off";
   if (type === "choice") return "choice";
+  if (type === "text") return "text";
+  if (type === "image") return "image";
   return type;
+}
+
+function isAudioReactive(name: string): boolean {
+  return AUDIO_REACTIVE_EFFECTS.has(name);
 }
 </script>
 
@@ -41,11 +49,40 @@ function paramTypeLabel(type: string): string {
       <p>No xLights show handy? Click "Load sample project" from the Projects page for a working example with a layout, audio, and effects already placed.</p>
     </section>
 
+    <section id="curves">
+      <h2>Value curves</h2>
+      <p>
+        Any parameter with a <strong>VC</strong> button next to it can animate across the effect instead of holding one
+        value. Click VC, pick a shape, and set the range the parameter sweeps between. Curve types:
+        {{ valueCurveTypes }}. Periodic shapes (sine, square, saw tooth, triangle) add a cycle count and a phase offset;
+        <em>Custom</em> gives you a point editor — click to add a point, drag to move it, shift-click to remove.
+      </p>
+    </section>
+
+    <section id="transitions">
+      <h2>Transitions</h2>
+      <p>
+        Each effect can fade or wipe itself in and out independently of what it draws. Open the
+        <strong>Transitions</strong> section in the props panel and set an in/out duration, then pick a type:
+        {{ transitionTypes }}. Blinds, Slide Bars and Checkerboard also take a pattern-density knob, and any type can be
+        reversed.
+      </p>
+    </section>
+
+    <section id="audio">
+      <h2>Audio-reactive effects</h2>
+      <p>
+        Load a track and it's analysed once into a per-frame level and spectrum, which the VU Meter effect renders from.
+        The same analysis feeds the .fseq export, so what the 3D preview shows is what the exported file plays. Without
+        a track loaded, an audio-reactive effect renders nothing rather than a misleading flat colour.
+      </p>
+    </section>
+
     <section id="effects">
       <h2>Effect reference</h2>
       <p>Generated from the same parameter registry the sequencer's props panel reads — always matches what's actually placeable today.</p>
       <div v-for="name in effectNames" :key="name" class="effect">
-        <h3>{{ name }}</h3>
+        <h3>{{ name }} <span v-if="isAudioReactive(name)" class="audio-tag">needs audio</span></h3>
         <table>
           <thead>
             <tr>
@@ -102,6 +139,15 @@ h2 {
 .effect h3 {
   margin-bottom: 0.4rem;
   font-size: 1rem;
+}
+.audio-tag {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: #8a6d1f;
+  border: 1px solid #d9c07a;
+  border-radius: 3px;
+  padding: 0 4px;
+  vertical-align: middle;
 }
 table {
   width: 100%;

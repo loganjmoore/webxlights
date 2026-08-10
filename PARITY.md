@@ -16,7 +16,8 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Screen placement on import | ⚠️ | `WorldPosX/Y` + `ScaleX` only — correct relative position, not exact rotation/shear |
 | Layout canvas | ⚠️ | Read-only render; no drag-to-reposition, no background photo underlay |
 | 2D layout | ✅ | Canvas-based |
-| 3D layout, view objects, mesh/GDTF | ❌ | Non-goal for v1 (SPEC ch5) |
+| 3D preview / house visualizer | ✅ | Three.js, orbit/zoom/pan, per-model depth from `WorldPosZ`, glow bulbs, ground grid, camera presets, plays the sequence at display refresh rate |
+| 3D layout *editing*, view objects, mesh/GDTF | ❌ | Non-goal for v1 (SPEC ch5) — models are still positioned in the 2D layout, the 3D view is display-only |
 | DMX moving-head/servo/skull family | ❌ | Non-goal for v1 (SPEC ch4 §5) |
 
 ## Sequencer (SPEC ch6)
@@ -35,12 +36,15 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 
 | Feature | Status | Notes |
 |---|---|---|
-| Effects implemented | ⚠️ | 15 of ~56 named effects (On, Bars, Color Wash, Fire, Meteors, Butterfly, SingleStrand, Snowflakes, Spirals, Twinkle, Strobe, Ripple, Wave, Pinwheel, Shockwave) |
+| Effects implemented | ⚠️ | 25 of ~56 named effects (On, Bars, Color Wash, Fire, Meteors, Butterfly, SingleStrand, Snowflakes, Spirals, Twinkle, Strobe, Ripple, Wave, Pinwheel, Shockwave, Garlands, Curtain, Plasma, Galaxy, Fan, Marquee, Circles, Text, Pictures, VU Meter) |
 | Each implemented effect's default/common render path | ✅ | Faithful to the SPEC's math; rarer option combinations (alternate directions, other render methods, etc.) are per-effect documented ceilings — see DECISIONS.md M3/M6 notes |
-| Shader (ISF), Liquid, Glediator, Video, VUMeter | ❌ | Non-goal for v1 / no audio-reactive pipeline yet |
+| Audio-reactive effects (VU Meter) | ⚠️ | 7 of ~20 VU Meter types (Spectrum, Volume Bars, Level Bar, Level Pulse, Level Color, Intensity Wave, Waveform), on an offline per-frame FFT of the loaded track |
+| Text effect | ⚠️ | Built-in 5×7 bitmap font only — no system font picker, outline/shadow options, or multi-line layout |
+| Pictures effect | ⚠️ | Images stored in the sequence body, downscaled to 64px on the long edge (no asset store yet) |
+| Shader (ISF), Liquid, Glediator, Video | ❌ | Non-goal for v1 |
 | Layer blend modes | ⚠️ | 10 of 24 (Normal, Effect 1/2, Average, Additive, Subtractive, Max, Min, 1/2 reveals) |
-| Value curves | ⚠️ | One type (Ramp/linear), wired to one param (`On.transparencyPct`) as a proof of the mechanism |
-| Transitions | ⚠️ | Fade In/Out only; no Wipe/From Middle/Circle Explode |
+| Value curves | ✅ | All 16 types (Flat, Ramp, Ramp Up/Down, Ramp Down/Up, Saw Tooth, Triangle, Sine, Abs Sine, Square, Parabolic Up/Down, Logarithmic Up/Down, Exponential Up/Down, Custom) with cycles/phase/reverse and a point editor, applied to every VC-flagged param of every effect |
+| Transitions | ✅ | 16 types (Fade, Wipe, Wipe Vertical, From Middle, To Middle, Square Explode/Implode, Circle Explode/Implode, Clock, Blinds, Slide Bars, Bow Tie, Star, Checkerboard, Ripple), in and out, with pattern density and reverse |
 | Buffer styles / sub-buffers | ❌ | Every effect renders into the model's default full buffer |
 
 ## File formats (SPEC ch11)
@@ -48,7 +52,7 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Feature | Status | Notes |
 |---|---|---|
 | `.xlights_rgbeffects.xml` import | ⚠️ | Unsupported `DisplayAs` types import as labeled placeholders, not dropped |
-| `.xsq` import | ⚠️ | 5 of 15 implemented effects get full param translation; others import with correct name/timing, schema-default params; exact-name-only model matching |
+| `.xsq` import | ⚠️ | 5 of 25 implemented effects get full param translation; others import with correct name/timing, schema-default params; exact-name-only model matching |
 | `.fseq` export | ⚠️ | V2 uncompressed only (no zlib/zstd); placeholder channel layout (no real controller/universe allocation) |
 | `.fseq` import | ❌ | Not implemented |
 | `.xmodel`, `.xtiming`, `.xmap`, `.xpreset` | ❌ | Not implemented |
@@ -99,5 +103,5 @@ the SPEC's own `AGENTS.md`). This needs a real xLights install to run headless i
 isn't available in this environment — building the harness's plumbing without ever running it
 against real xLights output wouldn't actually prove anything. Documented here as a real gap, not
 attempted, rather than claimed done. The engine's own golden-frame and determinism tests (106
-tests in `packages/engine`, hand-computed where the math is tractable by hand) are the
-practical substitute today.
+tests in `packages/engine` at M9, hand-computed where the math is tractable by hand) are the
+practical substitute today (234 tests in `packages/engine` as of the M6-completion pass).

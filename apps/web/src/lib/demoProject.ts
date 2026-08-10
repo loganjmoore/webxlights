@@ -81,7 +81,10 @@ function demoModels(): ModelUpsertPayload[] {
       type: "Matrix",
       supported: true,
       params: {},
-      raw_attrs: { NumStrings: "16", NodesPerString: "16" },
+      // WorldPosZ is what the 3D preview reads for depth. Real xLights layouts carry it; the
+      // sample gives the two props different depths so the visualizer opens on an actual 3D
+      // scene rather than a flat wall you can only orbit edge-on.
+      raw_attrs: { NumStrings: "16", NodesPerString: "16", WorldPosZ: "0" },
       screen: { x: 0, y: 0, scale: 1 },
       strings: 16,
       nodes_per_string: 16,
@@ -94,7 +97,7 @@ function demoModels(): ModelUpsertPayload[] {
       type: "Arches",
       supported: true,
       params: {},
-      raw_attrs: { NumArches: "1", NodesPerArch: "50", Arc: "180" },
+      raw_attrs: { NumArches: "1", NodesPerArch: "50", Arc: "180", WorldPosZ: "90" },
       screen: { x: 200, y: 0, scale: 1 },
       strings: 1,
       nodes_per_string: 50,
@@ -117,8 +120,19 @@ function demoSequenceBody(matrixId: number, archId: number): SequenceBody {
             id: newEffectId(),
             name: "Color Wash",
             startMs: 0,
-            endMs: DEMO_DURATION_MS,
+            endMs: DEMO_DURATION_MS / 2,
             params: { ...defaultParamsFor("Color Wash"), cycles: 2 },
+            // shows the transition system doing something other than a fade on first run
+            transition: { inType: "Circle Explode", inDurationMs: 800, outType: "Fade", outDurationMs: 600 },
+          },
+          {
+            id: newEffectId(),
+            name: "VU Meter",
+            startMs: DEMO_DURATION_MS / 2,
+            endMs: DEMO_DURATION_MS,
+            // the demo audio is synthesized, so the spectrum has something real to react to
+            params: { ...defaultParamsFor("VU Meter"), type: "Spectrum", bars: 16 },
+            transition: { inType: "Wipe", inDurationMs: 500 },
           },
         ],
       },
@@ -130,8 +144,16 @@ function demoSequenceBody(matrixId: number, archId: number): SequenceBody {
             id: newEffectId(),
             name: "Twinkle",
             startMs: 0,
-            endMs: DEMO_DURATION_MS,
+            endMs: DEMO_DURATION_MS / 2,
             params: defaultParamsFor("Twinkle"),
+          },
+          {
+            id: newEffectId(),
+            name: "Marquee",
+            startMs: DEMO_DURATION_MS / 2,
+            endMs: DEMO_DURATION_MS,
+            // a value curve on Speed, so the sample show demonstrates one without any setup
+            params: { ...defaultParamsFor("Marquee"), speed: { type: "Ramp", min: 2, max: 30 } },
           },
         ],
       },

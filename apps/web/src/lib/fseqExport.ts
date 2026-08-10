@@ -1,14 +1,13 @@
 import { writeFseqV2 } from "@webxlights/formats";
-import { computeGeometryFromAttrs, createRowSequencer, nodeColorsToChannelBytes, type ModelGeometry } from "@webxlights/engine";
+import {
+  computeGeometryFromAttrs,
+  createRowSequencer,
+  nodeColorsToChannelBytes,
+  type AudioSeries,
+  type ModelGeometry,
+} from "@webxlights/engine";
 import type { ModelRecord, SequenceBody, SequenceRecord } from "./api";
-
-// ponytail: same fixed default palette as the live preview (HousePreview.vue) - no palette
-// editor exists yet (M6/M7).
-const DEFAULT_PALETTE = [
-  { r: 255, g: 200, b: 120, a: 255 },
-  { r: 80, g: 160, b: 255, a: 255 },
-];
-const SEED = 12345;
+import { DEFAULT_PALETTE, PREVIEW_SEED as SEED } from "./renderSettings";
 
 function extractRgbOrder(stringType: string | null): string {
   const match = stringType?.match(/^([RGB]{3})/i);
@@ -19,7 +18,12 @@ function extractRgbOrder(stringType: string | null): string {
 // layout, not a real controller/universe allocation (SPEC ch3's "channels/universes/
 // controllers" is display + export math only in v1 per the goal prompt; a proper per-
 // controller channel map is out of scope until that's built).
-export function exportSequenceToFseq(models: ModelRecord[], body: SequenceBody, sequence: SequenceRecord): Uint8Array {
+export function exportSequenceToFseq(
+  models: ModelRecord[],
+  body: SequenceBody,
+  sequence: SequenceRecord,
+  audio?: AudioSeries,
+): Uint8Array {
   const frameMs = sequence.frame_ms;
   const frameCount = Math.max(1, Math.ceil(sequence.duration_ms / frameMs));
 
@@ -45,7 +49,7 @@ export function exportSequenceToFseq(models: ModelRecord[], body: SequenceBody, 
     const geo = geometries[i];
     if (!geo) return null;
     const rowEffects = body.rows.filter((r) => r.elementType === "model" && r.elementId === model.id).flatMap((r) => r.effects);
-    return createRowSequencer({ geometry: geo, effects: rowEffects }, frameMs, SEED, DEFAULT_PALETTE);
+    return createRowSequencer({ geometry: geo, effects: rowEffects }, frameMs, SEED, DEFAULT_PALETTE, audio);
   });
 
   const frames: Uint8Array[] = [];

@@ -5,6 +5,7 @@ import type { ModelGeometry } from "./models/types";
 import { renderLayerStack, type LayerSpec } from "./layerStack";
 import { bufferToNodeColors } from "./nodeMapping";
 import type { BlendMode } from "./blend";
+import { audioFrameAt, type AudioSeries } from "./audio";
 import { renderOn, type OnParams } from "./effects/on";
 import { renderBars, type BarsParams } from "./effects/bars";
 import { renderColorWash, type ColorWashParams } from "./effects/colorWash";
@@ -20,7 +21,19 @@ import { renderRipple, type RippleParams } from "./effects/ripple";
 import { renderWave, type WaveParams } from "./effects/wave";
 import { renderPinwheel, type PinwheelParams } from "./effects/pinwheel";
 import { renderShockwave, type ShockwaveParams } from "./effects/shockwave";
-import { applyFadeTransition, type TransitionSpec } from "./transition";
+import { renderGarlands, type GarlandsParams } from "./effects/garlands";
+import { renderCurtain, type CurtainParams } from "./effects/curtain";
+import { renderPlasma, type PlasmaParams } from "./effects/plasma";
+import { renderGalaxy, type GalaxyParams } from "./effects/galaxy";
+import { renderFan, type FanParams } from "./effects/fan";
+import { renderMarquee, type MarqueeParams } from "./effects/marquee";
+import { renderCircles, type CirclesParams } from "./effects/circles";
+import { renderText, type TextParams } from "./effects/text";
+import { renderPictures, type PicturesParams } from "./effects/pictures";
+import { renderVuMeter, type VuMeterParams } from "./effects/vuMeter";
+import type { FrameContext } from "./effects/types";
+import { resolveParamsAtPosition } from "./valueCurve";
+import { applyTransitions, type TransitionSpec } from "./transition";
 
 export interface RenderableEffect {
   name: string;
@@ -42,80 +55,157 @@ const MAX_LAYERS = 5;
 // (not a real-time constraint), cheap at typical effect lengths (a few hundred frames).
 const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe"]);
 
-function renderStateless(buffer: RenderBuffer, palette: RGBA[], effect: RenderableEffect, atMs: number, seed: number): void {
+function positionOf(effect: RenderableEffect, atMs: number): number {
   const duration = effect.endMs - effect.startMs || 1;
-  const positionInEffect01 = Math.max(0, Math.min(1, (atMs - effect.startMs) / duration));
+  return Math.max(0, Math.min(1, (atMs - effect.startMs) / duration));
+}
+
+// Every effect sees plain numbers: any param holding a ValueCurve is collapsed here, once per
+// effect per frame, so a curve works on every VC-flagged param without the effect knowing.
+function paramsAt(effect: RenderableEffect, position01: number): Record<string, unknown> {
+  return resolveParamsAtPosition(effect.params, position01);
+}
+
+function renderStateless(
+  buffer: RenderBuffer,
+  palette: RGBA[],
+  effect: RenderableEffect,
+  atMs: number,
+  seed: number,
+  audio: AudioSeries | undefined,
+): void {
+  const positionInEffect01 = positionOf(effect, atMs);
   const frameIndexInEffect = 0; // shimmer/parity-only field; scrubbing doesn't track frame parity
-  const ctx = { frameIndexInEffect, positionInEffect01, seed };
+  // Left undefined when the sequence has no analysed track, so audio-reactive effects can tell
+  // "no audio loaded" apart from "this frame of the song is silent".
+  const ctx: FrameContext = {
+    frameIndexInEffect,
+    positionInEffect01,
+    seed,
+    audio: audio ? audioFrameAt(audio, atMs) : undefined,
+  };
+  const params = paramsAt(effect, positionInEffect01);
 
   switch (effect.name) {
     case "On":
-      renderOn(buffer, palette, effect.params as unknown as OnParams, ctx);
+      renderOn(buffer, palette, params as unknown as OnParams, ctx);
       break;
     case "Bars":
-      renderBars(buffer, palette, effect.params as unknown as BarsParams, ctx);
+      renderBars(buffer, palette, params as unknown as BarsParams, ctx);
       break;
     case "Color Wash":
-      renderColorWash(buffer, palette, effect.params as unknown as ColorWashParams, ctx);
+      renderColorWash(buffer, palette, params as unknown as ColorWashParams, ctx);
       break;
     case "Butterfly":
-      renderButterfly(buffer, palette, effect.params as unknown as ButterflyParams, ctx);
+      renderButterfly(buffer, palette, params as unknown as ButterflyParams, ctx);
       break;
     case "Spirals":
-      renderSpirals(buffer, palette, effect.params as unknown as SpiralsParams, ctx);
+      renderSpirals(buffer, palette, params as unknown as SpiralsParams, ctx);
       break;
     case "Twinkle":
-      renderTwinkle(buffer, palette, effect.params as unknown as TwinkleParams, ctx);
+      renderTwinkle(buffer, palette, params as unknown as TwinkleParams, ctx);
       break;
     case "SingleStrand":
-      renderSingleStrandChase(buffer, palette, effect.params as unknown as SingleStrandChaseParams, ctx);
+      renderSingleStrandChase(buffer, palette, params as unknown as SingleStrandChaseParams, ctx);
       break;
     case "Ripple":
-      renderRipple(buffer, palette, effect.params as unknown as RippleParams, ctx);
+      renderRipple(buffer, palette, params as unknown as RippleParams, ctx);
       break;
     case "Wave":
-      renderWave(buffer, palette, effect.params as unknown as WaveParams, ctx);
+      renderWave(buffer, palette, params as unknown as WaveParams, ctx);
       break;
     case "Pinwheel":
-      renderPinwheel(buffer, palette, effect.params as unknown as PinwheelParams, ctx);
+      renderPinwheel(buffer, palette, params as unknown as PinwheelParams, ctx);
       break;
     case "Shockwave":
-      renderShockwave(buffer, palette, effect.params as unknown as ShockwaveParams, ctx);
+      renderShockwave(buffer, palette, params as unknown as ShockwaveParams, ctx);
+      break;
+    case "Garlands":
+      renderGarlands(buffer, palette, params as unknown as GarlandsParams, ctx);
+      break;
+    case "Curtain":
+      renderCurtain(buffer, palette, params as unknown as CurtainParams, ctx);
+      break;
+    case "Plasma":
+      renderPlasma(buffer, palette, params as unknown as PlasmaParams, ctx);
+      break;
+    case "Galaxy":
+      renderGalaxy(buffer, palette, params as unknown as GalaxyParams, ctx);
+      break;
+    case "Fan":
+      renderFan(buffer, palette, params as unknown as FanParams, ctx);
+      break;
+    case "Marquee":
+      renderMarquee(buffer, palette, params as unknown as MarqueeParams, ctx);
+      break;
+    case "Circles":
+      renderCircles(buffer, palette, params as unknown as CirclesParams, ctx);
+      break;
+    case "Text":
+      renderText(buffer, palette, params as unknown as TextParams, ctx);
+      break;
+    case "Pictures":
+      renderPictures(buffer, palette, params as unknown as PicturesParams, ctx);
+      break;
+    case "VU Meter":
+      renderVuMeter(buffer, palette, params as unknown as VuMeterParams, ctx);
       break;
     default:
       break; // unknown effect name: leave the layer transparent rather than throw
   }
 }
 
-function renderStateful(buffer: RenderBuffer, palette: RGBA[], effect: RenderableEffect, atMs: number, frameMs: number, seed: number): void {
+function renderStateful(
+  buffer: RenderBuffer,
+  palette: RGBA[],
+  effect: RenderableEffect,
+  atMs: number,
+  frameMs: number,
+  seed: number,
+): void {
   const duration = effect.endMs - effect.startMs || 1;
   const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
 
   if (effect.name === "Fire") {
     const state = createFireState(buffer.width, buffer.height, seed);
-    const params = effect.params as unknown as FireParams;
     for (let f = 0; f <= framesElapsed; f++) {
-      renderFire(buffer, params, { frameIndexInEffect: f, positionInEffect01: (f * frameMs) / duration, seed }, state);
+      const position01 = Math.min(1, (f * frameMs) / duration);
+      const params = paramsAt(effect, position01) as unknown as FireParams;
+      renderFire(buffer, params, { frameIndexInEffect: f, positionInEffect01: position01, seed }, state);
     }
   } else if (effect.name === "Meteors") {
     const state = createMeteorsState(seed);
-    const params = effect.params as unknown as MeteorsParams;
-    for (let f = 0; f <= framesElapsed; f++) renderMeteors(buffer, palette, params, state);
+    for (let f = 0; f <= framesElapsed; f++) {
+      const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as MeteorsParams;
+      renderMeteors(buffer, palette, params, state);
+    }
   } else if (effect.name === "Snowflakes") {
-    const params = effect.params as unknown as SnowflakesParams;
     const state = createSnowflakesState(buffer.width, buffer.height, 5, seed);
-    for (let f = 0; f <= framesElapsed; f++) renderSnowflakes(buffer, palette, params, state);
+    for (let f = 0; f <= framesElapsed; f++) {
+      const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as SnowflakesParams;
+      renderSnowflakes(buffer, palette, params, state);
+    }
   } else if (effect.name === "Strobe") {
-    const params = effect.params as unknown as StrobeParams;
     const state = createStrobeState(seed);
-    for (let f = 0; f <= framesElapsed; f++) renderStrobe(buffer, palette, params, state);
+    for (let f = 0; f <= framesElapsed; f++) {
+      const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as StrobeParams;
+      renderStrobe(buffer, palette, params, state);
+    }
   }
 }
 
 // Renders one row (model or group) at a given playhead time: finds effects active at atMs
 // (row.effects array order = layer order, bottom-to-top, Normal blend - M2's data model has
 // no explicit layer index yet), composites via the M3 layer stack, and maps to node colors.
-export function renderRowAtMs(row: RenderableRow, atMs: number, frameMs: number, seed: number, palette: RGBA[]): RGBA[] {
+// `audio` is the analysed track (audio.ts); omit it and audio-reactive effects see silence.
+export function renderRowAtMs(
+  row: RenderableRow,
+  atMs: number,
+  frameMs: number,
+  seed: number,
+  palette: RGBA[],
+  audio?: AudioSeries,
+): RGBA[] {
   const active = row.effects.filter((e) => atMs >= e.startMs && atMs < e.endMs).slice(-MAX_LAYERS);
   if (active.length === 0) {
     return row.geometry.nodes.map(() => rgba(0, 0, 0, 0));
@@ -124,8 +214,8 @@ export function renderRowAtMs(row: RenderableRow, atMs: number, frameMs: number,
   const layers: LayerSpec[] = active.map((effect) => ({
     render: (buffer: RenderBuffer) => {
       if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(buffer, palette, effect, atMs, frameMs, seed);
-      else renderStateless(buffer, palette, effect, atMs, seed);
-      if (effect.transition) applyFadeTransition(buffer, effect, atMs, effect.transition);
+      else renderStateless(buffer, palette, effect, atMs, seed, audio);
+      if (effect.transition) applyTransitions(buffer, effect, atMs, effect.transition);
     },
     blendMode: "Normal" as BlendMode,
     effectMixThreshold: 0,
@@ -150,7 +240,13 @@ export interface RowSequencer {
 // 0..N one-at-a-time via stored state produces byte-identical output to the original
 // replay-from-start loop, just without redoing frames 0..(k-1) on every call.
 // Caller MUST call renderFrameAt with strictly increasing atMs, one call per frame, in order.
-export function createRowSequencer(row: RenderableRow, frameMs: number, seed: number, palette: RGBA[]): RowSequencer {
+export function createRowSequencer(
+  row: RenderableRow,
+  frameMs: number,
+  seed: number,
+  palette: RGBA[],
+  audio?: AudioSeries,
+): RowSequencer {
   const statefulStates = new Map<number, unknown>(); // keyed by index into row.effects
 
   function renderFrameAt(atMs: number): RGBA[] {
@@ -168,9 +264,9 @@ export function createRowSequencer(row: RenderableRow, frameMs: number, seed: nu
         if (STATEFUL_EFFECTS.has(effect.name)) {
           renderStatefulIncremental(buffer, palette, effect, atMs, frameMs, seed, index, statefulStates);
         } else {
-          renderStateless(buffer, palette, effect, atMs, seed);
+          renderStateless(buffer, palette, effect, atMs, seed, audio);
         }
-        if (effect.transition) applyFadeTransition(buffer, effect, atMs, effect.transition);
+        if (effect.transition) applyTransitions(buffer, effect, atMs, effect.transition);
       },
       blendMode: "Normal" as BlendMode,
       effectMixThreshold: 0,
@@ -195,38 +291,36 @@ function renderStatefulIncremental(
 ): void {
   const duration = effect.endMs - effect.startMs || 1;
   const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
+  const position01 = Math.min(1, (framesElapsed * frameMs) / duration);
+  const params = paramsAt(effect, position01);
 
   if (effect.name === "Fire") {
-    const params = effect.params as unknown as FireParams;
     let state = states.get(key) as ReturnType<typeof createFireState> | undefined;
     if (!state) {
       state = createFireState(buffer.width, buffer.height, seed);
       states.set(key, state);
     }
-    renderFire(buffer, params, { frameIndexInEffect: framesElapsed, positionInEffect01: (framesElapsed * frameMs) / duration, seed }, state);
+    renderFire(buffer, params as unknown as FireParams, { frameIndexInEffect: framesElapsed, positionInEffect01: position01, seed }, state);
   } else if (effect.name === "Meteors") {
-    const params = effect.params as unknown as MeteorsParams;
     let state = states.get(key) as ReturnType<typeof createMeteorsState> | undefined;
     if (!state) {
       state = createMeteorsState(seed);
       states.set(key, state);
     }
-    renderMeteors(buffer, palette, params, state);
+    renderMeteors(buffer, palette, params as unknown as MeteorsParams, state);
   } else if (effect.name === "Snowflakes") {
-    const params = effect.params as unknown as SnowflakesParams;
     let state = states.get(key) as ReturnType<typeof createSnowflakesState> | undefined;
     if (!state) {
       state = createSnowflakesState(buffer.width, buffer.height, 5, seed);
       states.set(key, state);
     }
-    renderSnowflakes(buffer, palette, params, state);
+    renderSnowflakes(buffer, palette, params as unknown as SnowflakesParams, state);
   } else if (effect.name === "Strobe") {
-    const params = effect.params as unknown as StrobeParams;
     let state = states.get(key) as ReturnType<typeof createStrobeState> | undefined;
     if (!state) {
       state = createStrobeState(seed);
       states.set(key, state);
     }
-    renderStrobe(buffer, palette, params, state);
+    renderStrobe(buffer, palette, params as unknown as StrobeParams, state);
   }
 }
