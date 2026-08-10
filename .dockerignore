@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+vendor
+**/vendor
+apps/api/bootstrap/cache/*.php
+apps/api/storage/logs/*
+apps/api/storage/framework/cache/data/*
+apps/api/storage/framework/sessions/*
+apps/api/storage/framework/views/*
+apps/api/.env
+apps/api/database/*.sqlite
+apps/web/dist
+.git

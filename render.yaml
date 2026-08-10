@@ -1,0 +1,57 @@
+databases:
+  - name: webxlights-db
+    plan: basic-1gb
+    postgresMajorVersion: "17"
+
+services:
+  - type: web
+    name: webxlights-web
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /up
+    preDeployCommand: php artisan migrate --force
+    envVars:
+      - key: APP_NAME
+        value: webXLights
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        generateValue: true
+      - key: APP_URL
+        fromService:
+          type: web
+          name: webxlights-web
+          property: host
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DATABASE_URL
+        fromDatabase:
+          name: webxlights-db
+          property: connectionString
+      - key: SESSION_DRIVER
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      # R2 + SANCTUM_STATEFUL_DOMAINS are set manually in the Render dashboard
+      # (bucket/domain don't exist until M0's provisioning step is approved).
+
+  - type: worker
+    name: webxlights-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    dockerCommand: php artisan queue:work --tries=3
+    envVars:
+      - key: APP_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: webxlights-db
+          property: connectionString
+      - key: QUEUE_CONNECTION
+        value: database
