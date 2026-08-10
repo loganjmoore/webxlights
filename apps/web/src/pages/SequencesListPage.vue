@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { parseXsq } from "@webxlights/formats";
 import { api, type SequenceSummary } from "../lib/api";
 import { decodeAudioFile } from "../lib/audio";
+import { newEffectId } from "../stores/sequencer";
 
 const route = useRoute();
 const router = useRouter();
@@ -14,6 +16,8 @@ const frameMs = ref(50);
 const audioFile = ref<File | null>(null);
 const creating = ref(false);
 const error = ref("");
+const importing = ref(false);
+const importMessage = ref("");
 
 const FRAME_OPTIONS = [20, 25, 33, 40, 50]; // SPEC ch6
 
@@ -50,6 +54,75 @@ async function createSequence(): Promise<void> {
   }
 }
 
+// SPEC ch11 §4: import a .xsq. Model rows are matched to the layout's models by exact name
+// only (xLights' full mapping dialog with fuzzy/manual matching is a documented ceiling);
+// unmatched rows and effects with no param translation are reported, not silently dropped.
+async function importXsq(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  importing.value = true;
+  importMessage.value = "";
+  try {
+    const text = await file.text();
+    const parsed = parseXsq(text);
+
+    const layouts = await api.listLayouts(projectId.value);
+    const layout = layouts[0];
+    const models = layout ? await api.listModels(layout.id) : [];
+    const modelIdByName = new Map(models.map((m) => [m.name, m.id]));
+
+    const record = await api.createSequence(projectId.value, {
+      name: file.name.replace(/\.xsq$/i, ""),
+      frame_ms: parsed.frameMs,
+      duration_ms: parsed.durationMs,
+      audio_filename: parsed.mediaFilename || undefined,
+    });
+
+    const unmatchedModels: string[] = [];
+    const rows = parsed.rows
+      .filter((r) => r.elementType === "model")
+      .map((r) => {
+        const elementId = modelIdByName.get(r.name);
+        if (elementId === undefined) {
+          unmatchedModels.push(r.name);
+          return null;
+        }
+        return {
+          elementType: "model" as const,
+          elementId,
+          effects: r.effects.map((eff) => ({
+            id: newEffectId(),
+            name: eff.name,
+            startMs: eff.startMs,
+            endMs: eff.endMs,
+            params: eff.params as Record<string, number | boolean | string>,
+          })),
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    const timingTracks = parsed.rows
+      .filter((r) => r.elementType === "timing")
+      .map((r) => ({ name: r.name, marks: r.effects.map((e) => e.startMs) }));
+
+    await api.saveSequenceBody(record.id, { rows, timingTracks });
+
+    const parts = [`Imported ${rows.length} model rows`];
+    if (unmatchedModels.length) parts.push(`${unmatchedModels.length} model names had no match in this layout: ${unmatchedModels.join(", ")}`);
+    if (parsed.unsupportedEffectNames.length) parts.push(`effects imported without full param translation: ${parsed.unsupportedEffectNames.join(", ")}`);
+    importMessage.value = parts.join(" — ");
+
+    router.push({ name: "sequencer", params: { projectId: projectId.value, sequenceId: record.id } });
+  } catch (err) {
+    importMessage.value = err instanceof Error ? `Import failed: ${err.message}` : "Import failed";
+  } finally {
+    importing.value = false;
+    input.value = "";
+  }
+}
+
 onMounted(load);
 </script>
 
@@ -58,7 +131,12 @@ onMounted(load);
     <header>
       <router-link :to="`/projects/${projectId}/layout`">&larr; Layout</router-link>
       <h1>Sequences</h1>
+      <label class="import-btn">
+        {{ importing ? "Importing..." : "Import .xsq" }}
+        <input type="file" accept=".xsq" @change="importXsq" :disabled="importing" hidden />
+      </label>
     </header>
+    <p v-if="importMessage" class="import-message">{{ importMessage }}</p>
 
     <section class="new-sequence">
       <h2>New sequence</h2>
@@ -104,7 +182,20 @@ header {
   display: flex;
   align-items: baseline;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
+}
+.import-btn {
+  margin-left: auto;
+  cursor: pointer;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+.import-message {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin: 0 0 1rem;
 }
 .new-sequence {
   border: 1px solid #333;

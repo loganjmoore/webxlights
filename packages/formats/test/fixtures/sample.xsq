@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsequence BaseChannel="0" ChanCtrlBasic="0" ChanCtrlColor="0" FixedPointTiming="1" ModelBlending="true">
+  <head>
+    <version>2026.15.1</version>
+    <sequenceTiming>50 ms</sequenceTiming>
+    <sequenceType>Media</sequenceType>
+    <mediaFile>C:\show\test-tone.mp3</mediaFile>
+    <sequenceDuration>2.000</sequenceDuration>
+  </head>
+  <EffectDB>
+    <Effect>E_TEXTCTRL_Eff_On_Start=100,E_TEXTCTRL_Eff_On_End=100,E_TEXTCTRL_On_Transparency=0,E_TEXTCTRL_On_Cycles=1,E_CHECKBOX_On_Shimmer=0</Effect>
+    <Effect>E_SLIDER_Bars_BarCount=2,E_TEXTCTRL_Bars_Cycles=1,E_CHOICE_Bars_Direction=Left,E_TEXTCTRL_Bars_Center=0,E_CHECKBOX_Bars_Highlight=0</Effect>
+    <Effect>E_SLIDER_Fire_Height=60,E_SLIDER_Fire_HueShift=0</Effect>
+  </EffectDB>
+  <DisplayElements>
+    <Element collapsed="0" type="model" name="Mega Tree" visible="1"/>
+    <Element collapsed="0" type="model" name="Arch 1" visible="1"/>
+    <Element collapsed="0" type="timing" name="Beats" visible="1" views="" active="1"/>
+  </DisplayElements>
+  <ElementEffects>
+    <Element type="model" name="Mega Tree">
+      <EffectLayer>
+        <Effect ref="0" name="On" startTime="0" endTime="1000"/>
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Arch 1">
+      <EffectLayer>
+        <Effect ref="1" name="Bars" startTime="200" endTime="1500"/>
+        <Effect ref="2" name="Fire" startTime="1500" endTime="2000"/>
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Random Effect Model">
+      <EffectLayer>
+        <Effect name="Random" startTime="0" endTime="500"/>
+      </EffectLayer>
+    </Element>
+    <Element type="timing" name="Beats">
+      <EffectLayer>
+        <Effect label="1" startTime="0" endTime="500"/>
+        <Effect label="2" startTime="500" endTime="1000"/>
+      </EffectLayer>
+    </Element>
+  </ElementEffects>
+  <lastView>0</lastView>
+</xsequence>

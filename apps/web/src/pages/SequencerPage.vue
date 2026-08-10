@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import { EFFECT_SCHEMAS, defaultParamsFor } from "@webxlights/engine";
 import { api, type ModelRecord, type ModelGroupRecord, type SequenceEffect } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
+import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type GridRow } from "../components/SequencerGrid.vue";
 import Waveform from "../components/Waveform.vue";
@@ -123,6 +124,12 @@ function addTimingMarkAtPlayhead(): void {
   store.addTimingMark(0, playheadMs.value);
 }
 
+function exportFseq(): void {
+  if (!store.sequence) return;
+  const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence);
+  downloadFseq(bytes, store.sequence.name);
+}
+
 function onKeydown(e: KeyboardEvent): void {
   if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "SELECT") return;
 
@@ -182,6 +189,7 @@ watch(sequenceId, async (id) => {
         <option :value="1">1x</option>
         <option :value="2">2x</option>
       </select>
+      <button @click="exportFseq" :disabled="!store.sequence">Export .fseq</button>
       <span class="save-status">{{ store.saveStatus }}</span>
     </header>
 

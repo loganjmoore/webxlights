@@ -69,6 +69,15 @@ Each effect implements its default/most-common render path faithfully to the SPE
 - **No background photo underlay** (still blocked on R2, see M0/M1 notes) and **no palette editor** — every effect renders against one fixed default 2-color palette (`DEFAULT_PALETTE` in `HousePreview.vue`) until a real palette UI exists (M6/M7).
 - **Layer order = row's `effects` array order**, all `Normal` blend, full opacity — matches M2's data model, which has no explicit layer index yet (see M2 notes above).
 
+## M5 simplifications (documented ceilings, not silent gaps)
+
+- **fseq writer is uncompressed-only** (compression type 0). zlib (via native `CompressionStream`) and zstd-wasm are the next step per DECISIONS.md's original plan — uncompressed is correct and byte-valid today, just larger on disk than a real xLights export would be.
+- **Channel layout is a placeholder**: export concatenates supported models' channels in layout order, not through a real controller/universe/start-channel allocation (SPEC ch3's channel math is out of scope until controllers are modeled — display-only today per the goal prompt).
+- **`.xsq` param translation covers 5 of the 10 implemented effects** (On, Bars, Color Wash, Twinkle, Spirals) — a purchased/community sequence using Fire/Meteors/Butterfly/SingleStrand/Snowflakes imports those effects with correct name and time range but schema-default params (reported in the import summary, not silently lost — matches SPEC's "unknown effects import as inert placeholder" requirement, just for a subset of *known* effect names rather than only truly-unknown ones).
+- **Model mapping is exact-name-match only** — xLights' full mapping dialog (drag-to-map, Auto Map by alias/similarity, Save/Load `.xmap`) is unimplemented; unmatched model names are reported and their effects dropped.
+- **No R2 archiving of exported .fseq artifacts** (still blocked, see M0/M1/M2 notes) — export is a direct browser download only, which is actually SPEC ch16's own recommended "Mitigation 1: fseq export → user uploads (always works), zero infrastructure. Ship first."
+- **fseq playback on real hardware is unverified** — I have no physical FPP/xLights player to test against; verification is via round-trip parse (write → parse header → read every frame back → byte-identical) and hand-computed byte-layout checks against the SPEC's header table, not an actual light show.
+
 ## Bugs found only by actually running the UI (not caught by typecheck/lint)
 
 - **Stale canvas height on first data load**: `SequencerGrid`'s canvas height is bound via an inline `style` derived from `rows.length`, and its `watch(..., draw)` read `getBoundingClientRect()` on the same tick rows went from empty to populated — Vue's default pre-flush timing meant `draw()` ran *before* the DOM's new inline height was applied, so the grid rendered at 0px height (invisible) the first time real data arrived. Fixed with `{ flush: "post" }`. Same risk applies to any canvas component that both derives its own size from reactive data *and* redraws on that data changing.

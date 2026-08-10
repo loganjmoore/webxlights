@@ -11,7 +11,7 @@ Work milestone by milestone, in order. Each milestone: deployed to Render, CHANG
 - [x] **M2** — Sequencer shell + audio. Waveform, transport, canvas grid, timing tracks, effect placement/select/delete, undo/redo, autosave. Audio is client-side only (not R2-backed yet, re-select after reload) — see DECISIONS.md.
 - [x] **M3** — Render engine v1. RenderBuffer, 10 blend modes, 10 effects (On + Bars/ColorWash/Fire/Meteors/Butterfly/SingleStrand/Snowflakes/Spirals/Twinkle), layer stack, node/channel mapping, 75 golden-frame + determinism tests. Worker pool deferred to M4 (needed once there's a live preview to keep off the main thread) — see DECISIONS.md.
 - [x] **M4** — Live preview. Three.js Points house view, live-updates on scrub/edit by rendering active effects per row through the M3 engine. Runs on the main thread (no worker/SAB yet) and has no per-model mini-preview — see DECISIONS.md.
-- [ ] **M5** — fseq export + xsq import. fseq v2 writer, .xsq importer with placeholder fallback.
+- [x] **M5** — fseq export + xsq import. fseq v2 (uncompressed) writer + reader, byte-exact against the SPEC header table; .xsq importer resolves EffectDB refs, translates 5 of 10 effects' params, keeps the other 5 as name/timing-only placeholders; exact-name model matching. Compression (zlib/zstd), R2 artifact archiving, and the manual model-mapping dialog are deferred — see DECISIONS.md.
 - [ ] **M6** — Effects wave 2 + curves + transitions. 15 more effects, value curves, layer transitions.
 - [ ] **M7** — Versioning, sharing, polish. Snapshots, roles, Reverb presence, package show.
 - [ ] **M8** — FPP Connect (Chromium path). LNA upload, playlist sync.
