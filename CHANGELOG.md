@@ -1,5 +1,12 @@
 # Changelog
 
+## M8 — FPP Connect (Chromium path)
+
+- `apps/web/src/lib/fppConnect.ts`: Chromium/LNA detection (`userAgentData` Client Hints + UA fallback, correctly includes Edge as Chromium-derived); `getFppSystemInfo` (host verification via `GET /api/system/info`); `uploadFseqToFpp` (legacy `POST /api/file/uploads/<name>` + `GET /api/file/move/<name>`, Content-Type only per the goal prompt's exact instruction); `syncPlaylist` (GET-merge-POST of `/api/playlist/<name>` matching the SPEC's documented JSON shape byte-for-byte, including `total_items`/`total_duration` recompute and `random:0`).
+- `apps/web`: an "FPP Connect" panel on the sequencer page — host input + Connect (verifies + shows HostName/Version/Mode), playlist name + Upload to FPP (reuses M5's `exportSequenceToFseq` unchanged). Non-Chromium browsers see a guided-download message instead, pointing at the existing Export .fseq button. Gated by a single `FPP_CONNECT_ENABLED` flag; Export .fseq is a fully separate code path, so this never blocks it.
+- Verified live against a mock FPP HTTP server (no real hardware available, same as M5's fseq-format verification without physical playback): connected and got back the mock's HostName/Version/Mode; uploaded a rendered sequence and confirmed a byte-valid PSEQ file landed server-side; synced a playlist and confirmed the resulting JSON matches the SPEC's `/api/playlist/<name>` shape exactly.
+- Scoped to exactly what the goal prompt asked (SPEC ch16 §3.2): the legacy upload path only (not FPP 7+'s chunked PATCH, which the SPEC itself notes fails FPP's current CORS preflight), no config/outputs/models sync, no discovery beyond a user-entered host (browsers can't receive FPP's UDP multicast ping) — recorded in DECISIONS.md.
+
 ## M7 — Versioning, sharing, autosave hardening, package show (reduced scope)
 
 - `apps/api`: `sequence_versions` (immutable snapshots) and `project_members` (viewer/editor roles) tables. `Project::authorize(User, need)` is the single access-control gate now used by every controller (projects/layouts/models/model-groups/sequences) in place of six separate `owner_id === user()->id` checks — closes M7's sharing requirement without duplicating the rule anywhere. `sequences.revision` (a plain incrementing int, not a timestamp) backs an `etag`/`If-Match`-style conflict check on the autosave endpoint: a stale `if_match` 409s with the current server state instead of silently overwriting someone else's save.

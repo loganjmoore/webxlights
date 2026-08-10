@@ -5,6 +5,7 @@ import { EFFECT_SCHEMAS, defaultParamsFor } from "@webxlights/engine";
 import { api, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
+import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type GridRow } from "../components/SequencerGrid.vue";
 import Waveform from "../components/Waveform.vue";
@@ -29,6 +30,14 @@ const ZOOM_STEPS = [0.5, 1, 2];
 const clipboard = ref<SequenceEffect | null>(null);
 const versions = ref<SequenceVersion[]>([]);
 const showHistory = ref(false);
+
+const showFppPanel = ref(false);
+const fppChromiumCapable = isChromiumLanCapable();
+const fppHost = ref("");
+const fppSystemInfo = ref<FppSystemInfo | null>(null);
+const fppPlaylistName = ref("");
+const fppStatus = ref("");
+const fppBusy = ref(false);
 
 const pxPerMs = computed(() => {
   const containerWidth = 1200; // fit-to-width baseline before zoom
@@ -150,6 +159,40 @@ async function restoreVersion(versionId: number): Promise<void> {
   showHistory.value = false;
 }
 
+async function fppConnectHost(): Promise<void> {
+  if (!fppHost.value.trim()) return;
+  fppBusy.value = true;
+  fppStatus.value = "";
+  fppSystemInfo.value = null;
+  try {
+    fppSystemInfo.value = await getFppSystemInfo(fppHost.value.trim());
+  } catch (err) {
+    fppStatus.value = err instanceof Error ? `Couldn't reach FPP: ${err.message}` : "Couldn't reach FPP";
+  } finally {
+    fppBusy.value = false;
+  }
+}
+
+async function fppUpload(): Promise<void> {
+  if (!store.sequence || !fppSystemInfo.value) return;
+  fppBusy.value = true;
+  fppStatus.value = "Uploading...";
+  try {
+    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence);
+    const filename = `${store.sequence.name}.fseq`;
+    await uploadFseqToFpp(fppHost.value.trim(), filename, bytes);
+    fppStatus.value = `Uploaded ${filename} to ${fppSystemInfo.value.HostName}.`;
+    if (fppPlaylistName.value.trim()) {
+      await syncPlaylist(fppHost.value.trim(), fppPlaylistName.value.trim(), filename, Math.round(store.sequence.duration_ms / 1000), store.sequence.audio_filename ?? undefined);
+      fppStatus.value += ` Added to playlist "${fppPlaylistName.value.trim()}".`;
+    }
+  } catch (err) {
+    fppStatus.value = err instanceof Error ? `Failed: ${err.message}` : "Failed";
+  } finally {
+    fppBusy.value = false;
+  }
+}
+
 function onKeydown(e: KeyboardEvent): void {
   if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "SELECT") return;
 
@@ -212,8 +255,30 @@ watch(sequenceId, async (id) => {
       <button @click="exportFseq" :disabled="!store.sequence">Export .fseq</button>
       <button @click="snapshotNow" :disabled="!store.sequence">Snapshot</button>
       <button @click="toggleHistory" :disabled="!store.sequence">History</button>
+      <button v-if="FPP_CONNECT_ENABLED" @click="showFppPanel = !showFppPanel" :disabled="!store.sequence">FPP Connect</button>
       <span class="save-status">{{ store.saveStatus }}</span>
     </header>
+
+    <div v-if="showFppPanel" class="fpp-panel">
+      <template v-if="!fppChromiumCapable">
+        <p>
+          Uploading directly to an FPP device needs Chrome or Edge (the Local Network Access permission). In this browser, use
+          <strong>Export .fseq</strong> above and upload it yourself via FPP's own web UI (File Manager).
+        </p>
+      </template>
+      <template v-else>
+        <div class="fpp-row">
+          <input v-model="fppHost" type="text" placeholder="FPP hostname or IP (e.g. fpp.local)" />
+          <button @click="fppConnectHost" :disabled="fppBusy || !fppHost.trim()">Connect</button>
+          <span v-if="fppSystemInfo" class="fpp-connected">{{ fppSystemInfo.HostName }} — FPP {{ fppSystemInfo.Version }} ({{ fppSystemInfo.Mode }})</span>
+        </div>
+        <div v-if="fppSystemInfo" class="fpp-row">
+          <input v-model="fppPlaylistName" type="text" placeholder="Playlist name (optional)" />
+          <button @click="fppUpload" :disabled="fppBusy">Upload to FPP</button>
+        </div>
+        <p v-if="fppStatus" class="fpp-status">{{ fppStatus }}</p>
+      </template>
+    </div>
 
     <div v-if="store.saveStatus === 'conflict'" class="conflict-banner">
       <p>Someone else saved this sequence since you last loaded it. Keep your local changes, or take theirs?</p>
@@ -367,6 +432,29 @@ header h1 {
 }
 .history-panel .empty {
   color: #666;
+}
+.fpp-panel {
+  padding: 0.6rem 1rem;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  font-size: 0.85rem;
+}
+.fpp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.fpp-row input {
+  flex: 1;
+  max-width: 320px;
+}
+.fpp-connected {
+  color: #6fcf97;
+}
+.fpp-status {
+  margin: 0.4rem 0 0;
+  color: #aaa;
 }
 .palette {
   padding: 0.5rem 1rem;
