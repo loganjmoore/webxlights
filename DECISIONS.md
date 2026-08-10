@@ -61,6 +61,14 @@ Each effect implements its default/most-common render path faithfully to the SPE
 - **No worker pool / SharedArrayBuffer frame store yet**: the engine package is pure TS with no DOM dependency (matches the "testable in Node/Vitest" ground rule) and every effect function is a plain synchronous call — it can be dropped into a Web Worker as-is. The actual worker-pool wiring, SAB frame store, and "render dirty ranges" scheduler are deferred to M4, where a live preview first makes off-main-thread rendering necessary to verify.
 - **No value curves**: every VC-eligible param (marked in `EFFECT_SCHEMAS` with a `VC` badge) takes a flat value for now; the value-curve editor and per-frame VC evaluation are explicitly an M6 deliverable per the goal prompt.
 
+## M4 simplifications (documented ceilings, not silent gaps)
+
+- **Main thread, no worker/SAB/OffscreenCanvas**: `renderRowAtMs` runs synchronously on the UI thread on every playhead/body change. Fine at the scale exercised so far; the actual worker-pool + SharedArrayBuffer frame store from DECISIONS.md's original Effect Engine row is deferred to a perf-hardening pass — M9 is explicitly where performance budgets are gated per the goal prompt, not M4.
+- **Stateful effects (Fire/Meteors/Snowflakes) replay from the effect's start on every render call** to reach the current playhead frame — correct and deterministic for scrubbing, but O(frames) per call, so a long-running stateful effect gets more expensive to preview the further into it you scrub/play. A real implementation would cache state and step forward incrementally; deferred with the worker pool.
+- **No per-model mini-preview in the effect panel** (only the whole-house view). Same underlying `renderRowAtMs` call, just not wired to a second, cropped Three.js view yet.
+- **No background photo underlay** (still blocked on R2, see M0/M1 notes) and **no palette editor** — every effect renders against one fixed default 2-color palette (`DEFAULT_PALETTE` in `HousePreview.vue`) until a real palette UI exists (M6/M7).
+- **Layer order = row's `effects` array order**, all `Normal` blend, full opacity — matches M2's data model, which has no explicit layer index yet (see M2 notes above).
+
 ## Bugs found only by actually running the UI (not caught by typecheck/lint)
 
 - **Stale canvas height on first data load**: `SequencerGrid`'s canvas height is bound via an inline `style` derived from `rows.length`, and its `watch(..., draw)` read `getBoundingClientRect()` on the same tick rows went from empty to populated — Vue's default pre-flush timing meant `draw()` ran *before* the DOM's new inline height was applied, so the grid rendered at 0px height (invisible) the first time real data arrived. Fixed with `{ flush: "post" }`. Same risk applies to any canvas component that both derives its own size from reactive data *and* redraws on that data changing.

@@ -8,12 +8,14 @@ import { newEffectId, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type GridRow } from "../components/SequencerGrid.vue";
 import Waveform from "../components/Waveform.vue";
 import EffectPropsPanel from "../components/EffectPropsPanel.vue";
+import HousePreview from "../components/HousePreview.vue";
 
 const route = useRoute();
 const sequenceId = computed(() => Number(route.params.sequenceId));
 const store = useSequencerStore();
 
 const rows = ref<GridRow[]>([]);
+const modelRecords = ref<ModelRecord[]>([]);
 const peaks = ref<PeakBucket[]>([]);
 const audioEl = ref<HTMLAudioElement | null>(null);
 const audioUrl = ref<string | null>(null);
@@ -46,6 +48,7 @@ async function loadRows(): Promise<void> {
     ...models.map((m) => ({ elementType: "model" as const, elementId: m.id, name: m.name })),
     ...groups.map((g) => ({ elementType: "group" as const, elementId: g.id, name: g.name })),
   ];
+  modelRecords.value = models;
 }
 
 function onAudioFilePicked(e: Event): void {
@@ -212,6 +215,9 @@ watch(sequenceId, async (id) => {
 
     <div class="editor">
       <div class="timeline">
+        <div class="preview-wrap">
+          <HousePreview :models="modelRecords" :body="store.body" :playhead-ms="playheadMs" :frame-ms="store.sequence?.frame_ms ?? 50" />
+        </div>
         <Waveform :peaks="peaks" :duration-ms="store.sequence?.duration_ms ?? 0" :px-per-ms="pxPerMs" :playhead-ms="playheadMs" @seek="seekTo" />
         <div class="grid-scroll">
           <SequencerGrid
@@ -303,6 +309,10 @@ header h1 {
   flex: 1;
   overflow-y: auto;
   min-width: 0;
+}
+.preview-wrap {
+  height: 220px;
+  border-bottom: 1px solid #333;
 }
 .grid-scroll {
   overflow-x: auto;

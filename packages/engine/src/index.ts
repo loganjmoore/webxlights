@@ -29,3 +29,4 @@ export * from "./rng";
 export * from "./blend";
 export * from "./nodeMapping";
 export * from "./layerStack";
+export * from "./renderFrame";
