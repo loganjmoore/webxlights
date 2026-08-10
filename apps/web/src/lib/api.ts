@@ -36,6 +36,53 @@ export interface User {
   email: string;
 }
 
+export interface Layout {
+  id: number;
+  name: string;
+}
+
+export interface ModelRecord {
+  id: number;
+  name: string;
+  type: string;
+  supported: boolean;
+  params: Record<string, unknown>;
+  raw_attrs: Record<string, string>;
+  screen: { x?: number; y?: number; scale?: number; rotate?: number };
+  strings: number | null;
+  nodes_per_string: number | null;
+  string_type: string | null;
+  start_channel: string | null;
+  order: number;
+}
+
+export interface ModelGroupRecord {
+  id: number;
+  name: string;
+  buffer_style: string;
+  members: Array<{ id: number; name: string }>;
+}
+
+export interface ModelUpsertPayload {
+  name: string;
+  type: string;
+  supported?: boolean;
+  params?: Record<string, unknown>;
+  raw_attrs?: Record<string, string>;
+  screen?: Record<string, unknown>;
+  strings?: number | null;
+  nodes_per_string?: number | null;
+  string_type?: string | null;
+  start_channel?: string | null;
+  order?: number;
+}
+
+export interface GroupUpsertPayload {
+  name: string;
+  bufferStyle?: string;
+  memberNames: string[];
+}
+
 export const api = {
   async csrf(): Promise<void> {
     await fetch("/sanctum/csrf-cookie", { credentials: "include" });
@@ -51,4 +98,13 @@ export const api = {
   me: () => request<User>("/auth/me"),
   listProjects: () => request<Project[]>("/v1/projects"),
   createProject: (name: string) => request<Project>("/v1/projects", { method: "POST", body: JSON.stringify({ name }) }),
+  listLayouts: (projectId: number) => request<Layout[]>(`/v1/projects/${projectId}/layouts`),
+  listModels: (layoutId: number) => request<ModelRecord[]>(`/v1/layouts/${layoutId}/models`),
+  bulkUpsertModels: (layoutId: number, models: ModelUpsertPayload[]) =>
+    request<ModelRecord[]>(`/v1/layouts/${layoutId}/models/bulk`, { method: "POST", body: JSON.stringify({ models }) }),
+  updateModel: (layoutId: number, modelId: number, patch: Partial<ModelUpsertPayload>) =>
+    request<ModelRecord>(`/v1/layouts/${layoutId}/models/${modelId}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  listModelGroups: (layoutId: number) => request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups`),
+  bulkUpsertModelGroups: (layoutId: number, groups: GroupUpsertPayload[]) =>
+    request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups/bulk`, { method: "POST", body: JSON.stringify({ groups }) }),
 };

@@ -1,5 +1,6 @@
-import { RGBA, hsvToRgb, rgbToHsv } from "../color";
-import { RenderBuffer } from "../renderBuffer";
+import type { RGBA } from "../color";
+import { hsvToRgb, rgbToHsv } from "../color";
+import type { RenderBuffer } from "../renderBuffer";
 
 export interface OnParams {
   startIntensity: number; // 0-100

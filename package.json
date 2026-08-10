@@ -8,8 +8,8 @@
   ],
   "scripts": {
     "dev": "npm run dev -w apps/web",
-    "test": "npm run test -w packages/engine",
-    "typecheck": "npm run typecheck -w apps/web && npm run typecheck -w packages/engine",
+    "test": "npm run test -w packages/engine && npm run test -w packages/formats",
+    "typecheck": "npm run typecheck -w apps/web && npm run typecheck -w packages/engine && npm run typecheck -w packages/formats",
     "lint": "eslint packages && npm run lint -w apps/web"
   },
   "devDependencies": {

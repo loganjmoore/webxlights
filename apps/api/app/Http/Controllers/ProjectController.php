@@ -19,6 +19,7 @@ class ProjectController extends Controller
         ]);
 
         $project = $request->user()->projects()->create($data);
+        $project->layouts()->create(['name' => 'Layout']);
 
         return response()->json($project, 201);
     }

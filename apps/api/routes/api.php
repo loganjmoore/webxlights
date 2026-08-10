@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\LayoutController;
+use App\Http\Controllers\ModelEntityController;
+use App\Http\Controllers\ModelGroupController;
 use App\Http\Controllers\ProjectController;
 use Illuminate\Support\Facades\Route;
 
@@ -13,5 +16,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('v1')->group(function () {
         Route::apiResource('projects', ProjectController::class)->only(['index', 'store', 'show']);
+        Route::get('projects/{project}/layouts', [LayoutController::class, 'index']);
+
+        Route::get('layouts/{layout}/models', [ModelEntityController::class, 'index']);
+        Route::post('layouts/{layout}/models/bulk', [ModelEntityController::class, 'bulkUpsert']);
+        Route::patch('layouts/{layout}/models/{model}', [ModelEntityController::class, 'update']);
+
+        Route::get('layouts/{layout}/model-groups', [ModelGroupController::class, 'index']);
+        Route::post('layouts/{layout}/model-groups/bulk', [ModelGroupController::class, 'bulkUpsert']);
     });
 });

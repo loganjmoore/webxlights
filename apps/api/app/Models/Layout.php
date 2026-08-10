@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Project extends Model
+class Layout extends Model
 {
     use HasFactory;
 
@@ -18,13 +18,18 @@ class Project extends Model
         return ['settings' => 'array'];
     }
 
-    public function owner(): BelongsTo
+    public function project(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'owner_id');
+        return $this->belongsTo(Project::class);
     }
 
-    public function layouts(): HasMany
+    public function models(): HasMany
     {
-        return $this->hasMany(Layout::class);
+        return $this->hasMany(ModelEntity::class);
+    }
+
+    public function modelGroups(): HasMany
+    {
+        return $this->hasMany(ModelGroup::class);
     }
 }

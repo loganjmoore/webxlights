@@ -1,4 +1,5 @@
-import { RGBA, rgba } from "./color";
+import type { RGBA } from "./color";
+import { rgba } from "./color";
 
 // Origin bottom-left per SPEC ch4 §10 ("buffer coords bufX,bufY, 0-based, origin bottom-left").
 export class RenderBuffer {

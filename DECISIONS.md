@@ -29,6 +29,14 @@ Locked technical decisions (goal prompt §4). Do not relitigate without recordin
 - R2 bucket: not yet created — the only credentials on hand (brightprompt-hub's R2 token) turned out to be bucket-scoped, not account-scoped, so `CreateBucket` was denied. Not a blocker for M0 (no file uploads yet); needed by M2. Needs either a fresh R2 API token with bucket-create scope, or Logan creating the bucket by hand in the Cloudflare dashboard.
 - Migrations run as one-off Render Jobs after deploy (`preDeployCommand` isn't exposed by the public Render API for docker services, only via the dashboard/Blueprint sync) — `render.yaml` still declares it for whenever the project switches to Blueprint-based deploys.
 
+## M1 simplifications (documented ceilings, not silent gaps)
+
+- Matrix geometry: Vertical / Top Left / zigzag-on / strandsPerString=1 only. Horizontal, other starting corners, Don't Zig Zag, Alternate Nodes, Strands/String > 1 are unimplemented — add when a real imported model needs them.
+- Arches/Star/Circle: non-layered / single-ring only. Layered Arches, multi-layer Star (Layer Sizes, Inner Layer %) deferred.
+- Custom model: plain `CustomModel` grid format only; the compressed `CustomModelCompressed` variant (`node,row,col[,layer];...`) is unimplemented.
+- Screen placement on import uses `WorldPosX/Y` (+`ScaleX` for Boxed types) only — gives correct *relative* positions between models but not exact per-type rotation/shear (3pt Angle/Shear/Height, 2pt X2/Y2 endpoints).
+- Layout canvas is read-only render for M1 — no drag-to-reposition, no background photo underlay (needs R2, deferred to M2).
+
 ## Deviation log
 
 - 2026-08-10: `composer create-project laravel/laravel` installs Laravel 13.x (goal prompt said "12.x-ish LTS"). Laravel 12 is not what `laravel/laravel` resolves to as of this date; using current stable 13 instead of pinning back to an EOL-adjacent 12.
