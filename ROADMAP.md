@@ -6,7 +6,7 @@ Work milestone by milestone, in order. Each milestone: deployed to Render, CHANG
 
 ## Milestones
 
-- [ ] **M0** — Skeleton + deploy. Monorepo, Docker, render.yaml, R2 presign, Sanctum auth, project CRUD, CI, COOP/COEP verified.
+- [x] **M0** — Skeleton + deploy. Monorepo, Docker, render.yaml, Sanctum auth, project CRUD, CI, COOP/COEP verified. Live: https://webxlights-web.onrender.com. R2 presign deferred to M2 (first milestone that needs media upload) — see DECISIONS.md.
 - [ ] **M1** — Layout MVP + rgbeffects import. 12 model types, node-coordinate math, groups, importer.
 - [ ] **M2** — Sequencer shell + audio. Waveform, transport, virtualized grid, timing tracks, effect placement, undo/redo.
 - [ ] **M3** — Render engine v1. RenderBuffer, blend modes, 10 effects, worker pool, golden-frame tests.
