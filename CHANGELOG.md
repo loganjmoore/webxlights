@@ -1,5 +1,57 @@
 # Changelog
 
+## M15 — Import/export verification, sequencer UX fixes, app-wide dark theme
+
+Prompted by a request to verify import/export against real xLights files, check the Controllers
+page's sizing/padding, polish the navbar/controls app-wide, confirm effect drag-and-drop works,
+and add a way to manage which models show on the sequencer. No user-supplied xLights folder was
+reachable in this remote session - checked `/mnt/attach` (empty) and the working tree; verified
+against the repo's own real-format fixtures instead (`sample-rgbeffects.xml` + `sample.xsq`,
+the latter a genuine EffectDB-ref-indexed file), stated plainly as the substitution it is.
+
+- **Import verified live, end-to-end**: imported a layout, then a paired `.xsq` referencing its
+  models by exact name - both models and effects landed with correct names and exact millisecond
+  timing (`On` on Mega Tree 0-1000ms, `Bars` on Arch 1 200-1500ms, matching the fixture exactly);
+  an unmatched model name in the fixture ("Random Effect Model") was correctly dropped, not
+  phantom-rowed.
+- **Export verified at the byte level**: triggered a real "Export .fseq" click, downloaded the
+  actual file, and hand-checked every header field against the FSEQ v2 spec - magic bytes,
+  `chanDataOffset`/`headerLen` self-consistency, channel count (3510, matching the sum of the
+  three supported models' real node×byte math exactly), frame count (40, matching
+  `2000ms / 50ms`), and total file size (140448 bytes = 48-byte header + 40×3510). No xLights/FPP
+  install was available this session to open the file directly - stated as a real limitation of
+  this verification, not glossed over as equivalent to it.
+- **Fixed a real bug in effect placement**: arming a palette effect rendered a hint span that
+  reflowed the whole palette bar ~90px taller, shifting the grid below out from under the user's
+  cursor mid-interaction. This also produced a false "placement is broken" reading during initial
+  testing (a stale pre-arm canvas-position read caused pointer events to land on nothing) before
+  the actual reflow bug was isolated and fixed with an always-rendered, fixed-height hint area
+  (`visibility`, not `v-if`).
+- **Added real native HTML5 drag-and-drop for effects** (`SequencerGrid.vue`'s new
+  `dragover`/`drop` handlers, `SequencerPage.vue`'s palette buttons now `draggable`) - drag a
+  palette button straight onto the grid to place it at a default 1s length, resizable after. This
+  is additive: the existing arm-then-drag-to-size gesture (real xLights' own placement model)
+  works unchanged: two ways to the same result, matching `ModelPalette.vue`'s established
+  drag-and-drop convention on the Layout page instead of being a second, different mechanism.
+- **Added a "Models" panel** to the sequencer for showing/hiding which rows appear on the grid,
+  with effect counts per row and Show-all/Hide-all. Persisted per-sequence in `localStorage` - a
+  deliberate choice: this is a view/workspace preference, not sequence content, so it doesn't
+  touch effects and doesn't need to round-trip through `.xsq` import/export or "package show".
+- **Closed the white-background-inherited-from-the-Vite-template gap** (M13's original finding
+  on `LayoutPage.vue`) across every remaining page: `ControllersPage.vue`, `SequencerPage.vue`,
+  `AuthPage.vue`, `ProjectsPage.vue`, `SequencesListPage.vue`, `DocsPage.vue`. Also found and
+  fixed a related, separate bug while doing this: dozens of plain `<button>` elements across the
+  app had no explicit styling, rendering as a stray light-gray OS-default box against the new
+  dark chrome - given consistent dark styling (background/border/hover) app-wide.
+- **`ControllersPage.vue` spacing/padding pass**: uppercase letter-spaced table headers,
+  consistent row/cell padding, a divider before "Assigned models" in the property panel, and a
+  fixed display bug (`1–0` reading as a negative range for a zero-channel-count controller now
+  shows `—`).
+- Verified: `npm run lint && npm run typecheck && npm run test` all green (unchanged engine/
+  formats surface, no new tests needed - this pass touched `apps/web` UI/UX, not engine math);
+  `php artisan test` 27/27 (unchanged, no backend surface touched). The design detector
+  (`impeccable`'s `detect.mjs`) ran clean against every changed page/component.
+
 ## M14 — Model rendering + import fidelity audit
 
 Prompted directly by "ensure every model type looks like it should, ensure imported layouts

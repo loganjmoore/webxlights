@@ -25,11 +25,13 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Feature | Status | Notes |
 |---|---|---|
 | Timeline grid, effect place/select/move/resize | ✅ | Canvas-based, virtualized to a fixed viewport (M9); resize from either edge with snap-to-timing-mark, right-click context menu (copy/cut/paste/duplicate/delete) (M10) |
+| Effect placement gesture | ✅ | Arm a palette effect + drag on the grid (xLights' own gesture, sizes the effect in one motion) **and** native HTML5 drag-and-drop straight from the palette button onto the grid at a default 1s length (M15) — two ways to the same result, not two different mechanisms |
 | Horizontal zoom/scroll | ✅ | Fixed M10 — canvas now sizes to the real content width instead of clipping at the container edge |
 | Undo/redo | ⚠️ | Whole-body snapshots, not command-pattern inverses; a drag now snapshots once at drag start, not per pointermove (M10) |
 | Autosave | ✅ | With ETag-based conflict detection (M7) |
 | Timing tracks | ⚠️ | Rendered on a pinned ruler row, click-to-add/right-click-to-delete (M10); manual marks only, no fixed-interval/beat-bar generators, no lyric tracks |
 | Copy/paste effects | ✅ | Via right-click context menu (M10); Cut and Duplicate too |
+| Row (model/group) visibility | ✅ | A "Models" panel toggles which rows show on the grid, per sequence — a view preference (localStorage), not sequence data; doesn't touch which models/groups actually have effects (M15) |
 | Waveform + playback | ✅ | Native `AudioContext`, peaks computed on main thread |
 | Audio persistence | ✅ | Server-side, a Render persistent disk-backed Laravel disk; auto-restores on sequencer load, no manual re-select |
 
@@ -49,9 +51,9 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 
 | Feature | Status | Notes |
 |---|---|---|
-| `.xlights_rgbeffects.xml` import | ⚠️ | Unsupported `DisplayAs` types import as labeled placeholders, not dropped |
-| `.xsq` import | ⚠️ | 5 of 15 implemented effects get full param translation; others import with correct name/timing, schema-default params; exact-name-only model matching |
-| `.fseq` export | ⚠️ | V2 uncompressed only (no zlib/zstd); placeholder channel layout (no real controller/universe allocation) |
+| `.xlights_rgbeffects.xml` import | ⚠️ | Unsupported `DisplayAs` types import as labeled placeholders, not dropped. Verified live end-to-end M15 (layout + a paired `.xsq` referencing it by model name, both import and match correctly) |
+| `.xsq` import | ⚠️ | 5 of 15 implemented effects get full param translation; others import with correct name/timing, schema-default params; exact-name-only model matching. Verified live M15 against a real EffectDB-ref-indexed fixture — correct model matching, effect names, and exact millisecond timing |
+| `.fseq` export | ⚠️ | V2 uncompressed only (no zlib/zstd). Channel allocation is real controller-based addressing, not placeholder (M11 — this line was stale, corrected M15). Byte-level verified M15: a live-exported file's header (magic, offsets, channel/frame counts) and total size hand-checked against the FSEQ v2 spec and the actual model channel math, all exact. No real xLights/FPP install was available this session to open the file directly — this is the strongest verification available without one, not a substitute for it |
 | `.fseq` import | ❌ | Not implemented |
 | `.xmodel`, `.xtiming`, `.xmap`, `.xpreset` | ❌ | Not implemented |
 | `xlights_networks.xml` (controllers/outputs) | ❌ | Non-goal for v1 — display/export math only, no controller upload |

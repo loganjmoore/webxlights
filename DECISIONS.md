@@ -249,6 +249,52 @@ verified rigorously instead.
   real, pre-existing cosmetic defects unrelated to the bounds/transform work above - found by
   the same "actually look at every type" pass, fixed independently.
 
+## M15: Import/export verification, sequencer UX fixes, app-wide dark theme
+
+Not a scoped feature - a verification + polish pass across several independent asks (import/
+export fidelity, Controllers page spacing, app-wide chrome consistency, effect drag-and-drop,
+sequencer row management). No goal-prompt/adversarial-review ceremony (same call as M14 - that
+process was specific to M13's original ask); verified rigorously instead, same as M14.
+
+- **No user xLights folder was reachable this session.** This is a remote/cloud execution
+  environment, not a local session with filesystem access to the user's own machine - checked
+  `/mnt/attach` (the session's attachment mount point, empty) and the working tree. Substituted
+  the repo's own real-format fixtures (`packages/formats/test/fixtures/sample-rgbeffects.xml`,
+  `sample.xsq`) instead of fabricating a "verified against your files" claim. If the user wants
+  literal file-based verification, those files need to be attached to a session that can reach
+  them.
+- **No real xLights or FPP install was available to open the exported `.fseq` directly.** The
+  byte-level header verification (see CHANGELOG.md M15) is the strongest check available without
+  one - every field self-consistent and matching hand-computed values - but it is not the same
+  claim as "confirmed it opens in xLights." Stated as the real gap it is.
+- **Effect row visibility is client-side (`localStorage`), not sequence data.** Considered adding
+  a `hiddenRows` field to `SequenceBody` instead (server-side, syncs across collaborators/
+  devices) - rejected for this pass because it would need to round-trip through `.xsq` import/
+  export and "package show" without corrupting either, and because hiding a row is a workspace/
+  view choice (like which panels are open), not project content. `localStorage` keyed by sequence
+  ID is the lower-risk choice; revisit if multi-device/collaborator sync on this specific
+  preference is actually asked for.
+- **Native drag-and-drop for effects is additive, not a replacement.** Real xLights' own
+  placement gesture is arm-then-drag-to-size on the grid, which this codebase already matched
+  (M2). Adding native HTML5 drag-and-drop from the palette gives a second, literal "drag and
+  drop" path at a fixed default duration - consistent with `ModelPalette.vue`'s convention on the
+  Layout page, but a real fidelity trade (dropping doesn't let you size the effect in the same
+  motion the arm-and-drag gesture does).
+- **The "effect placement is broken" false alarm, and why it happened**: initial live testing
+  reused a canvas bounding-box measurement taken *before* arming a palette effect, not after -
+  arming reflowed the palette bar (the hint-text bug, fixed the same pass) and shifted the grid's
+  actual on-screen position by ~90px, so the test's stale coordinates landed on nothing.
+  Re-measuring after arming showed placement always worked. Recorded because it's the same class
+  of lesson M9/M10's own DECISIONS entries already flag: a test failure needs to be diagnosed
+  down to its actual cause before it's reported as a product bug, not assumed to be one.
+- **App-wide dark theme was a real, load-bearing gap, not a nice-to-have.** Half the app's pages
+  (`LayoutPage.vue`, `SequencerPage.vue` after M13's own fix) were dark; the other half
+  (`ControllersPage.vue`, `AuthPage.vue`, `ProjectsPage.vue`, `SequencesListPage.vue`,
+  `DocsPage.vue`) still had the Vite starter template's white background and 56px `<h1>`, making
+  roughly half the app read as broken/unstyled rather than merely inconsistent. Fixed uniformly
+  in this pass rather than continuing to fix it one page at a time as each one happened to be
+  touched for an unrelated reason.
+
 ## Fix: nginx client_max_body_size (mid-M12, user-reported)
 
 nginx's default `client_max_body_size` (1MB) 413'd real `xlights_rgbeffects.xml` imports and would have silently capped `SequenceController`'s 50MB audio upload limit well below what Laravel itself allows - a real production blocker a live user hit while this session was mid-milestone. Set to 100M in `apps/api/docker/nginx.conf`. Not caught by any existing test (local dev's `php artisan serve` has no equivalent limit) - worth remembering that nginx-layer limits are invisible to Laravel-level validation testing.

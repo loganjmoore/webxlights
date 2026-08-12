@@ -100,7 +100,7 @@ onMounted(load);
             <td>{{ c.name }}</td>
             <td>{{ c.protocol }}</td>
             <td>{{ c.ip_address ?? "—" }}</td>
-            <td>{{ c.start_channel }}–{{ c.start_channel + c.channel_count - 1 }}</td>
+            <td>{{ c.channel_count > 0 ? `${c.start_channel}–${c.start_channel + c.channel_count - 1}` : "—" }}</td>
             <td>{{ c.vendor ?? "—" }}</td>
             <td>{{ c.model ?? "—" }}</td>
           </tr>
@@ -182,30 +182,61 @@ onMounted(load);
 </template>
 
 <style scoped>
+/* M15: this page inherited the app shell's white-background/56px-<h1> default the same way
+   LayoutPage.vue did before M13 - fixed the same way, scoped to this page's own chrome. Also
+   a spacing/sizing pass: consistent 4px-based rhythm (0.25rem steps), clearer grouping in the
+   props panel, and generous enough row/cell padding to read as a real data table, not a cramped
+   default one. */
 .controllers-page {
   font-family: system-ui, sans-serif;
   height: 100vh;
   display: flex;
   flex-direction: column;
+  background: #0d0d11;
   color: #ddd;
 }
+.controllers-page a {
+  color: #e8c468;
+}
 header {
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 1.25rem;
   border-bottom: 1px solid #333;
   display: flex;
-  align-items: baseline;
-  gap: 1rem;
+  align-items: center;
+  gap: 1.25rem;
+  background: #16161c;
+}
+header h1 {
+  font-size: 1.1rem;
+  margin: 0;
+  color: #ddd;
+  font-weight: 600;
 }
 .add-buttons {
   margin-left: auto;
   display: flex;
-  gap: 0.4rem;
+  gap: 0.5rem;
+}
+.add-buttons button {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e26;
+  color: #ddd;
+  cursor: pointer;
+}
+.add-buttons button:hover {
+  border-color: #e8c468;
+  color: #e8c468;
 }
 .error {
   margin: 0;
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1.25rem;
   font-size: 0.85rem;
   color: #e57373;
+  background: #241414;
+  border-bottom: 1px solid #3a1f1f;
 }
 .body {
   flex: 1;
@@ -214,19 +245,23 @@ header {
 }
 .controller-table {
   flex: 1;
+  align-self: flex-start;
   overflow-y: auto;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
 .controller-table th {
   text-align: left;
-  padding: 0.5rem 0.75rem;
+  padding: 0.65rem 1rem;
   border-bottom: 1px solid #333;
   color: #888;
-  font-weight: normal;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .controller-table td {
-  padding: 0.4rem 0.75rem;
+  padding: 0.6rem 1rem;
   border-bottom: 1px solid #222;
 }
 .controller-table tbody tr {
@@ -236,51 +271,71 @@ header {
   background: #1a1a20;
 }
 .controller-table tbody tr.selected {
-  background: #26262f;
+  background: #2c2712;
+  outline: 1px solid #e8c468;
+  outline-offset: -1px;
 }
 .controller-table tbody tr.inactive {
   opacity: 0.5;
 }
 .controller-table .empty {
+  padding: 1.5rem 1rem;
   color: #666;
   cursor: default;
+  text-align: center;
 }
 .props-panel {
-  width: 260px;
+  width: 280px;
+  flex-shrink: 0;
   border-left: 1px solid #333;
-  padding: 0.75rem;
+  background: #16161c;
+  padding: 1rem;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.85rem;
 }
 .props-panel label {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.3rem;
   font-size: 0.75rem;
   color: #aaa;
+}
+.props-panel input,
+.props-panel select {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
 }
 .active-toggle {
   flex-direction: row !important;
   align-items: center;
-  gap: 0.4rem !important;
+  gap: 0.5rem !important;
 }
 .empty-panel {
   color: #666;
   font-size: 0.85rem;
 }
+.assigned-models {
+  padding-top: 0.85rem;
+  border-top: 1px solid #2a2a33;
+}
 .assigned-models h3 {
-  margin: 0.4rem 0 0.3rem;
-  font-size: 0.8rem;
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
   color: #888;
-  font-weight: normal;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .assigned-models ul {
   list-style: none;
   margin: 0;
   padding: 0;
   font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 .assigned-models .offset {
   color: #666;
@@ -292,7 +347,14 @@ header {
 }
 .delete-btn {
   margin-top: auto;
+  padding: 0.45rem 0.75rem;
   color: #e57373;
-  border-color: #5a2f2f;
+  background: #1e1e26;
+  border: 1px solid #5a2f2f;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.delete-btn:hover {
+  background: #2c1a1a;
 }
 </style>
