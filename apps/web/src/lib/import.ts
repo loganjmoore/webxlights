@@ -1,5 +1,5 @@
 import { parseRgbEffectsXml } from "@webxlights/formats";
-import { api, type GroupUpsertPayload, type ModelUpsertPayload } from "./api";
+import { api, type GroupUpsertPayload, type ModelUpsertPayload, type ViewObjectUpsertPayload } from "./api";
 
 export interface ImportSummary {
   imported: number;
@@ -50,6 +50,14 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
     .filter((g) => g.members.length > 0)
     .map((g) => ({ name: g.name, bufferStyle: g.layout, memberNames: g.members }));
   if (groups.length > 0) await api.bulkUpsertModelGroups(layoutId, groups);
+
+  const viewObjects: ViewObjectUpsertPayload[] = parsed.viewObjects.map((o) => ({
+    name: o.name,
+    type: o.displayAs,
+    supported: o.supported,
+    raw_attrs: o.attrs,
+  }));
+  if (viewObjects.length > 0) await api.bulkUpsertViewObjects(layoutId, viewObjects);
 
   return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length };
 }

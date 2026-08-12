@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { propertyFieldsFor } from "@webxlights/engine";
-import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord } from "../lib/api";
+import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas from "../components/LayoutCanvas.vue";
@@ -14,6 +14,7 @@ const projectId = computed(() => Number(route.params.projectId));
 
 const layout = ref<Layout | null>(null);
 const models = ref<ModelRecord[]>([]);
+const viewObjects = ref<ViewObjectRecord[]>([]); // M15.7: Gridlines/Mesh/... - view-only for now
 const controllers = ref<ControllerRecord[]>([]);
 const assignErrors = ref<Record<number, string>>({});
 const importing = ref(false);
@@ -212,7 +213,11 @@ async function loadLayout(): Promise<void> {
   layout.value = layouts[0] ?? null;
   controllers.value = controllerList;
   if (layout.value) {
-    [models.value, groups.value] = await Promise.all([api.listModels(layout.value.id), api.listModelGroups(layout.value.id)]);
+    [models.value, groups.value, viewObjects.value] = await Promise.all([
+      api.listModels(layout.value.id),
+      api.listModelGroups(layout.value.id),
+      api.listViewObjects(layout.value.id),
+    ]);
   }
 }
 
@@ -266,7 +271,11 @@ async function handleFileChange(e: Event): Promise<void> {
   try {
     const text = await file.text();
     const summary = await importRgbEffects(layout.value.id, text);
-    [models.value, groups.value] = await Promise.all([api.listModels(layout.value.id), api.listModelGroups(layout.value.id)]);
+    [models.value, groups.value, viewObjects.value] = await Promise.all([
+      api.listModels(layout.value.id),
+      api.listModelGroups(layout.value.id),
+      api.listViewObjects(layout.value.id),
+    ]);
     importMessage.value = `Imported ${summary.imported} models` +
       (summary.groups ? `, ${summary.groups} groups` : "") +
       (summary.unsupported.length ? ` — unsupported types kept but not rendered: ${summary.unsupported.join(", ")}` : "");
@@ -461,6 +470,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           <LayoutCanvas
             v-if="viewMode === '2d'"
             :models="models"
+            :view-objects="viewObjects"
             :selected-model-id="selectedModelId"
             @select="selectedModelId = $event"
             @move="handleMove"
@@ -469,6 +479,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           <LayoutCanvas3D
             v-else
             :models="models"
+            :view-objects="viewObjects"
             :selected-model-id="selectedModelId"
             @select="selectedModelId = $event"
             @move="handleMove3D"

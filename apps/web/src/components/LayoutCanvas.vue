@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
 import { computeGeometryFromAttrs, geometryCenter, nodeWorldOffset, transformedHalfExtents, type ModelGeometry, type ScreenTransform } from "@webxlights/engine";
-import type { ModelRecord } from "../lib/api";
+import type { ModelRecord, ViewObjectRecord } from "../lib/api";
 
-const props = defineProps<{ models: ModelRecord[]; selectedModelId: number | null }>();
+const props = defineProps<{ models: ModelRecord[]; viewObjects?: ViewObjectRecord[]; selectedModelId: number | null }>();
 const emit = defineEmits<{
   move: [modelId: number, x: number, y: number];
   select: [modelId: number | null];
@@ -105,6 +105,41 @@ function computeTransform(rect: { width: number; height: number }) {
   };
 }
 
+// M15.7: real xLights' Gridlines view_object. This 2D canvas already only ever draws the
+// WorldX/WorldY plane for every model (Z/3D rotation aren't a 2D-canvas concept at all - see
+// transformFor's RotateZ-only comment above) - Gridlines gets the same honest simplification
+// instead of trying to reproduce its real 3D ground-plane rotation (RotateX/Y/Z) here.
+function drawGridlines(ctx: CanvasRenderingContext2D, toScreenX: (x: number) => number, toScreenY: (y: number) => number): void {
+  for (const obj of props.viewObjects ?? []) {
+    if (obj.type !== "Gridlines" || obj.raw_attrs.Active === "0") continue;
+    const a = obj.raw_attrs;
+    const num = (key: string, fallback: number) => {
+      const n = parseFloat(a[key] ?? "");
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const width = num("GridWidth", 1000);
+    const height = num("GridHeight", 1000);
+    const spacing = Math.max(num("GridLineSpacing", 50), Math.max(width, height) / 500, 0.01);
+    const cx = num("WorldPosX", 0);
+    const cy = num("WorldPosY", 0);
+
+    ctx.strokeStyle = "#2e4a2e";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = cx - width / 2; x <= cx + width / 2 + 1e-6; x += spacing) {
+      const sx = toScreenX(x);
+      ctx.moveTo(sx, toScreenY(cy - height / 2));
+      ctx.lineTo(sx, toScreenY(cy + height / 2));
+    }
+    for (let y = cy - height / 2; y <= cy + height / 2 + 1e-6; y += spacing) {
+      const sy = toScreenY(y);
+      ctx.moveTo(toScreenX(cx - width / 2), sy);
+      ctx.lineTo(toScreenX(cx + width / 2), sy);
+    }
+    ctx.stroke();
+  }
+}
+
 function draw(): void {
   const canvas = canvasRef.value;
   if (!canvas) return;
@@ -120,6 +155,8 @@ function draw(): void {
   ctx.fillRect(0, 0, rect.width, rect.height);
 
   const { toScreenX, toScreenY } = computeTransform(rect);
+
+  drawGridlines(ctx, toScreenX, toScreenY);
 
   for (const model of props.models) {
     const { x: mx, y: my } = positionFor(model);

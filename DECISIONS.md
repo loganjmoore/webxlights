@@ -249,6 +249,51 @@ verified rigorously instead.
   real, pre-existing cosmetic defects unrelated to the bounds/transform work above - found by
   the same "actually look at every type" pass, fixed independently.
 
+## M15.7: view_objects import + Gridlines rendering
+
+Prompted by revisiting a finding from earlier this session (M15.1): while investigating whether
+`<view_object>` elements (Gridlines, Mesh) were real bugs or correctly out of scope, the
+conclusion then was "not a model, correctly excluded from model import" - true, but incomplete.
+`<view_objects>` is a real, separate xLights XML element, and `parseRgbEffectsXml` never looked
+at it at all - every real show's Gridlines/Mesh/Terrain helpers were silently dropped, not
+"correctly excluded," just never read. Opening real xLights' Layout tab's "3D Objects" sub-tab
+confirmed this is real, commonly-populated data (the same real show has both a Gridlines and a
+Mesh object).
+
+- **New `view_objects` table/model/controller, structurally mirroring `models`**: `type`
+  (DisplayAs), `supported`, `raw_attrs` (lossless). Import-only for now (`bulkUpsert` by name),
+  no manual create/edit UI - same reasoning M15.5's `ViewObjectController` comment gives: there's
+  no real user workflow for hand-authoring a Gridlines helper the way there is for models/groups.
+- **`SUPPORTED_VIEW_OBJECT_TYPES = ["Gridlines"]` only.** Mesh/Terrain need an OBJ-mesh loader or
+  heightmap renderer this codebase has never had any of; Ruler/Image/Controller are lower-value
+  and also unbuilt. Gridlines is the one type that's both commonly present and genuinely simple
+  to render (a set of evenly-spaced lines) - importing the rest as `supported: false` (kept,
+  not silently lost) rather than skipping `<view_objects>` selectively keeps the same "nothing
+  imported is silently invisible" convention every other supported/unsupported list in this
+  codebase already follows.
+- **2D and 3D each get their own honest interpretation of Gridlines, not a shared one.** The 2D
+  canvas (`LayoutCanvas.vue`) already only ever draws the WorldX/WorldY plane for every model -
+  Z and 3D rotation aren't representable there at all (see `transformFor`'s RotateZ-only
+  comment). Reproducing Gridlines' real RotateX/Y/Z ground-plane rotation in a 2D canvas would be
+  fabricating precision the surface can't actually show; drawing it flat in the same X/Y plane
+  every model already uses is the consistent, honest choice. `LayoutCanvas3D.vue` (Three.js) has
+  no such limitation and applies the real WorldPos + RotateX/Y/Z verbatim.
+- **Custom line-segment mesh instead of `THREE.GridHelper`** in 3D: `GridHelper` is square-only
+  (one `size` argument), but xLights' Grid Width/Height are independent (this real show's is
+  2500×2000, not square) - using `GridHelper` and silently rounding to a square would misrepresent
+  the real dimensions. A manual `LineSegments` geometry respects both axes exactly.
+- **Respects the real "Active" checkbox** (`raw_attrs.Active === "0"` skips rendering in both
+  canvases) - real xLights' own Layout tab showed this real show's Gridlines set inactive by the
+  user, and honoring that rather than always showing an imported grid is the faithful behavior.
+- Verified live against the real 120-model show: re-imported and confirmed via direct DB query
+  both real view objects landed correctly (`Gridlines` type=Gridlines supported=true with real
+  `GridWidth=2500`; `Mesh` type=Mesh supported=false) and the unsupported-types import banner
+  now correctly lists "Mesh" alongside the pre-existing DmxServo/DmxGeneral/Cube. Temporarily
+  flipped `Active` to `"1"` via direct DB update to confirm the renderer actually works (real
+  imported data had it off, matching real xLights) - both the 2D flat grid and the 3D rotated
+  ground-plane grid rendered correctly at the real 2500×2000/50-spacing dimensions, then
+  restored to the real `Active: "0"` value afterward.
+
 ## M15.6: Timing track generators (fixed-interval, Metronome)
 
 Prompted by opening real xLights' Sequence Settings > Timings tab and its "New Timing" dialog -

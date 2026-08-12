@@ -45,9 +45,24 @@ export interface ParsedModelGroup {
   layout: string | undefined;
 }
 
+// SPEC ch11 §2: a separate <view_objects><view_object> element, not a <model> - previously
+// not parsed at all (Gridlines/Mesh/Terrain/Ruler/Image/Controller helpers were silently
+// dropped on import). Only "Gridlines" renders today (packages/engine has no OBJ-mesh loader
+// or terrain heightmap support); everything else imports supported:false, same "kept, not
+// silently lost" convention as unsupported models.
+export const SUPPORTED_VIEW_OBJECT_TYPES = ["Gridlines"] as const;
+
+export interface ParsedViewObject {
+  name: string;
+  displayAs: string;
+  supported: boolean;
+  attrs: Record<string, string>;
+}
+
 export interface ParsedRgbEffects {
   models: ParsedModel[];
   groups: ParsedModelGroup[];
+  viewObjects: ParsedViewObject[];
   unsupportedTypes: string[]; // distinct DisplayAs values that were skipped
 }
 
@@ -82,5 +97,13 @@ export function parseRgbEffectsXml(xml: string): ParsedRgbEffects {
     layout: g.layout,
   }));
 
-  return { models, groups, unsupportedTypes: [...unsupported] };
+  const rawViewObjects = asArray<Record<string, string>>(root.view_objects?.view_object);
+  const viewObjects: ParsedViewObject[] = rawViewObjects.map((o) => {
+    const displayAs = o.DisplayAs ?? "";
+    const supported = (SUPPORTED_VIEW_OBJECT_TYPES as readonly string[]).includes(displayAs);
+    if (!supported) unsupported.add(displayAs);
+    return { name: o.name ?? "", displayAs, supported, attrs: o };
+  });
+
+  return { models, groups, viewObjects, unsupportedTypes: [...unsupported] };
 }

@@ -108,6 +108,25 @@ class LayoutModelsTest extends TestCase
         $this->assertCount(2, $members); // "Unknown Model" silently dropped, not a 500
     }
 
+    public function test_bulk_upsert_view_objects_and_lists_them(): void
+    {
+        $user = User::factory()->create();
+        $layout = Layout::factory()->for($user->projects()->create(['name' => 'Show']))->create();
+
+        $response = $this->actingAs($user)->postJson("/api/v1/layouts/{$layout->id}/view-objects/bulk", [
+            'objects' => [
+                ['name' => 'Gridlines', 'type' => 'Gridlines', 'supported' => true, 'raw_attrs' => ['GridWidth' => '2500']],
+                ['name' => 'Mesh', 'type' => 'Mesh', 'supported' => false, 'raw_attrs' => ['ObjFile' => '/x/house.obj']],
+            ],
+        ]);
+        $response->assertCreated();
+
+        $list = $this->actingAs($user)->getJson("/api/v1/layouts/{$layout->id}/view-objects");
+        $list->assertOk()->assertJsonCount(2);
+        $this->assertSame('2500', collect($list->json())->firstWhere('name', 'Gridlines')['raw_attrs']['GridWidth']);
+        $this->assertFalse(collect($list->json())->firstWhere('name', 'Mesh')['supported']);
+    }
+
     public function test_deleting_a_model_group_removes_it(): void
     {
         $user = User::factory()->create();

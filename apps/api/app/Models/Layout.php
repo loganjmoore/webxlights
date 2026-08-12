@@ -32,4 +32,9 @@ class Layout extends Model
     {
         return $this->hasMany(ModelGroup::class);
     }
+
+    public function viewObjects(): HasMany
+    {
+        return $this->hasMany(ViewObject::class);
+    }
 }
