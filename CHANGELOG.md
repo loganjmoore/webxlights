@@ -1,5 +1,31 @@
 # Changelog
 
+## M15.3 — Per-effect Color palette
+
+Continuing the standing ask to close gaps between webXLights and the real desktop xLights app -
+this pass compared the Sequencer's effect-editing surface. Real xLights builds this around three
+panels: Effect Settings (already implemented), Color, and Layer Blending. Every webXLights effect
+was locked to one fixed app-wide 2-color palette - both `HousePreview.vue` and `fseqExport.ts`
+already carried a `ponytail:` comment flagging exactly this gap ("no palette editor yet").
+
+- **Effects can now carry their own Color override** - a "Color" section in the Sequencer's
+  effect panel with 1-6 swatches (matching real xLights), `+`/`×` to add/remove, falling back to
+  the app-wide default when unset. Real, per-effect granularity - two effects on the same model
+  can have different colors, matching how real xLights' Color tab works.
+- **`packages/engine`**: `RenderableEffect.palette?: RGBA[]` resolved in `renderFrame.ts`
+  (`effect.palette ?? rowPalette`); new `hexToRgba`/`rgbaToHex` in `color.ts`; `DEFAULT_PALETTE`/
+  `DEFAULT_PALETTE_HEX` moved there too, replacing two copy-pasted RGBA literal arrays in
+  `HousePreview.vue` and `fseqExport.ts` with one source of truth.
+- **No backend changes** - `SequenceBody` is stored as an opaque JSON blob, so `palette` just
+  flows through like any other effect field.
+- Verified live against the real jinglebells sequence: selected a real imported Pinwheel effect,
+  edited its first swatch to red, confirmed it persisted through autosave to the database and
+  reactively round-tripped through the store.
+- New tests: `color.test.ts` (hex round-trip, `DEFAULT_PALETTE` derives from the hex list, not an
+  independent literal), a `render-frame.test.ts` case proving a per-effect palette wins over the
+  row's default. All existing tests still green: 129 engine + 20 formats (vitest), 28 PHPUnit,
+  typecheck/lint clean.
+
 ## M15.2 — Structural property editor (Layout page)
 
 Prompted by comparing webXLights' Layout page against the real desktop xLights app side by side

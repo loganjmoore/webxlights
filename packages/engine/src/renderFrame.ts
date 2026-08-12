@@ -28,6 +28,9 @@ export interface RenderableEffect {
   endMs: number;
   params: Record<string, unknown>;
   transition?: TransitionSpec;
+  // Per-effect color override (real xLights' Color tab) - falls back to the row's own palette
+  // (the app-wide default, until a model/group-level palette exists) when unset.
+  palette?: RGBA[];
 }
 
 export interface RenderableRow {
@@ -42,7 +45,8 @@ const MAX_LAYERS = 5;
 // (not a real-time constraint), cheap at typical effect lengths (a few hundred frames).
 const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe"]);
 
-function renderStateless(buffer: RenderBuffer, palette: RGBA[], effect: RenderableEffect, atMs: number, seed: number): void {
+function renderStateless(buffer: RenderBuffer, rowPalette: RGBA[], effect: RenderableEffect, atMs: number, seed: number): void {
+  const palette = effect.palette ?? rowPalette;
   const duration = effect.endMs - effect.startMs || 1;
   const positionInEffect01 = Math.max(0, Math.min(1, (atMs - effect.startMs) / duration));
   const frameIndexInEffect = 0; // shimmer/parity-only field; scrubbing doesn't track frame parity
@@ -87,7 +91,8 @@ function renderStateless(buffer: RenderBuffer, palette: RGBA[], effect: Renderab
   }
 }
 
-function renderStateful(buffer: RenderBuffer, palette: RGBA[], effect: RenderableEffect, atMs: number, frameMs: number, seed: number): void {
+function renderStateful(buffer: RenderBuffer, rowPalette: RGBA[], effect: RenderableEffect, atMs: number, frameMs: number, seed: number): void {
+  const palette = effect.palette ?? rowPalette;
   const duration = effect.endMs - effect.startMs || 1;
   const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
 
@@ -185,7 +190,7 @@ export function createRowSequencer(row: RenderableRow, frameMs: number, seed: nu
 
 function renderStatefulIncremental(
   buffer: RenderBuffer,
-  palette: RGBA[],
+  rowPalette: RGBA[],
   effect: RenderableEffect,
   atMs: number,
   frameMs: number,
@@ -193,6 +198,7 @@ function renderStatefulIncremental(
   key: number,
   states: Map<number, unknown>,
 ): void {
+  const palette = effect.palette ?? rowPalette;
   const duration = effect.endMs - effect.startMs || 1;
   const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
 

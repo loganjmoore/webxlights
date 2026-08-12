@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as THREE from "three";
-import { computeGeometryFromAttrs, renderRowAtMs, type ModelGeometry } from "@webxlights/engine";
+import { computeGeometryFromAttrs, DEFAULT_PALETTE, hexToRgba, renderRowAtMs, type ModelGeometry } from "@webxlights/engine";
 import type { ModelRecord, SequenceBody } from "../lib/api";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 
@@ -12,12 +12,6 @@ const props = defineProps<{
   frameMs: number;
 }>();
 
-// ponytail: no palette editor yet (M6/M7) - a fixed default palette until effects can carry
-// their own. Matches the "warm white LED" look used elsewhere in the app.
-const DEFAULT_PALETTE = [
-  { r: 255, g: 200, b: 120, a: 255 },
-  { r: 80, g: 160, b: 255, a: 255 },
-];
 const SEED = 12345;
 const NODE_SPACING = 4; // matches LayoutCanvas's local-unit-to-px scale
 
@@ -80,7 +74,8 @@ function updateColors(): void {
   for (const entry of rowEntries) {
     const rowEffects = props.body.rows
       .filter((r) => r.elementType === "model" && r.elementId === entry.model.id)
-      .flatMap((r) => r.effects);
+      .flatMap((r) => r.effects)
+      .map((e) => ({ ...e, palette: e.palette?.map(hexToRgba) }));
     const nodeColors = renderRowAtMs({ geometry: entry.geometry, effects: rowEffects }, props.playheadMs, props.frameMs, SEED, DEFAULT_PALETTE);
     nodeColors.forEach((c, i) => {
       const idx = (entry.offset + i) * 3;
