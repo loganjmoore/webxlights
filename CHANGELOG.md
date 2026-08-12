@@ -1,5 +1,56 @@
 # Changelog
 
+## M15.6 — Timing track generators (fixed-interval, Metronome)
+
+Closes the exact gap `PARITY.md` already flagged: "manual marks only, no fixed-interval/beat-bar
+generators." Opened real xLights' Sequence Settings > Timings tab and its New Timing dialog for
+reference (Empty, 25ms, 50ms, 100ms, Metronome, Metronome w/ Tags, FPP Commands, FPP Effects).
+
+- **New "Timing" panel in the Sequencer**: Fixed interval (ms) or Metronome (BPM), Generate
+  button. Ported the two options with no FPP/tag-data dependency; the other four need data this
+  codebase doesn't have or add nothing over the existing "Empty" behavior.
+- **A real bug found and fixed during live verification**: the first version overwrote
+  `timingTracks[0]`'s marks. Testing against the real jinglebells sequence showed
+  `timingTracks[0]` is "Beats" - a real imported track with 242 real marks, not a generic
+  placeholder - so this would have silently destroyed real timing data. Fixed to always add a
+  *new*, auto-named, de-duplicated track instead of overwriting one, matching what real xLights'
+  own New Timing dialog does.
+- Full multi-row timing tracks (separate rows per named track, like real xLights' Timings list)
+  stayed out of scope - `SequencerGrid.vue` currently merges every track onto one pinned ruler
+  and hardcodes `trackIndex: 0` in its click handling, a larger rendering change unrelated to
+  the generator gap this pass closes.
+- Verified live against the real 120707ms jinglebells sequence: generated a 50ms track (2415
+  marks, matches duration/interval exactly) and a 120bpm Metronome track (500ms interval),
+  confirmed via direct DB query that all 5 real imported tracks were untouched.
+- All existing tests still green: 130 engine + 20 formats (vitest), 29 PHPUnit, typecheck/lint
+  clean (this pass's logic lives in `apps/web`, which has no test harness - see M15.1's note on
+  why that gap wasn't closed either; verified live instead, twice, once to catch the bug).
+
+## M15.5 — Model Groups editor (Layout page)
+
+Continuing the standing ask, this pass compared the Controllers tab (found already
+appropriately scoped - the missing fields all relate to live network output, a documented
+non-goal, so leaving them out avoids offering controls with no real effect) and the Layout
+tab's Groups list (a real, previously-mismarked gap: `PARITY.md` claimed Model Groups was `✅`,
+but the entire feature was import-only, with zero create/rename/membership/delete path).
+
+- **New "Groups" tab on the Layout page**, alongside the existing "Models" tab: lists every
+  group with its member count, a "+ New group" button, and an editor (name, buffer style,
+  member checklist, Save, Delete) reusing the same visual language as the Position/Properties
+  panels from M15.2.
+- **Reuses the existing `bulkUpsertModelGroups` endpoint** (upsert-by-name, resolve members by
+  name) as the save path for both create and edit, instead of a second mechanism - the import
+  path and the new UI path now share one implementation.
+- **Backend**: added the one missing endpoint, `DELETE /layouts/{layout}/model-groups/{group}`.
+- Renaming a group correctly deletes the old row and recreates under the new name (required
+  since the upsert endpoint matches by name) - verified this doesn't leave an orphaned duplicate.
+- Verified live against the real 120-model/11-group show: all 11 real groups listed with real
+  member counts; edited "House"'s membership (added a 3rd model, persisted); created and deleted
+  a throwaway group; renamed "Spiral Trees" and confirmed via direct DB query the old row was
+  gone, the new one had both original members, and no duplicate was left behind.
+- New test: `test_deleting_a_model_group_removes_it` in `LayoutModelsTest.php`. All existing
+  tests still green: 130 engine + 20 formats (vitest), 29 PHPUnit, typecheck/lint clean.
+
 ## M15.4 — Layer Blending panel (blend mode, Mix, Fade transitions)
 
 Completes the three-panel effect-editing comparison M15.3 started (Effect Settings, Color, Layer

@@ -29,6 +29,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('layouts/{layout}/model-groups', [ModelGroupController::class, 'index']);
         Route::post('layouts/{layout}/model-groups/bulk', [ModelGroupController::class, 'bulkUpsert']);
+        Route::delete('layouts/{layout}/model-groups/{modelGroup}', [ModelGroupController::class, 'destroy']);
 
         Route::get('projects/{project}/sequences', [SequenceController::class, 'index']);
         Route::post('projects/{project}/sequences', [SequenceController::class, 'store']);

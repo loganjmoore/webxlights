@@ -44,6 +44,21 @@ const versions = ref<SequenceVersion[]>([]);
 const showHistory = ref(false);
 const contextMenu = ref<{ x: number; y: number; items: { label: string; action: string }[]; target: ContextMenuTarget } | null>(null);
 
+const showTimingPanel = ref(false);
+const timingGenerateMode = ref<"interval" | "bpm">("interval");
+const timingIntervalMs = ref(50);
+const timingBpm = ref(120);
+
+// M15.6: real xLights' "New Timing" generator (25ms/50ms/100ms fixed-interval, Metronome BPM).
+// Always adds a new named track (never overwrites trackIndex 0 - a real imported sequence's
+// first track is commonly something meaningful like "Beats", not a generic placeholder).
+function generateTimingTrack(): void {
+  const isBpm = timingGenerateMode.value === "bpm";
+  const ms = isBpm ? Math.round(60000 / timingBpm.value) : timingIntervalMs.value;
+  const name = isBpm ? `Metronome ${timingBpm.value}bpm` : `${timingIntervalMs.value}ms`;
+  store.generateTimingMarks(name, ms);
+}
+
 const showFppPanel = ref(false);
 const fppChromiumCapable = isChromiumLanCapable();
 const fppHost = ref("");
@@ -428,9 +443,27 @@ watch(sequenceId, async (id) => {
       <button :class="{ active: showModelsPanel }" @click="showModelsPanel = !showModelsPanel">
         Models{{ hiddenRowKeys.size ? ` (${visibleRows.length}/${rows.length})` : "" }}
       </button>
+      <button :class="{ active: showTimingPanel }" @click="showTimingPanel = !showTimingPanel" :disabled="!store.sequence">Timing</button>
       <button v-if="FPP_CONNECT_ENABLED" @click="showFppPanel = !showFppPanel" :disabled="!store.sequence">FPP Connect</button>
       <span class="save-status">{{ store.saveStatus }}</span>
     </header>
+
+    <div v-if="showTimingPanel" class="timing-panel">
+      <p class="timing-note">Adds a new timing track of evenly-spaced marks across the sequence (matches real xLights' New Timing generator).</p>
+      <div class="timing-row">
+        <select v-model="timingGenerateMode">
+          <option value="interval">Fixed interval</option>
+          <option value="bpm">Metronome (BPM)</option>
+        </select>
+        <template v-if="timingGenerateMode === 'interval'">
+          <input v-model.number="timingIntervalMs" type="number" min="1" /> ms
+        </template>
+        <template v-else>
+          <input v-model.number="timingBpm" type="number" min="1" /> BPM
+        </template>
+        <button @click="generateTimingTrack">Generate</button>
+      </div>
+    </div>
 
     <div v-if="showFppPanel" class="fpp-panel">
       <template v-if="!fppChromiumCapable">
@@ -769,11 +802,25 @@ header button.active {
   border-color: #e8c468;
   color: #e8c468;
 }
-.fpp-panel {
+.fpp-panel,
+.timing-panel {
   padding: 0.6rem 1rem;
   background: #1a1a1a;
   border-bottom: 1px solid #333;
   font-size: 0.85rem;
+}
+.timing-note {
+  margin: 0 0 0.5rem;
+  color: #888;
+  font-size: 0.8rem;
+}
+.timing-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.timing-row input[type="number"] {
+  width: 5rem;
 }
 .fpp-row {
   display: flex;

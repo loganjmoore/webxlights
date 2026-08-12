@@ -219,6 +219,8 @@ export const api = {
   listModelGroups: (layoutId: number) => request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups`),
   bulkUpsertModelGroups: (layoutId: number, groups: GroupUpsertPayload[]) =>
     request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups/bulk`, { method: "POST", body: JSON.stringify({ groups }) }),
+  deleteModelGroup: (layoutId: number, groupId: number) =>
+    request<void>(`/v1/layouts/${layoutId}/model-groups/${groupId}`, { method: "DELETE" }),
   listSequences: (projectId: number) => request<SequenceSummary[]>(`/v1/projects/${projectId}/sequences`),
   createSequence: (projectId: number, data: { name: string; frame_ms: number; duration_ms: number; audio_filename?: string }) =>
     request<SequenceRecord>(`/v1/projects/${projectId}/sequences`, { method: "POST", body: JSON.stringify(data) }),

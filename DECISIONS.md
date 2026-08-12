@@ -249,6 +249,77 @@ verified rigorously instead.
   real, pre-existing cosmetic defects unrelated to the bounds/transform work above - found by
   the same "actually look at every type" pass, fixed independently.
 
+## M15.6: Timing track generators (fixed-interval, Metronome)
+
+Prompted by opening real xLights' Sequence Settings > Timings tab and its "New Timing" dialog -
+`PARITY.md` already flagged "manual marks only, no fixed-interval/beat-bar generators" as a gap;
+this closes exactly that, scoped to what's honestly achievable without a larger rendering change.
+
+- **Full multi-row timing tracks were explicitly out of scope for this pass.** Real xLights
+  renders each named track (Structure, Lyrics 1, Beats, ...) as its own row with its own marks
+  and its own delete control. `SequencerGrid.vue` currently flattens every track into one merged
+  pinned ruler (`allMarks()` = `timingTracks.flatMap(t => t.marks)`) and hardcodes `trackIndex: 0`
+  in every click-hit-test - genuinely unrelated to the generator gap and a much larger rendering
+  rearchitecture. Building the generator on top of that limitation rather than blocking on fixing
+  it first was the right call: it's additive, doesn't make the existing limitation worse, and is
+  independently useful even before multi-row rendering exists.
+- **Ported only the fixed-interval and Metronome (BPM) options from real xLights' 8-option New
+  Timing dropdown** (Empty, 25ms, 50ms, 100ms, Metronome, Metronome w/ Tags, FPP Commands, FPP
+  Effects) - the other four either need data this codebase doesn't have (FPP Commands/Effects are
+  FPP-specific bindings, Metronome w/ Tags stores extra tag metadata) or add nothing over Empty
+  (an empty track is just `ensureDefaultTimingTrack`, already the existing behavior).
+- **A real bug found during live verification, fixed before shipping**: the first implementation
+  took a `trackIndex` and overwrote `timingTracks[trackIndex]`'s marks, defaulting to index 0.
+  Verified live against the real jinglebells sequence and found `timingTracks[0]` is "Beats" (a
+  real, meaningfully-named imported track with 242 real marks) - not a generic placeholder. The
+  generator would have silently destroyed real imported timing data. Fixed by always pushing a
+  *new* named track (auto-named from the generator settings, e.g. "50ms" or "Metronome
+  120bpm", de-duplicated against existing names) instead of targeting an index - matches what
+  real xLights' own New Timing dialog does (it always adds a track, never overwrites one).
+- Verified live against the real jinglebells sequence (120707ms duration): generated a 50ms
+  fixed-interval track, confirmed via direct DB query it added a new "50ms" track with 2415 marks
+  (120707/50 ≈ 2415) while all 5 real imported tracks (Beats, Note Onsets, Mark,
+  JingleBellsFrankSinatra, Backup) were untouched. Generated a 120bpm Metronome track separately
+  and confirmed the 500ms (60000/120) interval.
+
+## M15.5: Model Groups editor (Layout page)
+
+Prompted by another real-xLights-vs-webXLights side-by-side pass, this time on the Controllers
+tab and the Layout tab's Groups list. Controllers turned out already appropriately scoped -
+real xLights' extra fields (Description, Auto Size, Monitor, Multicast, FPP Proxy IP, Priority,
+Managed) all relate to live network output, a documented non-goal (browsers can't open raw UDP),
+so adding checkboxes for them would be exactly the "fake depth" this codebase's own standard
+argues against. Model Groups was the real find: `PARITY.md` claimed `✅` for it, but the entire
+feature was import-only - `bulkUpsertModelGroups` (resolves membership by model name, upserts by
+group name) was the *only* way a group's row ever got written, called from nowhere but the
+rgbeffects.xml importer. No create button, no rename, no membership editor, no delete - a project
+built natively in webXLights (not imported from a real show) had no way to use groups at all.
+
+- **Reused `bulkUpsertModelGroups` as the save path for both create and edit**, rather than
+  building a second create/update mechanism - it already does exactly what a group editor needs
+  (upsert-by-name, resolve members by name, `sync()` the pivot table), and it's exactly what the
+  importer itself relies on, so the UI path and the import path share one code path with two
+  entry points instead of two implementations that could drift.
+- **Renaming needed a delete-then-recreate, not a plain resave**: `bulkUpsertModelGroups` matches
+  on `name` (`updateOrCreate(['name' => ...], ...)`), so saving an existing group under a new
+  name without deleting the old row first would create a *second* group and leave the original
+  orphaned. `LayoutPage.vue`'s `saveGroup()` detects a name change against the currently-selected
+  group and deletes the old row by id before the upsert - verified live (see below) that this
+  produces exactly one group, not two, and the id changes but membership survives.
+- **Added the one missing piece, `DELETE /layouts/{layout}/model-groups/{modelGroup}`** - the
+  only genuinely new backend endpoint this pass needed.
+- **Buffer style is a fixed 4-option select (Default/Single Line/Horizontal/Vertical)**, not a
+  free-text field - these are the values `GroupUpsertPayload.bufferStyle` already flows through
+  to `buffer_style` unchanged; real xLights has more buffer-style options for groups with 2D
+  layouts (grid, etc.) that this codebase's rendering doesn't consume anywhere yet, so a wider
+  picker would offer choices with no observable effect.
+- Verified live against the real 120-model/11-group show: switching to the Groups tab showed all
+  11 real groups with real member counts; selecting "House" loaded its real 2 members; toggling
+  "DJ SIGN 1" on and saving persisted a 3rd member to the database; created and deleted a
+  throwaway group end-to-end; renamed "Spiral Trees" -> "Spiral Trees Renamed" and confirmed via
+  direct DB query that the old row was gone, the new one had a new id, and both original members
+  (Spiral Left, Spiral Right) survived the rename.
+
 ## M15.4: Layer Blending panel (blend mode, Mix, Fade transitions)
 
 Completes the three-panel real xLights effect-editing comparison M15.3 started: Effect Settings,

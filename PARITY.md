@@ -12,7 +12,7 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 |---|---|---|
 | Model types (12 of the goal prompt's list) | ✅ | Matrix, Single Line, Poly Line, Arches, Candy Canes, Circle, Star, Tree, Icicles, Window Frame, Wreath, Custom |
 | Matrix wiring variants | ⚠️ | Vertical/Top Left/zigzag/1 strand-per-string only |
-| Model Groups | ✅ | Membership + buffer style |
+| Model Groups | ✅ | Membership + buffer style, both import-only until M15.5 - a full Groups panel now exists on the Layout page (create, rename, delete, edit membership via checklist), matching real xLights' Groups tab. This row previously read ✅ while the only way to create or edit a group at all was re-importing `xlights_rgbeffects.xml` - corrected here, not a new gap |
 | Screen placement on import | ⚠️ | `WorldPosX/Y/Z` (as the model's *center*, not its raw local origin), `ScaleX`/`ScaleY`, and `RotateZ` all render now (M14) — correct position, per-axis scale, and rotation. Per-type shear (Angle/Shear/Height for 3-point line placement, X2/Y2 for 2-point) still isn't applied |
 | Layout canvas | ✅ | Drag-to-reposition (M12); drag-to-create from an 11-type model palette (M13, Custom excluded); every model's actual rendered/rotated/scaled bounds now drive auto-fit and hit-testing, not a buffer-dimension guess (M14); no background photo underlay |
 | 2D layout | ✅ | Canvas-based |
@@ -30,7 +30,7 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Horizontal zoom/scroll | ✅ | Fixed M10 — canvas now sizes to the real content width instead of clipping at the container edge |
 | Undo/redo | ⚠️ | Whole-body snapshots, not command-pattern inverses; a drag now snapshots once at drag start, not per pointermove (M10) |
 | Autosave | ✅ | With ETag-based conflict detection (M7) |
-| Timing tracks | ⚠️ | Rendered on a pinned ruler row, click-to-add/right-click-to-delete (M10); manual marks only, no fixed-interval/beat-bar generators, no lyric tracks |
+| Timing tracks | ⚠️ | Rendered on a pinned ruler row, click-to-add/right-click-to-delete (M10). Fixed-interval and Metronome (BPM) generators added M15.6 (matches real xLights' New Timing dialog's 25/50/100ms and Metronome options - FPP Commands/Effects and tag data out of scope), each generating a new named track rather than overwriting one - a real imported sequence commonly has several meaningfully-named tracks (Beats, Lyrics, etc.) with no guaranteed ordering. All tracks still render merged onto one pinned ruler, not as separate rows like real xLights' Timings list (a larger `SequencerGrid.vue` rendering change, not attempted) - no lyric tracks |
 | Copy/paste effects | ✅ | Via right-click context menu (M10); Cut and Duplicate too |
 | Row (model/group) visibility | ✅ | A "Models" panel toggles which rows show on the grid, per sequence — a view preference (localStorage), not sequence data; doesn't touch which models/groups actually have effects (M15) |
 | Waveform + playback | ✅ | Native `AudioContext`, peaks computed on main thread |
