@@ -12,7 +12,7 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 |---|---|---|
 | Model types (12 of the goal prompt's list) | ✅ | Matrix, Single Line, Poly Line, Arches, Candy Canes, Circle, Star, Tree, Icicles, Window Frame, Wreath, Custom |
 | Matrix wiring variants | ⚠️ | Vertical/Top Left/zigzag/1 strand-per-string only |
-| Model Groups | ✅ | Membership + buffer style |
+| Model Groups | ✅ | Membership + buffer style, both import-only until M15.5 - a full Groups panel now exists on the Layout page (create, rename, delete, edit membership via checklist), matching real xLights' Groups tab. This row previously read ✅ while the only way to create or edit a group at all was re-importing `xlights_rgbeffects.xml` - corrected here, not a new gap |
 | Screen placement on import | ⚠️ | `WorldPosX/Y/Z` (as the model's *center*, not its raw local origin), `ScaleX`/`ScaleY`, and `RotateZ` all render now (M14) — correct position, per-axis scale, and rotation. Per-type shear (Angle/Shear/Height for 3-point line placement, X2/Y2 for 2-point) still isn't applied |
 | Layout canvas | ✅ | Drag-to-reposition (M12); drag-to-create from an 11-type model palette (M13, Custom excluded); every model's actual rendered/rotated/scaled bounds now drive auto-fit and hit-testing, not a buffer-dimension guess (M14); no background photo underlay |
 | 2D layout | ✅ | Canvas-based |

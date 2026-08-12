@@ -1,5 +1,30 @@
 # Changelog
 
+## M15.5 — Model Groups editor (Layout page)
+
+Continuing the standing ask, this pass compared the Controllers tab (found already
+appropriately scoped - the missing fields all relate to live network output, a documented
+non-goal, so leaving them out avoids offering controls with no real effect) and the Layout
+tab's Groups list (a real, previously-mismarked gap: `PARITY.md` claimed Model Groups was `✅`,
+but the entire feature was import-only, with zero create/rename/membership/delete path).
+
+- **New "Groups" tab on the Layout page**, alongside the existing "Models" tab: lists every
+  group with its member count, a "+ New group" button, and an editor (name, buffer style,
+  member checklist, Save, Delete) reusing the same visual language as the Position/Properties
+  panels from M15.2.
+- **Reuses the existing `bulkUpsertModelGroups` endpoint** (upsert-by-name, resolve members by
+  name) as the save path for both create and edit, instead of a second mechanism - the import
+  path and the new UI path now share one implementation.
+- **Backend**: added the one missing endpoint, `DELETE /layouts/{layout}/model-groups/{group}`.
+- Renaming a group correctly deletes the old row and recreates under the new name (required
+  since the upsert endpoint matches by name) - verified this doesn't leave an orphaned duplicate.
+- Verified live against the real 120-model/11-group show: all 11 real groups listed with real
+  member counts; edited "House"'s membership (added a 3rd model, persisted); created and deleted
+  a throwaway group; renamed "Spiral Trees" and confirmed via direct DB query the old row was
+  gone, the new one had both original members, and no duplicate was left behind.
+- New test: `test_deleting_a_model_group_removes_it` in `LayoutModelsTest.php`. All existing
+  tests still green: 130 engine + 20 formats (vitest), 29 PHPUnit, typecheck/lint clean.
+
 ## M15.4 — Layer Blending panel (blend mode, Mix, Fade transitions)
 
 Completes the three-panel effect-editing comparison M15.3 started (Effect Settings, Color, Layer

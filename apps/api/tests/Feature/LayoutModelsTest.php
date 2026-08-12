@@ -108,6 +108,19 @@ class LayoutModelsTest extends TestCase
         $this->assertCount(2, $members); // "Unknown Model" silently dropped, not a 500
     }
 
+    public function test_deleting_a_model_group_removes_it(): void
+    {
+        $user = User::factory()->create();
+        $layout = Layout::factory()->for($user->projects()->create(['name' => 'Show']))->create();
+        $bulk = $this->actingAs($user)->postJson("/api/v1/layouts/{$layout->id}/model-groups/bulk", [
+            'groups' => [['name' => 'Front Yard', 'memberNames' => []]],
+        ]);
+        $groupId = $bulk->json('0.id');
+
+        $this->actingAs($user)->deleteJson("/api/v1/layouts/{$layout->id}/model-groups/{$groupId}")->assertNoContent();
+        $this->assertCount(0, $layout->fresh()->modelGroups);
+    }
+
     public function test_a_user_cannot_touch_another_users_layout(): void
     {
         $owner = User::factory()->create();

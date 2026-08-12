@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { propertyFieldsFor } from "@webxlights/engine";
-import { api, type ControllerRecord, type Layout, type ModelRecord } from "../lib/api";
+import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas from "../components/LayoutCanvas.vue";
@@ -23,6 +23,69 @@ const viewMode = ref<"2d" | "3d">("2d");
 const selectedModel = computed(() => models.value.find((m) => m.id === selectedModelId.value) ?? null);
 const renamingModelId = ref<number | null>(null);
 const renameValue = ref("");
+
+// M15.5: Model Groups editor - previously import-only (bulkUpsertModelGroups, resolves
+// membership by name), no path to create/rename/re-member/delete a group from the app itself.
+const activeTab = ref<"models" | "groups">("models");
+const groups = ref<ModelGroupRecord[]>([]);
+const selectedGroupId = ref<number | null>(null);
+const selectedGroup = computed(() => groups.value.find((g) => g.id === selectedGroupId.value) ?? null);
+const groupNameDraft = ref("");
+const groupBufferStyleDraft = ref("Default");
+const groupMemberIds = ref<Set<number>>(new Set());
+const groupError = ref("");
+
+function selectGroup(g: ModelGroupRecord): void {
+  selectedGroupId.value = g.id;
+  groupNameDraft.value = g.name;
+  groupBufferStyleDraft.value = g.buffer_style || "Default";
+  groupMemberIds.value = new Set(g.members.map((m) => m.id));
+}
+function newGroup(): void {
+  selectedGroupId.value = null;
+  groupNameDraft.value = "New Group";
+  groupBufferStyleDraft.value = "Default";
+  groupMemberIds.value = new Set();
+}
+function toggleGroupMember(modelId: number): void {
+  const next = new Set(groupMemberIds.value);
+  if (next.has(modelId)) next.delete(modelId);
+  else next.add(modelId);
+  groupMemberIds.value = next;
+}
+async function saveGroup(): Promise<void> {
+  if (!layout.value || !groupNameDraft.value.trim()) return;
+  groupError.value = "";
+  const name = groupNameDraft.value.trim();
+  const renaming = selectedGroup.value && selectedGroup.value.name !== name;
+  try {
+    // bulkUpsert matches groups by name (the import path's own contract), so a plain resave
+    // under a new name would create a second group instead of renaming this one - delete the
+    // old row first so the id changes but there's still exactly one group.
+    if (renaming) await api.deleteModelGroup(layout.value.id, selectedGroup.value!.id);
+
+    const memberNames = models.value.filter((m) => groupMemberIds.value.has(m.id)).map((m) => m.name);
+    const [saved] = await api.bulkUpsertModelGroups(layout.value.id, [
+      { name, bufferStyle: groupBufferStyleDraft.value, memberNames },
+    ]);
+    if (!saved) return;
+    groups.value = renaming
+      ? [...groups.value.filter((g) => g.id !== selectedGroup.value!.id), saved]
+      : groups.value.some((g) => g.id === saved.id)
+        ? groups.value.map((g) => (g.id === saved.id ? saved : g))
+        : [...groups.value, saved];
+    selectGroup(saved);
+  } catch (err) {
+    groupError.value = err instanceof Error ? err.message : "Couldn't save group";
+  }
+}
+async function deleteGroup(): Promise<void> {
+  if (!layout.value || !selectedGroup.value) return;
+  if (!window.confirm(`Delete group "${selectedGroup.value.name}"? This can't be undone.`)) return;
+  await api.deleteModelGroup(layout.value.id, selectedGroup.value.id);
+  groups.value = groups.value.filter((g) => g.id !== selectedGroup.value!.id);
+  selectedGroupId.value = null;
+}
 
 // First real caller of api.updateModel() (previously unused anywhere in the app) - the
 // persist path M12 exists to prove. ModelEntityController::update replaces `screen` wholesale,
@@ -148,7 +211,9 @@ async function loadLayout(): Promise<void> {
   const [layouts, controllerList] = await Promise.all([api.listLayouts(projectId.value), api.listControllers(projectId.value)]);
   layout.value = layouts[0] ?? null;
   controllers.value = controllerList;
-  if (layout.value) models.value = await api.listModels(layout.value.id);
+  if (layout.value) {
+    [models.value, groups.value] = await Promise.all([api.listModels(layout.value.id), api.listModelGroups(layout.value.id)]);
+  }
 }
 
 // M11: controller_id/controller_offset live on the model, but ModelEntityController::update
@@ -201,7 +266,7 @@ async function handleFileChange(e: Event): Promise<void> {
   try {
     const text = await file.text();
     const summary = await importRgbEffects(layout.value.id, text);
-    models.value = await api.listModels(layout.value.id);
+    [models.value, groups.value] = await Promise.all([api.listModels(layout.value.id), api.listModelGroups(layout.value.id)]);
     importMessage.value = `Imported ${summary.imported} models` +
       (summary.groups ? `, ${summary.groups} groups` : "") +
       (summary.unsupported.length ? ` — unsupported types kept but not rendered: ${summary.unsupported.join(", ")}` : "");
@@ -239,7 +304,53 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
     <p v-if="importMessage" class="import-message">{{ importMessage }}</p>
     <div class="body">
       <aside class="model-list">
-        <h2>Models ({{ models.length }})</h2>
+        <div class="tabs">
+          <button :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">Models ({{ models.length }})</button>
+          <button :class="{ active: activeTab === 'groups' }" @click="activeTab = 'groups'">Groups ({{ groups.length }})</button>
+        </div>
+
+        <template v-if="activeTab === 'groups'">
+          <ul class="group-list">
+            <li v-for="g in groups" :key="g.id" :class="{ selected: g.id === selectedGroupId }" @click="selectGroup(g)">
+              <span>{{ g.name }}</span>
+              <span class="type">{{ g.members.length }} model{{ g.members.length === 1 ? "" : "s" }}</span>
+            </li>
+          </ul>
+          <p v-if="groups.length === 0" class="empty">No groups yet.</p>
+          <button class="new-group-btn" @click="newGroup">+ New group</button>
+
+          <div v-if="selectedGroupId !== null || groupNameDraft" class="group-editor">
+            <label>
+              Name
+              <input v-model="groupNameDraft" type="text" />
+            </label>
+            <label>
+              Buffer style
+              <select v-model="groupBufferStyleDraft">
+                <option value="Default">Default</option>
+                <option value="Single Line">Single Line</option>
+                <option value="Horizontal">Horizontal</option>
+                <option value="Vertical">Vertical</option>
+              </select>
+            </label>
+            <p class="members-label">Members</p>
+            <ul class="member-checklist">
+              <li v-for="m in models" :key="m.id">
+                <label>
+                  <input type="checkbox" :checked="groupMemberIds.has(m.id)" @change="toggleGroupMember(m.id)" />
+                  {{ m.name }}
+                </label>
+              </li>
+            </ul>
+            <p v-if="groupError" class="assign-error">{{ groupError }}</p>
+            <div class="group-actions">
+              <button @click="saveGroup">Save</button>
+              <button v-if="selectedGroupId !== null" class="delete-btn" @click="deleteGroup">Delete group</button>
+            </div>
+          </div>
+        </template>
+
+        <template v-else>
         <ul>
           <li
             v-for="m in models"
@@ -342,6 +453,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
             />
           </label>
         </div>
+        </template>
       </aside>
       <div class="canvas-wrap">
         <ModelPalette v-if="viewMode === '2d'" />
@@ -484,6 +596,97 @@ header h1 {
 .model-list .empty {
   color: #666;
   font-size: 0.8rem;
+}
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.tabs button {
+  flex: 1;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.75rem;
+  color: #999;
+  background: #1a1a20;
+  border: 1px solid #333;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.tabs button.active {
+  color: #e8c468;
+  border-color: #e8c468;
+  background: #2c2712;
+}
+.new-group-btn {
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.3rem;
+  font-size: 0.75rem;
+  color: #999;
+  background: #1a1a20;
+  border: 1px dashed #444;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.new-group-btn:hover {
+  color: #ddd;
+  border-color: #666;
+}
+.group-editor {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #333;
+}
+.group-editor label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #aaa;
+  margin-bottom: 0.5rem;
+  gap: 0.5rem;
+}
+.group-editor input[type="text"],
+.group-editor select {
+  width: 8.5rem;
+  font-size: 0.8rem;
+}
+.members-label {
+  font-size: 0.75rem;
+  color: #888;
+  margin: 0.5rem 0 0.3rem;
+}
+.member-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+  max-height: 12rem;
+  overflow-y: auto;
+  font-size: 0.75rem;
+}
+.member-checklist li {
+  padding: 0.15rem 0;
+}
+.member-checklist label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #ccc;
+  cursor: pointer;
+}
+.group-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.group-actions button {
+  flex: 1;
+  padding: 0.35rem;
+  font-size: 0.75rem;
+  color: #ddd;
+  background: #1e1e26;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
 }
 .controller-assign {
   display: flex;

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Layout;
+use App\Models\ModelGroup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -52,6 +53,20 @@ class ModelGroupController extends Controller
         });
 
         return response()->json($result, 201);
+    }
+
+    // M15.5: the Layout page's Groups panel - real xLights lets you create/rename/delete a
+    // group and edit its membership entirely from the Layout tab; webXLights previously only
+    // ever created a group via rgbeffects.xml import (bulkUpsert above), with no path to remove
+    // one. bulkUpsert already covers create/rename/re-membership (upsert by name).
+    public function destroy(Request $request, Layout $layout, ModelGroup $modelGroup)
+    {
+        $this->authorizeLayout($request, $layout, 'editor');
+        abort_unless($modelGroup->layout_id === $layout->id, 404);
+
+        $modelGroup->delete();
+
+        return response()->noContent();
     }
 
     private function authorizeLayout(Request $request, Layout $layout, string $need = 'viewer'): void
