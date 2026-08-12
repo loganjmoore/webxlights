@@ -1,5 +1,19 @@
 # Changelog
 
+## Editors full width + popped-out house preview
+
+- **The app shell no longer letterboxes the editors.** `#app` carried a fixed `width: 1126px; margin: 0 auto` from the Vite starter template, so the sequencer and the layout editor — full-screen tools — sat in a centred column with dead bands either side on any real monitor. Every page already sets its own inner max-width and padding, so the shell now just fills the viewport.
+- **Pop out preview**: a new `/projects/:projectId/sequences/:sequenceId/preview` route puts the house preview in its own window (second monitor, the way real xLights does it), with its own Play/Stop/Stop-scrub transport. The sequencer stays the single source of truth — it owns the `<audio>` element and broadcasts the playhead over a `BroadcastChannel`; the preview mirrors it and sends transport *commands* back, so its buttons are a remote control rather than a second, competing transport. Two audio elements playing the same track would drift apart within seconds and you'd hear both.
+- The preview also loads the sequence from the API itself, so it still shows the show when no sequencer tab is open — it just won't move until one is, and says so.
+
+## Layout editor — multi-select, resize handles, in-app confirmations, import placement fix
+
+- **Marquee multi-select** on the 2D layout canvas: drag on empty space to rubber-band a selection (by intersection, so a band clipping a big matrix still catches it), Shift/Cmd/Ctrl to add, Cmd/Ctrl-A for all, Escape to clear. Dragging any member moves the whole selection; Delete removes all of them behind a single confirmation.
+- **Resize handles** on a single selected model — four corners (both axes) and four edges (one axis), computed in the model's own unrotated frame and drawn rotated with it so a handle means the same thing at any RotateZ. `scaleZ` is persisted alongside and the position panel gains a Scale Z field.
+- **In-app confirmation dialogs** (`lib/confirm.ts` + `ConfirmDialog.vue`, mounted once in `App.vue`) replace every `window.confirm()`. Esc and backdrop cancel, Tab is trapped, focus returns where it was. Native dialogs are unstyleable, block a canvas mid-drag with the pointer captured, and get suppressed by Chrome after a few in a row — which would have silently turned "confirm before deleting" into "delete without asking".
+- **Import placement systems** (`packages/engine/src/models/placement.ts`): xLights stores position differently per model class, and import read every model as "Boxed" (WorldPos = centre, ScaleX/RotateZ = size and angle). Two-point models (Single Line, Icicles) and three-point models (Arches, Candy Canes) store *one endpoint* plus an `X2/Y2/Z2` offset to the other, with size and angle coming from that vector — so every arch, candy cane, roofline and icicle run imported half its own length off-position, at default size, unrotated. Placement now derives the anchor, span and angle per system, with `Height` handled for three-point models. Poly Line's `PolyPointScreenLocation` and the three-point `Shear`/`Angle` attributes remain unimplemented and fall back rather than being mis-placed.
+- `scaleZ` round-trips but has no visible effect yet: `ModelNode` carries only `screenX/screenY`, so every model is planar and there's no Z extent to scale. Documented rather than faked with a handle that moves a number and changes nothing.
+
 ## Fix — migrations run on deploy (production 500 on every Layout page)
 
 - **The bug:** `GET /api/v1/layouts/{id}/view-objects` returned 500 in production for every layout after M15.7. That endpoint is part of the Layout page's own load, so the page came up behind a "Something went wrong" banner. M15.7's `create_view_objects_table` migration had never been applied — the code deployed, the table didn't.

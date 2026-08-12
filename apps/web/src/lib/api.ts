@@ -51,7 +51,7 @@ export interface ModelRecord {
   supported: boolean;
   params: Record<string, unknown>;
   raw_attrs: Record<string, string>;
-  screen: { x?: number; y?: number; z?: number; scale?: number; scaleY?: number; rotate?: number };
+  screen: { x?: number; y?: number; z?: number; scale?: number; scaleY?: number; scaleZ?: number; rotate?: number };
   strings: number | null;
   nodes_per_string: number | null;
   string_type: string | null;

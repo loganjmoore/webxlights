@@ -1,5 +1,19 @@
 import { parseRgbEffectsXml } from "@webxlights/formats";
+import { computeGeometryFromAttrs, screenFromAttrs, type ModelGeometry } from "@webxlights/engine";
 import { api, type GroupUpsertPayload, type ModelUpsertPayload, type ViewObjectUpsertPayload } from "./api";
+
+// The canvases' local-unit-to-world factor (LayoutCanvas/LayoutCanvas3D's NODE_SPACING).
+// Placement needs it to turn xLights' world-unit endpoint vectors into our local-unit scales.
+const NODE_SPACING = 4;
+
+function geometryOf(displayAs: string, attrs: Record<string, string>, supported: boolean): ModelGeometry | null {
+  if (!supported) return null;
+  try {
+    return computeGeometryFromAttrs(displayAs, attrs);
+  } catch {
+    return null;
+  }
+}
 
 export interface ImportSummary {
   imported: number;
@@ -7,26 +21,16 @@ export interface ImportSummary {
   groups: number;
 }
 
-// SPEC ch11 §2.1: WorldPosX/Y/Z is written for every model regardless of screen-location
-// system (Boxed/2pt/3pt/Poly/Multi) as the model's *center* point, with RotateZ pivoting
-// around that same center (confirmed against the xLights manual/community docs). ScaleX/
-// ScaleY/RotateZ are now actually rendered (LayoutCanvas.vue/LayoutCanvas3D.vue via
-// packages/engine's nodeWorldOffset), not just parsed and stored inertly - M13 shipped the
-// toolbar/palette but not this; M14 is the fidelity pass this comment used to defer to.
-// Per-type shear (Angle/Shear/Height for the 3-point line placement system, X2/Y2 endpoints
-// for 2-point) is still not applied - those are placement-system-specific attributes on top
-// of the universal Pos/Scale/RotateZ trio every model has, a real remaining gap, not silent
-// (see DECISIONS.md).
-function extractScreenPosition(attrs: Record<string, string>) {
-  return {
-    x: attrs.WorldPosX ? parseFloat(attrs.WorldPosX) : 0,
-    y: attrs.WorldPosY ? parseFloat(attrs.WorldPosY) : 0,
-    z: attrs.WorldPosZ ? parseFloat(attrs.WorldPosZ) : 0,
-    scale: attrs.ScaleX ? parseFloat(attrs.ScaleX) : 1,
-    scaleY: attrs.ScaleY ? parseFloat(attrs.ScaleY) : undefined,
-    rotate: attrs.RotateZ ? parseFloat(attrs.RotateZ) : 0,
-  };
-}
+// SPEC ch11 §2.1. Which attributes mean what depends on the model's placement system, which
+// differs per DisplayAs - see packages/engine/src/models/placement.ts. Boxed models really do
+// store WorldPos as a centre with ScaleX/RotateZ; two- and three-point models store one
+// endpoint plus an X2/Y2/Z2 offset to the other, and their size and angle come from that
+// vector. Reading every model as boxed (what this did before) put every arch, candy cane,
+// roofline and icicle run half its own length off-position, at default size and unrotated.
+//
+// Still not applied: Poly Line's PolyPointScreenLocation (NumPoints/PointData) and the
+// three-point Shear/Angle attributes - real remaining gaps, recorded in PARITY.md, not
+// silently mis-placed.
 
 export async function importRgbEffects(layoutId: number, xmlText: string): Promise<ImportSummary> {
   const parsed = parseRgbEffectsXml(xmlText);
@@ -36,7 +40,7 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
     type: m.displayAs,
     supported: m.supported,
     raw_attrs: m.attrs,
-    screen: extractScreenPosition(m.attrs),
+    screen: { ...screenFromAttrs(m.displayAs, m.attrs, geometryOf(m.displayAs, m.attrs, m.supported), NODE_SPACING) },
     strings: m.attrs.NumStrings ? parseInt(m.attrs.NumStrings, 10) : null,
     nodes_per_string: m.attrs.NodesPerString ? parseInt(m.attrs.NodesPerString, 10) : null,
     string_type: m.attrs.StringType ?? null,

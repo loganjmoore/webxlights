@@ -7,6 +7,7 @@ import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
+import { openPreviewChannel, previewUrlFor, type PreviewMessage } from "../lib/previewChannel";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type ContextMenuTarget, type GridRow } from "../components/SequencerGrid.vue";
 import EffectContextMenu from "../components/EffectContextMenu.vue";
@@ -373,6 +374,49 @@ async function fppUpload(): Promise<void> {
   }
 }
 
+// ---- Popped-out preview window -------------------------------------------------------
+// This tab is the source of truth: it owns the <audio> element and broadcasts the playhead;
+// the preview window mirrors it and sends transport commands back. See lib/previewChannel.ts.
+let previewChannel: BroadcastChannel | null = null;
+
+function previewSnapshot(): PreviewMessage {
+  return {
+    type: "snapshot",
+    models: modelRecords.value,
+    body: JSON.parse(JSON.stringify(store.body)) as typeof store.body,
+    frameMs: store.sequence?.frame_ms ?? 50,
+    durationMs: store.sequence?.duration_ms ?? 0,
+    name: store.sequence?.name ?? "",
+    audioLoaded: audioLoaded.value,
+  };
+}
+
+function broadcastTransport(): void {
+  previewChannel?.postMessage({ type: "transport", playheadMs: playheadMs.value, playing: playing.value });
+}
+
+function onPreviewMessage(e: MessageEvent<PreviewMessage>): void {
+  const message = e.data;
+  if (message.type === "hello") {
+    previewChannel?.postMessage(previewSnapshot());
+    broadcastTransport();
+    return;
+  }
+  if (message.type !== "command") return;
+
+  const el = audioEl.value;
+  if (message.action === "play") void el?.play();
+  else if (message.action === "pause") el?.pause();
+  else if (message.action === "stop") stop();
+  else if (message.action === "seek" && typeof message.ms === "number") seekTo(message.ms);
+  broadcastTransport();
+}
+
+function openPreviewWindow(): void {
+  window.open(previewUrlFor(route.params.projectId as string, sequenceId.value), `webxlights-preview-${sequenceId.value}`);
+  // A window opened now won't have its listener attached yet; it says hello when it's ready.
+}
+
 function onKeydown(e: KeyboardEvent): void {
   if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "SELECT") return;
 
@@ -405,10 +449,14 @@ onMounted(async () => {
   if (demoAudio) await loadAudioFile(demoAudio);
   else if (store.sequence?.audio_path) await loadStoredAudio();
   window.addEventListener("keydown", onKeydown);
+  previewChannel = openPreviewChannel(sequenceId.value);
+  previewChannel?.addEventListener("message", onPreviewMessage);
   if (importMessage.value) router.replace({ query: { ...route.query, importMessage: undefined } });
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
+  previewChannel?.removeEventListener("message", onPreviewMessage);
+  previewChannel?.close();
   if (audioUrl.value) URL.revokeObjectURL(audioUrl.value);
 });
 watch(sequenceId, async (id) => {
@@ -437,6 +485,9 @@ watch(sequenceId, async (id) => {
         <option :value="2">2x</option>
       </select>
       <button @click="exportFseq" :disabled="!store.sequence">Export .fseq</button>
+      <button @click="openPreviewWindow" :disabled="!store.sequence" title="Open the house preview in its own window">
+        Pop out preview
+      </button>
       <span v-if="exportError" class="export-error">{{ exportError }}</span>
       <button @click="snapshotNow" :disabled="!store.sequence">Snapshot</button>
       <button @click="toggleHistory" :disabled="!store.sequence">History</button>
