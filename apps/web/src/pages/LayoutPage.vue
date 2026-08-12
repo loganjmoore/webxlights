@@ -15,6 +15,7 @@ const projectId = computed(() => Number(route.params.projectId));
 const layout = ref<Layout | null>(null);
 const models = ref<ModelRecord[]>([]);
 const viewObjects = ref<ViewObjectRecord[]>([]); // M15.7: Gridlines/Mesh/... - view-only for now
+const viewObjectsError = ref(""); // non-fatal: the layout still loads without its helper objects
 const controllers = ref<ControllerRecord[]>([]);
 const assignErrors = ref<Record<number, string>>({});
 const importing = ref(false);
@@ -213,11 +214,24 @@ async function loadLayout(): Promise<void> {
   layout.value = layouts[0] ?? null;
   controllers.value = controllerList;
   if (layout.value) {
-    [models.value, groups.value, viewObjects.value] = await Promise.all([
+    // View objects are a decorative helper layer (Gridlines and friends) - the layout is
+    // perfectly usable without them, so a failure there degrades to "no gridlines" rather than
+    // rejecting the whole Promise.all and leaving the page with no models, no groups and a
+    // full-page error banner. That is exactly what M15.7 caused in production: the
+    // view_objects table's migration hadn't been applied, so one optional sub-resource 500'd
+    // and took the entire Layout page down with it.
+    viewObjectsError.value = "";
+    const [modelList, groupList, viewObjectList] = await Promise.all([
       api.listModels(layout.value.id),
       api.listModelGroups(layout.value.id),
-      api.listViewObjects(layout.value.id),
+      api.listViewObjects(layout.value.id).catch((err: unknown) => {
+        viewObjectsError.value = err instanceof Error ? `3D objects unavailable: ${err.message}` : "3D objects unavailable.";
+        return [] as ViewObjectRecord[];
+      }),
     ]);
+    models.value = modelList;
+    groups.value = groupList;
+    viewObjects.value = viewObjectList;
   }
 }
 
@@ -311,6 +325,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
       </label>
     </header>
     <p v-if="importMessage" class="import-message">{{ importMessage }}</p>
+    <p v-if="viewObjectsError" class="view-objects-error">{{ viewObjectsError }}</p>
     <div class="body">
       <aside class="model-list">
         <div class="tabs">
@@ -547,6 +562,13 @@ header h1 {
   padding: 0.5rem 1rem;
   font-size: 0.85rem;
   color: #aaa;
+}
+.view-objects-error {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  color: #e8c468;
+  background: #241f10;
 }
 .body {
   flex: 1;
