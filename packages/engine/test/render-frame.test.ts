@@ -86,4 +86,28 @@ describe("renderRowAtMs (M4 frame-render pipeline)", () => {
     const withoutOverride = renderRowAtMs({ geometry, effects: [{ name: "On", startMs: 0, endMs: 1000, params }] }, 500, 50, 1, [RED]);
     expect(withoutOverride[0]).toEqual(RED);
   });
+
+  // M15.4: real xLights' Layer Blending panel (blend mode + Mix) was fully implemented in
+  // blend.ts/layerStack.ts but every call site hardcoded "Normal"/0 - no per-effect override
+  // ever reached the layer stack. Two opaque "On" layers under default Normal blend always
+  // show only the top layer's color; Additive proves the override wires through.
+  it("an effect's own blendMode reaches the layer stack", () => {
+    const BLUE = rgba(0, 0, 255, 255);
+    const onParams = { startIntensity: 100, endIntensity: 100, transparencyPct: 0, cycles: 1, shimmer: false };
+    const effects = [
+      { name: "On", startMs: 0, endMs: 1000, params: onParams, palette: [RED] },
+      { name: "On", startMs: 0, endMs: 1000, params: onParams, palette: [BLUE], blendMode: "Additive" as const },
+    ];
+    const normalTop = renderRowAtMs(
+      { geometry, effects: [effects[0]!, { ...effects[1]!, blendMode: undefined }] },
+      500,
+      50,
+      1,
+      [RED],
+    );
+    expect(normalTop[0]).toEqual(BLUE); // Normal: opaque top layer fully overwrites
+
+    const additive = renderRowAtMs({ geometry, effects }, 500, 50, 1, [RED]);
+    expect(additive[0]).toEqual(rgba(255, 0, 255, 255)); // Additive: red + blue = magenta
+  });
 });

@@ -249,6 +249,48 @@ verified rigorously instead.
   real, pre-existing cosmetic defects unrelated to the bounds/transform work above - found by
   the same "actually look at every type" pass, fixed independently.
 
+## M15.4: Layer Blending panel (blend mode, Mix, Fade transitions)
+
+Completes the three-panel real xLights effect-editing comparison M15.3 started: Effect Settings,
+Color, and Layer Blending. This is the most surprising finding of the three - unlike Color,
+**the engine-side implementation already fully existed** for all of it (10 `BlendMode`s in
+`blend.ts`, the `effectMixThreshold` "Mix" concept in `layerStack.ts`, `TransitionSpec`/
+`applyFadeTransition` in `transition.ts`, all since M3) - `grep`ping the whole `apps/web` tree for
+any of these found zero references. Every layer was hardcoded `blendMode: "Normal" as BlendMode,
+effectMixThreshold: 0` at both `LayerSpec`-construction call sites in `renderFrame.ts`, and
+`RenderableEffect.transition` (already an optional field!) had no `SequenceEffect` counterpart to
+populate it from - three real engine capabilities, fully tested at the unit level, completely
+unreachable by any user action or import path.
+
+- **`blendMode`/`mix` join `palette` as optional per-effect overrides on `RenderableEffect`**,
+  resolved the same way (`effect.blendMode ?? "Normal"`, `effect.mix ?? 0`) at both call sites
+  that build a `LayerSpec` - the exact same pattern M15.3 established, so this is additive to
+  that, not a new mechanism.
+- **Why blend mode is genuinely inert on a single-layer row and that's fine to ship anyway**:
+  `blendPixel` composites this layer's pixel against the accumulated result of layers *below*
+  it - with zero or one layer active, "below" is empty/transparent and every blend mode reduces
+  to roughly the same visible result. It only does something when two effects overlap in time on
+  the same row (a common real technique: a base "On" wash with a "Twinkle" layered on top in
+  Additive/Max) - MAX_LAYERS is already 5, this isn't a hypothetical scenario.
+- **UI labels stay in the engine's own vocabulary ("Mix"), not a borrowed real-xLights label
+  ("Morph")** - the reference Layer Blending panel has both a "Morph" checkbox+slider (a
+  transition mechanic, unimplemented) and, on the same effectMixThreshold value, what real
+  xLights actually just calls the blend-mode-dependent threshold. Calling the UI control "Mix"
+  (the engine code's own name for the field, `effectMixThreshold: number; // ... "Mix" slider`)
+  avoids implying Morph support that doesn't exist.
+- **Not attempted this pass**: Suppress Effect Until Frame / Freeze Effect At Frame (no such
+  concept anywhere in the render engine - would be new engine work, not a UI-wiring fix like the
+  rest of this pass), Wipe/From Middle/Circle Explode transition types (still Fade-only, a
+  pre-existing documented ceiling), Canvas mode, and per-swatch "reflects music" toggles.
+- Verified live against a real imported Pinwheel effect: set Blend Mode to Additive and Fade In
+  to 500ms via the panel, confirmed both persisted through autosave to the database
+  (`{"blendMode":"Additive","transition":{"inDurationMs":500}}`) alongside the M15.3 palette
+  edit already on that same effect.
+- New regression test (`render-frame.test.ts`): two opaque "On" layers under default Normal
+  blend show only the top layer's color; the same two layers with the top one's `blendMode` set
+  to `"Additive"` produce the actual additive-composited color - proves the per-effect override
+  reaches `renderLayerStack`, not just that the field round-trips through storage.
+
 ## M15.3: Per-effect Color palette
 
 Prompted by continuing the same real-xLights-vs-webXLights comparison into the Sequencer: real

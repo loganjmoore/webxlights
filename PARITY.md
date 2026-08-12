@@ -44,9 +44,10 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Each implemented effect's default/common render path | ✅ | Faithful to the SPEC's math; rarer option combinations (alternate directions, other render methods, etc.) are per-effect documented ceilings — see DECISIONS.md M3/M6 notes |
 | Per-effect Color palette | ⚠️ | Real xLights' Color tab: 1–6 swatches per effect (M15.3), editable via the Sequencer's effect panel, falling back to the app-wide default when unset. Multi-color blending across the palette (`multiColorBlend`) already existed for effects that use it; still missing real xLights' per-swatch checkboxes ("C"/"c" toggles), palette presets, and the "colors reflect music" audio-reactive option |
 | Shader (ISF), Liquid, Glediator, Video, VUMeter | ❌ | Non-goal for v1 / no audio-reactive pipeline yet |
-| Layer blend modes | ⚠️ | 10 of 24 (Normal, Effect 1/2, Average, Additive, Subtractive, Max, Min, 1/2 reveals) |
+| Layer blend modes | ⚠️ | 10 of 24 implemented (Normal, Effect 1/2, Average, Additive, Subtractive, Max, Min, 1/2 reveals) and now actually selectable per effect via the Sequencer's Layer Blending panel (M15.4) - all 10 were render-implemented since M3 but every call site hardcoded "Normal", unreachable from any UI, until this pass |
+| "Mix" / Effect Mix Threshold slider | ⚠️ | The reveal/fade threshold some blend modes read - implemented since M3, wired to a UI slider in M15.4 (was hardcoded 0 everywhere) |
 | Value curves | ⚠️ | One type (Ramp/linear), wired to one param (`On.transparencyPct`) as a proof of the mechanism |
-| Transitions | ⚠️ | Fade In/Out only; no Wipe/From Middle/Circle Explode |
+| Transitions | ⚠️ | Fade In/Out only (no Wipe/From Middle/Circle Explode), and now actually settable via the Layer Blending panel's Fade In/Fade Out (ms) fields (M15.4) - `TransitionSpec`/`applyFadeTransition` were fully implemented since M3 but had zero UI or import path reaching them until this pass |
 | Buffer styles / sub-buffers | ❌ | Every effect renders into the model's default full buffer |
 
 ## File formats (SPEC ch11)

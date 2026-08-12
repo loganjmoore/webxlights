@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { EFFECT_SCHEMAS, defaultParamsFor } from "@webxlights/engine";
+import { EFFECT_SCHEMAS, defaultParamsFor, type BlendMode } from "@webxlights/engine";
 import { api, type ControllerRecord, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
@@ -283,6 +283,12 @@ function handleParamsUpdate(params: Record<string, number | boolean | string>): 
 function handlePaletteUpdate(palette: string[]): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { palette });
 }
+function handleBlendUpdate(patch: { blendMode?: BlendMode; mix?: number }): void {
+  if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, patch);
+}
+function handleTransitionUpdate(transition: { inDurationMs?: number; outDurationMs?: number }): void {
+  if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { transition });
+}
 
 function addTimingMarkAtPlayhead(): void {
   store.ensureDefaultTimingTrack();
@@ -554,7 +560,13 @@ watch(sequenceId, async (id) => {
         </div>
       </div>
       <aside class="props">
-        <EffectPropsPanel :effect="selectedEffect" @update="handleParamsUpdate" @update-palette="handlePaletteUpdate" />
+        <EffectPropsPanel
+          :effect="selectedEffect"
+          @update="handleParamsUpdate"
+          @update-palette="handlePaletteUpdate"
+          @update-blend="handleBlendUpdate"
+          @update-transition="handleTransitionUpdate"
+        />
       </aside>
     </div>
 
