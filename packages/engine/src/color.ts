@@ -9,6 +9,23 @@ export function rgba(r: number, g: number, b: number, a = 255): RGBA {
   return { r, g, b, a };
 }
 
+// `<input type="color">` <-> RGBA - the wire format for a per-effect palette override
+// (SequenceEffect.palette on apps/web's side), always opaque (a=255).
+export function hexToRgba(hex: string): RGBA {
+  const n = parseInt(hex.replace("#", ""), 16);
+  return rgba((n >> 16) & 255, (n >> 8) & 255, n & 255, 255);
+}
+export function rgbaToHex(c: RGBA): string {
+  const toHex = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+  return `#${toHex(c.r)}${toHex(c.g)}${toHex(c.b)}`;
+}
+
+// The app-wide fallback palette for any effect without its own per-effect Color override -
+// a "warm white LED" look, matching what real xLights ships with in a blank sequence. One
+// source of truth (used to be copy-pasted RGBA literals in HousePreview.vue and fseqExport.ts).
+export const DEFAULT_PALETTE_HEX = ["#ffc878", "#50a0ff"];
+export const DEFAULT_PALETTE: RGBA[] = DEFAULT_PALETTE_HEX.map(hexToRgba);
+
 // SPEC ch7-8 "On" effect ramps HSV.value; standard RGB<->HSV, H in [0,360), S/V in [0,1].
 export function rgbToHsv(c: RGBA): { h: number; s: number; v: number } {
   const r = c.r / 255;

@@ -280,6 +280,9 @@ function handleContextAction(action: string): void {
 function handleParamsUpdate(params: Record<string, number | boolean | string>): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { params });
 }
+function handlePaletteUpdate(palette: string[]): void {
+  if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { palette });
+}
 
 function addTimingMarkAtPlayhead(): void {
   store.ensureDefaultTimingTrack();
@@ -551,7 +554,7 @@ watch(sequenceId, async (id) => {
         </div>
       </div>
       <aside class="props">
-        <EffectPropsPanel :effect="selectedEffect" @update="handleParamsUpdate" />
+        <EffectPropsPanel :effect="selectedEffect" @update="handleParamsUpdate" @update-palette="handlePaletteUpdate" />
       </aside>
     </div>
 

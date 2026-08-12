@@ -66,7 +66,7 @@ Each effect implements its default/most-common render path faithfully to the SPE
 - **Main thread, no worker/SAB/OffscreenCanvas**: `renderRowAtMs` runs synchronously on the UI thread on every playhead/body change. Fine at the scale exercised so far; the actual worker-pool + SharedArrayBuffer frame store from DECISIONS.md's original Effect Engine row is deferred to a perf-hardening pass — M9 is explicitly where performance budgets are gated per the goal prompt, not M4.
 - **Stateful effects (Fire/Meteors/Snowflakes) replay from the effect's start on every render call** to reach the current playhead frame — correct and deterministic for scrubbing, but O(frames) per call, so a long-running stateful effect gets more expensive to preview the further into it you scrub/play. A real implementation would cache state and step forward incrementally; deferred with the worker pool.
 - **No per-model mini-preview in the effect panel** (only the whole-house view). Same underlying `renderRowAtMs` call, just not wired to a second, cropped Three.js view yet.
-- **No background photo underlay** (still blocked on R2, see M0/M1 notes) and **no palette editor** — every effect renders against one fixed default 2-color palette (`DEFAULT_PALETTE` in `HousePreview.vue`) until a real palette UI exists (M6/M7).
+- **No background photo underlay** (still blocked on R2, see M0/M1 notes). A per-effect palette editor shipped in M15.3 (below) — every effect can now carry its own Color override instead of always using the fixed app-wide default.
 - **Layer order = row's `effects` array order**, all `Normal` blend, full opacity — matches M2's data model, which has no explicit layer index yet (see M2 notes above).
 
 ## M5 simplifications (documented ceilings, not silent gaps)
@@ -248,6 +248,49 @@ verified rigorously instead.
   no-`DropPattern` default (one drop spanning the whole budget, i.e. a straight line) were both
   real, pre-existing cosmetic defects unrelated to the bounds/transform work above - found by
   the same "actually look at every type" pass, fixed independently.
+
+## M15.3: Per-effect Color palette
+
+Prompted by continuing the same real-xLights-vs-webXLights comparison into the Sequencer: real
+xLights' effect editing is built around three panels next to the timeline - Effect Settings
+(already implemented, `EFFECT_SCHEMAS`), Color (a multi-swatch palette per effect, entirely
+missing), and Layer Blending (blend mode/transitions, also missing - deferred, see below). Every
+webXLights effect was locked to one fixed app-wide 2-color palette regardless of what it actually
+rendered, confirmed by the pre-existing `ponytail:` comments on both `HousePreview.vue` and
+`fseqExport.ts` flagging exactly this ("no palette editor yet (M6/M7)").
+
+- **`effect.palette?: RGBA[]` on `RenderableEffect`, resolved once per render call** (`const
+  palette = effect.palette ?? rowPalette`) at the top of `renderStateless`/`renderStateful`/
+  `renderStatefulIncremental` in `renderFrame.ts` - the three functions that already receive a
+  palette argument for every effect in a row. This is a per-effect override, not a per-row one:
+  real xLights' Color tab is genuinely per-effect (two Pinwheels on the same model can have
+  different colors), so `RenderableEffect` carrying its own optional palette is the correct
+  granularity, not a `RenderableRow`-level field.
+- **Wire format is hex strings (`SequenceEffect.palette?: string[]`), converted to `RGBA[]` at
+  the two render call sites** (`HousePreview.vue`, `fseqExport.ts`) via the new `hexToRgba`/
+  `rgbaToHex` pair in `color.ts` - hex is what `<input type="color">` speaks natively and what's
+  actually easy to eyeball in a JSON body/database row, matching how `screen`/`raw_attrs` are
+  already stored as plain JSON rather than engine-internal shapes.
+- **`DEFAULT_PALETTE`/`DEFAULT_PALETTE_HEX` moved into `packages/engine/src/color.ts`**, replacing
+  two independent copies of the same RGBA literal array in `HousePreview.vue` and
+  `fseqExport.ts` - both files needed the hex form now too (as the props panel's own fallback
+  when an effect has no override), so this was the moment those two copies would have drifted
+  into three; one source of truth instead.
+- **Capped at 6 swatches, matching real xLights' Color tab** - not an arbitrary choice, the
+  engine's own `multiColorBlend`/`twoColorBlend` already operate over an arbitrary-length
+  palette array, so nothing technical caps it lower; 6 is what the reference UI offers.
+- **Not attempted this pass**: per-swatch enable/disable checkboxes (real xLights lets you keep a
+  6-color palette defined but only 2 active), palette presets/save-to-library, and the
+  "colors reflect music" audio-reactive toggle (no audio-analysis pipeline exists yet - same
+  gap VUMeter/Shader are blocked on). Layer Blending (blend mode dropdown, Fade/Wipe
+  transition types beyond the existing Fade In/Out, Suppress/Freeze frame) is a distinct,
+  larger panel - real xLights keeps Color and Layer Blending as separate tabs for a reason
+  (different concerns: what color, vs. how this layer combines with the ones below it) - left
+  for a dedicated pass rather than bolted onto this one.
+- Verified live against the real jinglebells sequence: selected a real imported Pinwheel effect
+  (no palette set), the panel showed the app-wide default two swatches; edited the first swatch
+  to red via the panel, confirmed the change persisted through autosave to the database
+  (`effect.palette: ["#ff0000", "#50a0ff"]`) and reactively round-tripped through the store.
 
 ## M15.2: Structural property editor (Layout page)
 

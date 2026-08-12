@@ -1,13 +1,7 @@
 import { writeFseqV2 } from "@webxlights/formats";
-import { computeGeometryFromAttrs, createRowSequencer, nodeColorsToChannelBytes, type ModelGeometry } from "@webxlights/engine";
+import { computeGeometryFromAttrs, createRowSequencer, DEFAULT_PALETTE, hexToRgba, nodeColorsToChannelBytes, type ModelGeometry } from "@webxlights/engine";
 import type { ControllerRecord, ModelRecord, SequenceBody, SequenceRecord } from "./api";
 
-// ponytail: same fixed default palette as the live preview (HousePreview.vue) - no palette
-// editor exists yet (M6/M7).
-const DEFAULT_PALETTE = [
-  { r: 255, g: 200, b: 120, a: 255 },
-  { r: 80, g: 160, b: 255, a: 255 },
-];
 const SEED = 12345;
 
 function extractRgbOrder(stringType: string | null): string {
@@ -78,7 +72,10 @@ export function exportSequenceToFseq(
   const sequencers = supported.map((model, i) => {
     const geo = geometries[i];
     if (!geo) return null;
-    const rowEffects = body.rows.filter((r) => r.elementType === "model" && r.elementId === model.id).flatMap((r) => r.effects);
+    const rowEffects = body.rows
+      .filter((r) => r.elementType === "model" && r.elementId === model.id)
+      .flatMap((r) => r.effects)
+      .map((e) => ({ ...e, palette: e.palette?.map(hexToRgba) }));
     return createRowSequencer({ geometry: geo, effects: rowEffects }, frameMs, SEED, DEFAULT_PALETTE);
   });
 

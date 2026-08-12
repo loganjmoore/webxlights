@@ -68,4 +68,22 @@ describe("renderRowAtMs (M4 frame-render pipeline)", () => {
       ).not.toThrow();
     }
   });
+
+  // M15.3: a per-effect Color override (real xLights' Color tab) wins over the row's own
+  // palette when set, and the row palette still applies when an effect has none.
+  it("an effect's own palette overrides the row's default palette", () => {
+    const BLUE = rgba(0, 0, 255, 255);
+    const params = { startIntensity: 100, endIntensity: 100, transparencyPct: 0, cycles: 1, shimmer: false };
+    const withOverride = renderRowAtMs(
+      { geometry, effects: [{ name: "On", startMs: 0, endMs: 1000, params, palette: [BLUE] }] },
+      500,
+      50,
+      1,
+      [RED],
+    );
+    expect(withOverride[0]).toEqual(BLUE);
+
+    const withoutOverride = renderRowAtMs({ geometry, effects: [{ name: "On", startMs: 0, endMs: 1000, params }] }, 500, 50, 1, [RED]);
+    expect(withoutOverride[0]).toEqual(RED);
+  });
 });

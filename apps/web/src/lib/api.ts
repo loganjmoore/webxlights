@@ -122,6 +122,9 @@ export interface SequenceEffect {
   startMs: number;
   endMs: number;
   params: Record<string, number | boolean | string>;
+  // Per-effect color override (real xLights' Color tab), hex strings. Unset = inherit the
+  // row's default palette.
+  palette?: string[];
 }
 
 export interface SequenceRow {
