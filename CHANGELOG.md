@@ -1,5 +1,31 @@
 # Changelog
 
+## M15.7 — view_objects import + Gridlines rendering
+
+Revisits an M15.1 finding: `<view_object>` elements (Gridlines, Mesh, Terrain, ...) are a
+separate xLights XML element from `<model>` - correctly *not* a model-import bug, but
+`parseRgbEffectsXml` never parsed `<view_objects>` at all, so every real show's Gridlines/Mesh
+helpers were silently dropped, not "correctly excluded." Real xLights' Layout tab "3D Objects"
+sub-tab confirmed this is real, commonly-populated data.
+
+- **New `view_objects` table/model/controller**, mirroring `models`' shape (`type`, `supported`,
+  lossless `raw_attrs`). Import-only (bulk-upsert by name), no manual create/edit UI yet.
+- **Only `Gridlines` renders** - the one type both commonly present and genuinely simple to
+  render honestly; Mesh/Terrain need an OBJ-mesh loader or heightmap renderer this codebase
+  doesn't have. Everything else still imports (kept, not silently lost) with `supported: false`.
+- **2D renders Gridlines flat in the X/Y plane** (matching every other model on that canvas,
+  which has no concept of 3D rotation at all); **3D applies the real WorldPos + RotateX/Y/Z**
+  via a custom line-segment mesh (not `THREE.GridHelper`, which is square-only and would
+  misrepresent xLights' independent Grid Width/Height - this real show's grid is 2500×2000).
+  Respects the real "Active" checkbox in both.
+- Verified live against the real 120-model show: re-imported, confirmed via DB query both real
+  view objects landed correctly and the unsupported-types banner now lists "Mesh"; temporarily
+  flipped `Active` to see the renderer actually work (real data had it off, matching real
+  xLights) - both 2D and 3D grids rendered correctly at the real dimensions, then restored.
+- New tests: `rgbeffects.test.ts` (view_objects parse separately from models, Gridlines
+  supported/Mesh not) and a bulk-upsert/list round-trip in `LayoutModelsTest.php`. All existing
+  tests still green: 130 engine + 21 formats (vitest), 30 PHPUnit, typecheck/lint clean.
+
 ## M15.6 — Timing track generators (fixed-interval, Metronome)
 
 Closes the exact gap `PARITY.md` already flagged: "manual marks only, no fixed-interval/beat-bar

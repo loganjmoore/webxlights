@@ -53,4 +53,21 @@ describe("parseRgbEffectsXml", () => {
     ]);
     expect(result.unsupportedTypes).toEqual([]);
   });
+
+  it("parses view_objects separately from models, flagging Gridlines as the only supported type", () => {
+    // Real xLights writes these under <view_objects>, not <models> - a distinct element that
+    // was previously not parsed at all, silently dropping every real show's Gridlines/Mesh.
+    const xml = `<xrgb><models></models><view_objects>
+      <view_object name="Gridlines" DisplayAs="Gridlines" GridLineSpacing="50" GridWidth="2500" GridHeight="2000"/>
+      <view_object name="Mesh" DisplayAs="Mesh" ObjFile="/path/house.obj"/>
+    </view_objects></xrgb>`;
+    const result = parseRgbEffectsXml(xml);
+    expect(result.viewObjects).toHaveLength(2);
+    expect(result.viewObjects.map((o) => [o.name, o.displayAs, o.supported])).toEqual([
+      ["Gridlines", "Gridlines", true],
+      ["Mesh", "Mesh", false],
+    ]);
+    expect(result.viewObjects[0]!.attrs.GridLineSpacing).toBe("50");
+    expect(result.unsupportedTypes).toEqual(["Mesh"]);
+  });
 });

@@ -4,10 +4,10 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { DragControls } from "three/examples/jsm/controls/DragControls.js";
 import { computeGeometryFromAttrs, geometryCenter, nodeWorldOffset, transformedHalfExtents, type ModelGeometry, type ScreenTransform } from "@webxlights/engine";
-import type { ModelRecord } from "../lib/api";
+import type { ModelRecord, ViewObjectRecord } from "../lib/api";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 
-const props = defineProps<{ models: ModelRecord[]; selectedModelId: number | null }>();
+const props = defineProps<{ models: ModelRecord[]; viewObjects?: ViewObjectRecord[]; selectedModelId: number | null }>();
 const emit = defineEmits<{
   select: [modelId: number | null];
   move: [modelId: number, x: number, y: number, z: number];
@@ -23,6 +23,47 @@ let dragControls: DragControls | null = null;
 let points: THREE.Points | null = null;
 let selectionHelper: THREE.BoxHelper | null = null;
 let rafId: number | null = null;
+let gridLines: THREE.LineSegments[] = [];
+
+// M15.7: real xLights' Gridlines view_object - a flat reference grid, most commonly used as a
+// ground plane (RotateX=-90 in the real file this was verified against). Three.js's built-in
+// GridHelper is square-only; xLights' Grid Width/Height are independent, so this builds the
+// line segments directly instead of reaching for GridHelper and silently rounding to square.
+function buildGridLines(width: number, height: number, spacingIn: number): THREE.LineSegments {
+  const halfW = width / 2;
+  const halfH = height / 2;
+  // Guards a malformed/near-zero spacing from generating an unbounded number of lines.
+  const spacing = Math.max(spacingIn, Math.max(width, height) / 500, 0.01);
+  const verts: number[] = [];
+  for (let x = -halfW; x <= halfW + 1e-6; x += spacing) verts.push(x, 0, -halfH, x, 0, halfH);
+  for (let z = -halfH; z <= halfH + 1e-6; z += spacing) verts.push(-halfW, 0, z, halfW, 0, z);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  return new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x4a7a4a, transparent: true, opacity: 0.4 }));
+}
+
+function buildViewObjects(): void {
+  if (!setup) return;
+  for (const g of gridLines) setup.scene.remove(g);
+  gridLines = [];
+  for (const obj of props.viewObjects ?? []) {
+    if (obj.type !== "Gridlines" || obj.raw_attrs.Active === "0") continue;
+    const a = obj.raw_attrs;
+    const num = (key: string, fallback: number) => {
+      const n = parseFloat(a[key] ?? "");
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const mesh = buildGridLines(num("GridWidth", 1000), num("GridHeight", 1000), num("GridLineSpacing", 50));
+    mesh.position.set(num("WorldPosX", 0), num("WorldPosY", 0), num("WorldPosZ", 0));
+    mesh.rotation.set(
+      THREE.MathUtils.degToRad(num("RotateX", -90)),
+      THREE.MathUtils.degToRad(num("RotateY", 0)),
+      THREE.MathUtils.degToRad(num("RotateZ", 0)),
+    );
+    setup.scene.add(mesh);
+    gridLines.push(mesh);
+  }
+}
 
 interface RowEntry {
   model: ModelRecord;
@@ -215,6 +256,7 @@ onMounted(() => {
   orbit = new OrbitControls(setup.camera, setup.renderer.domElement);
   orbit.enableDamping = true;
   buildScene();
+  buildViewObjects();
   fitCameraToScene();
 
   container.addEventListener("pointerdown", onPointerDown);
@@ -247,6 +289,7 @@ onBeforeUnmount(() => {
 });
 
 watch(() => props.models, buildScene, { deep: true });
+watch(() => props.viewObjects, buildViewObjects, { deep: true });
 watch(() => props.selectedModelId, updateSelectionHighlight);
 </script>
 

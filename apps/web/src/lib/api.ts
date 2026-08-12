@@ -118,6 +118,21 @@ export interface GroupUpsertPayload {
   memberNames: string[];
 }
 
+export interface ViewObjectRecord {
+  id: number;
+  name: string;
+  type: string;
+  supported: boolean;
+  raw_attrs: Record<string, string>;
+}
+
+export interface ViewObjectUpsertPayload {
+  name: string;
+  type: string;
+  supported?: boolean;
+  raw_attrs?: Record<string, string>;
+}
+
 export interface SequenceEffect {
   id: string;
   name: string;
@@ -221,6 +236,9 @@ export const api = {
     request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups/bulk`, { method: "POST", body: JSON.stringify({ groups }) }),
   deleteModelGroup: (layoutId: number, groupId: number) =>
     request<void>(`/v1/layouts/${layoutId}/model-groups/${groupId}`, { method: "DELETE" }),
+  listViewObjects: (layoutId: number) => request<ViewObjectRecord[]>(`/v1/layouts/${layoutId}/view-objects`),
+  bulkUpsertViewObjects: (layoutId: number, objects: ViewObjectUpsertPayload[]) =>
+    request<ViewObjectRecord[]>(`/v1/layouts/${layoutId}/view-objects/bulk`, { method: "POST", body: JSON.stringify({ objects }) }),
   listSequences: (projectId: number) => request<SequenceSummary[]>(`/v1/projects/${projectId}/sequences`),
   createSequence: (projectId: number, data: { name: string; frame_ms: number; duration_ms: number; audio_filename?: string }) =>
     request<SequenceRecord>(`/v1/projects/${projectId}/sequences`, { method: "POST", body: JSON.stringify(data) }),
