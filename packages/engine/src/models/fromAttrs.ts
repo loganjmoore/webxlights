@@ -77,10 +77,15 @@ export function computeGeometryFromAttrs(displayAs: string, attrs: Record<string
       });
     }
     case "Icicles":
+      // computeIcicles's own no-pattern default is one drop spanning the entire node budget -
+      // correct as a library default (least assumption possible), but a single straight line
+      // is the one shape "icicles" can't look like. A model actually imported with a real
+      // DropPattern attribute is unaffected (csvInts(attrs.DropPattern) wins); this fallback
+      // only fires for a drag-created model or an import that genuinely omits the attribute.
       return computeIcicles({
         strings: int(attrs.NumStrings, 1),
         nodesPerString: int(attrs.NodesPerString, 80),
-        dropPattern: csvInts(attrs.DropPattern),
+        dropPattern: csvInts(attrs.DropPattern) ?? [2, 4, 6, 4],
       });
     case "Window Frame":
       return computeWindowFrame({
