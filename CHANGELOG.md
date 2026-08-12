@@ -1,5 +1,32 @@
 # Changelog
 
+## M15.2 — Structural property editor (Layout page)
+
+Prompted by comparing webXLights' Layout page against the real desktop xLights app side by side
+on the same real show/models - the standing ask is to keep closing gaps between the two.
+
+- **Added a "Properties" panel to the Layout page**, below the existing Position panel - the
+  same real-xLights Layout tab pattern (Name/Type header + type-specific attribute grid) that
+  was previously entirely missing. Real xLights lets you edit a Tree's Degrees/Type/# Strings,
+  a Matrix's # Strings/Nodes-per-String, etc. directly in place; webXLights only exposed screen
+  position/scale/rotate until now, confirmed by the codebase's own M13 comment flagging "no
+  structural-param editor yet" as the reason a mis-imported model had no recovery path.
+- **New `packages/engine/src/models/propertySchema.ts`** (`MODEL_PROPERTY_SCHEMAS`) declares the
+  editable fields per model type, hand-matched to exactly the `raw_attrs` keys
+  `computeGeometryFromAttrs` reads for that type - editing a field always has a real, visible
+  effect, unlike real xLights' fuller grid (this engine doesn't render Tree's Rotation/Spiral
+  Wraps/Perspective or Matrix's wiring direction yet, so those aren't offered).
+- **Backend**: `ModelEntityController::update` now accepts `raw_attrs` (wholesale-replace, same
+  convention as `screen`); a geometry-affecting edit re-sends `channel_count` when the model has
+  a controller assigned, so a controller-routed model's channel span can't silently desync.
+- Verified live against the real 120-model show: selected the real "MTL9" Tree, edited Degrees
+  360 → 270, confirmed it persisted to the database and reactively round-tripped through the UI;
+  switching to a real Matrix model ("Garage Matrix") correctly swapped to its own 2-field schema.
+- New tests: `property-schema.test.ts` (every schema field's default reproduces
+  `fromAttrs.ts`'s own fallback geometry - keeps the two hand-maintained lists in sync) and a
+  `raw_attrs` PATCH round-trip in `LayoutModelsTest.php`. All existing tests still green:
+  126 engine + 20 formats (vitest), 28 PHPUnit, typecheck/lint clean.
+
 ## M15.1 — Real-file follow-up (real xLights show, local session)
 
 M15 (below) verified import/export against the repo's own fixtures because the session that did

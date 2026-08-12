@@ -15,6 +15,7 @@ export * from "./models/windowFrame";
 export * from "./models/wreath";
 export * from "./models/custom";
 export * from "./models/fromAttrs";
+export * from "./models/propertySchema";
 export * from "./effects/types";
 export * from "./effects/on";
 export * from "./effects/bars";

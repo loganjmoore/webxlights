@@ -117,6 +117,22 @@ class LayoutModelsTest extends TestCase
         $this->actingAs($intruder)->getJson("/api/v1/layouts/{$layout->id}/models")->assertForbidden();
     }
 
+    public function test_updating_raw_attrs_persists_structural_properties(): void
+    {
+        $user = User::factory()->create();
+        $layout = Layout::factory()->for($user->projects()->create(['name' => 'Show']))->create();
+        $bulk = $this->actingAs($user)->postJson("/api/v1/layouts/{$layout->id}/models/bulk", [
+            'models' => [['name' => 'Tree-1', 'type' => 'Tree', 'params' => [], 'raw_attrs' => ['NumStrings' => '16']]],
+        ]);
+        $modelId = $bulk->json('0.id');
+
+        $response = $this->actingAs($user)->patchJson("/api/v1/layouts/{$layout->id}/models/{$modelId}", [
+            'raw_attrs' => ['NumStrings' => '16', 'NodesPerString' => '75', 'TreeDegrees' => '270'],
+        ]);
+
+        $response->assertOk()->assertJsonPath('raw_attrs.NodesPerString', '75')->assertJsonPath('raw_attrs.TreeDegrees', '270');
+    }
+
     public function test_deleting_a_model_removes_it(): void
     {
         $user = User::factory()->create();

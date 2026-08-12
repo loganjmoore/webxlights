@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
+import { propertyFieldsFor } from "@webxlights/engine";
 import { api, type ControllerRecord, type Layout, type ModelRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { channelCountForModel } from "../lib/fseqExport";
@@ -47,6 +48,27 @@ function handlePositionField(field: "x" | "y" | "z" | "scale" | "scaleY" | "rota
   const value = Number(raw);
   if (Number.isNaN(value)) return;
   void updateScreen(selectedModel.value.id, { [field]: value });
+}
+
+// M15.2: the structural-property editor the M13 "no other recovery path" comment (see
+// handleDelete below) flagged as missing - matches real xLights' Layout tab property grid,
+// scoped to exactly the raw_attrs keys computeGeometryFromAttrs actually reads for this type
+// (packages/engine's propertyFieldsFor) so every field here has a real, visible effect.
+const propertyFields = computed(() => (selectedModel.value ? propertyFieldsFor(selectedModel.value.type) : []));
+
+async function updateProperty(key: string, raw: string): Promise<void> {
+  if (!layout.value || !selectedModel.value) return;
+  const model = selectedModel.value;
+  const raw_attrs = { ...model.raw_attrs, [key]: raw };
+  const updated = await api.updateModel(layout.value.id, model.id, {
+    raw_attrs,
+    // A geometry-affecting edit (e.g. more strings) changes the model's node/channel count -
+    // resend it alongside raw_attrs so a controller-assigned model's span check stays correct,
+    // same pattern assignController/updateOffset already use for controller_offset edits.
+    ...(model.controller_id != null ? { channel_count: channelCountForModel({ ...model, raw_attrs }) } : {}),
+  });
+  const idx = models.value.findIndex((m) => m.id === model.id);
+  if (idx !== -1) models.value[idx] = updated;
 }
 
 // M13: name auto-numbered per type ("Tree-1", "Tree-2", ...), matching the convention xLights'
@@ -299,6 +321,27 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           </label>
           <button class="delete-btn" @click="handleDelete(selectedModel.id)">Delete model</button>
         </div>
+
+        <div v-if="selectedModel && propertyFields.length" class="properties-panel">
+          <h2>Properties</h2>
+          <label v-for="field in propertyFields" :key="field.key">
+            {{ field.label }}
+            <select
+              v-if="field.type === 'select'"
+              :value="selectedModel.raw_attrs[field.key] ?? field.default"
+              @change="updateProperty(field.key, ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
+            <input
+              v-else
+              :type="field.type === 'number' ? 'number' : 'text'"
+              :step="field.step ?? 1"
+              :value="selectedModel.raw_attrs[field.key] ?? field.default"
+              @change="updateProperty(field.key, ($event.target as HTMLInputElement).value)"
+            />
+          </label>
+        </div>
       </aside>
       <div class="canvas-wrap">
         <ModelPalette v-if="viewMode === '2d'" />
@@ -482,6 +525,31 @@ header h1 {
 }
 .position-panel input {
   width: 5rem;
+  font-size: 0.8rem;
+}
+.properties-panel {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #333;
+}
+.properties-panel h2 {
+  font-size: 0.9rem;
+  font-weight: normal;
+  color: #888;
+  margin: 0 0 0.5rem;
+}
+.properties-panel label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #aaa;
+  margin-bottom: 0.4rem;
+  gap: 0.5rem;
+}
+.properties-panel input,
+.properties-panel select {
+  width: 6rem;
   font-size: 0.8rem;
 }
 .delete-btn {
