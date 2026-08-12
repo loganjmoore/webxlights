@@ -31,6 +31,11 @@ export interface RenderableEffect {
   // Per-effect color override (real xLights' Color tab) - falls back to the row's own palette
   // (the app-wide default, until a model/group-level palette exists) when unset.
   palette?: RGBA[];
+  // Real xLights' Layer Blending panel: how this effect's layer composites onto the layers
+  // below it (default "Normal" = fully opaque overwrite) and the "Mix" slider some blend
+  // modes read as their reveal/fade threshold (see blend.ts's blendPixel).
+  blendMode?: BlendMode;
+  mix?: number; // 0..1
 }
 
 export interface RenderableRow {
@@ -132,8 +137,8 @@ export function renderRowAtMs(row: RenderableRow, atMs: number, frameMs: number,
       else renderStateless(buffer, palette, effect, atMs, seed);
       if (effect.transition) applyFadeTransition(buffer, effect, atMs, effect.transition);
     },
-    blendMode: "Normal" as BlendMode,
-    effectMixThreshold: 0,
+    blendMode: effect.blendMode ?? "Normal",
+    effectMixThreshold: effect.mix ?? 0,
   }));
 
   const composited = renderLayerStack(row.geometry.width, row.geometry.height, layers);
@@ -177,8 +182,8 @@ export function createRowSequencer(row: RenderableRow, frameMs: number, seed: nu
         }
         if (effect.transition) applyFadeTransition(buffer, effect, atMs, effect.transition);
       },
-      blendMode: "Normal" as BlendMode,
-      effectMixThreshold: 0,
+      blendMode: effect.blendMode ?? "Normal",
+      effectMixThreshold: effect.mix ?? 0,
     }));
 
     const composited = renderLayerStack(row.geometry.width, row.geometry.height, layers);

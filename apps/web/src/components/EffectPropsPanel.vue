@@ -1,14 +1,30 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { DEFAULT_PALETTE_HEX, EFFECT_SCHEMAS } from "@webxlights/engine";
+import { DEFAULT_PALETTE_HEX, EFFECT_SCHEMAS, type BlendMode } from "@webxlights/engine";
 import type { SequenceEffect } from "../lib/api";
 
 const MAX_COLORS = 6; // matches real xLights' Color tab swatch count
+
+// The 10 of 24 real xLights "Layer Method" modes this engine implements (see blend.ts).
+const BLEND_MODES: BlendMode[] = [
+  "Normal",
+  "Effect 1",
+  "Effect 2",
+  "Average",
+  "Additive",
+  "Subtractive",
+  "Max",
+  "Min",
+  "1 reveals 2",
+  "2 reveals 1",
+];
 
 const props = defineProps<{ effect: SequenceEffect | null }>();
 const emit = defineEmits<{
   update: [params: Record<string, number | boolean | string>];
   updatePalette: [palette: string[]];
+  updateBlend: [patch: { blendMode?: BlendMode; mix?: number }];
+  updateTransition: [transition: { inDurationMs?: number; outDurationMs?: number }];
 }>();
 
 const schema = computed(() => (props.effect ? EFFECT_SCHEMAS[props.effect.name] : undefined));
@@ -30,6 +46,19 @@ function addColor(): void {
 function removeColor(index: number): void {
   if (palette.value.length <= 1) return;
   emit("updatePalette", palette.value.filter((_, i) => i !== index));
+}
+
+function setBlendMode(mode: string): void {
+  emit("updateBlend", { blendMode: mode as BlendMode });
+}
+function setMix(pct: string): void {
+  emit("updateBlend", { mix: Number(pct) / 100 });
+}
+function setTransition(field: "inDurationMs" | "outDurationMs", ms: string): void {
+  if (!props.effect) return;
+  const value = Number(ms);
+  if (Number.isNaN(value)) return;
+  emit("updateTransition", { ...props.effect.transition, [field]: value });
 }
 </script>
 
@@ -53,6 +82,47 @@ function removeColor(index: number): void {
           </div>
           <button v-if="palette.length < MAX_COLORS" class="add-swatch" title="Add color" @click="addColor">+</button>
         </div>
+      </div>
+
+      <div class="blend-panel">
+        <h4>Layer Blending</h4>
+        <label class="blend-row">
+          Blend Mode
+          <select :value="effect.blendMode ?? 'Normal'" @change="setBlendMode(($event.target as HTMLSelectElement).value)">
+            <option v-for="m in BLEND_MODES" :key="m" :value="m">{{ m }}</option>
+          </select>
+        </label>
+        <label class="blend-row">
+          Mix
+          <span class="blend-inline">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              :value="(effect.mix ?? 0) * 100"
+              @input="setMix(($event.target as HTMLInputElement).value)"
+            />
+            <span class="value">{{ Math.round((effect.mix ?? 0) * 100) }}</span>
+          </span>
+        </label>
+        <label class="blend-row">
+          Fade In (ms)
+          <input
+            type="number"
+            min="0"
+            :value="effect.transition?.inDurationMs ?? 0"
+            @change="setTransition('inDurationMs', ($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label class="blend-row">
+          Fade Out (ms)
+          <input
+            type="number"
+            min="0"
+            :value="effect.transition?.outDurationMs ?? 0"
+            @change="setTransition('outDurationMs', ($event.target as HTMLInputElement).value)"
+          />
+        </label>
       </div>
 
       <div v-for="p in schema.params" :key="p.key" class="param">
@@ -192,5 +262,43 @@ function removeColor(index: number): void {
 .add-swatch:hover {
   color: #ddd;
   border-color: #666;
+}
+.blend-panel {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid #333;
+}
+.blend-panel h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: #888;
+}
+.blend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #aaa;
+  margin-bottom: 0.4rem;
+  gap: 0.5rem;
+}
+.blend-row select,
+.blend-row input[type="number"] {
+  width: 7rem;
+  font-size: 0.75rem;
+}
+.blend-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.blend-inline input[type="range"] {
+  width: 5rem;
+}
+.blend-inline .value {
+  min-width: 1.5rem;
+  text-align: right;
+  color: #888;
 }
 </style>

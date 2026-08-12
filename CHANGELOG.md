@@ -1,5 +1,31 @@
 # Changelog
 
+## M15.4 — Layer Blending panel (blend mode, Mix, Fade transitions)
+
+Completes the three-panel effect-editing comparison M15.3 started (Effect Settings, Color, Layer
+Blending). The surprise: the engine already fully implements all of this - 10 blend modes
+(`blend.ts`), the "Mix" effect-mix-threshold slider (`layerStack.ts`), and Fade In/Out
+transitions (`transition.ts`), all since M3 - but every layer was hardcoded to Normal/0, and
+`RenderableEffect.transition` had no `SequenceEffect` field to populate it from. Zero references
+anywhere in `apps/web` to any of these three engine capabilities before this pass.
+
+- **New "Layer Blending" section in the Sequencer's effect panel**: Blend Mode dropdown (all 10
+  implemented modes), Mix slider (0-100%), Fade In/Fade Out (ms) number inputs.
+- **`packages/engine`**: `RenderableEffect.blendMode?`/`mix?` join the M15.3 `palette?` pattern,
+  resolved at both `LayerSpec`-construction sites in `renderFrame.ts` instead of the previous
+  hardcoded `"Normal"`/`0`.
+- UI labels the slider "Mix" (the engine's own name for the field), not "Morph" - real xLights'
+  panel has both, and they're different mechanics; borrowing the wrong label would imply Morph
+  support that doesn't exist.
+- Verified live against a real imported Pinwheel effect: set Blend Mode to Additive and Fade In
+  to 500ms, confirmed both persisted through autosave to the database alongside the M15.3 color
+  edit already on that effect.
+- New regression test proving a per-effect `blendMode` override actually reaches
+  `renderLayerStack` (not just that it round-trips through storage): two opaque layers under
+  Normal blend show only the top layer's color; the same two layers with Additive blend on top
+  produce the real additive-composited color. All existing tests still green: 130 engine + 20
+  formats (vitest), 28 PHPUnit, typecheck/lint clean.
+
 ## M15.3 — Per-effect Color palette
 
 Continuing the standing ask to close gaps between webXLights and the real desktop xLights app -

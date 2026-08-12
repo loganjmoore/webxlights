@@ -1,3 +1,5 @@
+import type { BlendMode } from "@webxlights/engine";
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -125,6 +127,10 @@ export interface SequenceEffect {
   // Per-effect color override (real xLights' Color tab), hex strings. Unset = inherit the
   // row's default palette.
   palette?: string[];
+  // Real xLights' Layer Blending panel.
+  blendMode?: BlendMode;
+  mix?: number; // 0..1, the "Mix" slider
+  transition?: { inDurationMs?: number; outDurationMs?: number };
 }
 
 export interface SequenceRow {
