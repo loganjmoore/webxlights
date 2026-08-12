@@ -249,6 +249,44 @@ verified rigorously instead.
   real, pre-existing cosmetic defects unrelated to the bounds/transform work above - found by
   the same "actually look at every type" pass, fixed independently.
 
+## M15.2: Structural property editor (Layout page)
+
+Prompted directly by comparing webXLights' Layout page against the real desktop xLights Layout
+tab side by side on the same real show: real xLights has a full property grid under the model
+list (Name/Type header, then every type-specific attribute - Tree's Degrees/Rotation/Spiral
+Wraps/# Strings, Matrix's # Strings/Nodes-per-String, etc. - all inline-editable); webXLights only
+exposed screen position/scale/rotate. The codebase's own M13 comment on `handleDelete` already
+flagged this: "no other recovery path... since there's no structural-param editor yet."
+
+- **Scoped to exactly what `computeGeometryFromAttrs` reads, not real xLights' full grid.** Real
+  xLights exposes properties this engine doesn't render at all (Tree's Rotation/Spiral
+  Wraps/Perspective/Alternate Nodes/Don't Zig Zag/Strand Direction, Matrix's Direction). Offering
+  an input for one of those would be dishonest - it would look editable and silently do nothing.
+  `packages/engine/src/models/propertySchema.ts`'s `MODEL_PROPERTY_SCHEMAS` is hand-matched
+  field-for-field against `fromAttrs.ts`'s switch cases, so every exposed field has a real,
+  visible effect; `property-schema.test.ts` locks the two in sync (each schema's own defaults
+  must reproduce `fromAttrs.ts`'s undocumented-attrs fallback geometry exactly).
+- **Lives in `packages/engine`, not `apps/web`, for the same reason `EFFECT_SCHEMAS` does**: the
+  schema describes *the render engine's own contract* (which attributes this type's geometry
+  function reads), not a UI concern - co-locating it with `fromAttrs.ts` is what makes the
+  sync test possible at all, and keeps a future non-web consumer (e.g. a CLI) able to reuse it.
+- **Backend: `raw_attrs` joins `screen` as a wholesale-replace field on `ModelEntityController::
+  update`**, not a deep merge - same convention `screen` already established (M12), so the client
+  always spreads the model's existing `raw_attrs` before patching in the one changed key, exactly
+  like `updateScreen` already does. A geometry-affecting edit re-sends `channel_count`
+  (`channelCountForModel`) alongside it when the model has a controller assigned, reusing the
+  exact pattern `assignController`/`updateOffset` established in M11 - editing `# Strings` on a
+  controller-routed model can't silently desync its channel span.
+- **`Custom` has no schema entry.** Its one raw attribute (`CustomModel`) is xLights' own custom
+  grid mini-language, not a scalar - a text input that edits it wrong corrupts the model
+  silently, and a real grid editor is out of scope for this pass. Left unlisted rather than
+  offered half-working.
+- Verified live against the real 120-model show: selected a real Tree model (`MTL9`), the panel
+  showed its real imported values (`# Strings: 16`, `Type: 0`, `Degrees: 360`, `Bottom/Top
+  Ratio: 6`), edited Degrees to 270, confirmed it persisted to the database and round-tripped
+  back through the reactive UI. Switching to a real Matrix model (`Garage Matrix`) correctly
+  swapped to its own 2-field schema.
+
 ## M15.1: Real-file follow-up (real xLights show, local session)
 
 M15's two biggest caveats - no reachable user xLights folder, no real xLights install to open the

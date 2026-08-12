@@ -17,6 +17,7 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Layout canvas | ✅ | Drag-to-reposition (M12); drag-to-create from an 11-type model palette (M13, Custom excluded); every model's actual rendered/rotated/scaled bounds now drive auto-fit and hit-testing, not a buffer-dimension guess (M14); no background photo underlay |
 | 2D layout | ✅ | Canvas-based |
 | 3D layout editing | ✅ | Orbit/pan/zoom, per-model picking (invisible pick meshes sized/centered to each model's real transformed bounds, not the shared Points cloud), drag-to-move via `DragControls`, numeric X/Y/Z/Scale X/Scale Y/Rotate panel (M12, scale-Y and real rotation rendering added M14) |
+| Structural property editor (# Strings, Tree Degrees/Type, Matrix size, etc.) | ⚠️ | Layout page "Properties" panel (M15.2), scoped to exactly the `raw_attrs` keys `computeGeometryFromAttrs` reads per type — every field has a real, visible effect. Real xLights' fuller property grid (Rotation/Spiral Wraps/Perspective on Tree, matrix wiring direction, etc.) isn't offered since this engine doesn't render those attributes yet |
 | 3D rendering fidelity (textures, mesh/GDTF objects, per-preview cameras) | ❌ | Non-goal for v1 (SPEC ch5) — M12 reverses only the "no 3D editing" non-goal, not rendering fidelity |
 | DMX moving-head/servo/skull family | ❌ | Non-goal for v1 (SPEC ch4 §5) |
 

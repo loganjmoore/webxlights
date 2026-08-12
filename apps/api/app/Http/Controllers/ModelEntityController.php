@@ -74,6 +74,9 @@ class ModelEntityController extends Controller
             'name' => ['sometimes', 'string'],
             'screen' => ['sometimes', 'array'],
             'params' => ['sometimes', 'array'],
+            // M15.2: the structural-property editor (Layout page) - replaces raw_attrs wholesale,
+            // same convention as `screen` (caller spreads the model's existing raw_attrs first).
+            'raw_attrs' => ['sometimes', 'array'],
             'order' => ['sometimes', 'integer'],
             'controller_id' => ['sometimes', 'nullable', 'integer', 'exists:controllers,id'],
             'controller_offset' => ['sometimes', 'nullable', 'integer', 'min:0'],
