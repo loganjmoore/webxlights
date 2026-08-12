@@ -14,7 +14,7 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Matrix wiring variants | ⚠️ | Vertical/Top Left/zigzag/1 strand-per-string only |
 | Model Groups | ✅ | Membership + buffer style |
 | Screen placement on import | ⚠️ | `WorldPosX/Y` + `ScaleX` only — correct relative position, not exact rotation/shear |
-| Layout canvas | ✅ | Drag-to-reposition (M12); no background photo underlay |
+| Layout canvas | ✅ | Drag-to-reposition (M12); drag-to-create from an 11-type model palette (M13, Custom excluded); no background photo underlay |
 | 2D layout | ✅ | Canvas-based |
 | 3D layout editing | ✅ | Orbit/pan/zoom, per-model picking (invisible pick meshes, not the shared Points cloud), drag-to-move via `DragControls`, numeric X/Y/Z/Scale/Rotate panel (M12) |
 | 3D rendering fidelity (textures, mesh/GDTF objects, per-preview cameras) | ❌ | Non-goal for v1 (SPEC ch5) — M12 reverses only the "no 3D editing" non-goal, not rendering fidelity |

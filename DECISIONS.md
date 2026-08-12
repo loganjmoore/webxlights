@@ -159,6 +159,48 @@ Delivered exactly the scope in `NEXT-MILESTONES.md`: 2D drag-to-reposition first
 - **2D's canvas flips Y for a top-left screen origin; `LayoutCanvas3D.vue` does not flip Y** (Three.js is Y-up, and the raw imported `WorldPosY` convention is used directly, matching `HousePreview.vue`'s existing approach). The two views intentionally use different vertical conventions for their own coordinate systems - both still read the same underlying `screen.y` value from the model record.
 - **`bulkUpsert` overwrites `screen` wholesale on every re-import** (pre-existing, not new) - re-importing an `xlights_rgbeffects.xml` after a hand-edited 3D position clobbers it back to the file's `WorldPos*` values. Worth knowing, not blocking.
 
+## M13: Layout visual parity + model placement toolbar
+
+Delivered exactly the scope in `GOAL-M13.md` (which also documents its own five adversarial
+review passes and one correction found only by live screenshotting, per this repo's standing
+discipline). Written from the official xLights manual, not from Logan's own reference
+screenshots — none were available this session, unlike M10-M12's six. Stated as a lower-
+confidence source in the goal doc itself.
+
+- **Custom model type excluded from the drag-create palette** - `parseCustomModelGrid` needs a
+  real `CustomModel` attribute string; `raw_attrs: {}` would make a dropped Custom model
+  geometry-less forever, reading as a bug rather than a placeholder. Real xLights uses a
+  dedicated grid editor for Custom models - a separate, much larger feature, not faked here.
+- **Drag-to-place uses fixed engine defaults, not real xLights' drag-to-size gesture** - the
+  actual product lets the initial drag define a matrix's width/height, an arch's span, etc.
+  live. This milestone drops at `computeGeometryFromAttrs`'s fallback defaults; resizing is
+  only what the existing X/Y/Z/Scale/Rotate panel already exposes, not per-type structural
+  params (string count, node count, degrees). A real fidelity gap, not a rounding error.
+- **No per-type structural-param editor** - follows from the cut above. Would be its own real
+  feature (a form driven by each type's attribute schema, analogous to `EFFECT_SCHEMAS` for
+  effects but for model geometry). Out of scope for this pass.
+- **Palette is 2D-only** - creating directly into the 3D view would need ground-plane
+  raycasting from a native HTML5 drag event, a materially different mechanism from the 2D
+  canvas-transform inversion this milestone reuses. Models created in 2D are immediately
+  editable in 3D via the existing M12 path.
+- **No icon artwork** - palette buttons are text-labeled. This repo has no icon asset pipeline,
+  and the reference source (the manual, not screenshots this time) couldn't verify exact icon
+  art anyway.
+- **Only `LayoutPage.vue`'s own chrome got the dark-theme pass** - `AuthPage.vue`/
+  `ProjectsPage.vue` and the rest of the app keep the inherited Vite-template light theme.
+  Comparing against xLights' *Layout* tab specifically didn't require touching pages that have
+  no xLights-tab equivalent; no evidence was gathered about them either way.
+- **A real, pre-existing geometry bug, not introduced by this milestone**: `computeTree`'s cone
+  radius formula had the bottom/top ratio inverted (present since M1). Found only by looking at
+  a live-rendered Tree, not by reading the code - it reads as plausible in isolation ("top
+  radius 1, bottom wider" the comment says, while the formula did the opposite). Fixed
+  one-line; confirmed via pixel-column measurement of the actual rendered output, since a
+  thumbnail-scale "Round" tree's wrap-around wobble is genuinely easy to misread by eye alone.
+- **This session had no working Docker daemon** (`/var/run/docker.sock` absent) - the
+  documented `docker compose up -d postgres` dev flow doesn't run here. Verification used a
+  throwaway sqlite `apps/api/.env` (gitignored, never committed) instead; Postgres remains the
+  real/deployed database per this file's locked stack, unchanged.
+
 ## Fix: nginx client_max_body_size (mid-M12, user-reported)
 
 nginx's default `client_max_body_size` (1MB) 413'd real `xlights_rgbeffects.xml` imports and would have silently capped `SequenceController`'s 50MB audio upload limit well below what Laravel itself allows - a real production blocker a live user hit while this session was mid-milestone. Set to 100M in `apps/api/docker/nginx.conf`. Not caught by any existing test (local dev's `php artisan serve` has no equivalent limit) - worth remembering that nginx-layer limits are invisible to Laravel-level validation testing.

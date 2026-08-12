@@ -7,7 +7,12 @@ const props = defineProps<{ models: ModelRecord[]; selectedModelId: number | nul
 const emit = defineEmits<{
   move: [modelId: number, x: number, y: number];
   select: [modelId: number | null];
+  create: [type: string, x: number, y: number];
 }>();
+
+// M13: must match ModelPalette.vue's dragstart MIME type exactly - namespaced so this canvas
+// ignores any other drag source (e.g. an OS file drag) that happens to land here.
+const MODEL_DRAG_MIME = "application/x-webxlights-model-type";
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const hoverCursor = ref("default");
@@ -187,6 +192,21 @@ function onPointerUp(): void {
   hoverCursor.value = "default";
 }
 
+// M13: reuses the exact same world-transform inversion as pointer-drag above, computed from
+// props.models as they stand *before* this drop's new model exists - the transform the canvas
+// is currently showing, so the drop lands where the cursor visually was.
+function onDrop(e: DragEvent): void {
+  const type = e.dataTransfer?.getData(MODEL_DRAG_MIME);
+  if (!type) return;
+  const canvas = canvasRef.value;
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const { toWorldX, toWorldY } = computeTransform(rect);
+  const x = toWorldX(e.clientX - rect.left);
+  const y = toWorldY(e.clientY - rect.top);
+  emit("create", type, x, y);
+}
+
 onMounted(() => {
   draw();
   window.addEventListener("resize", draw);
@@ -202,6 +222,8 @@ watch(() => [props.models, props.selectedModelId], draw, { deep: true });
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
+    @dragover.prevent
+    @drop.prevent="onDrop"
   ></canvas>
 </template>
 

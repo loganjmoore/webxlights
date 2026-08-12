@@ -116,4 +116,32 @@ class LayoutModelsTest extends TestCase
 
         $this->actingAs($intruder)->getJson("/api/v1/layouts/{$layout->id}/models")->assertForbidden();
     }
+
+    public function test_deleting_a_model_removes_it(): void
+    {
+        $user = User::factory()->create();
+        $layout = Layout::factory()->for($user->projects()->create(['name' => 'Show']))->create();
+
+        $bulk = $this->actingAs($user)->postJson("/api/v1/layouts/{$layout->id}/models/bulk", [
+            'models' => [['name' => 'Tree-1', 'type' => 'Tree', 'params' => [], 'raw_attrs' => []]],
+        ]);
+        $modelId = $bulk->json('0.id');
+
+        $this->actingAs($user)->deleteJson("/api/v1/layouts/{$layout->id}/models/{$modelId}")->assertNoContent();
+        $this->assertCount(0, $layout->fresh()->models);
+    }
+
+    public function test_deleting_a_model_from_the_wrong_layout_404s(): void
+    {
+        $user = User::factory()->create();
+        $layoutA = Layout::factory()->for($user->projects()->create(['name' => 'Show A']))->create();
+        $layoutB = Layout::factory()->for($user->projects()->create(['name' => 'Show B']))->create();
+
+        $bulk = $this->actingAs($user)->postJson("/api/v1/layouts/{$layoutA->id}/models/bulk", [
+            'models' => [['name' => 'Tree-1', 'type' => 'Tree', 'params' => [], 'raw_attrs' => []]],
+        ]);
+        $modelId = $bulk->json('0.id');
+
+        $this->actingAs($user)->deleteJson("/api/v1/layouts/{$layoutB->id}/models/{$modelId}")->assertNotFound();
+    }
 }

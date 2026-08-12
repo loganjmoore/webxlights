@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { api, type ControllerRecord, type Layout, type ModelRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas from "../components/LayoutCanvas.vue";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
+import ModelPalette from "../components/ModelPalette.vue";
 
 const route = useRoute();
 const projectId = computed(() => Number(route.params.projectId));
@@ -19,6 +20,8 @@ const importMessage = ref("");
 const selectedModelId = ref<number | null>(null);
 const viewMode = ref<"2d" | "3d">("2d");
 const selectedModel = computed(() => models.value.find((m) => m.id === selectedModelId.value) ?? null);
+const renamingModelId = ref<number | null>(null);
+const renameValue = ref("");
 
 // First real caller of api.updateModel() (previously unused anywhere in the app) - the
 // persist path M12 exists to prove. ModelEntityController::update replaces `screen` wholesale,
@@ -44,6 +47,79 @@ function handlePositionField(field: "x" | "y" | "z" | "scale" | "rotate", raw: s
   const value = Number(raw);
   if (Number.isNaN(value)) return;
   void updateScreen(selectedModel.value.id, { [field]: value });
+}
+
+// M13: name auto-numbered per type ("Tree-1", "Tree-2", ...), matching the convention xLights'
+// own reference screenshots show (NEXT-MILESTONES.md's "RRBL" through "RRBL-8" example).
+function nextNameForType(type: string): string {
+  const prefix = `${type}-`;
+  let max = 0;
+  for (const m of models.value) {
+    if (!m.name.startsWith(prefix)) continue;
+    const n = Number(m.name.slice(prefix.length));
+    if (Number.isFinite(n)) max = Math.max(max, n);
+  }
+  return `${prefix}${max + 1}`;
+}
+
+// Dropped from ModelPalette.vue via LayoutCanvas's dragover/drop handlers. raw_attrs stays {}
+// deliberately - computeGeometryFromAttrs (packages/engine) already has a sensible fallback
+// default for every draggable type, so an empty bag renders exactly like a real xLights
+// "place with defaults" model would, ready to resize via the position panel below.
+async function handleCreate(type: string, x: number, y: number): Promise<void> {
+  if (!layout.value) return;
+  const name = nextNameForType(type);
+  const [created] = await api.bulkUpsertModels(layout.value.id, [
+    {
+      name,
+      type,
+      supported: true,
+      params: {},
+      raw_attrs: {},
+      screen: { x, y, z: 0, scale: 1, rotate: 0 },
+      order: models.value.length,
+    },
+  ]);
+  if (!created) return;
+  models.value = [...models.value, created];
+  selectedModelId.value = created.id;
+}
+
+// The necessary complement to create (see GOAL-M13.md) - a mis-dropped or duplicate model has
+// no other recovery path since there's no structural-param editor yet.
+async function handleDelete(modelId: number): Promise<void> {
+  if (!layout.value) return;
+  if (!window.confirm("Delete this model? This can't be undone.")) return;
+  await api.deleteModel(layout.value.id, modelId);
+  models.value = models.value.filter((m) => m.id !== modelId);
+  if (selectedModelId.value === modelId) selectedModelId.value = null;
+}
+
+function onKeydown(e: KeyboardEvent): void {
+  const target = e.target as HTMLElement | null;
+  if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+  if ((e.key === "Delete" || e.key === "Backspace") && selectedModelId.value != null) {
+    e.preventDefault();
+    void handleDelete(selectedModelId.value);
+  }
+}
+
+// Auto-generated names ("Tree-2") are otherwise indistinguishable in the model list once more
+// than one of a type exists - double-click to rename, reusing the update endpoint verbatim.
+function startRename(model: ModelRecord): void {
+  renamingModelId.value = model.id;
+  renameValue.value = model.name;
+}
+async function commitRename(model: ModelRecord): Promise<void> {
+  const name = renameValue.value.trim();
+  renamingModelId.value = null;
+  if (!layout.value || !name || name === model.name) return;
+  const updated = await api.updateModel(layout.value.id, model.id, { name });
+  const idx = models.value.findIndex((m) => m.id === model.id);
+  if (idx !== -1) models.value[idx] = updated;
+}
+function cancelRename(): void {
+  renamingModelId.value = null;
 }
 
 async function loadLayout(): Promise<void> {
@@ -115,7 +191,11 @@ async function handleFileChange(e: Event): Promise<void> {
   }
 }
 
-onMounted(loadLayout);
+onMounted(() => {
+  void loadLayout();
+  window.addEventListener("keydown", onKeydown);
+});
+onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 </script>
 
 <template>
@@ -145,7 +225,18 @@ onMounted(loadLayout);
             :class="{ unsupported: !m.supported, selected: m.id === selectedModelId }"
             @click="selectedModelId = m.id"
           >
-            {{ m.name }} <span class="type">{{ m.type }}</span>
+            <input
+              v-if="renamingModelId === m.id"
+              v-model="renameValue"
+              class="rename-input"
+              autofocus
+              @click.stop
+              @keydown.enter="commitRename(m)"
+              @keydown.escape="cancelRename"
+              @blur="commitRename(m)"
+            />
+            <span v-else @dblclick.stop="startRename(m)">{{ m.name }}</span>
+            <span class="type">{{ m.type }}</span>
             <span v-if="m.start_channel" class="channel">ch {{ m.start_channel }}</span>
             <div class="controller-assign">
               <select :value="m.controller_id ?? ''" @change="assignController(m, ($event.target as HTMLSelectElement).value)">
@@ -195,34 +286,47 @@ onMounted(loadLayout);
             Rotate
             <input type="number" :value="selectedModel.screen.rotate ?? 0" @change="handlePositionField('rotate', ($event.target as HTMLInputElement).value)" />
           </label>
+          <button class="delete-btn" @click="handleDelete(selectedModel.id)">Delete model</button>
         </div>
       </aside>
       <div class="canvas-wrap">
-        <LayoutCanvas
-          v-if="viewMode === '2d'"
-          :models="models"
-          :selected-model-id="selectedModelId"
-          @select="selectedModelId = $event"
-          @move="handleMove"
-        />
-        <LayoutCanvas3D
-          v-else
-          :models="models"
-          :selected-model-id="selectedModelId"
-          @select="selectedModelId = $event"
-          @move="handleMove3D"
-        />
+        <ModelPalette v-if="viewMode === '2d'" />
+        <div class="canvas-area">
+          <LayoutCanvas
+            v-if="viewMode === '2d'"
+            :models="models"
+            :selected-model-id="selectedModelId"
+            @select="selectedModelId = $event"
+            @move="handleMove"
+            @create="handleCreate"
+          />
+          <LayoutCanvas3D
+            v-else
+            :models="models"
+            :selected-model-id="selectedModelId"
+            @select="selectedModelId = $event"
+            @move="handleMove3D"
+          />
+        </div>
       </div>
     </div>
   </main>
 </template>
 
 <style scoped>
+/* M13: xLights' own Layout tab is a dark editor UI throughout the window, not just the
+   preview canvas - this page inherited the app shell's default black-on-white (see
+   GOAL-M13.md's "Correction found during execution"). Scoped to this page's own chrome only. */
 .layout-page {
   font-family: system-ui, sans-serif;
   height: 100vh;
   display: flex;
   flex-direction: column;
+  background: #0d0d11;
+  color: #ddd;
+}
+.layout-page a {
+  color: #e8c468;
 }
 header {
   padding: 0.75rem 1rem;
@@ -230,6 +334,12 @@ header {
   display: flex;
   align-items: baseline;
   gap: 1rem;
+  background: #16161c;
+}
+header h1 {
+  color: #ddd;
+  font-size: 1.1rem;
+  margin: 0;
 }
 .view-toggle {
   display: flex;
@@ -253,6 +363,7 @@ header {
   border: 1px solid #555;
   border-radius: 4px;
   font-size: 0.85rem;
+  color: #ddd;
 }
 .import-message {
   margin: 0;
@@ -270,6 +381,16 @@ header {
   overflow-y: auto;
   padding: 0.75rem;
   border-right: 1px solid #333;
+  background: #16161c;
+  color: #ddd;
+}
+.rename-input {
+  width: 100%;
+  font-size: 0.85rem;
+  background: #0d0d11;
+  color: #ddd;
+  border: 1px solid #e8c468;
+  border-radius: 2px;
 }
 .model-list h2 {
   font-size: 0.9rem;
@@ -352,8 +473,28 @@ header {
   width: 5rem;
   font-size: 0.8rem;
 }
+.delete-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.35rem;
+  font-size: 0.75rem;
+  color: #e57373;
+  background: #1e1e26;
+  border: 1px solid #5c3333;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.delete-btn:hover {
+  background: #2c1a1a;
+}
 .canvas-wrap {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.canvas-area {
+  flex: 1;
+  min-height: 0;
 }
 </style>
