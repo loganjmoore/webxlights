@@ -1,17 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { placementSystemFor, screenFromAttrs } from "../src/models/placement";
 import { computeGeometryFromAttrs } from "../src/models/fromAttrs";
+import type { ModelGeometry } from "../src/models/types";
 import { transformedHalfExtents } from "../src/models/transform";
 
 const SPACING = 4; // the canvases' NODE_SPACING
 
-function geo(type: string, attrs: Record<string, string> = {}) {
-  return computeGeometryFromAttrs(type, attrs);
+// computeGeometryFromAttrs returns null for a type it can't build; every type used here is
+// supported, so a null means the test's own setup is wrong and should fail loudly.
+function geo(type: string, attrs: Record<string, string> = {}): ModelGeometry {
+  const g = computeGeometryFromAttrs(type, attrs);
+  if (!g) throw new Error(`no geometry for "${type}"`);
+  return g;
 }
 
 // World width a model actually occupies once placed - the number that has to match the span
 // xLights recorded between the model's two endpoints.
-function renderedWidth(g: ReturnType<typeof geo>, scale: number): number {
+function renderedWidth(g: ModelGeometry, scale: number): number {
   return transformedHalfExtents(g, { scale, scaleY: scale, rotateDeg: 0 }).halfW * 2 * SPACING;
 }
 
