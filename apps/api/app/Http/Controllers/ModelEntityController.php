@@ -102,6 +102,18 @@ class ModelEntityController extends Controller
         return $model;
     }
 
+    // M13: the necessary complement to drag-to-create — a mis-typed or duplicate drop from the
+    // model palette has no other recovery path (no structural-param editor exists yet).
+    public function destroy(Request $request, Layout $layout, ModelEntity $model)
+    {
+        $this->authorizeLayout($request, $layout, 'editor');
+        abort_unless($model->layout_id === $layout->id, 404);
+
+        $model->delete();
+
+        return response()->noContent();
+    }
+
     private function authorizeLayout(Request $request, Layout $layout, string $need = 'viewer'): void
     {
         $layout->project->authorize($request->user(), $need);

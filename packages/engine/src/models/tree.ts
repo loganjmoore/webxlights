@@ -28,7 +28,12 @@ export function computeTree(params: TreeParams): ModelGeometry {
       continue;
     }
 
-    const radius = 1 * heightT + (1 / bottomTopRatio) * (1 - heightT); // top radius 1, bottom wider
+    // M13: was `1 * heightT + (1/bottomTopRatio) * (1 - heightT)` - that puts the *narrow*
+    // radius at heightT=0 (bottom, per the buffer convention above) and the wide one at the
+    // top, an inverted cone (found by actually looking at a rendered Tree - see GOAL-M13.md).
+    // top radius is 1 (heightT=1); bottom radius is `bottomTopRatio` x that, per this
+    // param's own doc comment ("bottom radius = top radius x ratio").
+    const radius = 1 * heightT + bottomTopRatio * (1 - heightT); // top radius 1, bottom wider
     if (style === "Flat") {
       const angle = strandT * (degrees * Math.PI) / 180;
       node.screenX = Math.cos(angle) * radius;

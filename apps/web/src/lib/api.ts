@@ -199,6 +199,8 @@ export const api = {
     request<ModelRecord[]>(`/v1/layouts/${layoutId}/models/bulk`, { method: "POST", body: JSON.stringify({ models }) }),
   updateModel: (layoutId: number, modelId: number, patch: Partial<ModelUpsertPayload>) =>
     request<ModelRecord>(`/v1/layouts/${layoutId}/models/${modelId}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  deleteModel: (layoutId: number, modelId: number) =>
+    request<void>(`/v1/layouts/${layoutId}/models/${modelId}`, { method: "DELETE" }),
   listControllers: (projectId: number) => request<ControllerRecord[]>(`/v1/projects/${projectId}/controllers`),
   createController: (projectId: number, data: ControllerUpsertPayload) =>
     request<ControllerRecord>(`/v1/projects/${projectId}/controllers`, { method: "POST", body: JSON.stringify(data) }),

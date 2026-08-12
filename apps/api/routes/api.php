@@ -25,6 +25,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('layouts/{layout}/models', [ModelEntityController::class, 'index']);
         Route::post('layouts/{layout}/models/bulk', [ModelEntityController::class, 'bulkUpsert']);
         Route::patch('layouts/{layout}/models/{model}', [ModelEntityController::class, 'update']);
+        Route::delete('layouts/{layout}/models/{model}', [ModelEntityController::class, 'destroy']);
 
         Route::get('layouts/{layout}/model-groups', [ModelGroupController::class, 'index']);
         Route::post('layouts/{layout}/model-groups/bulk', [ModelGroupController::class, 'bulkUpsert']);
