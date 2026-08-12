@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import { propertyFieldsFor } from "@webxlights/engine";
 import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
+import { confirm } from "../lib/confirm";
 import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas from "../components/LayoutCanvas.vue";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
@@ -20,7 +21,12 @@ const controllers = ref<ControllerRecord[]>([]);
 const assignErrors = ref<Record<number, string>>({});
 const importing = ref(false);
 const importMessage = ref("");
-const selectedModelId = ref<number | null>(null);
+// Multi-select: the canvas can rubber-band several models at once. Everything that only
+// makes sense for one model (the property panel, resize handles) reads `selectedModelId`,
+// which is only set when the selection is exactly one.
+const selectedIds = ref<number[]>([]);
+const selectedModelId = computed(() => (selectedIds.value.length === 1 ? selectedIds.value[0]! : null));
+const selectedModels = computed(() => models.value.filter((m) => selectedIds.value.includes(m.id)));
 const viewMode = ref<"2d" | "3d">("2d");
 const selectedModel = computed(() => models.value.find((m) => m.id === selectedModelId.value) ?? null);
 const renamingModelId = ref<number | null>(null);
@@ -83,7 +89,13 @@ async function saveGroup(): Promise<void> {
 }
 async function deleteGroup(): Promise<void> {
   if (!layout.value || !selectedGroup.value) return;
-  if (!window.confirm(`Delete group "${selectedGroup.value.name}"? This can't be undone.`)) return;
+  const ok = await confirm({
+    title: "Delete group",
+    message: `"${selectedGroup.value.name}" will be removed. The models in it aren't deleted. This can't be undone.`,
+    confirmLabel: "Delete group",
+    danger: true,
+  });
+  if (!ok) return;
   await api.deleteModelGroup(layout.value.id, selectedGroup.value.id);
   groups.value = groups.value.filter((g) => g.id !== selectedGroup.value!.id);
   selectedGroupId.value = null;
@@ -93,7 +105,7 @@ async function deleteGroup(): Promise<void> {
 // persist path M12 exists to prove. ModelEntityController::update replaces `screen` wholesale,
 // it does not deep-merge, so this must always spread the model's existing screen values and
 // override only the changed keys, or a drag silently wipes scale/rotate/z. See DECISIONS.md.
-async function updateScreen(modelId: number, patch: Partial<{ x: number; y: number; z: number; scale: number; scaleY: number; rotate: number }>): Promise<void> {
+async function updateScreen(modelId: number, patch: Partial<{ x: number; y: number; z: number; scale: number; scaleY: number; scaleZ: number; rotate: number }>): Promise<void> {
   if (!layout.value) return;
   const model = models.value.find((m) => m.id === modelId);
   if (!model) return;
@@ -102,13 +114,34 @@ async function updateScreen(modelId: number, patch: Partial<{ x: number; y: numb
   if (idx !== -1) models.value[idx] = updated;
 }
 
-function handleMove(modelId: number, x: number, y: number): void {
-  void updateScreen(modelId, { x, y });
+// The 2D canvas moves the whole selection at once, so this takes a batch. Each model still
+// gets its own PATCH - ModelEntityController::update is per-model, and a drag of a handful of
+// props isn't worth a bulk endpoint that would need its own screen-merge semantics.
+async function handleMove(moves: Array<{ id: number; x: number; y: number }>): Promise<void> {
+  await Promise.all(moves.map((m) => updateScreen(m.id, { x: m.x, y: m.y })));
+}
+
+// Corner/edge handles on the 2D canvas. scaleZ follows scaleX so a model resized in the 2D
+// view keeps its proportions in the 3D view - a prop that got wider but stayed the same depth
+// would look wrong the moment you switched views.
+function handleResize(modelId: number, scale: number, scaleY: number): void {
+  void updateScreen(modelId, { scale, scaleY, scaleZ: scale });
+}
+
+// Ctrl/Cmd-click and shift-click in the model list mirror the canvas's own modifiers.
+function selectFromList(model: ModelRecord, e: MouseEvent): void {
+  if (e.shiftKey || e.metaKey || e.ctrlKey) {
+    selectedIds.value = selectedIds.value.includes(model.id)
+      ? selectedIds.value.filter((id) => id !== model.id)
+      : [...selectedIds.value, model.id];
+  } else {
+    selectedIds.value = [model.id];
+  }
 }
 function handleMove3D(modelId: number, x: number, y: number, z: number): void {
   void updateScreen(modelId, { x, y, z });
 }
-function handlePositionField(field: "x" | "y" | "z" | "scale" | "scaleY" | "rotate", raw: string): void {
+function handlePositionField(field: "x" | "y" | "z" | "scale" | "scaleY" | "scaleZ" | "rotate", raw: string): void {
   if (!selectedModel.value) return;
   const value = Number(raw);
   if (Number.isNaN(value)) return;
@@ -169,25 +202,50 @@ async function handleCreate(type: string, x: number, y: number): Promise<void> {
   ]);
   if (!created) return;
   models.value = [...models.value, created];
-  selectedModelId.value = created.id;
+  selectedIds.value = [created.id];
 }
 
 // The necessary complement to create (see GOAL-M13.md) - a mis-dropped or duplicate model has
 // no other recovery path since there's no structural-param editor yet.
 async function handleDelete(modelId: number): Promise<void> {
-  if (!layout.value) return;
-  if (!window.confirm("Delete this model? This can't be undone.")) return;
-  await api.deleteModel(layout.value.id, modelId);
-  models.value = models.value.filter((m) => m.id !== modelId);
-  if (selectedModelId.value === modelId) selectedModelId.value = null;
+  await deleteModels([modelId]);
+}
+
+// One confirmation for the whole selection, not one per model - a marquee over twenty props
+// followed by twenty dialogs would be unusable.
+async function deleteModels(ids: number[]): Promise<void> {
+  if (!layout.value || ids.length === 0) return;
+  const targets = models.value.filter((m) => ids.includes(m.id));
+  if (targets.length === 0) return;
+  const ok = await confirm({
+    title: targets.length === 1 ? "Delete model" : `Delete ${targets.length} models`,
+    message:
+      targets.length === 1
+        ? `"${targets[0]!.name}" will be removed from this layout. This can't be undone.`
+        : `${targets.map((m) => m.name).join(", ")} will be removed from this layout. This can't be undone.`,
+    confirmLabel: targets.length === 1 ? "Delete model" : `Delete ${targets.length} models`,
+    danger: true,
+  });
+  if (!ok) return;
+
+  const layoutId = layout.value.id;
+  await Promise.all(targets.map((m) => api.deleteModel(layoutId, m.id)));
+  const removed = new Set(targets.map((m) => m.id));
+  models.value = models.value.filter((m) => !removed.has(m.id));
+  selectedIds.value = selectedIds.value.filter((id) => !removed.has(id));
 }
 
 function onKeydown(e: KeyboardEvent): void {
   const target = e.target as HTMLElement | null;
   if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
-  if ((e.key === "Delete" || e.key === "Backspace") && selectedModelId.value != null) {
+  if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.value.length > 0) {
     e.preventDefault();
-    void handleDelete(selectedModelId.value);
+    void deleteModels([...selectedIds.value]);
+  } else if ((e.key === "a" || e.key === "A") && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    selectedIds.value = models.value.map((m) => m.id);
+  } else if (e.key === "Escape") {
+    selectedIds.value = [];
   }
 }
 
@@ -379,8 +437,8 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           <li
             v-for="m in models"
             :key="m.id"
-            :class="{ unsupported: !m.supported, selected: m.id === selectedModelId }"
-            @click="selectedModelId = m.id"
+            :class="{ unsupported: !m.supported, selected: selectedIds.includes(m.id) }"
+            @click="selectFromList(m, $event)"
           >
             <input
               v-if="renamingModelId === m.id"
@@ -414,6 +472,15 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           </li>
         </ul>
         <p v-if="models.length === 0" class="empty">No models yet — import a show to get started.</p>
+
+        <div v-if="selectedIds.length > 1" class="position-panel">
+          <h2>{{ selectedIds.length }} models selected</h2>
+          <p class="multi-hint">Drag any of them on the canvas to move the whole selection. Resize handles apply to one model at a time.</p>
+          <ul class="multi-list">
+            <li v-for="m in selectedModels" :key="m.id">{{ m.name }}</li>
+          </ul>
+          <button class="delete-btn" @click="deleteModels([...selectedIds])">Delete {{ selectedIds.length }} models</button>
+        </div>
 
         <div v-if="selectedModel" class="position-panel">
           <h2>Position</h2>
@@ -486,9 +553,10 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
             v-if="viewMode === '2d'"
             :models="models"
             :view-objects="viewObjects"
-            :selected-model-id="selectedModelId"
-            @select="selectedModelId = $event"
+            :selected-ids="selectedIds"
+            @select="selectedIds = $event"
             @move="handleMove"
+            @resize="handleResize"
             @create="handleCreate"
           />
           <LayoutCanvas3D
@@ -496,7 +564,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
             :models="models"
             :view-objects="viewObjects"
             :selected-model-id="selectedModelId"
-            @select="selectedModelId = $event"
+            @select="selectedIds = $event === null ? [] : [$event]"
             @move="handleMove3D"
           />
         </div>
@@ -787,6 +855,23 @@ header h1 {
 .properties-panel select {
   width: 6rem;
   font-size: 0.8rem;
+}
+.multi-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  color: #888;
+}
+.multi-list {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  max-height: 140px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  color: #aaa;
+}
+.multi-list li {
+  padding: 0.1rem 0;
 }
 .delete-btn {
   width: 100%;
