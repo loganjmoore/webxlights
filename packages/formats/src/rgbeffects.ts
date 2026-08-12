@@ -18,6 +18,18 @@ export const SUPPORTED_DISPLAY_AS = [
   "Custom",
 ] as const;
 
+// xLights writes these legacy DisplayAs strings for style variants of Matrix/Tree and
+// normalizes them on load (src: DisplayAsType.h legacy mapping) - a real show export
+// uses "Tree 360" far more often than the bare "Tree" string. Without this map those
+// models were silently downgraded to unsupported placeholders.
+const LEGACY_DISPLAY_AS: Record<string, string> = {
+  "Vert Matrix": "Matrix",
+  "Horiz Matrix": "Matrix",
+  "Tree 360": "Tree",
+  "Tree Flat": "Tree",
+  "Tree Ribbon": "Tree",
+};
+
 export interface ParsedModel {
   name: string;
   displayAs: string;
@@ -56,7 +68,8 @@ export function parseRgbEffectsXml(xml: string): ParsedRgbEffects {
   const unsupported = new Set<string>();
 
   for (const m of rawModels) {
-    const displayAs = m.DisplayAs ?? "";
+    const rawDisplayAs = m.DisplayAs ?? "";
+    const displayAs = LEGACY_DISPLAY_AS[rawDisplayAs] ?? rawDisplayAs;
     const supported = (SUPPORTED_DISPLAY_AS as readonly string[]).includes(displayAs);
     if (!supported) unsupported.add(displayAs);
     models.push({ name: m.name ?? "", displayAs, supported, attrs: m });

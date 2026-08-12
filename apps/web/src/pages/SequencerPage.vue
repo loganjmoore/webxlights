@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { EFFECT_SCHEMAS, defaultParamsFor } from "@webxlights/engine";
 import { api, type ControllerRecord, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
@@ -15,8 +15,10 @@ import EffectPropsPanel from "../components/EffectPropsPanel.vue";
 import HousePreview from "../components/HousePreview.vue";
 
 const route = useRoute();
+const router = useRouter();
 const sequenceId = computed(() => Number(route.params.sequenceId));
 const store = useSequencerStore();
+const importMessage = ref(typeof route.query.importMessage === "string" ? route.query.importMessage : "");
 
 const rows = ref<GridRow[]>([]);
 const modelRecords = ref<ModelRecord[]>([]);
@@ -379,6 +381,7 @@ onMounted(async () => {
   if (demoAudio) await loadAudioFile(demoAudio);
   else if (store.sequence?.audio_path) await loadStoredAudio();
   window.addEventListener("keydown", onKeydown);
+  if (importMessage.value) router.replace({ query: { ...route.query, importMessage: undefined } });
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
@@ -439,6 +442,11 @@ watch(sequenceId, async (id) => {
         </div>
         <p v-if="fppStatus" class="fpp-status">{{ fppStatus }}</p>
       </template>
+    </div>
+
+    <div v-if="importMessage" class="conflict-banner">
+      <p>{{ importMessage }}</p>
+      <button @click="importMessage = ''">Dismiss</button>
     </div>
 
     <div v-if="store.saveStatus === 'conflict'" class="conflict-banner">

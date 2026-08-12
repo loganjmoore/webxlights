@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { parseXsq } from "@webxlights/formats";
+import { defaultParamsFor } from "@webxlights/engine";
 import { api, type SequenceSummary } from "../lib/api";
 import { decodeAudioFile } from "../lib/audio";
 import { newEffectId } from "../stores/sequencer";
@@ -72,7 +73,12 @@ async function importXsq(e: Event): Promise<void> {
     const layouts = await api.listLayouts(projectId.value);
     const layout = layouts[0];
     const models = layout ? await api.listModels(layout.id) : [];
+    const groups = layout ? await api.listModelGroups(layout.id) : [];
     const modelIdByName = new Map(models.map((m) => [m.name, m.id]));
+    // A sequence Element targeting a Model Group has no distinct "group" type in the .xsq
+    // (xLights writes type="model" for both) - so a name miss against models falls back to
+    // groups before being reported unmatched. Real xLights shows target group rows this way.
+    const groupIdByName = new Map(groups.map((g) => [g.name, g.id]));
 
     const record = await api.createSequence(projectId.value, {
       name: file.name.replace(/\.xsq$/i, ""),
@@ -85,20 +91,28 @@ async function importXsq(e: Event): Promise<void> {
     const rows = parsed.rows
       .filter((r) => r.elementType === "model")
       .map((r) => {
-        const elementId = modelIdByName.get(r.name);
+        const modelId = modelIdByName.get(r.name);
+        const elementType = modelId !== undefined ? "model" : "group";
+        const elementId = modelId ?? groupIdByName.get(r.name);
         if (elementId === undefined) {
           unmatchedModels.push(r.name);
           return null;
         }
         return {
-          elementType: "model" as const,
+          elementType: elementType as "model" | "group",
           elementId,
           effects: r.effects.map((eff) => ({
             id: newEffectId(),
             name: eff.name,
             startMs: eff.startMs,
             endMs: eff.endMs,
-            params: eff.params as Record<string, number | boolean | string>,
+            // A name without a PARAM_MAPPER (translated: false) comes back from parseXsq with
+            // literally empty params - the renderers for the 10 implemented-but-unmapped effects
+            // (Shockwave, SingleStrand, Pinwheel, ...) don't all null-guard every field, so an
+            // untranslated real effect could render/export as NaN geometry and throw. The
+            // engine's own schema defaults (same ones a manually-added effect gets) are always a
+            // valid render input; real params (when translated) still win.
+            params: (eff.translated ? eff.params : defaultParamsFor(eff.name)) as Record<string, number | boolean | string>,
           })),
         };
       })
@@ -110,12 +124,19 @@ async function importXsq(e: Event): Promise<void> {
 
     await api.saveSequenceBody(record.id, { rows, timingTracks });
 
-    const parts = [`Imported ${rows.length} model rows`];
-    if (unmatchedModels.length) parts.push(`${unmatchedModels.length} model names had no match in this layout: ${unmatchedModels.join(", ")}`);
+    const parts = [`Imported ${rows.length} rows`];
+    if (unmatchedModels.length) parts.push(`${unmatchedModels.length} names had no match in this layout: ${unmatchedModels.join(", ")}`);
     if (parsed.unsupportedEffectNames.length) parts.push(`effects imported without full param translation: ${parsed.unsupportedEffectNames.join(", ")}`);
     importMessage.value = parts.join(" — ");
 
-    router.push({ name: "sequencer", params: { projectId: projectId.value, sequenceId: record.id } });
+    // The sequencer route is where the user actually looks - a message set here would be
+    // thrown away by this navigation (this page's importMessage never renders again), so it
+    // rides along as a query param instead of silently vanishing.
+    router.push({
+      name: "sequencer",
+      params: { projectId: projectId.value, sequenceId: record.id },
+      query: { importMessage: importMessage.value },
+    });
   } catch (err) {
     importMessage.value = err instanceof Error ? `Import failed: ${err.message}` : "Import failed";
   } finally {
