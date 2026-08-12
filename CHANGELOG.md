@@ -1,5 +1,67 @@
 # Changelog
 
+## M15.1 — Real-file follow-up (real xLights show, local session)
+
+M15 (below) verified import/export against the repo's own fixtures because the session that did
+it had no filesystem access to the user's actual xLights folder. This follow-up ran locally
+against the user's real show (`~/Desktop/xlights`: `xlights_rgbeffects.xml`, 120 models/11
+groups; `jinglebells.xsq`, 30 elements/804 effects) and the real desktop xLights app (installed
+on the same Mac). Found and fixed four real bugs the fixtures never exercised:
+
+- **Legacy `DisplayAs` strings weren't recognized as their canonical types.** xLights writes
+  `"Tree 360"`/`"Tree Flat"`/`"Tree Ribbon"` for Tree style variants and `"Vert Matrix"`/
+  `"Horiz Matrix"` for Matrix orientation, then normalizes them itself on load (confirmed against
+  `DisplayAsType.h`'s legacy mapping in the reverse-engineered spec) - `SUPPORTED_DISPLAY_AS` only
+  matched the bare `"Tree"`/`"Matrix"` strings, which real xLights almost never actually writes.
+  In the real layout, 35 of 120 models (29%) - including "Tree 360", the single most common type
+  in this show at 33 models - were silently downgraded to unsupported placeholders. Fixed with a
+  `LEGACY_DISPLAY_AS` synonym map in `packages/formats/src/rgbeffects.ts`, applied before the
+  supported-type check. Re-import after the fix: only `DmxServo`/`DmxGeneral`/`Cube` remain
+  unsupported - all three genuinely out of the M1 12-type scope, not a naming miss.
+- **`.xsq` import silently dropped every row targeting a Model Group.** A sequence Element
+  targeting a group has no distinct type in the file (xLights writes `type="model"` for both) -
+  the importer only checked model names, so a miss there was reported as "unmatched" and the row
+  discarded, never falling back to a group-name lookup. Real-world impact: 11 of 30 (37%) of this
+  file's model-type elements target a group (`Everything`, `HD`, `Matrixes`, `Pixel Trees`, etc.)
+  - more than a third of a real sequence's targeted elements were lost on import. Fixed in
+  `SequencesListPage.vue`'s `importXsq`: a model-name miss now falls back to the layout's group
+  names before being reported unmatched, tagging the row `elementType: "group"` (already a
+  first-class row type the Sequencer UI and store supported, just never populated by import).
+- **The import diagnostic banner was computed, then thrown away.** `importXsq`'s own comment
+  claimed "unmatched rows ... are reported, not silently dropped," but the message was set on a
+  `ref` local to `SequencesListPage.vue` immediately before `router.push`-ing to the Sequencer
+  page - the very next tick discarded it, so the user never saw which models/effects didn't fully
+  import. Fixed by carrying the message through as a `?importMessage=` router query param,
+  rendered as a dismissible banner on the Sequencer page and stripped from the URL on mount.
+- **`.fseq` export crashed outright on any real-world sequence** with
+  `Cannot read properties of undefined (reading 'r')` (`lerpColor` → `twoColorBlend` →
+  `renderShockwave`). Root cause: `translateEffectParams` returns literally `{}` for any effect
+  name without a `PARAM_MAPPER` entry (`translated: false`) instead of the engine's own schema
+  defaults, and `renderShockwave`'s color-blend math has no guard against `undefined`/`NaN`
+  params. Only 5 of the 15 render-implemented effects have a `PARAM_MAPPER` - the other 10
+  (Shockwave, SingleStrand, Pinwheel, Wave, Butterfly, Fire, Meteors, Snowflakes, Strobe, Ripple)
+  all hit this. In the real sequence, SingleStrand (267 uses) and Pinwheel (285) alone outnumber
+  every fully-mapped effect combined - export was broken for essentially any real show, not an
+  edge case. Fixed in `SequencesListPage.vue`: an untranslated effect's params now come from
+  `defaultParamsFor(name)` (`@webxlights/engine` - the same schema defaults a manually-placed
+  effect already gets) instead of an empty object.
+- **Verified the one thing M15 flagged as never actually checked**: exported a real 4829-frame/
+  588MB `.fseq` from the fixed sequence and opened it in the real desktop xLights app via
+  File → Open Sequence. It opened cleanly with no error, correctly correlated channel ranges back
+  to the real model/group names (Roof Line, Windows, Spiral Trees, House, Pixel Trees, Arches,
+  mini trees, Big Bulbs, Everything, Matrixes, HD, DJ SIGN 1, Floss 1, Dabbing 1, pixsnowman), and
+  showed an effect block at the same ~28-33s timestamp visible in webXLights' own Sequencer for
+  DJ SIGN 1 - real, independent confirmation the byte layout is correct, not just spec-compliant
+  in isolation.
+- **Newly discovered, not fixed this pass**: Model Group rows now import and are editable in the
+  Sequencer, but `fseqExport.ts` only reads `elementType === "model"` rows when building channel
+  data - a group's effects never reach the actual `.fseq` output, silently. Real-world impact in
+  this same file: 11 of 30 (37%) of targeted elements are groups. This is a real, previously
+  undocumented gap (expanding a group effect across its member models' geometry at export time is
+  real feature work, not a bug-sized fix) - not attempted here; see PARITY.md.
+- All tests still green after the fixes: 124 engine + 19 formats (vitest) + 27 PHPUnit,
+  `npm run typecheck`/`npm run lint` clean.
+
 ## M15 — Import/export verification, sequencer UX fixes, app-wide dark theme
 
 Prompted by a request to verify import/export against real xLights files, check the Controllers
@@ -7,7 +69,8 @@ page's sizing/padding, polish the navbar/controls app-wide, confirm effect drag-
 and add a way to manage which models show on the sequencer. No user-supplied xLights folder was
 reachable in this remote session - checked `/mnt/attach` (empty) and the working tree; verified
 against the repo's own real-format fixtures instead (`sample-rgbeffects.xml` + `sample.xsq`,
-the latter a genuine EffectDB-ref-indexed file), stated plainly as the substitution it is.
+the latter a genuine EffectDB-ref-indexed file), stated plainly as the substitution it is. See
+M15.1 above for the real-file follow-up this gap led to.
 
 - **Import verified live, end-to-end**: imported a layout, then a paired `.xsq` referencing its
   models by exact name - both models and effects landed with correct names and exact millisecond

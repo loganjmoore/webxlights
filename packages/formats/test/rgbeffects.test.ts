@@ -35,4 +35,22 @@ describe("parseRgbEffectsXml", () => {
   it("throws on a non-rgbeffects file", () => {
     expect(() => parseRgbEffectsXml("<foo/>")).toThrow();
   });
+
+  it("normalizes legacy DisplayAs style-variant strings to their canonical type", () => {
+    // Real xLights writes these on disk (confirmed via a real user show) and normalizes them
+    // itself on load - a naive exact-match against "Tree"/"Matrix" wrongly treats a real show's
+    // most common model style as unsupported.
+    const xml = `<xrgb><models>
+      <model name="Tree360" DisplayAs="Tree 360" NumStrings="16"/>
+      <model name="HMatrix" DisplayAs="Horiz Matrix" NumStrings="8"/>
+      <model name="VMatrix" DisplayAs="Vert Matrix" NumStrings="8"/>
+    </models></xrgb>`;
+    const result = parseRgbEffectsXml(xml);
+    expect(result.models.map((m) => [m.displayAs, m.supported])).toEqual([
+      ["Tree", true],
+      ["Matrix", true],
+      ["Matrix", true],
+    ]);
+    expect(result.unsupportedTypes).toEqual([]);
+  });
 });

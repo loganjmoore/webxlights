@@ -249,24 +249,34 @@ verified rigorously instead.
   real, pre-existing cosmetic defects unrelated to the bounds/transform work above - found by
   the same "actually look at every type" pass, fixed independently.
 
-## M15: Import/export verification, sequencer UX fixes, app-wide dark theme
+## M15.1: Real-file follow-up (real xLights show, local session)
 
-Not a scoped feature - a verification + polish pass across several independent asks (import/
-export fidelity, Controllers page spacing, app-wide chrome consistency, effect drag-and-drop,
-sequencer row management). No goal-prompt/adversarial-review ceremony (same call as M14 - that
-process was specific to M13's original ask); verified rigorously instead, same as M14.
+M15's two biggest caveats - no reachable user xLights folder, no real xLights install to open the
+export - were both artifacts of that session running remotely, not real product gaps. A local
+follow-up session (this one) had both: the user's actual show at `~/Desktop/xlights` and the real
+desktop xLights app on the same Mac. Full findings and fixes are in CHANGELOG.md M15.1; the
+reasoning behind each fix:
 
-- **No user xLights folder was reachable this session.** This is a remote/cloud execution
-  environment, not a local session with filesystem access to the user's own machine - checked
-  `/mnt/attach` (the session's attachment mount point, empty) and the working tree. Substituted
-  the repo's own real-format fixtures (`packages/formats/test/fixtures/sample-rgbeffects.xml`,
-  `sample.xsq`) instead of fabricating a "verified against your files" claim. If the user wants
-  literal file-based verification, those files need to be attached to a session that can reach
-  them.
-- **No real xLights or FPP install was available to open the exported `.fseq` directly.** The
-  byte-level header verification (see CHANGELOG.md M15) is the strongest check available without
-  one - every field self-consistent and matching hand-computed values - but it is not the same
-  claim as "confirmed it opens in xLights." Stated as the real gap it is.
+- **Why the `DisplayAs` fix belongs in the parser, not the renderer**: `computeGeometryFromAttrs`
+  already switches on the exact canonical strings (`"Tree"`, `"Matrix"`) and is correct to do so -
+  the bug was that `parseRgbEffectsXml` handed it xLights' legacy on-disk spelling instead of the
+  canonical type. Normalizing once at parse time (a small `LEGACY_DISPLAY_AS` lookup) fixes every
+  downstream consumer (rendering, the unsupported-types banner, the UI type badge) instead of
+  teaching each one about legacy spellings separately.
+- **Why the untranslated-effect-params fix landed in `apps/web`, not `packages/formats`**: keeping
+  `parseXsq`'s `{ params: {}, translated: false }` return honest (it genuinely didn't translate
+  anything) preserves `packages/formats` as a dependency-free pure parser - it has no reason to
+  know about the engine's effect schemas. `defaultParamsFor` already lives in `@webxlights/engine`
+  and is already used by the Sequencer UI's own "add effect" path; reusing it at the one call site
+  that persists imported rows keeps the layering intact (formats → nothing; web app → both formats
+  and engine) instead of adding a new formats → engine dependency for one fallback.
+- **Model Group export (the newly discovered, not-yet-fixed gap) is real feature work, not a
+  bug-fix**: rendering a group's effect requires resolving its member models' own geometries and
+  compositing per-member, in `fseqExport.ts`'s per-model render loop - a correct implementation
+  needs to decide layering order against each member's *own* row effects (does a group effect
+  replace, underlay, or blend with a model's individual effects?), which real xLights has explicit
+  rules for that this codebase doesn't implement anywhere yet. Left for a dedicated pass rather
+  than a rushed guess inside a verification session; see PARITY.md.
 - **Effect row visibility is client-side (`localStorage`), not sequence data.** Considered adding
   a `hiddenRows` field to `SequenceBody` instead (server-side, syncs across collaborators/
   devices) - rejected for this pass because it would need to round-trip through `.xsq` import/
