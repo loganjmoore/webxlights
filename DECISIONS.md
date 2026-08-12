@@ -561,6 +561,32 @@ M15.7 shipped `create_view_objects_table` and, two hours later, `GET /api/v1/lay
 - **`ViewObjectController` had no tests at all** - M15.7 shipped it uncovered. `tests/Feature/ViewObjectsTest.php` now covers index, bulk upsert, upsert idempotency by name, the authorization gate, and validation. To be clear about what this does and doesn't buy: CI always migrates a fresh database, so no test could have caught an unmigrated *production* database. The entrypoint is the fix; the tests are the coverage that should have shipped with the endpoint.
 - Diagnosis was confirmed rather than assumed: a brand-new account and empty layout on production returned `200 []` for models and model-groups and `500` for view-objects - same auth, same layout, no data, so the only difference was the table. Reproduced locally against sqlite (`SQLSTATE[HY000] no such table: view_objects`), then confirmed the entrypoint takes that same database from 500 to `200 []`.
 
+## Layout editor: multi-select, resize handles, in-app confirmations, and import placement systems (user-reported)
+
+Four things asked for together, three of them editor UX and one a real import-fidelity bug.
+
+- **Marquee multi-select.** Dragging on empty canvas rubber-bands a selection; it selects on *intersection*, not containment, because a band clipping the edge of a large matrix should still catch it. Shift/Cmd/Ctrl adds, Cmd/Ctrl-A selects all, Escape clears, and dragging any member moves the whole selection. Selection state moved from a single `selectedModelId` to `selectedIds: number[]`, with `selectedModelId` derived as "the selection, when it's exactly one" - the property panel and the resize handles are single-model concepts and stay that way.
+- **Resize handles** are computed in the model's own *unrotated* frame and drawn rotated with it. An axis-aligned box around a rotated shape makes a corner drag ambiguous ("wider" along which axis?); doing it in local space means a handle does the same thing at any RotateZ. Scale is re-derived from the shape's unscaled extents on every pointermove rather than multiplied into the current scale, which drifts over a long drag.
+- **In-app confirmations** (`lib/confirm.ts` + one `ConfirmDialog` in `App.vue`) replace both `window.confirm()` calls. Native dialogs were wrong here three ways: unstyleable in a dark editor, blocking (a canvas mid-drag freezes with the pointer still captured), and *suppressed by Chrome after a few in a row* - which would silently turn "confirm before deleting" into "delete without asking". A bulk delete asks once for the whole selection, not once per model.
+- **`scaleZ` is persisted and editable but has no visible effect, deliberately not faked.** `ModelNode` carries only `screenX/screenY`, so every model is planar and there is no Z extent to scale. A Z handle in the 3D view would move a number and change nothing on screen. Real per-node Z geometry (a Tree 360 actually wrapping, an arch bowing toward the viewer) is the prerequisite, and that's a model-geometry change rather than a canvas one.
+
+### The import placement bug
+
+**xLights does not place every model the same way**, and import treated all of them as "Boxed". Each model class picks a `ModelScreenLocation`, and the ones in play store completely different things:
+
+| System | WorldPosX/Y/Z means | Size and angle come from | Used by |
+|---|---|---|---|
+| Boxed | the model's centre | `ScaleX/Y/Z`, `RotateZ` | Matrix, Tree, Star, Circle, Wreath, Window Frame, Custom |
+| Two point | one **endpoint** | the `X2/Y2/Z2` offset to the other endpoint | Single Line, Icicles |
+| Three point | one **endpoint** | the endpoint vector, plus `Height` as a multiple of the length | Arches, Candy Canes |
+
+Reading a two- or three-point model as boxed puts it half its own length off-position, at default size, unrotated. Those are exactly the props a real yard is mostly made of - arches, candy canes, rooflines, icicle runs - so an imported show looked scrambled even though each model's own geometry was fine. `packages/engine/src/models/placement.ts` now derives the anchor (midpoint of the endpoints), the span (scaled so the model actually covers the endpoint vector), and the angle (`atan2` of that vector) per system.
+
+- Placement needs the renderer's local-unit-to-world factor (`NODE_SPACING`), because xLights' endpoint vectors are a length in world units while our `scale` multiplies a local one. It's an explicit parameter rather than a constant duplicated into the engine.
+- A degenerate endpoint vector (both offsets zero, which real shows do contain) falls back to the boxed reading. Scaling to a zero-length span would make the model invisible and un-clickable, which reads as "the import dropped it".
+- **Not verified against a real xLights layout yet.** The repo's own fixture carries no positioning attributes at all, which is why this shipped wrong and stayed wrong. The math is unit-tested (span, angle, midpoint, Height), but confirming that an imported show *looks* like it does in xLights needs a real `xlights_rgbeffects.xml` with known positions to compare against.
+- Still unimplemented, recorded rather than approximated: Poly Line's `PolyPointScreenLocation` (`NumPoints`/`PointData`) - it falls back to boxed rather than being run through two-point math that doesn't apply to it - and the three-point `Shear`/`Angle` attributes.
+
 ## Bugs found only by actually running the UI (not caught by typecheck/lint)
 
 - **`overflow-y: auto` with no explicit `overflow-x` silently computes `overflow-x` to `auto` too**: `SequencerGrid.vue`'s `.grid-scroll-viewport` needed vertical scroll only (the canvas handles its own horizontal sizing, scrolled by the page's outer `.h-scroll` wrapper) — but per the CSS Overflow spec, when one of `overflow-x`/`overflow-y` is non-`visible` and the other is left at the `visible` default, the `visible` one computes to `auto` too. This turned `.grid-scroll-viewport` into a second, narrower horizontal scroll container that silently clipped the widened (post-M10) canvas to its own ~880px box, before the outer wrapper's scroll ever got a chance to reveal the rest — invisible in code review (the CSS reads correctly as "vertical scroll only"), only caught by actually zooming in and scrolling in a live browser and finding effects that `getImageData` proved were drawn but weren't on screen. Fixed with an explicit `overflow-x: visible`. General lesson: never set only one of `overflow-x`/`overflow-y` without deciding what the other one should compute to.
