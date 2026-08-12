@@ -157,11 +157,12 @@ code {
 }
 
 #app {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
+  /* Was a fixed 1126px centred column from the Vite starter template. The editors (sequencer,
+     layout) are full-screen tools, and it was letterboxing them with dead bands either side on
+     any real monitor. Every page already sets its own inner max-width and padding, so the
+     shell doesn't need to constrain anything. */
+  width: 100%;
   text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;

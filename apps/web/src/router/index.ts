@@ -6,6 +6,7 @@ import ControllersPage from "../pages/ControllersPage.vue";
 import SequencesListPage from "../pages/SequencesListPage.vue";
 import SequencerPage from "../pages/SequencerPage.vue";
 import DocsPage from "../pages/DocsPage.vue";
+import PreviewPage from "../pages/PreviewPage.vue";
 import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({
@@ -22,6 +23,14 @@ const router = createRouter({
       path: "/projects/:projectId/sequences/:sequenceId",
       name: "sequencer",
       component: SequencerPage,
+      meta: { requiresAuth: true },
+    },
+    {
+      // The pop-out house preview (lib/previewChannel.ts). A real route rather than a
+      // detached component, so it survives a reload and can be bookmarked onto a second screen.
+      path: "/projects/:projectId/sequences/:sequenceId/preview",
+      name: "sequence-preview",
+      component: PreviewPage,
       meta: { requiresAuth: true },
     },
   ],

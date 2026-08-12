@@ -1,5 +1,11 @@
 # Changelog
 
+## Editors full width + popped-out house preview
+
+- **The app shell no longer letterboxes the editors.** `#app` carried a fixed `width: 1126px; margin: 0 auto` from the Vite starter template, so the sequencer and the layout editor — full-screen tools — sat in a centred column with dead bands either side on any real monitor. Every page already sets its own inner max-width and padding, so the shell now just fills the viewport.
+- **Pop out preview**: a new `/projects/:projectId/sequences/:sequenceId/preview` route puts the house preview in its own window (second monitor, the way real xLights does it), with its own Play/Stop/Stop-scrub transport. The sequencer stays the single source of truth — it owns the `<audio>` element and broadcasts the playhead over a `BroadcastChannel`; the preview mirrors it and sends transport *commands* back, so its buttons are a remote control rather than a second, competing transport. Two audio elements playing the same track would drift apart within seconds and you'd hear both.
+- The preview also loads the sequence from the API itself, so it still shows the show when no sequencer tab is open — it just won't move until one is, and says so.
+
 ## Layout editor — multi-select, resize handles, in-app confirmations, import placement fix
 
 - **Marquee multi-select** on the 2D layout canvas: drag on empty space to rubber-band a selection (by intersection, so a band clipping a big matrix still catches it), Shift/Cmd/Ctrl to add, Cmd/Ctrl-A for all, Escape to clear. Dragging any member moves the whole selection; Delete removes all of them behind a single confirmation.
