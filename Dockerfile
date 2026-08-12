@@ -29,10 +29,13 @@ COPY --from=web-build /repo/apps/web/dist ./public/app
 
 COPY apps/api/docker/nginx.conf /etc/nginx/http.d/default.conf
 COPY apps/api/docker/supervisord.conf /etc/supervisord.conf
+COPY apps/api/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 10000
-# /var/data is the Render persistent disk's mount path (render.yaml) - owned by root on a
-# fresh mount, so php-fpm (www-data) can't write until this runs on every container start.
-CMD ["sh", "-c", "mkdir -p /var/data/audio && chown -R www-data:www-data /var/data && exec supervisord -c /etc/supervisord.conf"]
+# Prepares the Render persistent disk, applies pending migrations, then starts nginx +
+# php-fpm. Migrating on start rather than trusting render.yaml's preDeployCommand is
+# deliberate - see the comments in entrypoint.sh.
+CMD ["/usr/local/bin/entrypoint.sh"]

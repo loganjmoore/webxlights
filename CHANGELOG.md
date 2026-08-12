@@ -1,5 +1,13 @@
 # Changelog
 
+## Fix — migrations run on deploy (production 500 on every Layout page)
+
+- **The bug:** `GET /api/v1/layouts/{id}/view-objects` returned 500 in production for every layout after M15.7. That endpoint is part of the Layout page's own load, so the page came up behind a "Something went wrong" banner. M15.7's `create_view_objects_table` migration had never been applied — the code deployed, the table didn't.
+- **Root cause, older than M15.7:** nothing ran migrations on deploy. `render.yaml` declares `preDeployCommand: php artisan migrate --force`, but Render doesn't honor it for a Docker service created via the public API (recorded in DECISIONS.md since M0), so migrations were manual one-off jobs someone had to remember. M15.7 was just the first time nobody did.
+- `apps/api/docker/entrypoint.sh` (new, wired as the image `CMD`): prepares the persistent disk as before, runs `php artisan migrate --force` with retries for a cold database, then `exec`s supervisord. Only the web container runs it — the worker overrides `CMD` — so there's no concurrent-migration race. A migration that keeps failing fails the boot on purpose: Render then keeps the previous healthy deploy instead of serving a half-migrated app.
+- `apps/web/src/pages/LayoutPage.vue`: view objects are a decorative helper layer, so a failure there now degrades to "no gridlines" plus a quiet inline notice instead of rejecting the `Promise.all` that also carries models and groups and blanking the page.
+- `apps/api/tests/Feature/ViewObjectsTest.php` (new): index, bulk upsert, idempotency by name, authorization, validation — M15.7 shipped the controller with no coverage at all.
+
 ## M15.7 — view_objects import + Gridlines rendering
 
 Revisits an M15.1 finding: `<view_object>` elements (Gridlines, Mesh, Terrain, ...) are a
