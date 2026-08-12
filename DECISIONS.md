@@ -201,6 +201,54 @@ confidence source in the goal doc itself.
   throwaway sqlite `apps/api/.env` (gitignored, never committed) instead; Postgres remains the
   real/deployed database per this file's locked stack, unchanged.
 
+## M14: Model rendering + import fidelity audit
+
+Not a scoped feature - a direct response to "ensure every model type looks like it should,
+ensure imported layouts perfectly match." No goal-prompt/adversarial-review ceremony for this
+one (that process was specific to M13's original ask); this is a bug-fixing/verification pass,
+verified rigorously instead.
+
+- **`ModelGeometry.width`/`.height` were being used as a screen bounding box** - they're buffer
+  (row/col) dimensions for effect rendering, unrelated to on-screen size for any type whose
+  `screenX/screenY` isn't literally `bufX/bufY`. New `geometryScreenBounds`
+  (`packages/engine/src/models/bounds.ts`) derives the real box from the nodes themselves.
+  Circle/Star/Wreath were rendering as a barely-visible speck next to a Tree before this -
+  confirmed by screenshot, not assumed.
+- **Real xLights' `WorldPosX/Y` is a model's center, not its raw local origin** - confirmed
+  against the manual/community docs (searched, not assumed), since no reference file with known
+  WorldPos/RotateZ/Scale values and a known-correct render was available to verify against
+  directly. Every asymmetric model type (Icicles, Window Frame, Arches, Candy Canes) needed
+  re-centering onto that anchor; `packages/engine/src/models/transform.ts` is the one shared
+  definition 2D and 3D both render through now, specifically so they can't quietly diverge the
+  way this codebase's own pre-existing 2D/3D Y-flip convention already does (see M12's note).
+- **Rotation's sign convention is stated, not verified against real xLights.** Implemented as
+  standard counter-clockwise-positive in a Y-up system, consistent between 2D and 3D by
+  construction (one shared `nodeWorldOffset`) - but nothing in this session confirms that
+  matches real xLights' own `RotateZ` handedness. A real, honestly-flagged fidelity gap if it
+  turns out backwards, not a silent guess.
+- **Per-type shear still not applied** - Angle/Shear/Height for the 3-point line placement
+  system, X2/Y2 endpoints for 2-point. These are placement-system-specific attributes on top of
+  the universal Pos/Scale/RotateZ trio every model now gets; a real remaining gap, same
+  category as M12's original "not exact rotation/shear" note in `PARITY.md`, now half-closed
+  instead of fully closed.
+- **Found a real regression in this milestone's own work before shipping it**: the bounds
+  refactor above initially omitted the `NODE_SPACING` factor `draw()` applies when placing
+  nodes, a ~4x unit mismatch between what auto-fit/hit-testing thought a model's size was and
+  what actually got drawn. Every screenshot taken after introducing this bug still looked
+  correct, because the multi-model fixtures used for visual verification had inter-model
+  spacing large enough to dominate the computed auto-fit extent regardless of any single
+  model's own (wrong) size - the bug was invisible to "does the screenshot look right" and only
+  surfaced when an actual canvas click (at a real, sampled-from-the-live-canvas pixel, not a
+  guessed coordinate) failed to select anything, including a dead-center click on the single
+  largest model on the canvas. General lesson, worth stating plainly: a refactor to bounds/
+  hit-testing code needs its own interaction test, not just a visual re-screenshot of the
+  rendering it also happens to feed - the two can drift independently and only one of them
+  shows up in a static image.
+- Candy Canes' hook radius (hardcoded `0.5`, unreadable at any real pole length) and Icicles'
+  no-`DropPattern` default (one drop spanning the whole budget, i.e. a straight line) were both
+  real, pre-existing cosmetic defects unrelated to the bounds/transform work above - found by
+  the same "actually look at every type" pass, fixed independently.
+
 ## Fix: nginx client_max_body_size (mid-M12, user-reported)
 
 nginx's default `client_max_body_size` (1MB) 413'd real `xlights_rgbeffects.xml` imports and would have silently capped `SequenceController`'s 50MB audio upload limit well below what Laravel itself allows - a real production blocker a live user hit while this session was mid-milestone. Set to 100M in `apps/api/docker/nginx.conf`. Not caught by any existing test (local dev's `php artisan serve` has no equivalent limit) - worth remembering that nginx-layer limits are invisible to Laravel-level validation testing.

@@ -27,7 +27,7 @@ const renameValue = ref("");
 // persist path M12 exists to prove. ModelEntityController::update replaces `screen` wholesale,
 // it does not deep-merge, so this must always spread the model's existing screen values and
 // override only the changed keys, or a drag silently wipes scale/rotate/z. See DECISIONS.md.
-async function updateScreen(modelId: number, patch: Partial<{ x: number; y: number; z: number; scale: number; rotate: number }>): Promise<void> {
+async function updateScreen(modelId: number, patch: Partial<{ x: number; y: number; z: number; scale: number; scaleY: number; rotate: number }>): Promise<void> {
   if (!layout.value) return;
   const model = models.value.find((m) => m.id === modelId);
   if (!model) return;
@@ -42,7 +42,7 @@ function handleMove(modelId: number, x: number, y: number): void {
 function handleMove3D(modelId: number, x: number, y: number, z: number): void {
   void updateScreen(modelId, { x, y, z });
 }
-function handlePositionField(field: "x" | "y" | "z" | "scale" | "rotate", raw: string): void {
+function handlePositionField(field: "x" | "y" | "z" | "scale" | "scaleY" | "rotate", raw: string): void {
   if (!selectedModel.value) return;
   const value = Number(raw);
   if (Number.isNaN(value)) return;
@@ -273,13 +273,24 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
             <input type="number" :value="selectedModel.screen.z ?? 0" @change="handlePositionField('z', ($event.target as HTMLInputElement).value)" />
           </label>
           <label>
-            Scale
+            Scale X
             <input
               type="number"
               step="0.1"
               min="0.1"
               :value="selectedModel.screen.scale ?? 1"
               @change="handlePositionField('scale', ($event.target as HTMLInputElement).value)"
+            />
+          </label>
+          <label>
+            Scale Y
+            <input
+              type="number"
+              step="0.1"
+              min="0.1"
+              :value="selectedModel.screen.scaleY ?? selectedModel.screen.scale ?? 1"
+              title="Defaults to Scale X (uniform) until set independently"
+              @change="handlePositionField('scaleY', ($event.target as HTMLInputElement).value)"
             />
           </label>
           <label>

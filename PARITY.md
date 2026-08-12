@@ -13,10 +13,10 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Model types (12 of the goal prompt's list) | ✅ | Matrix, Single Line, Poly Line, Arches, Candy Canes, Circle, Star, Tree, Icicles, Window Frame, Wreath, Custom |
 | Matrix wiring variants | ⚠️ | Vertical/Top Left/zigzag/1 strand-per-string only |
 | Model Groups | ✅ | Membership + buffer style |
-| Screen placement on import | ⚠️ | `WorldPosX/Y` + `ScaleX` only — correct relative position, not exact rotation/shear |
-| Layout canvas | ✅ | Drag-to-reposition (M12); drag-to-create from an 11-type model palette (M13, Custom excluded); no background photo underlay |
+| Screen placement on import | ⚠️ | `WorldPosX/Y/Z` (as the model's *center*, not its raw local origin), `ScaleX`/`ScaleY`, and `RotateZ` all render now (M14) — correct position, per-axis scale, and rotation. Per-type shear (Angle/Shear/Height for 3-point line placement, X2/Y2 for 2-point) still isn't applied |
+| Layout canvas | ✅ | Drag-to-reposition (M12); drag-to-create from an 11-type model palette (M13, Custom excluded); every model's actual rendered/rotated/scaled bounds now drive auto-fit and hit-testing, not a buffer-dimension guess (M14); no background photo underlay |
 | 2D layout | ✅ | Canvas-based |
-| 3D layout editing | ✅ | Orbit/pan/zoom, per-model picking (invisible pick meshes, not the shared Points cloud), drag-to-move via `DragControls`, numeric X/Y/Z/Scale/Rotate panel (M12) |
+| 3D layout editing | ✅ | Orbit/pan/zoom, per-model picking (invisible pick meshes sized/centered to each model's real transformed bounds, not the shared Points cloud), drag-to-move via `DragControls`, numeric X/Y/Z/Scale X/Scale Y/Rotate panel (M12, scale-Y and real rotation rendering added M14) |
 | 3D rendering fidelity (textures, mesh/GDTF objects, per-preview cameras) | ❌ | Non-goal for v1 (SPEC ch5) — M12 reverses only the "no 3D editing" non-goal, not rendering fidelity |
 | DMX moving-head/servo/skull family | ❌ | Non-goal for v1 (SPEC ch4 §5) |
 

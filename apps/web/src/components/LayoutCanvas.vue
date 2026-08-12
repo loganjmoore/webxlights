@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-import { computeGeometryFromAttrs, type ModelGeometry } from "@webxlights/engine";
+import { computeGeometryFromAttrs, geometryCenter, nodeWorldOffset, transformedHalfExtents, type ModelGeometry, type ScreenTransform } from "@webxlights/engine";
 import type { ModelRecord } from "../lib/api";
 
 const props = defineProps<{ models: ModelRecord[]; selectedModelId: number | null }>();
@@ -40,9 +40,31 @@ function positionFor(model: ModelRecord): { x: number; y: number } {
   return { x: model.screen.x ?? 0, y: model.screen.y ?? 0 };
 }
 
-function halfExtents(model: ModelRecord, geo: ModelGeometry | null): { halfW: number; halfH: number } {
-  const scale = model.screen.scale ?? 1;
-  return geo ? { halfW: (geo.width * NODE_SPACING * scale) / 2, halfH: (geo.height * NODE_SPACING * scale) / 2 } : { halfW: 20, halfH: 20 };
+// Real xLights writes WorldPosX/Y as a model's *center*, and RotateZ pivots around that same
+// center - `model.screen.x/y` is that anchor. `screen.scaleY` defaults to `scale` (uniform)
+// when absent, matching every model saved before per-axis scale existed.
+function transformFor(model: ModelRecord): ScreenTransform {
+  return { scale: model.screen.scale ?? 1, scaleY: model.screen.scaleY, rotateDeg: model.screen.rotate ?? 0 };
+}
+
+// `geo.width`/`geo.height` are buffer (row/col) dimensions for effect rendering, not a screen
+// bounding box - Circle/Star/Wreath normalize to a unit circle regardless of node count, Tree's
+// real width comes from `bottomTopRatio` not `strings`, Window Frame's real extent is `top` x
+// `leftRight` not the total perimeter node count. `transformedHalfExtents` (packages/engine)
+// derives the real, transformed (scaled + rotated) box from the nodes' actual screenX/screenY,
+// centered on the anchor by construction - see transform.ts's module doc for why every model
+// type needs to be centered on its anchor in the first place, not just this one.
+function modelWorldBounds(model: ModelRecord, geo: ModelGeometry | null): { minX: number; maxX: number; minY: number; maxY: number } {
+  const { x, y } = positionFor(model);
+  if (!geo) return { minX: x - 20, maxX: x + 20, minY: y - 20, maxY: y + 20 };
+  // transformedHalfExtents is in local geometry units, same as node.screenX/Y - draw() below
+  // multiplies node offsets by NODE_SPACING before placing them in world space, so this needs
+  // the same factor or bounds/hit-testing silently work in a 4x-smaller unit than what's
+  // actually drawn (masked in multi-model scenes where inter-model spacing dominates the
+  // computed extent, but a real, reproducible click-to-select miss on any single/dominant
+  // model - caught only by testing an actual canvas click, not by screenshotting the result).
+  const { halfW, halfH } = transformedHalfExtents(geo, transformFor(model));
+  return { minX: x - halfW * NODE_SPACING, maxX: x + halfW * NODE_SPACING, minY: y - halfH * NODE_SPACING, maxY: y + halfH * NODE_SPACING };
 }
 
 function worldBounds(models: ModelRecord[]): { minX: number; minY: number; maxX: number; maxY: number } {
@@ -52,12 +74,11 @@ function worldBounds(models: ModelRecord[]): { minX: number; minY: number; maxX:
   let maxY = -Infinity;
 
   for (const model of models) {
-    const { x, y } = positionFor(model);
-    const { halfW, halfH } = halfExtents(model, geometryFor(model));
-    minX = Math.min(minX, x - halfW);
-    maxX = Math.max(maxX, x + halfW);
-    minY = Math.min(minY, y - halfH);
-    maxY = Math.max(maxY, y + halfH);
+    const b = modelWorldBounds(model, geometryFor(model));
+    minX = Math.min(minX, b.minX);
+    maxX = Math.max(maxX, b.maxX);
+    minY = Math.min(minY, b.minY);
+    maxY = Math.max(maxY, b.maxY);
   }
 
   if (!Number.isFinite(minX)) return { minX: -100, minY: -100, maxX: 100, maxY: 100 };
@@ -102,7 +123,6 @@ function draw(): void {
 
   for (const model of props.models) {
     const { x: mx, y: my } = positionFor(model);
-    const scale = model.screen.scale ?? 1;
     const geo = geometryFor(model);
     const selected = model.id === props.selectedModelId;
 
@@ -120,9 +140,12 @@ function draw(): void {
     }
 
     ctx.fillStyle = selected ? "#fff" : "#e8c468";
+    const center = geometryCenter(geo);
+    const transform = transformFor(model);
     for (const node of geo.nodes) {
-      const worldX = mx + node.screenX * NODE_SPACING * scale;
-      const worldY = my + node.screenY * NODE_SPACING * scale;
+      const offset = nodeWorldOffset(node, center, transform);
+      const worldX = mx + offset.x * NODE_SPACING;
+      const worldY = my + offset.y * NODE_SPACING;
       const sx = toScreenX(worldX);
       const sy = toScreenY(worldY);
       ctx.beginPath();
@@ -133,17 +156,22 @@ function draw(): void {
 }
 
 function hitTest(sx: number, sy: number, rect: { width: number; height: number }): ModelRecord | null {
-  const { toScreenX, toScreenY, fitScale } = computeTransform(rect);
+  const { toScreenX, toScreenY } = computeTransform(rect);
   for (let i = props.models.length - 1; i >= 0; i--) {
     const model = props.models[i]!;
-    const { x: mx, y: my } = positionFor(model);
     const geo = geometryFor(model);
-    const msx = toScreenX(mx);
-    const msy = toScreenY(my);
-    const { halfW, halfH } = geo ? halfExtents(model, geo) : { halfW: PLACEHOLDER_HALF / fitScale, halfH: PLACEHOLDER_HALF / fitScale };
-    const halfWScreen = geo ? halfW * fitScale : PLACEHOLDER_HALF;
-    const halfHScreen = geo ? halfH * fitScale : PLACEHOLDER_HALF;
-    if (Math.abs(sx - msx) <= Math.max(halfWScreen, 8) && Math.abs(sy - msy) <= Math.max(halfHScreen, 8)) return model;
+    const wb = modelWorldBounds(model, geo);
+    // World Y maps to screen Y flipped (toScreenY), so world-minY becomes the larger screen Y -
+    // take min/max of the two projected corners rather than assuming an axis direction.
+    const sx1 = toScreenX(wb.minX);
+    const sx2 = toScreenX(wb.maxX);
+    const sy1 = toScreenY(wb.minY);
+    const sy2 = toScreenY(wb.maxY);
+    const left = Math.min(sx1, sx2) - 8;
+    const right = Math.max(sx1, sx2) + 8;
+    const top = Math.min(sy1, sy2) - 8;
+    const bottom = Math.max(sy1, sy2) + 8;
+    if (sx >= left && sx <= right && sy >= top && sy <= bottom) return model;
   }
   return null;
 }

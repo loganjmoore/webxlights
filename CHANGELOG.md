@@ -1,5 +1,67 @@
 # Changelog
 
+## M14 — Model rendering + import fidelity audit
+
+Prompted directly by "ensure every model type looks like it should, ensure imported layouts
+perfectly match" - an audit pass across every model's geometry and every placement attribute,
+not a single scoped feature. Three real, independent rendering bugs found and fixed, plus a
+real missing-feature gap (rotation/non-uniform-scale parsed since M1/M12 but never rendered)
+completed:
+
+- **Bounding-box estimate was wrong for most model types.** `LayoutCanvas.vue`/
+  `LayoutCanvas3D.vue` used `ModelGeometry.width`/`.height` (buffer row/col counts, meant for
+  effect rendering) as a stand-in for a model's on-screen size, for auto-fit, hit-testing, and
+  the 3D pick mesh. That's only correct for types whose `screenX/screenY` literally equals
+  `bufX/bufY` (Matrix). Circle/Star/Wreath normalize to a unit circle regardless of node count
+  (rendered as a barely-visible speck next to a Tree); Tree's real width comes from
+  `bottomTopRatio`, not `strings`; Window Frame's real extent is `top` x `leftRight`, not the
+  perimeter node total. New `geometryScreenBounds` (`packages/engine/src/models/bounds.ts`)
+  derives the real box from the nodes' actual rendered positions instead - one shared
+  definition both 2D and 3D use, not two independent guesses.
+- **Candy Canes' hook was an unreadable tiny wiggle.** The crook's curl radius was a hardcoded
+  `0.5` local units regardless of pole length - invisible at any real node count (the pole is
+  typically ~3x the hook's own node budget). Now scales with `crookNodes`, so the hook actually
+  reads as a hook.
+- **Icicles' no-`DropPattern` default was a straight line** - the one shape "icicles" can't
+  look like. `computeIcicles`'s own no-pattern default (one drop spanning the whole node
+  budget) is defensible as a library default, but `fromAttrs.ts`'s Icicles case (what a
+  drag-created model or an import genuinely missing the attribute gets) now supplies a
+  repeating short/long pattern by default instead.
+- **Position/rotation/scale fidelity on import, completed.** Real xLights writes
+  `WorldPosX/Y/Z` as a model's *center* (confirmed against the manual/community docs, not
+  assumed) and pivots `RotateZ` around that same center - `ModelNode.screenX/screenY` is each
+  shape's own natural local parametrization, frequently *not* centered on (0,0) (Icicles hangs
+  entirely below its mounting line; Window Frame/Arches/Candy Canes sit in a single quadrant).
+  New `packages/engine/src/models/transform.ts` (`geometryCenter`, `nodeWorldOffset`,
+  `transformedHalfExtents`) is the one shared definition of "where a model's anchor really is"
+  - both `LayoutCanvas.vue` and `LayoutCanvas3D.vue` now render through it, so they can't
+  quietly disagree the way the pre-existing 2D/3D Y-flip convention already does. `RotateZ`
+  (parsed and editable since M12, never rendered) and a new per-axis `screen.scaleY` (defaults
+  to `scale`, so every existing single-scale model is unaffected) both actually render now, in
+  both 2D and 3D. `LayoutPage.vue`'s position panel gets a Scale Y field.
+- **A real regression caught only by testing an actual canvas click, not by screenshotting the
+  result**: the bounds refactor above initially dropped a `* NODE_SPACING` factor `draw()`
+  itself applies when placing nodes - every multi-model screenshot still looked correct because
+  inter-model spacing dominated the computed auto-fit extent, masking a ~4x-undersized
+  per-model hit-test box. Clicking a rendered model's own dots (verified via in-page canvas
+  pixel sampling, not guessed screen coordinates) missed entirely until this was found and
+  fixed - a reminder that "the screenshot looks right" isn't sufficient verification for
+  anything with its own separate bounds computation.
+- **Stated, not silent**: rotation's sign convention (counter-clockwise-positive in a Y-up
+  system) is internally consistent between 2D and 3D but not verified against real xLights'
+  own `RotateZ` handedness - no reference file with a known before/after render was available
+  this session. Per-type shear (Angle/Shear/Height for the 3-point line placement system, X2/Y2
+  for 2-point) is still not applied - a real remaining gap on top of the universal Pos/Scale/
+  RotateZ trio every model now gets.
+- Verified live: all 11 draggable palette types re-screenshotted individually post-fix (correct
+  shapes, correct relative scale - Circle/Star/Wreath now fill the canvas like Tree/Matrix
+  instead of rendering as a speck); a hand-built realistic fixture (a tree, two rooflines
+  rotated ±20°, and a window frame scaled 2x/0.5x non-uniformly) rendered as a coherent house
+  layout in both 2D and 3D, wireframe selection box aligned exactly to the rendered points; a
+  rotated line's own rendered pixels (sampled from the live canvas, not assumed) correctly
+  selected the right model on click. `packages/engine`: 14 new tests (`bounds.test.ts`,
+  `transform.test.ts`) - 124 total, all passing.
+
 ## M13 — Layout visual parity + model placement toolbar
 
 - New `apps/web/src/components/ModelPalette.vue`: a drag-source toolbar of the 11 model types `computeGeometryFromAttrs` already has real defaults for (Matrix, Single Line, Poly Line, Arches, Candy Canes, Circle, Star, Tree, Icicles, Window Frame, Wreath — Custom excluded, see below). Native HTML5 `draggable`, no new dependency.

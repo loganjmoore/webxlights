@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { DragControls } from "three/examples/jsm/controls/DragControls.js";
-import { computeGeometryFromAttrs, type ModelGeometry } from "@webxlights/engine";
+import { computeGeometryFromAttrs, geometryCenter, nodeWorldOffset, transformedHalfExtents, type ModelGeometry, type ScreenTransform } from "@webxlights/engine";
 import type { ModelRecord } from "../lib/api";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 
@@ -27,6 +27,8 @@ let rafId: number | null = null;
 interface RowEntry {
   model: ModelRecord;
   geometry: ModelGeometry;
+  center: { x: number; y: number };
+  transform: ScreenTransform;
   offset: number;
   pickMesh: THREE.Mesh;
 }
@@ -42,9 +44,11 @@ function geometryFor(model: ModelRecord): ModelGeometry | null {
   }
 }
 
-function halfExtents(model: ModelRecord, geo: ModelGeometry): { halfW: number; halfH: number } {
-  const scale = model.screen.scale ?? 1;
-  return { halfW: Math.max((geo.width * NODE_SPACING * scale) / 2, 10), halfH: Math.max((geo.height * NODE_SPACING * scale) / 2, 10) };
+// Real xLights writes WorldPosX/Y as a model's *center*, and RotateZ pivots around that same
+// center - `model.screen.x/y/z` is that anchor. See packages/engine/src/models/transform.ts's
+// module doc for why every model type (not just the coincidentally-centered ones) needs this.
+function transformFor(model: ModelRecord): ScreenTransform {
+  return { scale: model.screen.scale ?? 1, scaleY: model.screen.scaleY, rotateDeg: model.screen.rotate ?? 0 };
 }
 
 function buildPositions(): Float32Array {
@@ -54,11 +58,11 @@ function buildPositions(): Float32Array {
     const mx = entry.model.screen.x ?? 0;
     const my = entry.model.screen.y ?? 0;
     const mz = entry.model.screen.z ?? 0;
-    const scale = entry.model.screen.scale ?? 1;
     entry.geometry.nodes.forEach((node, i) => {
       const idx = (entry.offset + i) * 3;
-      positions[idx] = mx + node.screenX * NODE_SPACING * scale;
-      positions[idx + 1] = my + node.screenY * NODE_SPACING * scale;
+      const off = nodeWorldOffset(node, entry.center, entry.transform);
+      positions[idx] = mx + off.x * NODE_SPACING;
+      positions[idx + 1] = my + off.y * NODE_SPACING;
       positions[idx + 2] = mz;
     });
   }
@@ -77,15 +81,23 @@ function buildScene(): void {
   for (const model of props.models) {
     const geo = geometryFor(model);
     if (!geo || geo.nodes.length === 0) continue;
-    const { halfW, halfH } = halfExtents(model, geo);
+    const transform = transformFor(model);
+    const { halfW, halfH } = transformedHalfExtents(geo, transform);
+    // Every node is already placed relative to the shape's own center (see nodeWorldOffset),
+    // so a symmetric box at the anchor lines up with the rendered points directly - no
+    // re-centering translate needed here the way an axis-aligned, buffer-dimension-sized box
+    // used to require. Floor is a half-extent minimum (matches the pre-existing clickability
+    // floor for tiny/degenerate shapes), not a full-size one.
+    const halfWWorld = Math.max(halfW * NODE_SPACING, 10);
+    const halfHWorld = Math.max(halfH * NODE_SPACING, 10);
     const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(halfW * 2, halfH * 2, PICK_DEPTH),
+      new THREE.BoxGeometry(halfWWorld * 2, halfHWorld * 2, PICK_DEPTH),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
     mesh.position.set(model.screen.x ?? 0, model.screen.y ?? 0, model.screen.z ?? 0);
     mesh.userData.modelId = model.id;
     setup.scene.add(mesh);
-    rowEntries.push({ model, geometry: geo, offset, pickMesh: mesh });
+    rowEntries.push({ model, geometry: geo, center: geometryCenter(geo), transform, offset, pickMesh: mesh });
     offset += geo.nodes.length;
   }
 
@@ -115,11 +127,11 @@ function buildScene(): void {
     if (!entry || !points) return;
     const posAttr = points.geometry.getAttribute("position") as THREE.BufferAttribute;
     const arr = posAttr.array as Float32Array;
-    const scale = entry.model.screen.scale ?? 1;
     entry.geometry.nodes.forEach((node, i) => {
       const idx = (entry.offset + i) * 3;
-      arr[idx] = mesh.position.x + node.screenX * NODE_SPACING * scale;
-      arr[idx + 1] = mesh.position.y + node.screenY * NODE_SPACING * scale;
+      const off = nodeWorldOffset(node, entry.center, entry.transform);
+      arr[idx] = mesh.position.x + off.x * NODE_SPACING;
+      arr[idx + 1] = mesh.position.y + off.y * NODE_SPACING;
       arr[idx + 2] = mesh.position.z;
     });
     posAttr.needsUpdate = true;
@@ -154,10 +166,15 @@ function fitCameraToScene(): void {
   for (const entry of rowEntries) {
     const mx = entry.model.screen.x ?? 0;
     const my = entry.model.screen.y ?? 0;
-    minX = Math.min(minX, mx - 40);
-    maxX = Math.max(maxX, mx + 40);
-    minY = Math.min(minY, my - 40);
-    maxY = Math.max(maxY, my + 40);
+    // Real half-extents, not a flat 40-unit guess - a scaled-up or rotated model could
+    // exceed that margin and clip against the camera's frustum edges.
+    const { halfW, halfH } = transformedHalfExtents(entry.geometry, entry.transform);
+    const marginX = Math.max(halfW * NODE_SPACING, 40);
+    const marginY = Math.max(halfH * NODE_SPACING, 40);
+    minX = Math.min(minX, mx - marginX);
+    maxX = Math.max(maxX, mx + marginX);
+    minY = Math.min(minY, my - marginY);
+    maxY = Math.max(maxY, my + marginY);
   }
   if (!Number.isFinite(minX)) { minX = -100; maxX = 100; minY = -100; maxY = 100; }
   const cx = (minX + maxX) / 2;

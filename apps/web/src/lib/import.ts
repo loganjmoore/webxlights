@@ -8,15 +8,22 @@ export interface ImportSummary {
 }
 
 // SPEC ch11 §2.1: WorldPosX/Y/Z is written for every model regardless of screen-location
-// system (Boxed/2pt/3pt/Poly/Multi). Using it alone (plus ScaleX for Boxed types) gives
-// correct *relative* placement between models on first import; per-type rotation/shear
-// (Angle/Shear/Height for 3pt, X2/Y2 endpoints for 2pt) is a later fidelity pass.
+// system (Boxed/2pt/3pt/Poly/Multi) as the model's *center* point, with RotateZ pivoting
+// around that same center (confirmed against the xLights manual/community docs). ScaleX/
+// ScaleY/RotateZ are now actually rendered (LayoutCanvas.vue/LayoutCanvas3D.vue via
+// packages/engine's nodeWorldOffset), not just parsed and stored inertly - M13 shipped the
+// toolbar/palette but not this; M14 is the fidelity pass this comment used to defer to.
+// Per-type shear (Angle/Shear/Height for the 3-point line placement system, X2/Y2 endpoints
+// for 2-point) is still not applied - those are placement-system-specific attributes on top
+// of the universal Pos/Scale/RotateZ trio every model has, a real remaining gap, not silent
+// (see DECISIONS.md).
 function extractScreenPosition(attrs: Record<string, string>) {
   return {
     x: attrs.WorldPosX ? parseFloat(attrs.WorldPosX) : 0,
     y: attrs.WorldPosY ? parseFloat(attrs.WorldPosY) : 0,
     z: attrs.WorldPosZ ? parseFloat(attrs.WorldPosZ) : 0,
     scale: attrs.ScaleX ? parseFloat(attrs.ScaleX) : 1,
+    scaleY: attrs.ScaleY ? parseFloat(attrs.ScaleY) : undefined,
     rotate: attrs.RotateZ ? parseFloat(attrs.RotateZ) : 0,
   };
 }
