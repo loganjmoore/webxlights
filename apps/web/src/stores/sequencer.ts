@@ -157,6 +157,23 @@ export const useSequencerStore = defineStore("sequencer", () => {
     }
   }
 
+  // M15.6: real xLights' "New Timing" generator (25ms/50ms/100ms fixed-interval, Metronome
+  // BPM) - PARITY.md's "manual marks only" gap. Always creates a *new* named track rather than
+  // overwriting trackIndex 0 - a real imported sequence commonly has several named tracks
+  // (Beats/Lyrics/Mark/...) with no guaranteed "the generic one is always index 0" ordering;
+  // clobbering whatever happens to be first would silently destroy real imported timing data.
+  // Matches real xLights' own New Timing dialog, which always adds a new track too.
+  function generateTimingMarks(name: string, intervalMs: number): void {
+    if (!sequence.value || intervalMs <= 0) return;
+    pushUndoSnapshot();
+    let trackName = name;
+    let n = 2;
+    while (body.value.timingTracks.some((t) => t.name === trackName)) trackName = `${name} ${n++}`;
+    const marks: number[] = [];
+    for (let ms = 0; ms < sequence.value.duration_ms; ms += intervalMs) marks.push(ms);
+    body.value.timingTracks.push({ name: trackName, marks });
+  }
+
   async function saveNow(): Promise<void> {
     if (!sequence.value) return;
     if (saveTimer) {
@@ -233,6 +250,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     addTimingMark,
     deleteTimingMark,
     ensureDefaultTimingTrack,
+    generateTimingMarks,
     snapshot: pushUndoSnapshot,
     saveNow,
   };

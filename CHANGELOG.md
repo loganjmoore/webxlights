@@ -1,5 +1,31 @@
 # Changelog
 
+## M15.6 — Timing track generators (fixed-interval, Metronome)
+
+Closes the exact gap `PARITY.md` already flagged: "manual marks only, no fixed-interval/beat-bar
+generators." Opened real xLights' Sequence Settings > Timings tab and its New Timing dialog for
+reference (Empty, 25ms, 50ms, 100ms, Metronome, Metronome w/ Tags, FPP Commands, FPP Effects).
+
+- **New "Timing" panel in the Sequencer**: Fixed interval (ms) or Metronome (BPM), Generate
+  button. Ported the two options with no FPP/tag-data dependency; the other four need data this
+  codebase doesn't have or add nothing over the existing "Empty" behavior.
+- **A real bug found and fixed during live verification**: the first version overwrote
+  `timingTracks[0]`'s marks. Testing against the real jinglebells sequence showed
+  `timingTracks[0]` is "Beats" - a real imported track with 242 real marks, not a generic
+  placeholder - so this would have silently destroyed real timing data. Fixed to always add a
+  *new*, auto-named, de-duplicated track instead of overwriting one, matching what real xLights'
+  own New Timing dialog does.
+- Full multi-row timing tracks (separate rows per named track, like real xLights' Timings list)
+  stayed out of scope - `SequencerGrid.vue` currently merges every track onto one pinned ruler
+  and hardcodes `trackIndex: 0` in its click handling, a larger rendering change unrelated to
+  the generator gap this pass closes.
+- Verified live against the real 120707ms jinglebells sequence: generated a 50ms track (2415
+  marks, matches duration/interval exactly) and a 120bpm Metronome track (500ms interval),
+  confirmed via direct DB query that all 5 real imported tracks were untouched.
+- All existing tests still green: 130 engine + 20 formats (vitest), 29 PHPUnit, typecheck/lint
+  clean (this pass's logic lives in `apps/web`, which has no test harness - see M15.1's note on
+  why that gap wasn't closed either; verified live instead, twice, once to catch the bug).
+
 ## M15.5 — Model Groups editor (Layout page)
 
 Continuing the standing ask, this pass compared the Controllers tab (found already

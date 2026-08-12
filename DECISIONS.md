@@ -249,6 +249,39 @@ verified rigorously instead.
   real, pre-existing cosmetic defects unrelated to the bounds/transform work above - found by
   the same "actually look at every type" pass, fixed independently.
 
+## M15.6: Timing track generators (fixed-interval, Metronome)
+
+Prompted by opening real xLights' Sequence Settings > Timings tab and its "New Timing" dialog -
+`PARITY.md` already flagged "manual marks only, no fixed-interval/beat-bar generators" as a gap;
+this closes exactly that, scoped to what's honestly achievable without a larger rendering change.
+
+- **Full multi-row timing tracks were explicitly out of scope for this pass.** Real xLights
+  renders each named track (Structure, Lyrics 1, Beats, ...) as its own row with its own marks
+  and its own delete control. `SequencerGrid.vue` currently flattens every track into one merged
+  pinned ruler (`allMarks()` = `timingTracks.flatMap(t => t.marks)`) and hardcodes `trackIndex: 0`
+  in every click-hit-test - genuinely unrelated to the generator gap and a much larger rendering
+  rearchitecture. Building the generator on top of that limitation rather than blocking on fixing
+  it first was the right call: it's additive, doesn't make the existing limitation worse, and is
+  independently useful even before multi-row rendering exists.
+- **Ported only the fixed-interval and Metronome (BPM) options from real xLights' 8-option New
+  Timing dropdown** (Empty, 25ms, 50ms, 100ms, Metronome, Metronome w/ Tags, FPP Commands, FPP
+  Effects) - the other four either need data this codebase doesn't have (FPP Commands/Effects are
+  FPP-specific bindings, Metronome w/ Tags stores extra tag metadata) or add nothing over Empty
+  (an empty track is just `ensureDefaultTimingTrack`, already the existing behavior).
+- **A real bug found during live verification, fixed before shipping**: the first implementation
+  took a `trackIndex` and overwrote `timingTracks[trackIndex]`'s marks, defaulting to index 0.
+  Verified live against the real jinglebells sequence and found `timingTracks[0]` is "Beats" (a
+  real, meaningfully-named imported track with 242 real marks) - not a generic placeholder. The
+  generator would have silently destroyed real imported timing data. Fixed by always pushing a
+  *new* named track (auto-named from the generator settings, e.g. "50ms" or "Metronome
+  120bpm", de-duplicated against existing names) instead of targeting an index - matches what
+  real xLights' own New Timing dialog does (it always adds a track, never overwrites one).
+- Verified live against the real jinglebells sequence (120707ms duration): generated a 50ms
+  fixed-interval track, confirmed via direct DB query it added a new "50ms" track with 2415 marks
+  (120707/50 ≈ 2415) while all 5 real imported tracks (Beats, Note Onsets, Mark,
+  JingleBellsFrankSinatra, Backup) were untouched. Generated a 120bpm Metronome track separately
+  and confirmed the 500ms (60000/120) interval.
+
 ## M15.5: Model Groups editor (Layout page)
 
 Prompted by another real-xLights-vs-webXLights side-by-side pass, this time on the Controllers
