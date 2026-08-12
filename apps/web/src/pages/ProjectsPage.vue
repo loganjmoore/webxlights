@@ -159,62 +159,169 @@ async function loadSampleProject(): Promise<void> {
 
 <style scoped>
 .projects {
-  max-width: 480px;
-  margin: 4rem auto;
+  min-height: 100vh;
+  background: #0d0d11;
+  color: #ddd;
   font-family: system-ui, sans-serif;
+}
+.projects > * {
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.page-header {
+  max-width: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid #333;
+  background: #16161c;
+  margin: 0;
+}
+.page-header h1 {
+  font-size: 1.15rem;
+  margin: 0;
+  color: #fff;
+  font-weight: 600;
+}
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.logout-btn,
+.docs-nav-link {
+  font-size: 0.8rem;
+  color: #aaa;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.docs-nav-link:hover,
+.logout-btn:hover {
+  color: #e8c468;
 }
 form {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin: 1.5rem auto 0;
+  padding: 0 1.25rem;
 }
 form input {
   flex: 1;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.9rem;
+  border: 1px solid #333;
+  border-radius: 5px;
+  background: #16161c;
+  color: #eee;
 }
-.page-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
+form input:focus {
+  outline: none;
+  border-color: #e8c468;
 }
-.header-nav {
-  display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-}
-.logout-btn {
-  font-size: 0.8rem;
-}
-.docs-nav-link {
+form button {
+  padding: 0.5rem 1rem;
   font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 5px;
+  background: #e8c468;
+  color: #111;
+  cursor: pointer;
+}
+.import-package-btn {
+  display: inline-block;
+  margin: 0.85rem 1.25rem 0;
+  cursor: pointer;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  background: #1e1e26;
+  color: #ddd;
+}
+.import-package-btn:hover {
+  border-color: #e8c468;
+  color: #e8c468;
+}
+.package-message {
+  font-size: 0.85rem;
+  color: #888;
+  padding: 0 1.25rem;
 }
 .onboarding {
-  margin: 1rem 0 1.5rem;
-  padding: 1rem;
-  border: 1px dashed #999;
-  border-radius: 6px;
-  background: #f9f7f0;
+  margin: 1.25rem 1.25rem 1.5rem;
+  padding: 1.1rem;
+  border: 1px dashed #444;
+  border-radius: 8px;
+  background: #16161c;
 }
 .onboarding p {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.6rem;
+  color: #ccc;
+}
+.onboarding button {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 5px;
+  background: #e8c468;
+  color: #111;
+  cursor: pointer;
 }
 .docs-link {
   font-size: 0.85rem;
+  margin: 0.6rem 0 0;
+}
+.docs-link a {
+  color: #e8c468;
+}
+ul {
+  padding: 0 1.25rem 1.5rem;
   margin: 0.5rem 0 0;
+  list-style: none;
 }
 li {
-  margin-bottom: 0.5rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #222;
+}
+li:last-child {
+  border-bottom: none;
+}
+li > a {
+  color: #ddd;
+  font-weight: 500;
+}
+li > a:hover {
+  color: #e8c468;
 }
 .share-btn {
   margin-left: 0.5rem;
   font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e26;
+  color: #ccc;
+  cursor: pointer;
+}
+.share-btn:hover {
+  border-color: #e8c468;
+  color: #e8c468;
 }
 .share-panel {
-  margin: 0.4rem 0 0.8rem;
-  padding: 0.6rem;
-  background: #f4f4f4;
-  border-radius: 4px;
+  margin: 0.6rem 0 0;
+  padding: 0.75rem;
+  background: #16161c;
+  border: 1px solid #2a2a33;
+  border-radius: 6px;
   font-size: 0.85rem;
 }
 .members {
@@ -223,6 +330,8 @@ li {
   padding: 0;
 }
 .members li {
+  border-bottom: none;
+  padding: 0.25rem 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -234,21 +343,13 @@ li {
   display: flex;
   gap: 0.4rem;
 }
-.share-error {
-  color: #b00020;
-  margin: 0.4rem 0 0;
-}
-.import-package-btn {
-  display: inline-block;
-  margin-bottom: 1rem;
-  cursor: pointer;
-  padding: 0.3rem 0.7rem;
-  border: 1px solid #999;
-  border-radius: 4px;
-  font-size: 0.8rem;
-}
-.package-message {
+.invite-form input,
+.invite-form select {
+  padding: 0.35rem 0.5rem;
   font-size: 0.85rem;
-  color: #555;
+}
+.share-error {
+  color: #e57373;
+  margin: 0.4rem 0 0;
 }
 </style>

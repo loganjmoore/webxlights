@@ -175,57 +175,114 @@ onMounted(load);
 <style scoped>
 .sequences-page {
   font-family: system-ui, sans-serif;
-  max-width: 480px;
-  margin: 2rem auto;
-  padding: 0 1rem;
+  min-height: 100vh;
+  background: #0d0d11;
+  color: #ddd;
 }
 header {
   display: flex;
-  align-items: baseline;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid #333;
+  background: #16161c;
+}
+header a {
+  color: #e8c468;
+}
+header h1 {
+  font-size: 1.1rem;
+  margin: 0;
+  color: #ddd;
+  font-weight: 600;
 }
 .import-btn {
   margin-left: auto;
   cursor: pointer;
-  padding: 0.3rem 0.7rem;
-  border: 1px solid #555;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #444;
   border-radius: 4px;
   font-size: 0.8rem;
+  background: #1e1e26;
+  color: #ddd;
+}
+.import-btn:hover {
+  border-color: #e8c468;
+  color: #e8c468;
 }
 .import-message {
   font-size: 0.8rem;
   color: #aaa;
-  margin: 0 0 1rem;
+  margin: 0;
+  padding: 0.6rem 1.25rem;
+  border-bottom: 1px solid #333;
+}
+.sequences-page > .new-sequence,
+.sequences-page > .list {
+  max-width: 480px;
+  margin: 0 auto;
 }
 .new-sequence {
   border: 1px solid #333;
-  border-radius: 6px;
-  padding: 1rem;
+  background: #16161c;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-top: 1.5rem;
   margin-bottom: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.75rem;
 }
 .new-sequence h2 {
   margin: 0 0 0.25rem;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  color: #ddd;
+  font-weight: 600;
 }
 .new-sequence label {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: #aaa;
+}
+.new-sequence button {
+  padding: 0.5rem 0;
   font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 5px;
+  background: #e8c468;
+  color: #111;
+  cursor: pointer;
+}
+.new-sequence button:disabled {
+  background: #3a3624;
+  color: #777;
+  cursor: default;
 }
 .error {
-  color: #c0392b;
+  margin: 0;
+  color: #e57373;
+  font-size: 0.8rem;
 }
 .list {
   list-style: none;
-  padding: 0;
+  padding: 0 1.25rem 1.5rem;
+  margin: 0;
 }
 .list li {
-  padding: 0.4rem 0;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #222;
+}
+.list li:last-child {
+  border-bottom: none;
+}
+.list a {
+  color: #ddd;
+}
+.list a:hover {
+  color: #e8c468;
 }
 .meta {
   color: #888;
@@ -234,5 +291,6 @@ header {
 }
 .empty {
   color: #666;
+  padding: 0.5rem 0;
 }
 </style>

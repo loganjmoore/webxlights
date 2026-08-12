@@ -20,6 +20,12 @@ const store = useSequencerStore();
 
 const rows = ref<GridRow[]>([]);
 const modelRecords = ref<ModelRecord[]>([]);
+// Which rows are shown on the grid - a workspace/view preference (like which panels are open),
+// not sequence data, so it lives in localStorage per sequence rather than in the sequence body:
+// hiding a row here never touches its effects, and doesn't need to round-trip through .xsq
+// import/export or collaborate across users the way real sequence content does.
+const hiddenRowKeys = ref<Set<string>>(new Set());
+const showModelsPanel = ref(false);
 const controllers = ref<ControllerRecord[]>([]);
 const exportError = ref<string | null>(null);
 const peaks = ref<PeakBucket[]>([]);
@@ -52,6 +58,45 @@ const pxPerMs = computed(() => {
 
 const selectedEffect = computed(() => (store.selectedEffectId ? store.findEffect(store.selectedEffectId) : null));
 
+function rowKey(row: GridRow): string {
+  return `${row.elementType}:${row.elementId}`;
+}
+function hiddenStorageKey(): string {
+  return `webxlights.sequencer.hiddenRows.${sequenceId.value}`;
+}
+function loadHiddenRows(): void {
+  try {
+    const raw = localStorage.getItem(hiddenStorageKey());
+    hiddenRowKeys.value = new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    hiddenRowKeys.value = new Set();
+  }
+}
+function saveHiddenRows(): void {
+  localStorage.setItem(hiddenStorageKey(), JSON.stringify([...hiddenRowKeys.value]));
+}
+function toggleRowVisible(row: GridRow): void {
+  const key = rowKey(row);
+  const next = new Set(hiddenRowKeys.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  hiddenRowKeys.value = next;
+  saveHiddenRows();
+}
+function showAllRows(): void {
+  hiddenRowKeys.value = new Set();
+  saveHiddenRows();
+}
+function hideAllRows(): void {
+  hiddenRowKeys.value = new Set(rows.value.map(rowKey));
+  saveHiddenRows();
+}
+const visibleRows = computed(() => rows.value.filter((r) => !hiddenRowKeys.value.has(rowKey(r))));
+function effectCountFor(row: GridRow): number {
+  const found = store.body.rows.find((r) => r.elementType === row.elementType && r.elementId === row.elementId);
+  return found?.effects.length ?? 0;
+}
+
 async function loadRows(): Promise<void> {
   // The sequencer needs a project's layout; fetch it via the sequence's project.
   const layouts = await api.listLayouts(Number(route.params.projectId));
@@ -67,6 +112,7 @@ async function loadRows(): Promise<void> {
   ];
   modelRecords.value = models;
   controllers.value = await api.listControllers(Number(route.params.projectId));
+  loadHiddenRows();
 }
 
 function onAudioFilePicked(e: Event): void {
@@ -140,6 +186,30 @@ function handlePlace(row: GridRow, startMs: number, endMs: number): void {
     params: defaultParamsFor(pendingEffectName.value),
   });
   pendingEffectName.value = null;
+}
+
+const EFFECT_DRAG_MIME = "application/x-webxlights-effect-name";
+function onEffectDragStart(e: DragEvent, name: string): void {
+  if (!e.dataTransfer) return;
+  e.dataTransfer.setData(EFFECT_DRAG_MIME, name);
+  e.dataTransfer.effectAllowed = "copy";
+}
+
+const DEFAULT_DROPPED_EFFECT_MS = 1000;
+
+// Native drag-and-drop from the palette (SequencerGrid.vue's onDrop), matching ModelPalette.vue's
+// convention on the Layout page - dropped at a default duration, same "place with defaults,
+// resize after" pattern as a dropped model. The existing arm+drag-on-grid gesture (which lets
+// you size the effect in one motion) is untouched and still the way to place a specific length.
+function handleDropEffect(row: GridRow, name: string, startMs: number): void {
+  const endMs = Math.min(startMs + DEFAULT_DROPPED_EFFECT_MS, store.sequence?.duration_ms ?? startMs + DEFAULT_DROPPED_EFFECT_MS);
+  store.addEffect(row.elementType, row.elementId, {
+    id: newEffectId(),
+    name,
+    startMs,
+    endMs: Math.max(endMs, startMs + 200),
+    params: defaultParamsFor(name),
+  });
 }
 
 function handleMove(effectId: string, startMs: number, endMs: number): void {
@@ -297,7 +367,7 @@ function onKeydown(e: KeyboardEvent): void {
     if (store.selectedEffectId) clipboard.value = store.copyEffect(store.selectedEffectId);
   } else if ((e.metaKey || e.ctrlKey) && e.key === "v") {
     if (clipboard.value) {
-      const row = rows.value[0];
+      const row = visibleRows.value[0]; // pasting onto a hidden row would look like paste did nothing
       if (row) store.pasteEffectAt(row.elementType, row.elementId, clipboard.value, playheadMs.value);
     }
   }
@@ -343,6 +413,9 @@ watch(sequenceId, async (id) => {
       <span v-if="exportError" class="export-error">{{ exportError }}</span>
       <button @click="snapshotNow" :disabled="!store.sequence">Snapshot</button>
       <button @click="toggleHistory" :disabled="!store.sequence">History</button>
+      <button :class="{ active: showModelsPanel }" @click="showModelsPanel = !showModelsPanel">
+        Models{{ hiddenRowKeys.size ? ` (${visibleRows.length}/${rows.length})` : "" }}
+      </button>
       <button v-if="FPP_CONNECT_ENABLED" @click="showFppPanel = !showFppPanel" :disabled="!store.sequence">FPP Connect</button>
       <span class="save-status">{{ store.saveStatus }}</span>
     </header>
@@ -385,6 +458,27 @@ watch(sequenceId, async (id) => {
       </ul>
     </div>
 
+    <div v-if="showModelsPanel" class="models-panel">
+      <div class="models-panel-head">
+        <h2>Rows shown on the grid</h2>
+        <div class="models-panel-actions">
+          <button @click="showAllRows" :disabled="hiddenRowKeys.size === 0">Show all</button>
+          <button @click="hideAllRows" :disabled="hiddenRowKeys.size === rows.length">Hide all</button>
+        </div>
+      </div>
+      <ul>
+        <li v-for="row in rows" :key="rowKey(row)">
+          <label>
+            <input type="checkbox" :checked="!hiddenRowKeys.has(rowKey(row))" @change="toggleRowVisible(row)" />
+            {{ row.name }}
+            <span class="row-type">{{ row.elementType }}</span>
+          </label>
+          <span class="row-effect-count">{{ effectCountFor(row) }} effect{{ effectCountFor(row) === 1 ? "" : "s" }}</span>
+        </li>
+        <li v-if="rows.length === 0" class="empty">No models or groups in this project's layout yet.</li>
+      </ul>
+    </div>
+
     <div v-if="!audioLoaded" class="reselect-audio">
       <p>Select the audio file for this sequence.</p>
       <input type="file" accept="audio/*" @change="onAudioFilePicked" />
@@ -401,16 +495,25 @@ watch(sequenceId, async (id) => {
     ></audio>
 
     <div class="palette">
-      <span class="palette-label">Effects:</span>
-      <button
-        v-for="name in Object.keys(EFFECT_SCHEMAS)"
-        :key="name"
-        :class="{ armed: pendingEffectName === name }"
-        @click="armEffect(name)"
-      >
-        {{ name }}
-      </button>
-      <span v-if="pendingEffectName" class="hint">Drag on a row to place "{{ pendingEffectName }}"</span>
+      <div class="palette-buttons">
+        <span class="palette-label">Effects:</span>
+        <button
+          v-for="name in Object.keys(EFFECT_SCHEMAS)"
+          :key="name"
+          draggable="true"
+          :class="{ armed: pendingEffectName === name }"
+          @click="armEffect(name)"
+          @dragstart="onEffectDragStart($event, name)"
+        >
+          {{ name }}
+        </button>
+      </div>
+      <!-- Always rendered (visibility, not v-if) so arming/disarming never changes the palette's
+           height - a v-if here used to reflow the whole grid below by ~90px every time an effect
+           got armed, moving the exact row a user was about to drag on out from under their cursor. -->
+      <p class="hint" :class="{ visible: !!pendingEffectName }">
+        Drag "{{ pendingEffectName }}" onto a row to place it, or drag its palette button directly onto the grid.
+      </p>
     </div>
 
     <div class="editor">
@@ -421,7 +524,7 @@ watch(sequenceId, async (id) => {
         <div class="h-scroll">
           <Waveform :peaks="peaks" :duration-ms="store.sequence?.duration_ms ?? 0" :px-per-ms="pxPerMs" :playhead-ms="playheadMs" @seek="seekTo" />
           <SequencerGrid
-            :rows="rows"
+            :rows="visibleRows"
             :body="store.body"
             :duration-ms="store.sequence?.duration_ms ?? 0"
             :px-per-ms="pxPerMs"
@@ -430,6 +533,7 @@ watch(sequenceId, async (id) => {
             :pending-effect-name="pendingEffectName"
             @select="handleSelect"
             @place="handlePlace"
+            @drop-effect="handleDropEffect"
             @move="handleMove"
             @seek="seekTo"
             @drag-start="handleDragStart"
@@ -460,18 +564,59 @@ watch(sequenceId, async (id) => {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  background: #0d0d11;
   color: #ddd;
+}
+.sequencer-page a {
+  color: #e8c468;
 }
 header {
   padding: 0.6rem 1rem;
   border-bottom: 1px solid #333;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  flex-wrap: wrap;
+  row-gap: 0.4rem;
+  column-gap: 1rem;
+  background: #16161c;
 }
 header h1 {
   font-size: 1rem;
   margin: 0;
+  color: #ddd;
+  font-weight: 600;
+}
+header button,
+.fpp-row button,
+.history-panel button,
+.conflict-banner button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e26;
+  color: #ddd;
+  cursor: pointer;
+}
+header button:hover:not(:disabled),
+.fpp-row button:hover:not(:disabled),
+.history-panel button:hover:not(:disabled),
+.conflict-banner button:hover {
+  border-color: #e8c468;
+  color: #e8c468;
+}
+header button:disabled {
+  color: #555;
+  cursor: default;
+}
+header select {
+  padding: 0.3rem 0.4rem;
+  font-size: 0.8rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e26;
+  color: #ddd;
 }
 .transport,
 .undo {
@@ -537,6 +682,70 @@ header h1 {
 .history-panel .empty {
   color: #666;
 }
+.models-panel {
+  padding: 0.6rem 1rem;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  font-size: 0.85rem;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.models-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+.models-panel-head h2 {
+  font-size: 0.85rem;
+  margin: 0;
+  color: #888;
+  font-weight: normal;
+}
+.models-panel-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.models-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.models-panel li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #262630;
+}
+.models-panel li:last-child {
+  border-bottom: none;
+}
+.models-panel label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.models-panel .row-type {
+  color: #666;
+  font-size: 0.7rem;
+}
+.models-panel .row-effect-count {
+  color: #666;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.models-panel .empty {
+  color: #666;
+}
+header button.active {
+  background: #2c2712;
+  border-color: #e8c468;
+  color: #e8c468;
+}
 .fpp-panel {
   padding: 0.6rem 1rem;
   background: #1a1a1a;
@@ -562,10 +771,29 @@ header h1 {
 }
 .palette {
   padding: 0.5rem 1rem;
+  border-bottom: 1px solid #333;
+}
+.palette-buttons {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.4rem;
-  border-bottom: 1px solid #333;
+}
+.palette-buttons button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e26;
+  color: #ddd;
+  cursor: grab;
+}
+.palette-buttons button:hover {
+  border-color: #e8c468;
+  color: #e8c468;
+}
+.palette-buttons button:active {
+  cursor: grabbing;
 }
 .palette-label {
   color: #888;
@@ -574,10 +802,20 @@ header h1 {
 .palette button.armed {
   background: #e8c468;
   color: #111;
+  border-color: #e8c468;
 }
+/* Reserved height always present (visibility, not display:none) - see the template comment:
+   arming an effect must never change the palette's height, or the grid below jumps under the
+   user's cursor mid-interaction. */
 .hint {
+  margin: 0.35rem 0 0;
   color: #e8c468;
   font-size: 0.8rem;
+  line-height: 1.3;
+  visibility: hidden;
+}
+.hint.visible {
+  visibility: visible;
 }
 .editor {
   flex: 1;

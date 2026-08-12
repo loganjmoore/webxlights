@@ -26,6 +26,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [effectId: string | null];
   place: [row: GridRow, startMs: number, endMs: number];
+  dropEffect: [row: GridRow, name: string, startMs: number];
   move: [effectId: string, startMs: number, endMs: number];
   seek: [ms: number];
   dragStart: [];
@@ -39,6 +40,11 @@ const HEADER_HEIGHT = 24; // pinned timing-track ruler, drawn every frame regard
 const VIEWPORT_HEIGHT = 420; // fixed canvas height - only visible rows are drawn (M9 perf budget: 100 rows / 5k effects)
 const EDGE_PX = 6;
 const SNAP_PX = 6;
+
+// Must match SequencerPage.vue's palette dragstart MIME type exactly - namespaced so this
+// grid ignores any other drag source that happens to land here (matches ModelPalette.vue's
+// same convention on the Layout page, for the same reason).
+const EFFECT_DRAG_MIME = "application/x-webxlights-effect-name";
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const scrollRef = ref<HTMLDivElement | null>(null);
@@ -326,6 +332,29 @@ function onPointerUp(e: PointerEvent): void {
   dragState = null;
 }
 
+// Native HTML5 drag-and-drop from the effect palette, matching ModelPalette.vue's convention
+// on the Layout page - the same "drag a labeled control onto a canvas" gesture in both places,
+// not two different interaction models for a conceptually identical action. This is additive:
+// the existing "arm, then click-drag on the grid to size it" gesture (xLights' own placement
+// model) still works unchanged - dropping just places at a default size, resizable after, the
+// same "place with defaults" convention M13's model palette already established.
+function onDragOver(e: DragEvent): void {
+  if (!e.dataTransfer?.types.includes(EFFECT_DRAG_MIME)) return;
+  e.preventDefault();
+}
+function onDrop(e: DragEvent): void {
+  const name = e.dataTransfer?.getData(EFFECT_DRAG_MIME);
+  if (!name) return;
+  const canvas = canvasRef.value;
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const hit = hitTest(x, y);
+  if (hit.kind !== "row-empty") return; // dropping onto an existing effect/ruler is a no-op, not an overwrite
+  emit("dropEffect", hit.row, name, snapMs(xToMs(x)));
+}
+
 onMounted(() => {
   draw();
   window.addEventListener("resize", draw);
@@ -347,6 +376,8 @@ watch(() => [props.rows, props.body, props.playheadMs, props.selectedEffectId, p
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
         @contextmenu="onContextMenu"
+        @dragover="onDragOver"
+        @drop="onDrop"
       ></canvas>
     </div>
   </div>

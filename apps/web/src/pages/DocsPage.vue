@@ -76,25 +76,47 @@ function paramTypeLabel(type: string): string {
 <style scoped>
 .docs {
   font-family: system-ui, sans-serif;
-  max-width: 720px;
-  margin: 2rem auto;
-  padding: 0 1rem 4rem;
+  min-height: 100vh;
+  background: #0d0d11;
+  color: #ccc;
+  line-height: 1.55;
 }
-header {
+.docs > header {
+  max-width: none;
   display: flex;
-  align-items: baseline;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.85rem 1.25rem;
+  background: #16161c;
+  border-bottom: 1px solid #333;
+  margin: 0 0 2rem;
+}
+.docs > header a {
+  color: #e8c468;
+  font-size: 0.9rem;
+}
+.docs > section {
+  max-width: 720px;
+  margin: 0 auto 2.5rem;
+  padding: 0 1.25rem;
 }
 h1 {
   margin: 0;
-}
-section {
-  margin-bottom: 2.5rem;
+  font-size: 1.1rem;
+  color: #fff;
+  font-weight: 600;
 }
 h2 {
-  border-bottom: 1px solid #ccc;
-  padding-bottom: 0.4rem;
+  color: #fff;
+  font-size: 1.15rem;
+  border-bottom: 1px solid #333;
+  padding-bottom: 0.5rem;
+}
+code {
+  background: #1e1e26;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.9em;
 }
 .effect {
   margin-bottom: 1.5rem;
@@ -102,6 +124,7 @@ h2 {
 .effect h3 {
   margin-bottom: 0.4rem;
   font-size: 1rem;
+  color: #e8c468;
 }
 table {
   width: 100%;
@@ -111,11 +134,11 @@ table {
 th,
 td {
   text-align: left;
-  padding: 0.3rem 0.5rem;
-  border-bottom: 1px solid #eee;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #262630;
 }
 th {
-  color: #666;
+  color: #888;
   font-weight: 600;
 }
 </style>
