@@ -104,6 +104,20 @@ function localSize(geo: ModelGeometry | null): { width: number; height: number }
   return { width: Math.max(half.halfW * 2, 1e-6), height: Math.max(half.halfH * 2, 1e-6) };
 }
 
+// The two readings of a boxed model's ScaleX/Y/Z. They differ by a factor of the model's node
+// count, which is why getting it wrong doesn't merely mis-size one prop - it makes a 32-wide
+// matrix thirty times the size of the roofline next to it and swamps the whole layout.
+//
+//   perNode   - ScaleX multiplies a render size measured in node units, so world width is
+//               ScaleX x nodesWide.
+//   worldSize - ScaleX *is* the model's world width; the shape is normalised into it.
+//
+// The xLights manual says only "ScaleXYZ determine the size of the model", which doesn't
+// separate the two, and the community documentation doesn't either. Rather than pick one on a
+// hunch and bake it in, both are implemented and `chooseBoxedScaleReading` picks per file from
+// evidence inside that file - see below.
+export type BoxedScaleReading = "perNode" | "worldSize";
+
 // `unitsPerLocal` is the renderer's local-unit-to-world factor (NODE_SPACING): a node offset of
 // 1 becomes this many world units on the canvas. Placement has to know it, because xLights'
 // X2/Y2 are a length in world units and our scale multiplies a local one.
@@ -112,6 +126,7 @@ export function screenFromAttrs(
   attrs: Record<string, string>,
   geo: ModelGeometry | null,
   unitsPerLocal: number,
+  boxedScale: BoxedScaleReading = "perNode",
 ): PlacedScreen {
   const system = placementSystemFor(displayAs);
   const x1 = num(attrs, "WorldPosX", 0);
@@ -119,29 +134,39 @@ export function screenFromAttrs(
   const z1 = num(attrs, "WorldPosZ", 0);
 
   if (system === "boxed") {
-    // xLights' ScaleX/Y/Z multiply the model's *render size*, which is measured in node units -
-    // so a real show's ScaleX values are tuned against node counts, and a model's world width
-    // is ScaleX x renderWidth. Our renderers draw a model at
-    // localExtent x screen.scale x unitsPerLocal, and (since units.ts) localExtent is also in
-    // node units, so matching xLights means:
+    const perLocal = unitsPerLocal || 1;
+    const rotate = num(attrs, "RotateZ", 0);
+
+    if (boxedScale === "worldSize") {
+      // ScaleX is the world width outright, so the shape is normalised into it: our renderers
+      // draw a model at localExtent x screen.scale x unitsPerLocal, and that has to come out
+      // equal to ScaleX.
+      const size = localSize(geo);
+      const scaleX = num(attrs, "ScaleX", 1) / (size.width * perLocal);
+      const scaleY = attrs.ScaleY !== undefined ? num(attrs, "ScaleY", 1) / (size.height * perLocal) : undefined;
+      // Depth has no local extent to divide by (a flat model's is zero), so it follows X - the
+      // same thing every other placement system does with Z.
+      const scaleZ = attrs.ScaleZ !== undefined ? num(attrs, "ScaleZ", 1) / (size.width * perLocal) : undefined;
+      return { x: x1, y: y1, z: z1, scale: scaleX, scaleY, scaleZ, rotate };
+    }
+
+    // perNode: ScaleX multiplies a render size measured in node units, so a show's ScaleX
+    // values are tuned against node counts and a model's world width is ScaleX x renderWidth.
+    // Our renderers draw a model at localExtent x screen.scale x unitsPerLocal, and (since
+    // units.ts) localExtent is also in node units, so matching xLights means:
     //
     //     localExtent x ourScale x unitsPerLocal  ==  ScaleX x localExtent
     //     => ourScale = ScaleX / unitsPerLocal
-    //
-    // Taking ScaleX at face value instead - what this did before - inflated every boxed model
-    // by exactly unitsPerLocal, which is why an imported show came out as a pile of
-    // overlapping props at wildly different sizes instead of a yard.
-    const perLocal = unitsPerLocal || 1;
     const scaleX = num(attrs, "ScaleX", 1) / perLocal;
     const scaleYRaw = attrs.ScaleY !== undefined ? num(attrs, "ScaleY", 1) / perLocal : undefined;
     const scaleZRaw = attrs.ScaleZ !== undefined ? num(attrs, "ScaleZ", 1) / perLocal : undefined;
-    return { x: x1, y: y1, z: z1, scale: scaleX, scaleY: scaleYRaw, scaleZ: scaleZRaw, rotate: num(attrs, "RotateZ", 0) };
+    return { x: x1, y: y1, z: z1, scale: scaleX, scaleY: scaleYRaw, scaleZ: scaleZRaw, rotate };
   }
 
   if (system === "polyLine") {
     const path = parsePolyPointPath(attrs, polyLineNodeCount(attrs));
     // No vertex list to place against - it's a plain straight run, so read it as boxed.
-    if (!path) return screenFromAttrs("__boxed__", attrs, geo, unitsPerLocal);
+    if (!path) return screenFromAttrs("__boxed__", attrs, geo, unitsPerLocal, boxedScale);
 
     // The geometry built from the same path already carries every angle in the run, so there's
     // nothing left for a rotation to do and the scale has to stay uniform: skewing one axis
@@ -172,7 +197,7 @@ export function screenFromAttrs(
   // A degenerate or missing endpoint vector (both offsets zero) can't say anything about size
   // or angle - fall back to the boxed reading rather than collapsing the model to nothing.
   if (length < 1e-9) {
-    return screenFromAttrs("__boxed__", attrs, geo, unitsPerLocal);
+    return screenFromAttrs("__boxed__", attrs, geo, unitsPerLocal, boxedScale);
   }
 
   const size = localSize(geo);
@@ -181,12 +206,23 @@ export function screenFromAttrs(
   const x = x1 + dx / 2;
   const y = y1 + dy / 2;
   const z = z1 + dz / 2;
-  const rotate = (Math.atan2(dy, dx) * 180) / Math.PI;
-  const scale = length / (size.width * unitsPerLocal);
+  // A run drawn right-to-left has an endpoint vector pointing backwards, and turning the model
+  // through that angle turns it over: an arch came out as a bowl, a candy cane hooked at the
+  // bottom. In xLights the third handle is what decides which side the arc rises to, and which
+  // end you happened to anchor from doesn't change it - you can drag either handle and it stays
+  // an arch. So a backwards vector is folded into a mirror along the model's own X axis rather
+  // than a half turn: same line, same endpoints, same node order along it, but "up" stays up.
+  const rawRotate = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const backwards = rawRotate > 90 || rawRotate <= -90;
+  const rotate = backwards ? rawRotate - Math.sign(rawRotate) * 180 : rawRotate;
+  const mirror = backwards ? -1 : 1;
+  const scale = (mirror * length) / (size.width * unitsPerLocal);
 
   if (system === "twoPoint") {
-    // Nothing in the XML constrains the perpendicular axis, so it stays proportional.
-    return { x, y, z, scale, scaleY: scale, scaleZ: scale, rotate };
+    // Nothing in the XML constrains the perpendicular axis, so it stays proportional. The
+    // mirror belongs to X alone - it's a direction, not a size - so Y takes the magnitude.
+    const perpendicular = Math.abs(scale);
+    return { x, y, z, scale, scaleY: perpendicular, scaleZ: perpendicular, rotate };
   }
 
   // Three point: Height is a multiple of the model's length (xLights' own convention - an arch
@@ -199,9 +235,13 @@ export function screenFromAttrs(
   // most of the way down the yard.
   const heightAttr = attrs.Height ?? attrs.height;
   if (heightAttr === undefined) {
-    return { x, y, z, scale, scaleY: scale, scaleZ: scale, rotate };
+    const perpendicular = Math.abs(scale);
+    return { x, y, z, scale, scaleY: perpendicular, scaleZ: perpendicular, rotate };
   }
+  // Height carries its own sign, and that sign is the one thing that should be able to turn the
+  // arc over - xLights' third handle can be dragged below the line. It is deliberately not
+  // combined with the mirror above: doing both is what flipped a right-to-left arch.
   const height = numAny(attrs, ["Height", "height"], 1);
   const scaleY = (length * height) / (size.height * unitsPerLocal);
-  return { x, y, z, scale, scaleY, scaleZ: scale, rotate };
+  return { x, y, z, scale, scaleY, scaleZ: Math.abs(scale), rotate };
 }

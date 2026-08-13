@@ -76,10 +76,17 @@ describe("xLights placement systems (SPEC ch11 §2.1)", () => {
     expect(renderedWidth(g, diagonal.scale)).toBeCloseTo(Math.hypot(100, 100), 4);
   });
 
-  it("a negative endpoint vector points the model the other way", () => {
-    const screen = screenFromAttrs("Single Line", { WorldPosX: "400", WorldPosY: "0", X2: "-300", Y2: "0" }, geo("Single Line"), SPACING);
+  it("a backwards endpoint vector mirrors the model instead of turning it over", () => {
+    // A half turn puts the model on the same line either way, so for a symmetric shape it looks
+    // fine - but it also flips the perpendicular axis, and that is what turned a right-to-left
+    // arch into a bowl. The mirror keeps the same line and the same node order along it.
+    const g = geo("Single Line");
+    const screen = screenFromAttrs("Single Line", { WorldPosX: "400", WorldPosY: "0", X2: "-300", Y2: "0" }, g, SPACING);
     expect(screen.x).toBeCloseTo(250);
-    expect(Math.abs(screen.rotate)).toBeCloseTo(180);
+    expect(screen.rotate).toBeCloseTo(0);
+    expect(screen.scale).toBeLessThan(0); // mirrored along its own X
+    expect(renderedWidth(g, screen.scale)).toBeCloseTo(300, 4);
+    expect(screen.scaleY).toBeGreaterThan(0); // ...but never along Y
   });
 
   it("Z is carried through the midpoint too", () => {
@@ -109,6 +116,43 @@ describe("xLights placement systems (SPEC ch11 §2.1)", () => {
     const g = geo("Icicles", { NumStrings: "1", NodesPerString: "60" });
     const screen = screenFromAttrs("Icicles", { WorldPosX: "0", WorldPosY: "0", X2: "250", Y2: "0" }, g, SPACING);
     expect(screen.scaleY).toBeCloseTo(screen.scale);
+  });
+
+  // Reported from a real show: "the arches look upside down". A run drawn right-to-left has a
+  // backwards endpoint vector, and turning the model through that angle turned the arc over.
+  it("an arch rises to the same side whichever end it was anchored from", () => {
+    const g = geo("Arches", { NumArches: "3", NodesPerArch: "20" });
+    const forward = screenFromAttrs("Arches", { WorldPosX: "200", WorldPosY: "120", X2: "200", Y2: "0", Height: "0.5" }, g, SPACING);
+    const backward = screenFromAttrs("Arches", { WorldPosX: "400", WorldPosY: "120", X2: "-200", Y2: "0", Height: "0.5" }, g, SPACING);
+
+    expect(backward.x).toBeCloseTo(forward.x); // same span of yard
+    expect(Math.sign(backward.scaleY!)).toBe(Math.sign(forward.scaleY!)); // and the same way up
+    expect(backward.scaleY).toBeCloseTo(forward.scaleY!);
+  });
+
+  it("a candy cane hooks the same way whichever end it was anchored from", () => {
+    const g = geo("Candy Canes", { NumCanes: "4", NodesPerCane: "18" });
+    const forward = screenFromAttrs("Candy Canes", { WorldPosX: "0", WorldPosY: "0", X2: "160", Y2: "0", Height: "0.6" }, g, SPACING);
+    const backward = screenFromAttrs("Candy Canes", { WorldPosX: "160", WorldPosY: "0", X2: "-160", Y2: "0", Height: "0.6" }, g, SPACING);
+    expect(Math.sign(backward.scaleY!)).toBe(Math.sign(forward.scaleY!));
+  });
+
+  it("still lets a negative Height turn the arc over, because that sign is deliberate", () => {
+    // xLights' third handle can be dragged below the line. That is the one thing that should
+    // flip the arc - the direction the run happens to be drawn in is not.
+    const g = geo("Arches", { NumArches: "3", NodesPerArch: "20" });
+    const up = screenFromAttrs("Arches", { WorldPosX: "0", WorldPosY: "0", X2: "200", Y2: "0", Height: "0.5" }, g, SPACING);
+    const down = screenFromAttrs("Arches", { WorldPosX: "0", WorldPosY: "0", X2: "200", Y2: "0", Height: "-0.5" }, g, SPACING);
+    expect(Math.sign(down.scaleY!)).toBe(-Math.sign(up.scaleY!));
+  });
+
+  it("a model running up-and-to-the-left keeps its angle rather than snapping flat", () => {
+    // The fold is only a half turn, so a diagonal stays diagonal - 135 degrees becomes -45 with
+    // a mirror, which is the same line.
+    const g = geo("Single Line");
+    const screen = screenFromAttrs("Single Line", { WorldPosX: "0", WorldPosY: "0", X2: "-100", Y2: "100" }, g, SPACING);
+    expect(screen.rotate).toBeCloseTo(-45);
+    expect(renderedWidth(g, screen.scale)).toBeCloseTo(Math.hypot(100, 100), 4);
   });
 
   it("a missing endpoint vector falls back to the boxed reading instead of collapsing", () => {
