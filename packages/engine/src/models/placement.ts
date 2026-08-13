@@ -1,5 +1,6 @@
 import type { ModelGeometry } from "./types";
-import { transformedHalfExtents } from "./transform";
+import { geometryCenter, transformedHalfExtents } from "./transform";
+import { parsePolyPointPath } from "./polyPoints";
 
 // xLights does NOT place every model the same way. Each model class picks a
 // ModelScreenLocation, and the three in play for the types webXLights renders store completely
@@ -10,6 +11,9 @@ import { transformedHalfExtents } from "./transform";
 //                other end. Length and angle come from that vector. ScaleX/RotateZ are not
 //                where the size and rotation live.
 //   Three point- Two point, plus Height (a multiple of the length) for the perpendicular axis.
+//   Poly point - An ordered list of vertices in PointData. The model's *shape* is in the
+//                placement attributes, so this one is read in models/polyPoints.ts and turned
+//                into geometry as well as a position.
 //
 // Import used to read WorldPos as a centre for everything and take ScaleX/RotateZ at face
 // value, which is right for Boxed models and wrong for every two/three-point one: an arch, a
@@ -17,7 +21,7 @@ import { transformedHalfExtents } from "./transform";
 // belongs, at the default size, unrotated. Those are exactly the props a real yard is mostly
 // made of, so an imported show looked scrambled even though each model's own geometry was
 // fine.
-export type PlacementSystem = "boxed" | "twoPoint" | "threePoint";
+export type PlacementSystem = "boxed" | "twoPoint" | "threePoint" | "polyLine";
 
 // Which system each DisplayAs uses, confirmed against the xLights manual's own Layout
 // descriptions rather than inferred from the shape alone: a Single Line is drawn
@@ -29,14 +33,16 @@ export type PlacementSystem = "boxed" | "twoPoint" | "threePoint";
 // treated as three-point too; the manual's Arches page documents its properties but not its
 // handles, so that one is inference rather than quotation.
 //
-// Poly Line's PolyPointScreenLocation (NumPoints/PointData) is a fourth system, still
-// unimplemented - it falls back to boxed rather than being silently mis-placed by two-point
-// math that doesn't describe it (see PARITY.md).
+// Poly Line's PolyPointScreenLocation is the fourth system. It is not two-point math with more
+// points: the vertex list is the model's shape, so it is read once (polyPoints.ts) and used
+// both to build the geometry and to place it. A Poly Line with no usable PointData - one drawn
+// in webXLights rather than imported - still falls back to the boxed reading of a straight run.
 const PLACEMENT_BY_TYPE: Record<string, PlacementSystem> = {
   "Single Line": "twoPoint",
   Arches: "threePoint",
   "Candy Canes": "threePoint",
   Icicles: "threePoint",
+  "Poly Line": "polyLine",
 };
 
 export function placementSystemFor(displayAs: string): PlacementSystem {
@@ -70,12 +76,22 @@ function numAny(attrs: Record<string, string>, keys: string[], fallback: number)
   return fallback;
 }
 
+// Must agree with fromAttrs.ts's own reading of NodesPerString, because the local path it
+// hands computePolyLine and the scale derived here are two halves of the same conversion.
+function polyLineNodeCount(attrs: Record<string, string>): number {
+  const parsed = parseInt(attrs.NodesPerString ?? "", 10);
+  return Number.isFinite(parsed) ? parsed : 50;
+}
+
 // Which system actually got used for a model, so an import can report it. A show full of
 // arches and rooflines that reports zero two/three-point models means the attribute names
 // above are wrong for that file - a visible signal instead of a silent fallback.
 export function appliedPlacementFor(displayAs: string, attrs: Record<string, string>): PlacementSystem {
   const system = placementSystemFor(displayAs);
   if (system === "boxed") return "boxed";
+  if (system === "polyLine") {
+    return parsePolyPointPath(attrs, polyLineNodeCount(attrs)) ? "polyLine" : "boxed";
+  }
   const dx = numAny(attrs, ["X2", "x2"], 0);
   const dy = numAny(attrs, ["Y2", "y2"], 0);
   return Math.hypot(dx, dy) < 1e-9 ? "boxed" : system;
@@ -120,6 +136,32 @@ export function screenFromAttrs(
     const scaleYRaw = attrs.ScaleY !== undefined ? num(attrs, "ScaleY", 1) / perLocal : undefined;
     const scaleZRaw = attrs.ScaleZ !== undefined ? num(attrs, "ScaleZ", 1) / perLocal : undefined;
     return { x: x1, y: y1, z: z1, scale: scaleX, scaleY: scaleYRaw, scaleZ: scaleZRaw, rotate: num(attrs, "RotateZ", 0) };
+  }
+
+  if (system === "polyLine") {
+    const path = parsePolyPointPath(attrs, polyLineNodeCount(attrs));
+    // No vertex list to place against - it's a plain straight run, so read it as boxed.
+    if (!path) return screenFromAttrs("__boxed__", attrs, geo, unitsPerLocal);
+
+    // The geometry built from the same path already carries every angle in the run, so there's
+    // nothing left for a rotation to do and the scale has to stay uniform: skewing one axis
+    // would bend the corners the vertices just described.
+    const scale = path.worldLength / (path.localLength * (unitsPerLocal || 1));
+    // Vertex 0 sits at WorldPos, but our renderers hang a model off the centre of its own
+    // bounding box - so the anchor is WorldPos plus the offset from vertex 0 to that centre.
+    // Z needs no such correction: transform.ts measures depth from the model's own axis rather
+    // than from a centre, so the anchor's Z is vertex 0's outright.
+    const center = geo ? geometryCenter(geo) : { x: 0, y: 0 };
+    const perWorld = path.worldLength / path.localLength;
+    return {
+      x: x1 + center.x * perWorld,
+      y: y1 + center.y * perWorld,
+      z: z1,
+      scale,
+      scaleY: scale,
+      scaleZ: scale,
+      rotate: 0,
+    };
   }
 
   const dx = numAny(attrs, ["X2", "x2"], 0);

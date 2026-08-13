@@ -29,9 +29,9 @@ describe("xLights placement systems (SPEC ch11 §2.1)", () => {
     expect(placementSystemFor("Icicles")).toBe("threePoint"); // three handles: start, end, shear
     expect(placementSystemFor("Arches")).toBe("threePoint");
     expect(placementSystemFor("Candy Canes")).toBe("threePoint");
-    // Poly Line's own PolyPointScreenLocation isn't implemented - it must fall back to boxed,
-    // not get silently run through the two-point math.
-    expect(placementSystemFor("Poly Line")).toBe("boxed");
+    // Poly Line has its own system: the vertex list is the shape, so it is neither boxed nor
+    // two-point math with extra points (see polyPoints.test.ts).
+    expect(placementSystemFor("Poly Line")).toBe("polyLine");
   });
 
   it("a boxed model keeps WorldPos as its centre and takes Scale/Rotate at face value", () => {

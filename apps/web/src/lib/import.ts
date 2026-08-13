@@ -23,7 +23,7 @@ export interface ImportSummary {
   // import banner because it's the one thing that says, against a real show, whether the
   // two/three-point path fired at all - a yard full of arches and rooflines reporting zero
   // two/three-point models means those attributes aren't named what we expect in that file.
-  placement: { boxed: number; twoPoint: number; threePoint: number };
+  placement: { boxed: number; twoPoint: number; threePoint: number; polyLine: number };
 }
 
 // SPEC ch11 §2.1. Which attributes mean what depends on the model's placement system, which
@@ -33,9 +33,11 @@ export interface ImportSummary {
 // vector. Reading every model as boxed (what this did before) put every arch, candy cane,
 // roofline and icicle run half its own length off-position, at default size and unrotated.
 //
-// Still not applied: Poly Line's PolyPointScreenLocation (NumPoints/PointData) and the
-// three-point Shear/Angle attributes - real remaining gaps, recorded in PARITY.md, not
-// silently mis-placed.
+// Poly Line goes further still: its PointData vertex list is the model's shape, so it decides
+// the geometry as well as the position.
+//
+// Still not applied: cPointData's curved Poly Line segments and the three-point Shear/Angle
+// attributes - real remaining gaps, recorded in PARITY.md, not silently mis-placed.
 
 export async function importRgbEffects(layoutId: number, xmlText: string): Promise<ImportSummary> {
   const parsed = parseRgbEffectsXml(xmlText);
@@ -53,11 +55,12 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
     order: i,
   }));
 
-  const placement = { boxed: 0, twoPoint: 0, threePoint: 0 };
+  const placement = { boxed: 0, twoPoint: 0, threePoint: 0, polyLine: 0 };
   for (const m of parsed.models) {
     const applied = appliedPlacementFor(m.displayAs, m.attrs);
     if (applied === "twoPoint") placement.twoPoint++;
     else if (applied === "threePoint") placement.threePoint++;
+    else if (applied === "polyLine") placement.polyLine++;
     else placement.boxed++;
   }
 

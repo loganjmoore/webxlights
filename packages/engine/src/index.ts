@@ -4,6 +4,7 @@ export * from "./models/types";
 export * from "./models/bounds";
 export * from "./models/transform";
 export * from "./models/placement";
+export * from "./models/polyPoints";
 export * from "./models/units";
 export * from "./models/matrix";
 export * from "./models/line";

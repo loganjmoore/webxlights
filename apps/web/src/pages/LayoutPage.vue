@@ -372,11 +372,11 @@ async function handleFileChange(e: Event): Promise<void> {
     // arches, candy canes, rooflines and icicles but reports 0 two/three-point models means
     // those attributes aren't named what the importer expects in this file - worth seeing
     // rather than silently falling back to the boxed reading.
-    const { boxed, twoPoint, threePoint } = summary.placement;
+    const { boxed, twoPoint, threePoint, polyLine } = summary.placement;
     importMessage.value =
       `Imported ${summary.imported} models` +
       (summary.groups ? `, ${summary.groups} groups` : "") +
-      ` — placement: ${boxed} boxed, ${twoPoint} two-point, ${threePoint} three-point` +
+      ` — placement: ${boxed} boxed, ${twoPoint} two-point, ${threePoint} three-point, ${polyLine} poly-line` +
       (summary.unsupported.length ? ` — unsupported types kept but not rendered: ${summary.unsupported.join(", ")}` : "");
   } catch (err) {
     importMessage.value = err instanceof Error ? `Import failed: ${err.message}` : "Import failed";

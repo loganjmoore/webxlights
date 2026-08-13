@@ -1,4 +1,10 @@
-import { appliedPlacementFor, computeGeometryFromAttrs, transformedHalfExtents, type ModelGeometry } from "@webxlights/engine";
+import {
+  appliedPlacementFor,
+  computeGeometryFromAttrs,
+  parsePolyPointPath,
+  transformedHalfExtents,
+  type ModelGeometry,
+} from "@webxlights/engine";
 import type { ModelRecord } from "./api";
 
 // A compact, pasteable dump of how every model in a layout was placed: the raw xLights
@@ -34,6 +40,9 @@ const PLACEMENT_ATTRS = [
   "Shear",
   "Angle",
   "NumPoints",
+  "PointData",
+  "pointData",
+  "cPointData",
 ];
 
 const NODE_SPACING = 4; // matches the canvases
@@ -53,7 +62,7 @@ function round(n: number | undefined, places = 2): string {
 }
 
 export function buildPlacementReport(models: ModelRecord[]): string {
-  const counts = { boxed: 0, twoPoint: 0, threePoint: 0 };
+  const counts = { boxed: 0, twoPoint: 0, threePoint: 0, polyLine: 0 };
   const byType = new Map<string, number>();
   const lines: string[] = [];
 
@@ -77,10 +86,15 @@ export function buildPlacementReport(models: ModelRecord[]): string {
       : null;
     const size = half ? `${round(half.halfW * 2 * NODE_SPACING)}x${round(half.halfH * 2 * NODE_SPACING)}` : "-";
 
+    // PointData's coordinate convention is read at parse time rather than known, so say which
+    // reading fired: a run of poly lines reporting the wrong one is the whole diagnosis.
+    const path = applied === "polyLine" ? parsePolyPointPath(model.raw_attrs, model.nodes_per_string ?? 50) : null;
+
     lines.push(
       [
         `${model.name} [${model.type}]`,
         `applied=${applied}`,
+        ...(path ? [`poly=${path.units} ${path.world.length}pts span=${round(path.worldLength)}`] : []),
         `pos=(${round(model.screen.x)},${round(model.screen.y)},${round(model.screen.z)})`,
         `scale=(${round(model.screen.scale, 4)},${round(model.screen.scaleY, 4)})`,
         `rot=${round(model.screen.rotate)}`,
@@ -94,7 +108,7 @@ export function buildPlacementReport(models: ModelRecord[]): string {
 
   return [
     `webXLights placement report`,
-    `models=${models.length} | applied: boxed=${counts.boxed} twoPoint=${counts.twoPoint} threePoint=${counts.threePoint}`,
+    `models=${models.length} | applied: boxed=${counts.boxed} twoPoint=${counts.twoPoint} threePoint=${counts.threePoint} polyLine=${counts.polyLine}`,
     `types: ${typeSummary}`,
     `(pos/scale/rot are what the importer derived; "raw" is what xLights wrote; rendered is the`,
     ` model's on-canvas size in world units)`,
