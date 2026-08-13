@@ -41,7 +41,9 @@ describe("xLights placement systems (SPEC ch11 §2.1)", () => {
       geo("Matrix"),
       SPACING,
     );
-    expect(screen).toMatchObject({ x: 100, y: 50, z: 7, scale: 2, scaleY: 3, rotate: 45 });
+    // ScaleX/Y are xLights' node-unit render multipliers; ours multiply local units that are
+    // then drawn at SPACING px each, so they divide through by it (see placement.ts).
+    expect(screen).toMatchObject({ x: 100, y: 50, z: 7, scale: 2 / SPACING, scaleY: 3 / SPACING, rotate: 45 });
   });
 
   it("a two-point model anchors on the midpoint of its endpoints, not on one end", () => {
@@ -106,7 +108,7 @@ describe("xLights placement systems (SPEC ch11 §2.1)", () => {
     // Real shows contain models saved before an endpoint was ever set; scale 0 would make them
     // invisible and un-clickable, which reads as "the import dropped it".
     const screen = screenFromAttrs("Single Line", { WorldPosX: "10", WorldPosY: "20", ScaleX: "3", RotateZ: "15" }, geo("Single Line"), SPACING);
-    expect(screen).toMatchObject({ x: 10, y: 20, scale: 3, rotate: 15 });
+    expect(screen).toMatchObject({ x: 10, y: 20, scale: 3 / SPACING, rotate: 15 });
   });
 
   it("an unsupported model with no geometry still gets a usable position", () => {
@@ -117,7 +119,50 @@ describe("xLights placement systems (SPEC ch11 §2.1)", () => {
 
   it("attributes that aren't present don't invent values", () => {
     const screen = screenFromAttrs("Matrix", {}, geo("Matrix"), SPACING);
-    expect(screen).toMatchObject({ x: 0, y: 0, z: 0, scale: 1, rotate: 0 });
+    expect(screen).toMatchObject({ x: 0, y: 0, z: 0, scale: 1 / SPACING, rotate: 0 });
     expect(screen.scaleY).toBeUndefined(); // absent ScaleY stays uniform, it doesn't become 1
+  });
+});
+
+// The invariant that was broken, and the reason an imported show came out as a pile of
+// overlapping props at wildly different sizes: xLights' ScaleX means the same thing whatever
+// the model type, so two models with the same ScaleX and the same node count must end up
+// roughly the same size on our canvas too. Ring types (Circle/Star/Wreath) used to normalize
+// to a fixed 2-unit shape, so they came out ~25x smaller than a matrix of the same node count.
+describe("cross-type size consistency", () => {
+  const NODES = 50;
+
+  function worldWidth(type: string, attrs: Record<string, string>): number {
+    const g = geo(type, attrs);
+    const screen = screenFromAttrs(type, { ScaleX: "1", ...attrs }, g, SPACING);
+    return transformedHalfExtents(g, { scale: screen.scale, scaleY: screen.scaleY, rotateDeg: 0 }).halfW * 2 * SPACING;
+  }
+
+  it("a ring model and a line model of the same node count land within a small factor", () => {
+    const line = worldWidth("Single Line", { NumStrings: "1", NodesPerString: String(NODES) });
+    const circle = worldWidth("Circle", { NumStrings: "1", NodesPerString: String(NODES) });
+    // a ring of N nodes is N/pi across vs a line's N - about a third, not a twenty-fifth
+    expect(circle).toBeGreaterThan(line / 5);
+    expect(circle).toBeLessThan(line * 5);
+  });
+
+  it("every supported type stays within one order of magnitude at the same ScaleX", () => {
+    const widths: Array<[string, number]> = [
+      ["Matrix", worldWidth("Matrix", { NumStrings: "50", NodesPerString: "50" })],
+      ["Single Line", worldWidth("Single Line", { NumStrings: "1", NodesPerString: "50" })],
+      ["Circle", worldWidth("Circle", { NumStrings: "1", NodesPerString: "50" })],
+      ["Star", worldWidth("Star", { NumStrings: "1", NodesPerString: "50" })],
+      ["Wreath", worldWidth("Wreath", { NumStrings: "1", NodesPerString: "50" })],
+      ["Tree", worldWidth("Tree", { NumStrings: "16", NodesPerString: "50" })],
+    ];
+    const values = widths.map(([, w]) => w);
+    const ratio = Math.max(...values) / Math.max(Math.min(...values), 1e-9);
+    expect(ratio, `sizes were ${widths.map(([t, w]) => `${t}=${w.toFixed(1)}`).join(", ")}`).toBeLessThan(10);
+  });
+
+  it("a ring's size tracks its node count", () => {
+    const small = worldWidth("Circle", { NumStrings: "1", NodesPerString: "20" });
+    const big = worldWidth("Circle", { NumStrings: "1", NodesPerString: "200" });
+    expect(big).toBeGreaterThan(small * 5);
   });
 });

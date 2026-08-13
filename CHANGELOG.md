@@ -1,5 +1,13 @@
 # Changelog
 
+## Import scale — one unit convention across model types
+
+Follow-up to the placement fix, from side-by-side screenshots of the same 120-model show in xLights and webXLights: positions were being read correctly but everything still came out at wildly different sizes, piled together.
+
+- **`packages/engine/src/models/units.ts`** states the convention every model type now follows: *one local unit == the spacing between two adjacent nodes*. Circle, Star and Wreath were placing nodes on a normalized unit circle, so a 50-node ring and a 500-node ring were both 2 units across while a 50-node line was 49 — a 25× mismatch against every other type. Ring radii are now `n / 2π`. Effect rendering is untouched (effects address nodes via `bufX/bufY`).
+- **Boxed scale** now divides through by the local-unit factor: xLights' `ScaleX` multiplies a node-unit render size, so importing it at face value inflated every boxed model 4× on top of the per-type inconsistency. `ScaleX`/`ScaleY` are applied independently, so a model that's wide and short in xLights stays wide and short here.
+- Rendering the same synthetic yard before and after: world bounding box **699×1840 → 514×460**, from one model sprawling over everything to each prop distinguishable. `test/yard-layout.test.ts` locks in the structural properties (yard-shaped bounds, no model covering >60%, distinct centres, two-point models spanning their declared run) and `test/placement.test.ts` adds the cross-type invariant directly.
+
 ## Editors full width + popped-out house preview
 
 - **The app shell no longer letterboxes the editors.** `#app` carried a fixed `width: 1126px; margin: 0 auto` from the Vite starter template, so the sequencer and the layout editor — full-screen tools — sat in a centred column with dead bands either side on any real monitor. Every page already sets its own inner max-width and padding, so the shell now just fills the viewport.

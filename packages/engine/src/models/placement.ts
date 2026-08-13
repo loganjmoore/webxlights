@@ -71,10 +71,23 @@ export function screenFromAttrs(
   const z1 = num(attrs, "WorldPosZ", 0);
 
   if (system === "boxed") {
-    const scale = num(attrs, "ScaleX", 1);
-    const scaleYRaw = attrs.ScaleY !== undefined ? num(attrs, "ScaleY", scale) : undefined;
-    const scaleZRaw = attrs.ScaleZ !== undefined ? num(attrs, "ScaleZ", scale) : undefined;
-    return { x: x1, y: y1, z: z1, scale, scaleY: scaleYRaw, scaleZ: scaleZRaw, rotate: num(attrs, "RotateZ", 0) };
+    // xLights' ScaleX/Y/Z multiply the model's *render size*, which is measured in node units -
+    // so a real show's ScaleX values are tuned against node counts, and a model's world width
+    // is ScaleX x renderWidth. Our renderers draw a model at
+    // localExtent x screen.scale x unitsPerLocal, and (since units.ts) localExtent is also in
+    // node units, so matching xLights means:
+    //
+    //     localExtent x ourScale x unitsPerLocal  ==  ScaleX x localExtent
+    //     => ourScale = ScaleX / unitsPerLocal
+    //
+    // Taking ScaleX at face value instead - what this did before - inflated every boxed model
+    // by exactly unitsPerLocal, which is why an imported show came out as a pile of
+    // overlapping props at wildly different sizes instead of a yard.
+    const perLocal = unitsPerLocal || 1;
+    const scaleX = num(attrs, "ScaleX", 1) / perLocal;
+    const scaleYRaw = attrs.ScaleY !== undefined ? num(attrs, "ScaleY", 1) / perLocal : undefined;
+    const scaleZRaw = attrs.ScaleZ !== undefined ? num(attrs, "ScaleZ", 1) / perLocal : undefined;
+    return { x: x1, y: y1, z: z1, scale: scaleX, scaleY: scaleYRaw, scaleZ: scaleZRaw, rotate: num(attrs, "RotateZ", 0) };
   }
 
   const dx = num(attrs, "X2", 0);
@@ -85,8 +98,7 @@ export function screenFromAttrs(
   // A degenerate or missing endpoint vector (both offsets zero) can't say anything about size
   // or angle - fall back to the boxed reading rather than collapsing the model to nothing.
   if (length < 1e-9) {
-    const scale = num(attrs, "ScaleX", 1);
-    return { x: x1, y: y1, z: z1, scale, rotate: num(attrs, "RotateZ", 0), scaleZ: undefined, scaleY: undefined };
+    return screenFromAttrs("__boxed__", attrs, geo, unitsPerLocal);
   }
 
   const size = localSize(geo);

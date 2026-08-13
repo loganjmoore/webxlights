@@ -1,4 +1,5 @@
 import type { ModelGeometry, ModelNode } from "./types";
+import { ringRadiusForNodeCount } from "./units";
 
 export interface WreathParams {
   strings: number;
@@ -13,8 +14,9 @@ export function computeWreath(params: WreathParams): ModelGeometry {
   const nodes: ModelNode[] = [];
   for (let n = 0; n < total; n++) {
     const angle = (n / total) * 2 * Math.PI;
-    const screenX = Math.cos(angle);
-    const screenY = Math.sin(angle);
+    // scaled into node units (units.ts), like every other model type
+    const screenX = Math.cos(angle) * ringRadiusForNodeCount(total);
+    const screenY = Math.sin(angle) * ringRadiusForNodeCount(total);
     nodes.push({ bufX: n, bufY: 0, screenX, screenY, string: 0, indexInString: n });
   }
   return { width: side, height: side, nodes };

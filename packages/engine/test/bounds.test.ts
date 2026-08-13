@@ -14,11 +14,19 @@ describe("geometryScreenBounds", () => {
     expect(b.maxY).toBe(2); // nodesPerString - 1
   });
 
-  it("is a unit circle regardless of node count, unrelated to buffer width/height", () => {
+  it("sizes a ring in node units, not as a normalized unit circle", () => {
+    // units.ts: one local unit == the spacing between adjacent nodes, for every model type.
+    // A ring of N nodes therefore has circumference N, so diameter N/pi - NOT a fixed 2, and
+    // not the buffer width either. xLights' ScaleX multiplies a node-unit render size, so a
+    // normalized ring imported ~25x too small next to a matrix of the same node count.
     const geo = computeCircle({ strings: 1, nodesPerString: 50 });
     const b = geometryScreenBounds(geo);
-    expect(b.maxX - b.minX).toBeCloseTo(2, 1); // diameter ~2 (radius 1), not 50
-    expect(b.maxY - b.minY).toBeCloseTo(2, 1);
+    expect(b.maxX - b.minX).toBeCloseTo(50 / Math.PI, 1);
+    expect(b.maxY - b.minY).toBeCloseTo(50 / Math.PI, 1);
+
+    // and it scales with node count, unlike the old fixed-radius version
+    const bigger = geometryScreenBounds(computeCircle({ strings: 1, nodesPerString: 200 }));
+    expect(bigger.maxX - bigger.minX).toBeCloseTo(200 / Math.PI, 1);
   });
 
   it("a Tree's real width comes from bottomTopRatio, not the strings count", () => {
