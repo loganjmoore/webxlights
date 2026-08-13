@@ -1,5 +1,13 @@
 import { writeFseqV2 } from "@webxlights/formats";
-import { computeGeometryFromAttrs, createRowSequencer, DEFAULT_PALETTE, hexToRgba, nodeColorsToChannelBytes, type ModelGeometry } from "@webxlights/engine";
+import {
+  computeGeometryFromAttrs,
+  createRowSequencer,
+  DEFAULT_PALETTE,
+  hexToRgba,
+  nodeColorsToChannelBytes,
+  type AudioSeries,
+  type ModelGeometry,
+} from "@webxlights/engine";
 import type { ControllerRecord, ModelRecord, SequenceBody, SequenceRecord } from "./api";
 
 const SEED = 12345;
@@ -33,6 +41,9 @@ export function exportSequenceToFseq(
   body: SequenceBody,
   sequence: SequenceRecord,
   controllers: ControllerRecord[] = [],
+  // The analysed track, so an audio-reactive effect exports the same frames the preview shows.
+  // Omitted (no audio loaded) those effects render as "no audio", not as silence.
+  audio?: AudioSeries,
 ): Uint8Array {
   const frameMs = sequence.frame_ms;
   const frameCount = Math.max(1, Math.ceil(sequence.duration_ms / frameMs));
@@ -76,7 +87,7 @@ export function exportSequenceToFseq(
       .filter((r) => r.elementType === "model" && r.elementId === model.id)
       .flatMap((r) => r.effects)
       .map((e) => ({ ...e, palette: e.palette?.map(hexToRgba) }));
-    return createRowSequencer({ geometry: geo, effects: rowEffects }, frameMs, SEED, DEFAULT_PALETTE);
+    return createRowSequencer({ geometry: geo, effects: rowEffects }, frameMs, SEED, DEFAULT_PALETTE, audio);
   });
 
   const frames: Uint8Array[] = [];

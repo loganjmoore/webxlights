@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 import { useRoute } from "vue-router";
+import type { AudioSeries } from "@webxlights/engine";
 import { api, type ModelRecord, type SequenceBody } from "../lib/api";
 import { openPreviewChannel, type PreviewMessage } from "../lib/previewChannel";
 import HousePreview from "../components/HousePreview.vue";
@@ -21,6 +22,12 @@ const name = ref("");
 const playheadMs = ref(0);
 const playing = ref(false);
 const audioLoaded = ref(false);
+// Mirrored from the sequencer tab, which does the analysis. This window can't compute it
+// itself - it never holds the audio file - and audio-reactive effects would otherwise render
+// here as "no audio" while the same frame lights up in the other window.
+// shallowRef for the same reason the sequencer uses one: the series is thousands of frames and
+// nothing here reads into it reactively (see SequencerPage).
+const audio = shallowRef<AudioSeries | null>(null);
 const connected = ref(false);
 
 let channel: BroadcastChannel | null = null;
@@ -74,6 +81,8 @@ function onMessage(e: MessageEvent<PreviewMessage>): void {
     connected.value = true;
     playheadMs.value = message.playheadMs;
     playing.value = message.playing;
+  } else if (message.type === "audio") {
+    audio.value = message.audio;
   }
 }
 
@@ -116,7 +125,7 @@ onBeforeUnmount(() => {
     </header>
 
     <div class="stage">
-      <HousePreview :models="models" :body="body" :playhead-ms="playheadMs" :frame-ms="frameMs" />
+      <HousePreview :models="models" :body="body" :playhead-ms="playheadMs" :frame-ms="frameMs" :audio="audio ?? undefined" />
     </div>
 
     <p v-if="!connected" class="hint">

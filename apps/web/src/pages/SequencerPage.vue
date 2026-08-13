@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { EFFECT_SCHEMAS, defaultParamsFor, type BlendMode } from "@webxlights/engine";
+import { EFFECT_SCHEMAS, defaultParamsFor, type AudioSeries, type BlendMode, type TransitionSpec } from "@webxlights/engine";
 import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
+import { analyzeAudioBuffer } from "../lib/audioAnalysis";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
@@ -35,6 +36,16 @@ const peaks = ref<PeakBucket[]>([]);
 const audioEl = ref<HTMLAudioElement | null>(null);
 const audioUrl = ref<string | null>(null);
 const audioLoaded = ref(false);
+// The analysed track that audio-reactive effects (VU Meter) render against. Analysis is offline
+// and happens once per load, not per frame: the preview, the popped-out preview and the .fseq
+// export all read the same precomputed numbers, so the same effect renders identically in all
+// three (SPEC ch10/16 determinism - a live AnalyserNode would give a different answer each run).
+// shallowRef, not ref: a plain ref would wrap thousands of analysed frames in reactive proxies,
+// and a proxy is not structured-cloneable - postMessage to the popped-out preview throws
+// "could not be cloned" on it. Nothing reads inside the series reactively anyway; it is
+// replaced wholesale when a track is analysed.
+const audioSeries = shallowRef<AudioSeries | null>(null);
+const analyzingAudio = ref(false);
 const playheadMs = ref(0);
 const playing = ref(false);
 const pendingEffectName = ref<string | null>(null);
@@ -148,6 +159,24 @@ async function loadAudioFile(file: File): Promise<void> {
   peaks.value = computePeaks(buffer, 800);
   audioUrl.value = URL.createObjectURL(file);
   audioLoaded.value = true;
+  startAudioAnalysis(buffer);
+}
+
+// One FFT per frame over the whole track is a second or so of straight-line work on a long
+// song. Deferring it past a paint means the waveform and transport are usable immediately and
+// the analysis lands a moment later, instead of the tab freezing on load with nothing drawn.
+function startAudioAnalysis(buffer: AudioBuffer): void {
+  analyzingAudio.value = true;
+  audioSeries.value = null;
+  const frameMs = store.sequence?.frame_ms ?? 50;
+  setTimeout(() => {
+    try {
+      audioSeries.value = analyzeAudioBuffer(buffer, frameMs);
+      previewChannel?.postMessage(previewAudioMessage());
+    } finally {
+      analyzingAudio.value = false;
+    }
+  }, 0);
 }
 
 // Fetches the copy SequenceController@audio serves back and feeds it through the same
@@ -302,7 +331,7 @@ function handlePaletteUpdate(palette: string[]): void {
 function handleBlendUpdate(patch: { blendMode?: BlendMode; mix?: number }): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, patch);
 }
-function handleTransitionUpdate(transition: { inDurationMs?: number; outDurationMs?: number }): void {
+function handleTransitionUpdate(transition: TransitionSpec): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { transition });
 }
 
@@ -315,7 +344,7 @@ function exportFseq(): void {
   if (!store.sequence) return;
   exportError.value = null;
   try {
-    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, controllers.value);
+    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, controllers.value, audioSeries.value ?? undefined);
     downloadFseq(bytes, store.sequence.name);
   } catch (err) {
     exportError.value = err instanceof Error ? err.message : "Export failed";
@@ -359,7 +388,7 @@ async function fppUpload(): Promise<void> {
   fppBusy.value = true;
   fppStatus.value = "Uploading...";
   try {
-    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, controllers.value);
+    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, controllers.value, audioSeries.value ?? undefined);
     const filename = `${store.sequence.name}.fseq`;
     await uploadFseqToFpp(fppHost.value.trim(), filename, bytes);
     fppStatus.value = `Uploaded ${filename} to ${fppSystemInfo.value.HostName}.`;
@@ -391,6 +420,10 @@ function previewSnapshot(): PreviewMessage {
   };
 }
 
+function previewAudioMessage(): PreviewMessage {
+  return { type: "audio", audio: audioSeries.value };
+}
+
 function broadcastTransport(): void {
   previewChannel?.postMessage({ type: "transport", playheadMs: playheadMs.value, playing: playing.value });
 }
@@ -399,6 +432,7 @@ function onPreviewMessage(e: MessageEvent<PreviewMessage>): void {
   const message = e.data;
   if (message.type === "hello") {
     previewChannel?.postMessage(previewSnapshot());
+    previewChannel?.postMessage(previewAudioMessage());
     broadcastTransport();
     return;
   }
@@ -462,6 +496,8 @@ onBeforeUnmount(() => {
 watch(sequenceId, async (id) => {
   await store.load(id);
   audioLoaded.value = false;
+  audioSeries.value = null;
+  analyzingAudio.value = false;
 });
 </script>
 
@@ -488,6 +524,7 @@ watch(sequenceId, async (id) => {
       <button @click="openPreviewWindow" :disabled="!store.sequence" title="Open the house preview in its own window">
         Pop out preview
       </button>
+      <span v-if="analyzingAudio" class="analyzing">Analyzing audio…</span>
       <span v-if="exportError" class="export-error">{{ exportError }}</span>
       <button @click="snapshotNow" :disabled="!store.sequence">Snapshot</button>
       <button @click="toggleHistory" :disabled="!store.sequence">History</button>
@@ -620,7 +657,13 @@ watch(sequenceId, async (id) => {
     <div class="editor">
       <div class="timeline">
         <div class="preview-wrap">
-          <HousePreview :models="modelRecords" :body="store.body" :playhead-ms="playheadMs" :frame-ms="store.sequence?.frame_ms ?? 50" />
+          <HousePreview
+            :models="modelRecords"
+            :body="store.body"
+            :playhead-ms="playheadMs"
+            :frame-ms="store.sequence?.frame_ms ?? 50"
+            :audio="audioSeries ?? undefined"
+          />
         </div>
         <div class="h-scroll">
           <Waveform :peaks="peaks" :duration-ms="store.sequence?.duration_ms ?? 0" :px-per-ms="pxPerMs" :playhead-ms="playheadMs" @seek="seekTo" />
@@ -742,6 +785,10 @@ header select {
 }
 .export-error {
   color: #e57373;
+  font-size: 0.8rem;
+}
+.analyzing {
+  color: #e8c468;
   font-size: 0.8rem;
 }
 .reselect-audio {

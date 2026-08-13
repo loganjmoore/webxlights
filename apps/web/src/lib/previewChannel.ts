@@ -1,3 +1,4 @@
+import type { AudioSeries } from "@webxlights/engine";
 import type { ModelRecord, SequenceBody } from "./api";
 
 // Links the sequencer to a popped-out preview window (real xLights has the same idea: the
@@ -39,7 +40,16 @@ export interface PreviewCommand {
   ms?: number;
 }
 
-export type PreviewMessage = PreviewSnapshot | PreviewTransport | PreviewHello | PreviewCommand;
+// The analysed track, so audio-reactive effects light up in the popped-out window too. Sent on
+// its own rather than inside the snapshot: a snapshot goes out on every edit, and a series is
+// thousands of frames - re-cloning it each time a slider moves would be the most expensive
+// thing either window does. This one goes out when a track is analysed, and on hello.
+export interface PreviewAudio {
+  type: "audio";
+  audio: AudioSeries | null;
+}
+
+export type PreviewMessage = PreviewSnapshot | PreviewTransport | PreviewHello | PreviewCommand | PreviewAudio;
 
 export function previewChannelName(sequenceId: number): string {
   return `webxlights-preview-${sequenceId}`;

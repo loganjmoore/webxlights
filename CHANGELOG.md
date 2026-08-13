@@ -1,5 +1,14 @@
 # Changelog
 
+## Value curves, transitions and audio reactivity reach the UI
+
+Three features that were fully implemented in the engine, tested, and documented on the Docs page — but that nothing in the app could actually reach.
+
+- **Value curves.** `ValueCurveEditor.vue` existed and was imported by no one; the props panel showed a "VC" badge captioned *"stubbed until M6"*. The editor is now mounted on every VC-flagged numeric param of every effect: all 16 curve types, min/max, cycles and phase for the periodic ones, reverse, six presets, and a draggable point editor for Custom. Turning a curve on seeds it from the param's current value, so enabling one never jumps the effect to an unrelated range; turning it off collapses back to a single number. While a curve is on, the flat slider is hidden — leaving both would show a number that isn't what the effect is rendering.
+- **Transitions.** The panel offered "Fade In (ms)" and "Fade Out (ms)" and nothing else, so 15 of the 16 implemented transition types were unreachable. There is now a Transitions section with an in and out type picker, duration, reverse, and a pattern-density knob that appears only for Blinds, Slide Bars and Checkerboard — the three types that read one.
+- **Audio reactivity.** `analyzeAudioBuffer()` existed and was called from nowhere, so the VU Meter rendered against no audio in both previews and in the export. The sequencer now analyses a track once when it loads and hands the same series to the house preview, the popped-out preview window and the `.fseq` export, so the effect renders identically in all three (SPEC ch10/16 determinism). Analysis is deferred past a paint and reports "Analyzing audio…" rather than freezing the tab on load, and the series is broadcast to the preview window on its own message rather than inside the snapshot that goes out on every edit.
+
+
 ## "Copy placement report" on the Layout page
 
 Placement can't be verified from inside the app. The maths is unit-tested and the placement systems are confirmed against the xLights manual, but whether a *real* show lands where it does in xLights can only be checked against that show — and the file that would settle it lives on the user's machine.
