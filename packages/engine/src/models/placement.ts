@@ -58,6 +58,29 @@ function num(attrs: Record<string, string>, key: string, fallback: number): numb
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+// The endpoint offsets are the one set of attribute names not confirmed against a real file,
+// and xLights' own XML is not consistently capitalised across attributes. Accepting the
+// plausible spellings costs nothing and avoids the whole two/three-point path silently never
+// firing over a capital letter - which would look exactly like "the fix didn't work".
+function numAny(attrs: Record<string, string>, keys: string[], fallback: number): number {
+  for (const key of keys) {
+    const parsed = parseFloat(attrs[key] ?? "");
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+// Which system actually got used for a model, so an import can report it. A show full of
+// arches and rooflines that reports zero two/three-point models means the attribute names
+// above are wrong for that file - a visible signal instead of a silent fallback.
+export function appliedPlacementFor(displayAs: string, attrs: Record<string, string>): PlacementSystem {
+  const system = placementSystemFor(displayAs);
+  if (system === "boxed") return "boxed";
+  const dx = numAny(attrs, ["X2", "x2"], 0);
+  const dy = numAny(attrs, ["Y2", "y2"], 0);
+  return Math.hypot(dx, dy) < 1e-9 ? "boxed" : system;
+}
+
 // Local (unscaled, unrotated) size of a shape, in the same units node.screenX/Y are in.
 function localSize(geo: ModelGeometry | null): { width: number; height: number } {
   if (!geo || geo.nodes.length === 0) return { width: 1, height: 1 };
@@ -99,9 +122,9 @@ export function screenFromAttrs(
     return { x: x1, y: y1, z: z1, scale: scaleX, scaleY: scaleYRaw, scaleZ: scaleZRaw, rotate: num(attrs, "RotateZ", 0) };
   }
 
-  const dx = num(attrs, "X2", 0);
-  const dy = num(attrs, "Y2", 0);
-  const dz = num(attrs, "Z2", 0);
+  const dx = numAny(attrs, ["X2", "x2"], 0);
+  const dy = numAny(attrs, ["Y2", "y2"], 0);
+  const dz = numAny(attrs, ["Z2", "z2"], 0);
   const length = Math.hypot(dx, dy);
 
   // A degenerate or missing endpoint vector (both offsets zero) can't say anything about size
@@ -132,10 +155,11 @@ export function screenFromAttrs(
   // height == length. Defaulting Height to 1 is badly wrong for the props that have it: a run
   // of icicles is a fraction as deep as it is wide, and squaring it up would drop the drops
   // most of the way down the yard.
-  if (attrs.Height === undefined) {
+  const heightAttr = attrs.Height ?? attrs.height;
+  if (heightAttr === undefined) {
     return { x, y, z, scale, scaleY: scale, scaleZ: scale, rotate };
   }
-  const height = num(attrs, "Height", 1);
+  const height = numAny(attrs, ["Height", "height"], 1);
   const scaleY = (length * height) / (size.height * unitsPerLocal);
   return { x, y, z, scale, scaleY, scaleZ: scale, rotate };
 }

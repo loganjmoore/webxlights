@@ -348,8 +348,16 @@ async function handleFileChange(e: Event): Promise<void> {
       api.listModelGroups(layout.value.id),
       api.listViewObjects(layout.value.id),
     ]);
-    importMessage.value = `Imported ${summary.imported} models` +
+    // Placement counts are shown because they're the one number that says whether xLights'
+    // two/three-point placement actually applied to this show. A yard that's visibly full of
+    // arches, candy canes, rooflines and icicles but reports 0 two/three-point models means
+    // those attributes aren't named what the importer expects in this file - worth seeing
+    // rather than silently falling back to the boxed reading.
+    const { boxed, twoPoint, threePoint } = summary.placement;
+    importMessage.value =
+      `Imported ${summary.imported} models` +
       (summary.groups ? `, ${summary.groups} groups` : "") +
+      ` — placement: ${boxed} boxed, ${twoPoint} two-point, ${threePoint} three-point` +
       (summary.unsupported.length ? ` — unsupported types kept but not rendered: ${summary.unsupported.join(", ")}` : "");
   } catch (err) {
     importMessage.value = err instanceof Error ? `Import failed: ${err.message}` : "Import failed";

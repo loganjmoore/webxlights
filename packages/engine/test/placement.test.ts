@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placementSystemFor, screenFromAttrs } from "../src/models/placement";
+import { appliedPlacementFor, placementSystemFor, screenFromAttrs } from "../src/models/placement";
 import { computeGeometryFromAttrs } from "../src/models/fromAttrs";
 import type { ModelGeometry } from "../src/models/types";
 import { transformedHalfExtents } from "../src/models/transform";
@@ -171,5 +171,32 @@ describe("cross-type size consistency", () => {
     const small = worldWidth("Circle", { NumStrings: "1", NodesPerString: "20" });
     const big = worldWidth("Circle", { NumStrings: "1", NodesPerString: "200" });
     expect(big).toBeGreaterThan(small * 5);
+  });
+});
+
+// The endpoint attribute names are the one part of this not confirmed against a real xLights
+// file. These make the uncertainty visible instead of silent: spelling variants are accepted,
+// and appliedPlacementFor reports what a model actually resolved to so an import can say
+// "0 two-point models" when the guess is wrong for a given show.
+describe("placement reporting and attribute tolerance", () => {
+  it("reports the system a model actually resolved to", () => {
+    expect(appliedPlacementFor("Matrix", { WorldPosX: "1" })).toBe("boxed");
+    expect(appliedPlacementFor("Single Line", { X2: "100", Y2: "0" })).toBe("twoPoint");
+    expect(appliedPlacementFor("Arches", { X2: "100", Y2: "0" })).toBe("threePoint");
+  });
+
+  it("reports boxed when a two/three-point model has no usable endpoint vector", () => {
+    // This is the signal: a show full of arches reporting "boxed" means the endpoint
+    // attributes aren't named what we expect in that file.
+    expect(appliedPlacementFor("Arches", { WorldPosX: "10", ScaleX: "2" })).toBe("boxed");
+    expect(appliedPlacementFor("Single Line", { X2: "0", Y2: "0" })).toBe("boxed");
+  });
+
+  it("accepts lowercase endpoint attributes as well as capitalised ones", () => {
+    const upper = screenFromAttrs("Single Line", { WorldPosX: "0", WorldPosY: "0", X2: "300", Y2: "0" }, geo("Single Line"), SPACING);
+    const lower = screenFromAttrs("Single Line", { WorldPosX: "0", WorldPosY: "0", x2: "300", y2: "0" }, geo("Single Line"), SPACING);
+    expect(lower.x).toBeCloseTo(upper.x);
+    expect(lower.scale).toBeCloseTo(upper.scale);
+    expect(appliedPlacementFor("Single Line", { x2: "300", y2: "0" })).toBe("twoPoint");
   });
 });

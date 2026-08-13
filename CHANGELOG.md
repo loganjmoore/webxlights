@@ -1,5 +1,12 @@
 # Changelog
 
+## Import reports which placement system it used
+
+The one assumption in the placement work that couldn't be checked without a real xLights file is the *names* of the endpoint attributes (`X2`/`Y2`/`Z2`). If they're wrong for a given show, the two/three-point path silently falls back to the boxed reading — safe, but invisible.
+
+- **Spelling variants accepted**: `X2`/`x2`, `Y2`/`y2`, `Z2`/`z2`, `Height`/`height`. xLights' XML isn't consistently capitalised, and losing the feature to a capital letter isn't a trade worth making.
+- **The import banner now reports the breakdown** — "Imported 120 models, 11 groups — placement: 94 boxed, 18 two-point, 8 three-point". A show visibly full of arches and rooflines that reports 0 two-point and 0 three-point means the attribute names are wrong for that file, which is now one glance away instead of indistinguishable from "the fix didn't work".
+
 ## Placement corrected against the xLights manual
 
 Checking the placement systems against the manual's own Layout documentation, rather than against inference from each prop's shape, found one wrong mapping and one bad default.

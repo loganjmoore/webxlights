@@ -798,6 +798,31 @@ remain an inference - the manual documents their properties (# Arches, Arc Degre
 but not their handles - and they're treated as three-point on the grounds that they're the same
 shape of prop as Candy Canes.
 
+## Making the import say which placement system it used
+
+The placement work has one assumption that couldn't be checked without a real xLights file:
+the *names* of the endpoint attributes (`X2`/`Y2`/`Z2`). Everything else is confirmed - by the
+manual for the placement systems themselves, by unit tests for the maths - but if those names
+are wrong for a given show, `screenFromAttrs` finds a zero-length vector, falls back to the
+boxed reading, and the whole two/three-point path silently never runs. That failure mode is
+safe (it degrades to the old behaviour rather than misplacing anything) but invisible, which is
+the worst property for something that's meant to have fixed a visible bug.
+
+Two changes make it visible instead:
+
+- **Spelling variants are accepted.** `X2`/`x2`, `Y2`/`y2`, `Z2`/`z2`, `Height`/`height`.
+  xLights' XML isn't consistently capitalised across attributes, and losing the whole feature
+  over a capital letter isn't a trade worth making.
+- **The import reports what it applied.** `appliedPlacementFor()` returns the system a model
+  actually resolved to, and the import banner now reads e.g. "Imported 120 models, 11 groups -
+  placement: 94 boxed, 18 two-point, 8 three-point". A yard that visibly contains arches,
+  candy canes, rooflines and icicles but reports **0 two-point, 0 three-point** means the
+  attribute names are wrong for that file - one glance at the banner says so, where before it
+  would just have looked like the fix hadn't worked.
+
+This is the closest thing to verification available without the show file itself: the next real
+import answers the open question in its own status line.
+
 ## Bugs found only by actually running the UI (not caught by typecheck/lint)
 
 - **`overflow-y: auto` with no explicit `overflow-x` silently computes `overflow-x` to `auto` too**: `SequencerGrid.vue`'s `.grid-scroll-viewport` needed vertical scroll only (the canvas handles its own horizontal sizing, scrolled by the page's outer `.h-scroll` wrapper) — but per the CSS Overflow spec, when one of `overflow-x`/`overflow-y` is non-`visible` and the other is left at the `visible` default, the `visible` one computes to `auto` too. This turned `.grid-scroll-viewport` into a second, narrower horizontal scroll container that silently clipped the widened (post-M10) canvas to its own ~880px box, before the outer wrapper's scroll ever got a chance to reveal the rest — invisible in code review (the CSS reads correctly as "vertical scroll only"), only caught by actually zooming in and scrolling in a live browser and finding effects that `getImageData` proved were drawn but weren't on screen. Fixed with an explicit `overflow-x: visible`. General lesson: never set only one of `overflow-x`/`overflow-y` without deciding what the other one should compute to.
