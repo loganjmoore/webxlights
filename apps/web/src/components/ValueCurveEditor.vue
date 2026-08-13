@@ -278,6 +278,11 @@ onBeforeUnmount(() => {
   padding: 0 4px;
   font-size: 0.6rem;
   cursor: pointer;
+  /* `display: contents` puts this straight into the props panel's param grid, so the off-state
+     button needs its own row rather than landing in the slider's value column. The on-state
+     one lives inside .vc-head, which is a flex row, so it ignores this. */
+  grid-column: 1 / -1;
+  justify-self: start;
 }
 .vc-toggle.on {
   background: #e8c468;

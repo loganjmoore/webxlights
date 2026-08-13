@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { DEFAULT_PALETTE_HEX, EFFECT_SCHEMAS, type BlendMode } from "@webxlights/engine";
+import {
+  DEFAULT_PALETTE_HEX,
+  EFFECT_SCHEMAS,
+  PATTERNED_TRANSITION_TYPES,
+  TRANSITION_TYPES,
+  isValueCurve,
+  type BlendMode,
+  type EffectParamSpec,
+  type TransitionSpec,
+  type TransitionType,
+} from "@webxlights/engine";
 import type { EffectParamValue, SequenceEffect } from "../lib/api";
+import ValueCurveEditor from "./ValueCurveEditor.vue";
 
 const MAX_COLORS = 6; // matches real xLights' Color tab swatch count
 
@@ -24,7 +35,7 @@ const emit = defineEmits<{
   update: [params: Record<string, EffectParamValue>];
   updatePalette: [palette: string[]];
   updateBlend: [patch: { blendMode?: BlendMode; mix?: number }];
-  updateTransition: [transition: { inDurationMs?: number; outDurationMs?: number }];
+  updateTransition: [transition: TransitionSpec];
 }>();
 
 const schema = computed(() => (props.effect ? EFFECT_SCHEMAS[props.effect.name] : undefined));
@@ -54,11 +65,33 @@ function setBlendMode(mode: string): void {
 function setMix(pct: string): void {
   emit("updateBlend", { mix: Number(pct) / 100 });
 }
-function setTransition(field: "inDurationMs" | "outDurationMs", ms: string): void {
+// The whole TransitionSpec is emitted every time: SequencerPage replaces `transition` wholesale
+// (like every other effect patch), so sending only the changed key would drop the rest.
+function patchTransition(changes: Partial<TransitionSpec>): void {
   if (!props.effect) return;
+  emit("updateTransition", { ...props.effect.transition, ...changes });
+}
+function setTransitionMs(field: "inDurationMs" | "outDurationMs", ms: string): void {
   const value = Number(ms);
   if (Number.isNaN(value)) return;
-  emit("updateTransition", { ...props.effect.transition, [field]: value });
+  patchTransition({ [field]: Math.max(0, value) });
+}
+
+const transition = computed<TransitionSpec>(() => props.effect?.transition ?? {});
+// Blinds/Slide Bars/Checkerboard are the types whose "adjust" knob means anything (it sets the
+// pattern's density); showing the slider for a Fade would be a control that does nothing.
+const inPatterned = computed(() => PATTERNED_TRANSITION_TYPES.has(transition.value.inType ?? "Fade"));
+const outPatterned = computed(() => PATTERNED_TRANSITION_TYPES.has(transition.value.outType ?? "Fade"));
+
+// A value curve replaces the param's flat value, so the slider is hidden while one is on -
+// leaving both visible would show a number that isn't what the effect is rendering.
+function hasCurve(key: string): boolean {
+  return isValueCurve(props.effect?.params[key]);
+}
+// Only the numeric sliders have a range for a curve to sweep between. A checkbox or a choice
+// has nothing to interpolate, and the schema never marks those as curve-able anyway.
+function curveable(p: EffectParamSpec): boolean {
+  return Boolean(p.valueCurve) && (p.type === "intSlider" || p.type === "floatSlider");
 }
 </script>
 
@@ -105,33 +138,99 @@ function setTransition(field: "inDurationMs" | "outDurationMs", ms: string): voi
             <span class="value">{{ Math.round((effect.mix ?? 0) * 100) }}</span>
           </span>
         </label>
+      </div>
+
+      <div class="blend-panel">
+        <h4>Transitions</h4>
         <label class="blend-row">
-          Fade In (ms)
+          In
+          <select
+            :value="transition.inType ?? 'Fade'"
+            @change="patchTransition({ inType: ($event.target as HTMLSelectElement).value as TransitionType })"
+          >
+            <option v-for="t in TRANSITION_TYPES" :key="t" :value="t">{{ t }}</option>
+          </select>
+        </label>
+        <label class="blend-row">
+          In Duration (ms)
           <input
             type="number"
             min="0"
-            :value="effect.transition?.inDurationMs ?? 0"
-            @change="setTransition('inDurationMs', ($event.target as HTMLInputElement).value)"
+            :value="transition.inDurationMs ?? 0"
+            @change="setTransitionMs('inDurationMs', ($event.target as HTMLInputElement).value)"
           />
         </label>
+        <label v-if="inPatterned" class="blend-row">
+          In Adjust
+          <span class="blend-inline">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              :value="transition.inAdjust ?? 50"
+              @input="patchTransition({ inAdjust: Number(($event.target as HTMLInputElement).value) })"
+            />
+            <span class="value">{{ transition.inAdjust ?? 50 }}</span>
+          </span>
+        </label>
         <label class="blend-row">
-          Fade Out (ms)
+          In Reverse
+          <input
+            type="checkbox"
+            :checked="transition.inReverse ?? false"
+            @change="patchTransition({ inReverse: ($event.target as HTMLInputElement).checked })"
+          />
+        </label>
+
+        <label class="blend-row">
+          Out
+          <select
+            :value="transition.outType ?? 'Fade'"
+            @change="patchTransition({ outType: ($event.target as HTMLSelectElement).value as TransitionType })"
+          >
+            <option v-for="t in TRANSITION_TYPES" :key="t" :value="t">{{ t }}</option>
+          </select>
+        </label>
+        <label class="blend-row">
+          Out Duration (ms)
           <input
             type="number"
             min="0"
-            :value="effect.transition?.outDurationMs ?? 0"
-            @change="setTransition('outDurationMs', ($event.target as HTMLInputElement).value)"
+            :value="transition.outDurationMs ?? 0"
+            @change="setTransitionMs('outDurationMs', ($event.target as HTMLInputElement).value)"
           />
         </label>
+        <label v-if="outPatterned" class="blend-row">
+          Out Adjust
+          <span class="blend-inline">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              :value="transition.outAdjust ?? 50"
+              @input="patchTransition({ outAdjust: Number(($event.target as HTMLInputElement).value) })"
+            />
+            <span class="value">{{ transition.outAdjust ?? 50 }}</span>
+          </span>
+        </label>
+        <label class="blend-row">
+          Out Reverse
+          <input
+            type="checkbox"
+            :checked="transition.outReverse ?? false"
+            @change="patchTransition({ outReverse: ($event.target as HTMLInputElement).checked })"
+          />
+        </label>
+        <p class="hint">A transition only shows with a duration above 0.</p>
       </div>
 
       <div v-for="p in schema.params" :key="p.key" class="param">
-        <label>
-          {{ p.label }}
-          <span v-if="p.valueCurve" class="vc-badge" title="Value curve (stubbed until M6)">VC</span>
-        </label>
+        <label>{{ p.label }}</label>
+        <template v-if="hasCurve(p.key)">
+          <!-- the curve is the value now, so the flat slider would be showing a stale number -->
+        </template>
         <input
-          v-if="p.type === 'intSlider'"
+          v-else-if="p.type === 'intSlider'"
           type="range"
           :min="p.min"
           :max="p.max"
@@ -160,7 +259,15 @@ function setTransition(field: "inDurationMs" | "outDurationMs", ms: string): voi
         >
           <option v-for="opt in p.options" :key="opt" :value="opt">{{ opt }}</option>
         </select>
-        <span class="value">{{ effect.params[p.key] ?? p.default }}</span>
+        <span v-if="!hasCurve(p.key)" class="value">{{ effect.params[p.key] ?? p.default }}</span>
+        <ValueCurveEditor
+          v-if="curveable(p)"
+          :model-value="effect.params[p.key] ?? p.default"
+          :label="p.label"
+          :min="p.min ?? 0"
+          :max="p.max ?? 100"
+          @update:model-value="setParam(p.key, $event)"
+        />
       </div>
     </template>
   </div>
@@ -190,13 +297,10 @@ function setTransition(field: "inDurationMs" | "outDurationMs", ms: string): voi
   color: #aaa;
   font-size: 0.75rem;
 }
-.vc-badge {
-  color: #e8c468;
-  border: 1px solid #e8c468;
-  border-radius: 3px;
-  padding: 0 3px;
-  font-size: 0.6rem;
-  margin-left: 0.3rem;
+.hint {
+  margin: 0.2rem 0 0;
+  color: #666;
+  font-size: 0.65rem;
 }
 .value {
   text-align: right;

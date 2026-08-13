@@ -49,15 +49,13 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Shader (ISF), Liquid, Glediator, Video, VUMeter | ❌ | Non-goal for v1 / no audio-reactive pipeline yet |
 | Layer blend modes | ⚠️ | 10 of 24 implemented (Normal, Effect 1/2, Average, Additive, Subtractive, Max, Min, 1/2 reveals) and now actually selectable per effect via the Sequencer's Layer Blending panel (M15.4) - all 10 were render-implemented since M3 but every call site hardcoded "Normal", unreachable from any UI, until this pass |
 | "Mix" / Effect Mix Threshold slider | ⚠️ | The reveal/fade threshold some blend modes read - implemented since M3, wired to a UI slider in M15.4 (was hardcoded 0 everywhere) |
-| Value curves | ⚠️ | One type (Ramp/linear), wired to one param (`On.transparencyPct`) as a proof of the mechanism |
-| Transitions | ⚠️ | Fade In/Out only (no Wipe/From Middle/Circle Explode), and now actually settable via the Layer Blending panel's Fade In/Fade Out (ms) fields (M15.4) - `TransitionSpec`/`applyFadeTransition` were fully implemented since M3 but had zero UI or import path reaching them until this pass |
-| Audio-reactive effects (VU Meter) | ⚠️ | 7 of ~20 VU Meter types (Spectrum, Volume Bars, Level Bar, Level Pulse, Level Color, Intensity Wave, Waveform), on an offline per-frame FFT of the loaded track |
+| Audio-reactive effects (VU Meter) | ⚠️ | 7 of ~20 VU Meter types (Spectrum, Volume Bars, Level Bar, Level Pulse, Level Color, Intensity Wave, Waveform), on an offline per-frame FFT of the loaded track. The analysis now actually reaches the renderer: the sequencer analyses a track once on load and hands the same series to the house preview, the popped-out preview and the .fseq export, so a meter renders identically in all three |
 | Text effect | ⚠️ | Built-in 5×7 bitmap font only — no system font picker, outline/shadow options, or multi-line layout |
 | Pictures effect | ⚠️ | Images stored in the sequence body, downscaled to 64px on the long edge (no asset store yet) |
 | Shader (ISF), Liquid, Glediator, Video | ❌ | Non-goal for v1 |
 | Layer blend modes | ⚠️ | 10 of 24 (Normal, Effect 1/2, Average, Additive, Subtractive, Max, Min, 1/2 reveals) |
-| Value curves | ✅ | All 16 types (Flat, Ramp, Ramp Up/Down, Ramp Down/Up, Saw Tooth, Triangle, Sine, Abs Sine, Square, Parabolic Up/Down, Logarithmic Up/Down, Exponential Up/Down, Custom) with cycles/phase/reverse and a point editor, applied to every VC-flagged param of every effect |
-| Transitions | ✅ | 16 types (Fade, Wipe, Wipe Vertical, From Middle, To Middle, Square Explode/Implode, Circle Explode/Implode, Clock, Blinds, Slide Bars, Bow Tie, Star, Checkerboard, Ripple), in and out, with pattern density and reverse |
+| Value curves | ✅ | All 16 types (Flat, Ramp, Ramp Up/Down, Ramp Down/Up, Saw Tooth, Triangle, Sine, Abs Sine, Square, Parabolic Up/Down, Logarithmic Up/Down, Exponential Up/Down, Custom) with cycles/phase/reverse, a draggable point editor for Custom and six presets, reachable from the props panel on every VC-flagged param of every effect |
+| Transitions | ✅ | 16 types (Fade, Wipe, Wipe Vertical, From Middle, To Middle, Square Explode/Implode, Circle Explode/Implode, Clock, Blinds, Slide Bars, Bow Tie, Star, Checkerboard, Ripple), in and out, each with its own type, duration and reverse, plus a pattern-density knob on the three types that read one - all set from the props panel's Transitions section |
 | Buffer styles / sub-buffers | ❌ | Every effect renders into the model's default full buffer |
 
 ## File formats (SPEC ch11)

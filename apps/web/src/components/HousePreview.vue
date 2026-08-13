@@ -8,6 +8,7 @@ import {
   hexToRgba,
   nodeWorldOffset,
   renderRowAtMs,
+  type AudioSeries,
   type ModelGeometry,
 } from "@webxlights/engine";
 import type { ModelRecord, SequenceBody } from "../lib/api";
@@ -18,6 +19,9 @@ const props = defineProps<{
   body: SequenceBody;
   playheadMs: number;
   frameMs: number;
+  // The analysed track. Undefined means "no audio loaded", which audio-reactive effects render
+  // differently from a silent frame of a loaded one (renderFrame.ts).
+  audio?: AudioSeries;
 }>();
 
 const SEED = 12345;
@@ -95,7 +99,14 @@ function updateColors(): void {
       .filter((r) => r.elementType === "model" && r.elementId === entry.model.id)
       .flatMap((r) => r.effects)
       .map((e) => ({ ...e, palette: e.palette?.map(hexToRgba) }));
-    const nodeColors = renderRowAtMs({ geometry: entry.geometry, effects: rowEffects }, props.playheadMs, props.frameMs, SEED, DEFAULT_PALETTE);
+    const nodeColors = renderRowAtMs(
+      { geometry: entry.geometry, effects: rowEffects },
+      props.playheadMs,
+      props.frameMs,
+      SEED,
+      DEFAULT_PALETTE,
+      props.audio,
+    );
     nodeColors.forEach((c, i) => {
       const idx = (entry.offset + i) * 3;
       const brightness = c.a / 255;
@@ -174,6 +185,11 @@ onBeforeUnmount(() => {
 });
 
 watch(() => [props.playheadMs, props.body], updateColors, { deep: true });
+// `audio` arrives after the track is analysed, which is a repaint even at a stationary
+// playhead - without it a VU Meter sits dark until the next scrub. Watched by identity, not
+// deeply: the series is thousands of frames, and traversing it on every playhead tick would
+// cost more than the render it triggers.
+watch(() => props.audio, updateColors);
 watch(
   () => props.models,
   () => {
