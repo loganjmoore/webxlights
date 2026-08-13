@@ -89,7 +89,12 @@ function geometryFor(model: ModelRecord): ModelGeometry | null {
 // center - `model.screen.x/y/z` is that anchor. See packages/engine/src/models/transform.ts's
 // module doc for why every model type (not just the coincidentally-centered ones) needs this.
 function transformFor(model: ModelRecord): ScreenTransform {
-  return { scale: model.screen.scale ?? 1, scaleY: model.screen.scaleY, rotateDeg: model.screen.rotate ?? 0 };
+  return {
+    scale: model.screen.scale ?? 1,
+    scaleY: model.screen.scaleY,
+    scaleZ: model.screen.scaleZ,
+    rotateDeg: model.screen.rotate ?? 0,
+  };
 }
 
 function buildPositions(): Float32Array {
@@ -104,7 +109,8 @@ function buildPositions(): Float32Array {
       const off = nodeWorldOffset(node, entry.center, entry.transform);
       positions[idx] = mx + off.x * NODE_SPACING;
       positions[idx + 1] = my + off.y * NODE_SPACING;
-      positions[idx + 2] = mz;
+      // real per-node depth (models/types.ts) - a 360-degree tree is a cone, not a flat plane
+      positions[idx + 2] = mz + off.z * NODE_SPACING;
     });
   }
   return positions;
@@ -173,7 +179,7 @@ function buildScene(): void {
       const off = nodeWorldOffset(node, entry.center, entry.transform);
       arr[idx] = mesh.position.x + off.x * NODE_SPACING;
       arr[idx + 1] = mesh.position.y + off.y * NODE_SPACING;
-      arr[idx + 2] = mesh.position.z;
+      arr[idx + 2] = mesh.position.z + off.z * NODE_SPACING;
     });
     posAttr.needsUpdate = true;
     if (selectionHelper && selectionHelper.object === mesh) selectionHelper.update();

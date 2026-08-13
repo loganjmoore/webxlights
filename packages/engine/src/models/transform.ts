@@ -13,6 +13,7 @@ import { geometryScreenBounds } from "./bounds";
 export interface ScreenTransform {
   scale?: number; // uniform, or scaleX when scaleY is also given
   scaleY?: number; // defaults to `scale` (uniform) when absent - matches every model saved before this existed
+  scaleZ?: number; // defaults to `scale`; only means anything for models with real depth
   // Standard counter-clockwise-positive rotation in a Y-up coordinate system (+X rotated 90
   // degrees lands on +Y - see transform.test.ts). Neither 2D's canvas nor 3D's Three.js scene
   // flips X, and both treat increasing world Y as "visually up" (2D flips the Y *pixel value*
@@ -33,30 +34,44 @@ export function geometryCenter(geo: ModelGeometry): { x: number; y: number } {
 // A node's offset from the model's anchor (its true center), in local geometry units, after
 // per-axis scale and rotation. Callers multiply by their own px-per-unit and add the anchor's
 // world position - this function knows nothing about pixels or the DOM.
-export function nodeWorldOffset(node: ModelNode, center: { x: number; y: number }, transform: ScreenTransform): { x: number; y: number } {
+export function nodeWorldOffset(
+  node: ModelNode,
+  center: { x: number; y: number },
+  transform: ScreenTransform,
+): { x: number; y: number; z: number } {
   const scaleX = transform.scale ?? 1;
   const scaleY = transform.scaleY ?? scaleX;
+  const scaleZ = transform.scaleZ ?? scaleX;
   const dx = (node.screenX - center.x) * scaleX;
   const dy = (node.screenY - center.y) * scaleY;
+  // Depth is measured from the model's own axis (0), not from a centre - a cone's nodes wrap
+  // symmetrically about it already.
+  const dz = (node.screenZ ?? 0) * scaleZ;
   const rad = ((transform.rotateDeg ?? 0) * Math.PI) / 180;
-  if (rad === 0) return { x: dx, y: dy };
+  // RotateZ spins the model in its own X/Y plane, so depth is unchanged by it.
+  if (rad === 0) return { x: dx, y: dy, z: dz };
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
-  return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+  return { x: dx * cos - dy * sin, y: dx * sin + dy * cos, z: dz };
 }
 
 // Half-extents of the *transformed* (scaled + rotated) shape, still centered on the anchor by
 // construction - rotating/scaling around the center can't move the center. Used for auto-fit
 // and hit-testing bounds, and the 3D pick mesh's box size.
-export function transformedHalfExtents(geo: ModelGeometry, transform: ScreenTransform): { halfW: number; halfH: number } {
-  if (geo.nodes.length === 0) return { halfW: 0, halfH: 0 };
+export function transformedHalfExtents(
+  geo: ModelGeometry,
+  transform: ScreenTransform,
+): { halfW: number; halfH: number; halfD: number } {
+  if (geo.nodes.length === 0) return { halfW: 0, halfH: 0, halfD: 0 };
   const center = geometryCenter(geo);
   let maxAbsX = 0;
   let maxAbsY = 0;
+  let maxAbsZ = 0;
   for (const node of geo.nodes) {
     const off = nodeWorldOffset(node, center, transform);
     if (Math.abs(off.x) > maxAbsX) maxAbsX = Math.abs(off.x);
     if (Math.abs(off.y) > maxAbsY) maxAbsY = Math.abs(off.y);
+    if (Math.abs(off.z) > maxAbsZ) maxAbsZ = Math.abs(off.z);
   }
-  return { halfW: maxAbsX, halfH: maxAbsY };
+  return { halfW: maxAbsX, halfH: maxAbsY, halfD: maxAbsZ };
 }

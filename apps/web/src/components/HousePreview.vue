@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as THREE from "three";
-import { computeGeometryFromAttrs, DEFAULT_PALETTE, hexToRgba, renderRowAtMs, type ModelGeometry } from "@webxlights/engine";
+import {
+  computeGeometryFromAttrs,
+  DEFAULT_PALETTE,
+  geometryCenter,
+  hexToRgba,
+  nodeWorldOffset,
+  renderRowAtMs,
+  type ModelGeometry,
+} from "@webxlights/engine";
 import type { ModelRecord, SequenceBody } from "../lib/api";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 
@@ -55,12 +63,23 @@ function buildPositions(): Float32Array {
   for (const entry of rowEntries) {
     const mx = entry.model.screen.x ?? 0;
     const my = entry.model.screen.y ?? 0;
-    const scale = entry.model.screen.scale ?? 1;
+    const mz = entry.model.screen.z ?? 0;
+    // Shares the layout canvases' transform so the show previews in the same shape it's laid
+    // out in - per-axis scale, rotation and real per-node depth, not a flat scale on raw
+    // screenX/screenY (which ignored rotation and squashed a 360-degree tree into a triangle).
+    const transform = {
+      scale: entry.model.screen.scale ?? 1,
+      scaleY: entry.model.screen.scaleY,
+      scaleZ: entry.model.screen.scaleZ,
+      rotateDeg: entry.model.screen.rotate ?? 0,
+    };
+    const center = geometryCenter(entry.geometry);
     entry.geometry.nodes.forEach((node, i) => {
       const idx = (entry.offset + i) * 3;
-      positions[idx] = mx + node.screenX * NODE_SPACING * scale;
-      positions[idx + 1] = my + node.screenY * NODE_SPACING * scale;
-      positions[idx + 2] = 0;
+      const off = nodeWorldOffset(node, center, transform);
+      positions[idx] = mx + off.x * NODE_SPACING;
+      positions[idx + 1] = my + off.y * NODE_SPACING;
+      positions[idx + 2] = mz + off.z * NODE_SPACING;
     });
   }
   return positions;

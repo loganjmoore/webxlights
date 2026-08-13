@@ -1,5 +1,14 @@
 # Changelog
 
+## Models get a real Z axis — a 360° tree renders as a cone
+
+The remaining structural difference against real xLights' 3D layout: a mega tree was a solid filled triangle instead of a cone.
+
+- `computeTree` was already computing the cone, then discarding it — the Round style folded the wrap into `screenY` as a "depth cue" because `ModelNode` had nowhere to put depth. `ModelNode.screenZ` (optional; most props genuinely are flat) now carries it, and `screenY` is the strand height again.
+- `nodeWorldOffset` returns `{x, y, z}` and `transformedHalfExtents` returns `halfD`, so depth flows through the one transform both canvases share. `scaleZ` scales it; `RotateZ` doesn't touch it, since that rotation spins the model in its own X/Y plane. This is also what finally makes the `scaleZ` field mean something.
+- `HousePreview` now uses that shared transform as well — it had been placing nodes at `screenX * scale`, ignoring per-axis scale and rotation, so the sequencer's preview could show a show in a different shape from the layout it was built in.
+- Verified top-down on a 24×30 360° tree: concentric rings, X span 12.0 = Z span 12.0, where every node used to sit at Z=0.
+
 ## Import scale — one unit convention across model types
 
 Follow-up to the placement fix, from side-by-side screenshots of the same 120-model show in xLights and webXLights: positions were being read correctly but everything still came out at wildly different sizes, piled together.
