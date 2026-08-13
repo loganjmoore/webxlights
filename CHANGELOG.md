@@ -1,5 +1,13 @@
 # Changelog
 
+## "Copy placement report" on the Layout page
+
+Placement can't be verified from inside the app. The maths is unit-tested and the placement systems are confirmed against the xLights manual, but whether a *real* show lands where it does in xLights can only be checked against that show — and the file that would settle it lives on the user's machine.
+
+`raw_attrs` is lossless, so the imported models already carry everything needed. This button dumps, per model: what xLights wrote (`WorldPos*`, `Scale*`, `Rotate*`, `X2`/`Y2`/`Z2`, `Height`, `Shear`, `Angle`, `NumPoints`), which placement system was applied, what position/scale/rotation the importer derived, and the model's resulting on-canvas size — plus totals by placement system and by type. Clipboard first, file download as fallback.
+
+Deliberately placement attributes only: channel assignments, controller names and start channels aren't needed to diagnose a layout and shouldn't end up pasted into a chat or an issue.
+
 ## Import reports which placement system it used
 
 The one assumption in the placement work that couldn't be checked without a real xLights file is the *names* of the endpoint attributes (`X2`/`Y2`/`Z2`). If they're wrong for a given show, the two/three-point path silently falls back to the boxed reading — safe, but invisible.

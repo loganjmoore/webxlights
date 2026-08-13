@@ -5,6 +5,7 @@ import { propertyFieldsFor } from "@webxlights/engine";
 import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { confirm } from "../lib/confirm";
+import { buildPlacementReport, copyOrDownloadReport } from "../lib/placementReport";
 import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas from "../components/LayoutCanvas.vue";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
@@ -21,6 +22,24 @@ const controllers = ref<ControllerRecord[]>([]);
 const assignErrors = ref<Record<number, string>>({});
 const importing = ref(false);
 const importMessage = ref("");
+const reportMessage = ref("");
+
+// Placement can't be verified from inside the app - the maths is unit-tested and the placement
+// systems are confirmed against the xLights manual, but whether a real show lands where it does
+// in xLights can only be checked against that show. raw_attrs is lossless, so this hands over
+// everything needed to check it (what xLights wrote, and what the importer derived) without
+// anyone having to go and find the original xlights_rgbeffects.xml.
+async function copyPlacementReport(): Promise<void> {
+  if (models.value.length === 0) {
+    reportMessage.value = "Nothing to report yet — import a show first.";
+    return;
+  }
+  const where = await copyOrDownloadReport(buildPlacementReport(models.value));
+  reportMessage.value =
+    where === "copied"
+      ? `Placement report for ${models.value.length} models copied to the clipboard.`
+      : `Clipboard unavailable — downloaded the placement report for ${models.value.length} models instead.`;
+}
 // Multi-select: the canvas can rubber-band several models at once. Everything that only
 // makes sense for one model (the property panel, resize handles) reads `selectedModelId`,
 // which is only set when the selection is exactly one.
@@ -389,9 +408,18 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
         {{ importing ? "Importing..." : "Import xlights_rgbeffects.xml" }}
         <input type="file" accept=".xml" @change="handleFileChange" :disabled="importing" hidden />
       </label>
+      <button
+        class="report-btn"
+        :disabled="models.length === 0"
+        title="Copy what xLights wrote and what the importer derived, for every model"
+        @click="copyPlacementReport"
+      >
+        Copy placement report
+      </button>
     </header>
     <p v-if="importMessage" class="import-message">{{ importMessage }}</p>
     <p v-if="viewObjectsError" class="view-objects-error">{{ viewObjectsError }}</p>
+    <p v-if="reportMessage" class="import-message">{{ reportMessage }}</p>
     <div class="body">
       <aside class="model-list">
         <div class="tabs">
@@ -632,6 +660,11 @@ header h1 {
   border-radius: 4px;
   font-size: 0.85rem;
   color: #ddd;
+}
+.report-btn {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
 }
 .import-message {
   margin: 0;
