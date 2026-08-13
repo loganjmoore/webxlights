@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 import { useRoute } from "vue-router";
 import type { AudioSeries } from "@webxlights/engine";
 import { api, type ModelRecord, type SequenceBody } from "../lib/api";
-import { openPreviewChannel, type PreviewMessage } from "../lib/previewChannel";
+import { openPreviewChannel, postPreviewMessage, type PreviewMessage } from "../lib/previewChannel";
 import HousePreview from "../components/HousePreview.vue";
 
 // The popped-out house preview. It renders the same sequence the sequencer tab is editing and
@@ -34,7 +34,7 @@ let channel: BroadcastChannel | null = null;
 let helloTimer: ReturnType<typeof setInterval> | null = null;
 
 function send(message: PreviewMessage): void {
-  channel?.postMessage(message);
+  postPreviewMessage(channel, message);
 }
 
 function play(): void {

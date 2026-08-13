@@ -8,7 +8,7 @@ import { analyzeAudioBuffer } from "../lib/audioAnalysis";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
-import { openPreviewChannel, previewUrlFor, type PreviewMessage } from "../lib/previewChannel";
+import { openPreviewChannel, postPreviewMessage, previewUrlFor, type PreviewMessage } from "../lib/previewChannel";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type ContextMenuTarget, type GridRow } from "../components/SequencerGrid.vue";
 import EffectContextMenu from "../components/EffectContextMenu.vue";
@@ -172,7 +172,7 @@ function startAudioAnalysis(buffer: AudioBuffer): void {
   setTimeout(() => {
     try {
       audioSeries.value = analyzeAudioBuffer(buffer, frameMs);
-      previewChannel?.postMessage(previewAudioMessage());
+      postPreviewMessage(previewChannel, previewAudioMessage());
     } finally {
       analyzingAudio.value = false;
     }
@@ -411,7 +411,7 @@ let previewChannel: BroadcastChannel | null = null;
 function previewSnapshot(): PreviewMessage {
   return {
     type: "snapshot",
-    models: modelRecords.value,
+    models: JSON.parse(JSON.stringify(modelRecords.value)) as ModelRecord[],
     body: JSON.parse(JSON.stringify(store.body)) as typeof store.body,
     frameMs: store.sequence?.frame_ms ?? 50,
     durationMs: store.sequence?.duration_ms ?? 0,
@@ -425,14 +425,14 @@ function previewAudioMessage(): PreviewMessage {
 }
 
 function broadcastTransport(): void {
-  previewChannel?.postMessage({ type: "transport", playheadMs: playheadMs.value, playing: playing.value });
+  postPreviewMessage(previewChannel, { type: "transport", playheadMs: playheadMs.value, playing: playing.value });
 }
 
 function onPreviewMessage(e: MessageEvent<PreviewMessage>): void {
   const message = e.data;
   if (message.type === "hello") {
-    previewChannel?.postMessage(previewSnapshot());
-    previewChannel?.postMessage(previewAudioMessage());
+    postPreviewMessage(previewChannel, previewSnapshot());
+    postPreviewMessage(previewChannel, previewAudioMessage());
     broadcastTransport();
     return;
   }
