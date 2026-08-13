@@ -823,6 +823,22 @@ Two changes make it visible instead:
 This is the closest thing to verification available without the show file itself: the next real
 import answers the open question in its own status line.
 
+## Handing over the data needed to verify placement
+
+The placement work has been verified every way that's possible from inside this repo: unit
+tests for the maths, the xLights manual for the placement systems themselves, a synthetic yard
+for the overall shape. The one thing none of that can establish is whether a *real* show lands
+where it does in real xLights - and the file that would settle it lives on the user's machine.
+
+`raw_attrs` is lossless, so an imported layout already holds every attribute xLights wrote.
+"Copy placement report" on the Layout page dumps, per model: those raw placement attributes,
+which system `appliedPlacementFor` resolved to, the position/scale/rotation the importer
+derived, and the model's resulting on-canvas size - plus totals by system and by type.
+
+It's scoped to placement attributes on purpose. The full attribute bag also carries channel
+assignments, controller names and start channels, none of which help diagnose a layout and all
+of which would then be sitting in a chat log or a bug report.
+
 ## Bugs found only by actually running the UI (not caught by typecheck/lint)
 
 - **`overflow-y: auto` with no explicit `overflow-x` silently computes `overflow-x` to `auto` too**: `SequencerGrid.vue`'s `.grid-scroll-viewport` needed vertical scroll only (the canvas handles its own horizontal sizing, scrolled by the page's outer `.h-scroll` wrapper) — but per the CSS Overflow spec, when one of `overflow-x`/`overflow-y` is non-`visible` and the other is left at the `visible` default, the `visible` one computes to `auto` too. This turned `.grid-scroll-viewport` into a second, narrower horizontal scroll container that silently clipped the widened (post-M10) canvas to its own ~880px box, before the outer wrapper's scroll ever got a chance to reveal the rest — invisible in code review (the CSS reads correctly as "vertical scroll only"), only caught by actually zooming in and scrolling in a live browser and finding effects that `getImageData` proved were drawn but weren't on screen. Fixed with an explicit `overflow-x: visible`. General lesson: never set only one of `overflow-x`/`overflow-y` without deciding what the other one should compute to.
