@@ -17,7 +17,11 @@ export function computeSingleLine(params: SingleLineParams): ModelGeometry {
 
 export interface PolyLineParams {
   totalNodes: number;
-  points?: Array<{ x: number; y: number }>; // path vertices; defaults to a straight line
+  // Path vertices in local node units (one unit == one node gap), defaulting to a straight
+  // line. Imported models get these from PointData - see models/polyPoints.ts. `z` is optional
+  // because a Poly Line drawn on the 2D canvas is planar; a real one that climbs a roofline is
+  // not, and its depth has to survive into the 3D view.
+  points?: Array<{ x: number; y: number; z?: number }>;
 }
 
 // SPEC ch4: "# Lights|# Nodes (PolyLineNodes) IS the total node count", buffer default = 1xN
@@ -37,7 +41,7 @@ export function computePolyLine(params: PolyLineParams): ModelGeometry {
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i]!;
     const b = points[i + 1]!;
-    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1e-6;
+    const len = Math.hypot(b.x - a.x, b.y - a.y, (b.z ?? 0) - (a.z ?? 0)) || 1e-6;
     segLengths.push(len);
     totalLength += len;
   }
@@ -56,7 +60,9 @@ export function computePolyLine(params: PolyLineParams): ModelGeometry {
     const t = segLengths[segIdx]! > 0 ? remaining / segLengths[segIdx]! : 0;
     const screenX = a.x + (b.x - a.x) * t;
     const screenY = a.y + (b.y - a.y) * t;
-    nodes.push({ bufX: i, bufY: 0, screenX, screenY, string: 0, indexInString: i });
+    const az = a.z ?? 0;
+    const screenZ = az + ((b.z ?? 0) - az) * t;
+    nodes.push({ bufX: i, bufY: 0, screenX, screenY, screenZ, string: 0, indexInString: i });
   }
   return { width: totalNodes, height: 1, nodes };
 }

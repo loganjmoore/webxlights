@@ -10,6 +10,7 @@ import { computeIcicles } from "./icicles";
 import { computeWindowFrame } from "./windowFrame";
 import { computeWreath } from "./wreath";
 import { parseCustomModelGrid } from "./custom";
+import { parsePolyPointPath } from "./polyPoints";
 
 const int = (v: string | undefined, fallback: number): number => {
   const n = v === undefined ? NaN : parseInt(v, 10);
@@ -38,8 +39,13 @@ export function computeGeometryFromAttrs(displayAs: string, attrs: Record<string
         strings: int(attrs.NumStrings, 1),
         nodesPerString: int(attrs.NodesPerString, 50),
       });
-    case "Poly Line":
-      return computePolyLine({ totalNodes: int(attrs.NodesPerString, 50) });
+    case "Poly Line": {
+      // Poly Line is the one type whose shape is stored in its placement attributes: without
+      // PointData it really is a straight run; with it, the vertices are the model
+      // (models/polyPoints.ts).
+      const totalNodes = int(attrs.NodesPerString, 50);
+      return computePolyLine({ totalNodes, points: parsePolyPointPath(attrs, totalNodes)?.local });
+    }
     case "Arches":
       return computeArches({
         archCount: int(attrs.NumArches, 1),
