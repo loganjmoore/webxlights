@@ -1,4 +1,4 @@
-import type { BlendMode } from "@webxlights/engine";
+import type { BlendMode, PictureImage, TransitionSpec, ValueCurve } from "@webxlights/engine";
 
 export class ApiError extends Error {
   status: number;
@@ -133,19 +133,25 @@ export interface ViewObjectUpsertPayload {
   raw_attrs?: Record<string, string>;
 }
 
+// A param is a flat value, a ValueCurve that animates it across the effect (valueCurve.ts),
+// or - for Pictures - a decoded image. All JSON-safe, so they survive autosave, snapshots and
+// the package-show export like any other param.
+export type EffectParamValue = number | boolean | string | ValueCurve | PictureImage;
+
 export interface SequenceEffect {
   id: string;
   name: string;
   startMs: number;
   endMs: number;
-  params: Record<string, number | boolean | string>;
+  params: Record<string, EffectParamValue>;
   // Per-effect color override (real xLights' Color tab), hex strings. Unset = inherit the
   // row's default palette.
   palette?: string[];
   // Real xLights' Layer Blending panel.
   blendMode?: BlendMode;
   mix?: number; // 0..1, the "Mix" slider
-  transition?: { inDurationMs?: number; outDurationMs?: number };
+  // In/out reveals - now the full transition system (engine/transition.ts), not just fades.
+  transition?: TransitionSpec;
 }
 
 export interface SequenceRow {

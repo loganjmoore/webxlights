@@ -80,6 +80,10 @@ Each effect implements its default/most-common render path faithfully to the SPE
 
 ## M6: scoped down from the full milestone ask (not a documented-ceiling-per-option like M1-M5)
 
+> **Superseded.** Everything this section lists as unbuilt was completed in a follow-up pass —
+> see "M6 completion" below. Kept as-is because it's the record of what shipped when, and
+> because the reasoning for splitting the milestone is still the reasoning.
+
 The goal prompt's M6 asks for 15 new effects, a full value-curve editor (Sine/Ramp/Square/Custom types, presets, point editor), a full transition system (Fade/Wipe/From Middle/Circle Explode), and VUMeter audio-reactive plumbing. That's roughly the same scope as M3 (which took a full milestone on its own). Rather than half-build all of it, this pass delivers a smaller, complete, tested slice:
 
 - **5 new effects, not 15**: Strobe, Ripple (Old/Circle draw style only), Wave (Sine type only), Pinwheel (New Render Method only), Shockwave (no acceleration curve). Each is faithful to its SPEC render algorithm on the default/common path, same as every M3 effect. Garlands, Curtain, Plasma, Galaxy, Fan, Marquee, Pictures, Text, and VUMeter are unimplemented.
@@ -660,6 +664,117 @@ Verified by rendering a 24x30 360-degree tree top-down (X against Z): concentric
 12.0 and Z span 12.0, where before every node sat at Z=0. `test/transform.test.ts` asserts the
 wrap lands on Z, that a round tree is as deep as it is wide, that a strand's height is
 uncontaminated by the wrap, that flat props stay at Z=0, and that RotateZ leaves depth alone.
+## M6 completion: the rest of effects wave 2, the full curve + transition systems, audio reactivity, and the 3D visualizer
+
+M6 shipped a tested slice and documented the rest as unbuilt. This pass closes it out and takes
+the 3D preview from "proof that the pipeline reaches the screen" to something you can actually
+watch a show in.
+
+- **10 more effects, 25 total** (was 15): Garlands, Curtain, Plasma, Galaxy, Fan, Marquee,
+  Circles, Text, Pictures, VU Meter. Same rule as M3/M6 — the default/common render path,
+  faithful to the SPEC's math, with the rarer option combinations recorded as ceilings in
+  PARITY.md rather than half-built.
+  - **Circles is deliberately stateless.** xLights carries circle positions frame to frame;
+    here each circle's path is a closed-form function of (time, seed, index), with `reflect()`
+    doing in one step what integrating a constant velocity against the walls would do frame by
+    frame. That keeps it out of `STATEFUL_EFFECTS`, so scrubbing to the middle of a long
+    Circles effect costs one frame's work instead of replaying every frame before it.
+  - **Text rasterises through a built-in 5×7 bitmap font** (`effects/font5x7.ts`). xLights
+    renders system fonts through wxWidgets; the engine package is DOM-free by decision (so it
+    stays testable in Node), which rules out canvas `fillText`. At the pixel densities a real
+    prop has, a 5×7 cell is about as large as a legible glyph gets anyway. No font picker, no
+    outline/shadow, no multi-line layout.
+  - **Pictures takes decoded RGBA rows, not a file.** Decoding happens in the browser
+    (`lib/pictureImport.ts`) and the pixels travel as plain JSON in the effect's params, so an
+    image round-trips through autosave/snapshots/package-show like any other param and renders
+    identically in a Node test. Images are downscaled to 64px on the long edge on import —
+    there's still no R2 asset store, so they ride inside the sequence body, and the ROADMAP's
+    <500KB autosave budget is real.
+- **Value curves: all 16 types, applied to every VC-flagged param.** The M6 version had one
+  type on one param. The mechanism that made the difference is `resolveParamsAtPosition()`, a
+  single pass in `renderFrame.ts` that collapses any param holding a ValueCurve into a plain
+  number before the effect function runs. Effects therefore never learn that curves exist, and
+  every param already marked `valueCurve: true` in `EFFECT_SCHEMAS` became curvable without
+  touching 25 effect files. `ValueCurveEditor.vue` adds the shape picker, min/max, cycles and
+  phase for the periodic shapes, a reverse toggle, six presets, and a click/drag/shift-click
+  point editor for Custom curves, all over a live plot of the curve.
+- **Transitions: 16 types, in and out.** Every non-Fade transition is an *order field* — a
+  scalar per pixel saying how early it joins the reveal, shown once `order <= progress`, with a
+  short soft edge. Defining them that way makes them total by construction (progress 0 reveals
+  nothing, progress 1 reveals everything, whatever the shape), which is exactly what the
+  "reveals monotonically, and fully, for every type" test asserts across all 16. Adding another
+  is one pure function.
+- **Audio reactivity is analysed offline, not tapped live.** `engine/audio.ts` runs a windowed
+  radix-2 FFT over the decoded track once when it loads, producing a per-frame level plus a
+  log-spaced spectrum. A live `AnalyserNode` was the obvious alternative and is the wrong one
+  twice over: rendering has to be deterministic (SPEC ch10/16), and a full-sequence export runs
+  far faster than real time, so there'd be no live audio to tap at export time. Analysing once
+  means the 3D preview and the `.fseq` export read the same numbers by construction. The
+  down-mix is to mono on purpose — analysing only channel 0 (what the waveform strip does)
+  makes a hard-panned track look like it drops out.
+  - With **no** track loaded, VU Meter renders nothing rather than its zero-level appearance: a
+    solid bottom-of-palette wash reads as a bug, not as silence. `FrameContext.audio` is left
+    undefined in that case, which is what distinguishes "no audio loaded" from "this frame of
+    the song is silent".
+- **The 3D visualizer is now a visualizer.** Before: a fixed camera pointed at a flat plane of
+  square points. Now: orbit/zoom/pan (OrbitControls), per-model depth read from the layout's own
+  `WorldPosZ`, round glow bulbs (a generated radial-gradient sprite, plus a larger additive pass
+  for bloom — cheaper than an EffectComposer chain and it survives on integrated GPUs), a ground
+  grid sized to the show, front/left/right/top camera presets, live node-size and glow/grid
+  toggles, and an Expand mode that gives the visualizer the window.
+  - **The playhead is driven by rAF while playing, not by `timeupdate`.** The `<audio>`
+    element's own event fires roughly four times a second — fine for a clock readout, and the
+    reason the preview stepped through a show in visible jumps. `timeupdate` is now only used
+    to catch up after a seek or a pause.
+  - **Colour updates are gated on the sequence's frame index**, not on the playhead: the
+    preview redraws at display refresh rate but only re-renders the engine when the sequence
+    actually has a new frame (every `frame_ms`), which at a 50ms frame time is a third of the
+    work at 60Hz.
+- **Not done in this pass** (unchanged from before, and still real): no palette editor (every
+  effect still renders against the one fixed 2-colour palette, now shared by the preview and
+  the export through `lib/renderSettings.ts` so they cannot drift), no buffer-style/sub-buffer
+  panel, no per-model mini-preview, no group-row rendering in the preview (rows bound to a model
+  group are still skipped — group buffer styles are their own piece of work), and `.xsq` param
+  translation still covers the same 5 effects, so the 10 new ones import name-and-timing only.
+
+### Verified live
+
+Run end-to-end in a real browser against the real API (Laravel on sqlite locally, since the
+Render Postgres isn't reachable from here): signup → Load sample project → sequencer. Confirmed
+by driving the actual UI, not by reading the code:
+
+- All 25 effects appear in the palette; each of the 10 new ones was placed on a real model row
+  and rendered in the 3D preview at a real playhead position — Plasma as a full rainbow field,
+  Garlands as stacked sagging rows, Text scrolling legible glyphs ("…RY…" of MERRY CHRISTMAS)
+  on a 16-pixel-tall matrix, Circles as overlapping discs, Fan as rotating wedges, Marquee
+  chasing the border, VU Meter as a single spectrum band (correct: the sample's synthesized
+  audio is a pure-tone arpeggio, so exactly one band is loud).
+- The value-curve editor opens from a VC button, plots the selected shape, switches type, and
+  takes a click-placed point in Custom mode.
+- Transition controls set an in/out duration and type, and the effect visibly reveals with them.
+- Playback advances the playhead smoothly (1.42s → 2.94s across 1.5s of wall-clock) with the
+  3D view updating continuously rather than in the four-per-second steps `timeupdate` gave.
+- Camera presets, orbit-drag, node size, glow and grid toggles, Expand, and Export .fseq (a real
+  file download) all work; zero console or page errors across the runs.
+
+Two things this **cannot** verify here, unchanged from earlier milestones: playback on real
+lighting hardware, and the Render/Postgres deployment path (the local run swaps in sqlite).
+
+### Bugs this pass found in its own new code, caught by tests rather than by eye
+
+- **Aliasing dressed up as animation.** Plasma advanced its phase by `position01 * speed * 2π`,
+  so at any whole-number Speed the field lands on an exact period boundary at position 0.5 and
+  1.0 — the "animated" plasma rendered an identical frame at those points. Speed is now plain
+  radians. The same class of bug hid a real behaviour in Marquee's test: a chase reversed can
+  land on the same band *phase* at a given instant, so "reverse changes the output" is only
+  observable if you compare colour rather than lit/unlit.
+- **A one-pixel row shear in Pictures.** Flipping the image with `floor((1 - v) * height)` puts
+  the exact half-way pixel on the wrong side of the row boundary; flipping the row *index*
+  (`height - 1 - floor(v * height)`) is exact. It only showed up as a wrong pixel count in the
+  black-is-transparent test.
+- **Curtain snapped shut on its own last frame.** `effectTimeIntervalPosition` is a sawtooth, so
+  it wraps to 0 at position 1.0 — a curtain that had just finished opening slammed closed for
+  one frame at the end of the effect. The final cycle now holds at 1.
 
 ## Bugs found only by actually running the UI (not caught by typecheck/lint)
 

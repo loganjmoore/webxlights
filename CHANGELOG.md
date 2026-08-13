@@ -1,5 +1,15 @@
 # Changelog
 
+## Restore the M6 work that PRs #2–#10 reverted
+
+PR #1 (25 effects, the full value-curve and transition systems, audio reactivity) merged on 10 Aug. The parallel `claude/xlights-visual-drag-drop-hild31` branch behind PRs #2–#10 had been cut from main *before* that merge, so merging it reverted those files — `main` has been running 15 effects, one value-curve type and fade-only transitions ever since, with `packages/engine/src/effects/{garlands,curtain,plasma,galaxy,fan,marquee,circles,text,pictures,vuMeter}.ts` and `audio.ts` simply gone. Recovered by cherry-picking `refs/pull/1/head` onto current main.
+
+**Restored in full:** the engine. 25 effects, all 16 value-curve types with the generic per-frame resolution pass, all 16 in/out transition types, and the offline FFT audio analysis the VU Meter family reads. Engine tests 151 → 275.
+
+**Kept from main where the two diverged:** the per-effect Color palette (M15.3), the Layer Blending panel's blend mode and Mix (M15.4), the controller-routed `.fseq` addressing (M11) and the current `HousePreview`. `renderStateless`/`renderStateful` were re-patched so the per-effect palette still overrides the row palette on the paths M6 rewrote.
+
+**Not re-integrated in this pass, and a real remaining gap:** M6's *UI* for the new capability. `EffectPropsPanel.vue` and `SequencerPage.vue` have both evolved substantially on main, so the value-curve editor (`ValueCurveEditor.vue` is restored but not yet mounted), the transition-type picker, and the audio-analysis wiring need re-integrating into the current panels rather than being pasted over them. Until then the new effects are placeable and render, but curves/transition types/audio are reachable only through the engine API.
+
 ## Models get a real Z axis — a 360° tree renders as a cone
 
 The remaining structural difference against real xLights' 3D layout: a mega tree was a solid filled triangle instead of a cone.
@@ -422,6 +432,16 @@ nginx defaulted to a 1MB `client_max_body_size`, well under what a real `xlights
 - Dockerfile: the persistent disk mounts owned by root on a fresh container, so the entrypoint now `chown`s `/var/data` to `www-data` before starting php-fpm, or the audio disk write fails.
 - 3 new PHPUnit tests (upload + fetch, re-upload replaces and deletes the old file, cross-user access denied) — 21 total, green.
 - Verified live: opened a sequence with a stored `audio_path`, no manual file picker shown, waveform rendered, `<audio>` element sourced from the fetched blob with a real nonzero duration.
+## M6 completion — the rest of effects wave 2, full value curves + transitions, audio reactivity, 3D visualizer
+
+- `packages/engine`: **10 new effects, 25 total** — Garlands, Curtain, Plasma, Galaxy, Fan, Marquee, Circles, Text, Pictures and VU Meter, each faithful to its SPEC render path on the default/common options and each with its own test file. Circles is closed-form rather than state-carrying (its bounce is evaluated directly instead of integrated frame by frame), so scrubbing into the middle of one costs a single frame's work. Text rasterises through a new built-in 5×7 bitmap font (`effects/font5x7.ts`) because the engine is DOM-free and has no `fillText`; Pictures takes decoded RGBA rows so an image round-trips through the sequence JSON and renders identically in a Node test.
+- `packages/engine`: **the full value-curve system** — all 16 xLights curve types (Flat, Ramp, Ramp Up/Down, Ramp Down/Up, Saw Tooth, Triangle, Sine, Abs Sine, Square, Parabolic Up/Down, Logarithmic Up/Down, Exponential Up/Down, Custom) with cycles, phase, reverse, and a Custom point list. `resolveParamsAtPosition()` collapses any curved param to a number once per effect per frame in `renderFrame.ts`, so every param already flagged `valueCurve: true` became curvable without touching a single effect file, and effects still only ever see plain numbers.
+- `packages/engine`: **the full transition system** — 16 in/out types (Fade, Wipe, Wipe Vertical, From Middle, To Middle, Square Explode/Implode, Circle Explode/Implode, Clock, Blinds, Slide Bars, Bow Tie, Star, Checkerboard, Ripple) with pattern density and reverse. Each is an order field (`order(x,y) <= progress`), which makes "reveals nothing at 0, everything at 1, monotonically in between" true by construction for every type — and asserted for all 16.
+- `packages/engine`: **audio analysis** (`audio.ts`) — a windowed radix-2 FFT producing a per-frame level and log-spaced spectrum for the whole track, computed once on load. Offline rather than a live `AnalyserNode` on purpose: rendering must be deterministic, and a full export runs faster than real time, so the preview and the `.fseq` export read the same numbers by construction.
+- `apps/web`: **the 3D visualizer**, built out from the fixed-camera point cloud — orbit/zoom/pan, per-model depth from the layout's own `WorldPosZ`, round glow bulbs (generated sprite + an additive bloom pass, no post-processing chain), a ground grid sized to the show, front/left/right/top camera presets, live node-size/glow/grid controls, and an Expand mode. The playhead is now driven by `requestAnimationFrame` while playing instead of the `<audio>` element's ~4Hz `timeupdate`, so a sequence plays back smoothly rather than in visible steps; engine re-renders are still gated on the sequence's own frame rate.
+- `apps/web`: `ValueCurveEditor.vue` (shape picker, range, cycles/phase, reverse, six presets, and a click/drag/shift-click point editor over a live plot), transition controls in the props panel, text and image inputs, and a warning when an audio-reactive effect is placed with no track loaded. `/docs` gains value-curve, transition and audio-reactive sections; the effect reference still generates itself from `EFFECT_SCHEMAS`.
+- `apps/web`: the preview's palette and RNG seed moved into `lib/renderSettings.ts`, shared with the exporter — they were duplicated constants in two files, which is exactly how a preview quietly stops matching its export.
+- Three bugs the new tests caught in the new code: Plasma's phase advanced in multiples of 2π, so at whole-number Speeds it rendered an identical "animated" frame at positions 0.5 and 1.0; Pictures sheared by one source row because the vertical flip was applied to the coordinate rather than the row index; and Curtain slammed shut on its own final frame because the sawtooth position wraps to 0 at 1.0.
 
 ## M9 — Hardening + parity harness + docs (reduced scope)
 

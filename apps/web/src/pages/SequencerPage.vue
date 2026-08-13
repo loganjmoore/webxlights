@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { EFFECT_SCHEMAS, defaultParamsFor, type BlendMode } from "@webxlights/engine";
-import { api, type ControllerRecord, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
+import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
@@ -293,7 +293,7 @@ function handleContextAction(action: string): void {
   }
 }
 
-function handleParamsUpdate(params: Record<string, number | boolean | string>): void {
+function handleParamsUpdate(params: Record<string, EffectParamValue>): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { params });
 }
 function handlePaletteUpdate(palette: string[]): void {

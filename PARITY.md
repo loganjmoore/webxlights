@@ -20,6 +20,8 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Structural property editor (# Strings, Tree Degrees/Type, Matrix size, etc.) | ⚠️ | Layout page "Properties" panel (M15.2), scoped to exactly the `raw_attrs` keys `computeGeometryFromAttrs` reads per type — every field has a real, visible effect. Real xLights' fuller property grid (Rotation/Spiral Wraps/Perspective on Tree, matrix wiring direction, etc.) isn't offered since this engine doesn't render those attributes yet |
 | 3D rendering fidelity (textures, mesh/GDTF objects, per-preview cameras) | ❌ | Non-goal for v1 (SPEC ch5) — M12 reverses only the "no 3D editing" non-goal, not rendering fidelity |
 | View objects (`<view_objects>`: Gridlines, Mesh, Terrain, Ruler, Image, Controller) | ⚠️ | A separate XML element from `<models>`, previously not parsed at all (every real show's Gridlines helper was silently dropped on import). Gridlines imports and renders in both 2D (flat X/Y reference grid) and 3D (a proper ground-plane grid respecting independent Width/Height and the real RotateX/Y/Z) as of M15.7, matching the Layout page's real "Active" checkbox. Mesh/Terrain/Ruler/Image/Controller import (kept, not silently lost) but don't render — Mesh/Terrain need an OBJ/heightmap loader this engine doesn't have |
+| 3D preview / house visualizer | ✅ | Three.js, orbit/zoom/pan, per-model depth from `WorldPosZ`, glow bulbs, ground grid, camera presets, plays the sequence at display refresh rate |
+| 3D layout *editing*, view objects, mesh/GDTF | ❌ | Non-goal for v1 (SPEC ch5) — models are still positioned in the 2D layout, the 3D view is display-only |
 | DMX moving-head/servo/skull family | ❌ | Non-goal for v1 (SPEC ch4 §5) |
 
 ## Sequencer (SPEC ch6)
@@ -41,7 +43,7 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 
 | Feature | Status | Notes |
 |---|---|---|
-| Effects implemented | ⚠️ | 15 of ~56 named effects (On, Bars, Color Wash, Fire, Meteors, Butterfly, SingleStrand, Snowflakes, Spirals, Twinkle, Strobe, Ripple, Wave, Pinwheel, Shockwave) |
+| Effects implemented | ⚠️ | 25 of ~56 named effects (On, Bars, Color Wash, Fire, Meteors, Butterfly, SingleStrand, Snowflakes, Spirals, Twinkle, Strobe, Ripple, Wave, Pinwheel, Shockwave, Garlands, Curtain, Plasma, Galaxy, Fan, Marquee, Circles, Text, Pictures, VU Meter) |
 | Each implemented effect's default/common render path | ✅ | Faithful to the SPEC's math; rarer option combinations (alternate directions, other render methods, etc.) are per-effect documented ceilings — see DECISIONS.md M3/M6 notes |
 | Per-effect Color palette | ⚠️ | Real xLights' Color tab: 1–6 swatches per effect (M15.3), editable via the Sequencer's effect panel, falling back to the app-wide default when unset. Multi-color blending across the palette (`multiColorBlend`) already existed for effects that use it; still missing real xLights' per-swatch checkboxes ("C"/"c" toggles), palette presets, and the "colors reflect music" audio-reactive option |
 | Shader (ISF), Liquid, Glediator, Video, VUMeter | ❌ | Non-goal for v1 / no audio-reactive pipeline yet |
@@ -49,6 +51,13 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | "Mix" / Effect Mix Threshold slider | ⚠️ | The reveal/fade threshold some blend modes read - implemented since M3, wired to a UI slider in M15.4 (was hardcoded 0 everywhere) |
 | Value curves | ⚠️ | One type (Ramp/linear), wired to one param (`On.transparencyPct`) as a proof of the mechanism |
 | Transitions | ⚠️ | Fade In/Out only (no Wipe/From Middle/Circle Explode), and now actually settable via the Layer Blending panel's Fade In/Fade Out (ms) fields (M15.4) - `TransitionSpec`/`applyFadeTransition` were fully implemented since M3 but had zero UI or import path reaching them until this pass |
+| Audio-reactive effects (VU Meter) | ⚠️ | 7 of ~20 VU Meter types (Spectrum, Volume Bars, Level Bar, Level Pulse, Level Color, Intensity Wave, Waveform), on an offline per-frame FFT of the loaded track |
+| Text effect | ⚠️ | Built-in 5×7 bitmap font only — no system font picker, outline/shadow options, or multi-line layout |
+| Pictures effect | ⚠️ | Images stored in the sequence body, downscaled to 64px on the long edge (no asset store yet) |
+| Shader (ISF), Liquid, Glediator, Video | ❌ | Non-goal for v1 |
+| Layer blend modes | ⚠️ | 10 of 24 (Normal, Effect 1/2, Average, Additive, Subtractive, Max, Min, 1/2 reveals) |
+| Value curves | ✅ | All 16 types (Flat, Ramp, Ramp Up/Down, Ramp Down/Up, Saw Tooth, Triangle, Sine, Abs Sine, Square, Parabolic Up/Down, Logarithmic Up/Down, Exponential Up/Down, Custom) with cycles/phase/reverse and a point editor, applied to every VC-flagged param of every effect |
+| Transitions | ✅ | 16 types (Fade, Wipe, Wipe Vertical, From Middle, To Middle, Square Explode/Implode, Circle Explode/Implode, Clock, Blinds, Slide Bars, Bow Tie, Star, Checkerboard, Ripple), in and out, with pattern density and reverse |
 | Buffer styles / sub-buffers | ❌ | Every effect renders into the model's default full buffer |
 
 ## File formats (SPEC ch11)
@@ -58,6 +67,9 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | `.xlights_rgbeffects.xml` import | ⚠️ | Unsupported `DisplayAs` types import as labeled placeholders, not dropped. Verified live M15.1 against a real 120-model/11-group show: legacy style-variant spellings ("Tree 360", "Horiz/Vert Matrix" — what xLights actually writes to disk for those types) are normalized to their canonical type before the supported-type check (fixed M15.1 — previously 29% of this real file's models were wrongly downgraded). Genuinely-unsupported types (`DmxServo`, `DmxGeneral`, `Cube`) remain labeled placeholders as designed |
 | `.xsq` import | ⚠️ | 5 of 15 implemented effects get full param translation; others import with correct name/timing and the engine's own schema-default params (fixed M15.1 — previously imported with empty `{}` params, which crashed `.fseq` export for 10 of those 15 effects). Model rows match by exact name; a name miss now falls back to matching a Model Group before being reported unmatched (fixed M15.1 — real real-world sequences commonly target groups: 37% of one real show's targeted elements). The unmatched-models/untranslated-effects summary is now actually shown to the user as a dismissible banner on the Sequencer page (fixed M15.1 — previously computed then discarded by navigation). Verified live M15.1 against a real 30-row/804-effect sequence |
 | `.fseq` export | ⚠️ | V2 uncompressed only (no zlib/zstd). Channel allocation is real controller-based addressing, not placeholder (M11). A Model Group's effects do not reach the export (`fseqExport.ts` only reads `elementType === "model"` rows) — a real, undocumented-until-M15.1 gap; 37% of one real show's targeted elements are groups. Verified live M15.1: exported a real 4829-frame/588MB file from a real show and opened it in the real desktop xLights app (File → Open Sequence) — opened cleanly, correctly correlated channels back to real model/group names, effect timing matched webXLights' own Sequencer. The one thing M15 flagged as never actually checked |
+| `.xlights_rgbeffects.xml` import | ⚠️ | Unsupported `DisplayAs` types import as labeled placeholders, not dropped |
+| `.xsq` import | ⚠️ | 5 of 25 implemented effects get full param translation; others import with correct name/timing, schema-default params; exact-name-only model matching |
+| `.fseq` export | ⚠️ | V2 uncompressed only (no zlib/zstd); placeholder channel layout (no real controller/universe allocation) |
 | `.fseq` import | ❌ | Not implemented |
 | `.xmodel`, `.xtiming`, `.xmap`, `.xpreset` | ❌ | Not implemented |
 | `xlights_networks.xml` (controllers/outputs) | ❌ | Non-goal for v1 — display/export math only, no controller upload |
@@ -118,5 +130,5 @@ the SPEC's own `AGENTS.md`). This needs a real xLights install to run headless i
 isn't available in this environment — building the harness's plumbing without ever running it
 against real xLights output wouldn't actually prove anything. Documented here as a real gap, not
 attempted, rather than claimed done. The engine's own golden-frame and determinism tests (106
-tests in `packages/engine`, hand-computed where the math is tractable by hand) are the
-practical substitute today.
+tests in `packages/engine` at M9, hand-computed where the math is tractable by hand) are the
+practical substitute today (234 tests in `packages/engine` as of the M6-completion pass).
