@@ -97,6 +97,17 @@ export function appliedPlacementFor(displayAs: string, attrs: Record<string, str
   return Math.hypot(dx, dy) < 1e-9 ? "boxed" : system;
 }
 
+// Which of a boxed model's scale attributes were stored negative. The importer reads them as
+// magnitudes (see screenFromAttrs), which is a real decision about someone's show, so it is
+// reported rather than applied silently: a file where this fires on nothing, yet still imports
+// models upside down, is telling you the cause is something else - RotateZ, most likely.
+export function negativeScaleAttrs(attrs: Record<string, string>): string[] {
+  return ["ScaleX", "ScaleY", "ScaleZ"].filter((key) => {
+    const parsed = parseFloat(attrs[key] ?? "");
+    return Number.isFinite(parsed) && parsed < 0;
+  });
+}
+
 // Local (unscaled, unrotated) size of a shape, in the same units node.screenX/Y are in.
 function localSize(geo: ModelGeometry | null): { width: number; height: number } {
   if (!geo || geo.nodes.length === 0) return { width: 1, height: 1 };
@@ -136,18 +147,36 @@ export function screenFromAttrs(
   if (system === "boxed") {
     const perLocal = unitsPerLocal || 1;
     const rotate = num(attrs, "RotateZ", 0);
+    // A boxed model's scale carries a sign, and taking it at face value turned trees upside
+    // down. xLights' model-local Y runs the other way from ours - its render buffer's row 0 is
+    // the top, ours is the bottom (models/matrix.ts) - so a negative scale there is how a model
+    // is drawn the right way up, not an instruction to mirror it. Applying it to geometry that
+    // is already the right way up flips it: a mega tree stood on its point.
+    //
+    // Only the magnitude is used. The cost is that a model somebody deliberately mirrored in
+    // xLights comes in unmirrored; the alternative was every tree in every show upside down,
+    // and asymmetric props (trees, icicles, window frames) are exactly the ones it ruins.
+    // `negativeScaleAttrs` reports it so an import can say how many models this touched.
+    const sx = Math.abs(num(attrs, "ScaleX", 1));
+    const sy = attrs.ScaleY !== undefined ? Math.abs(num(attrs, "ScaleY", 1)) : undefined;
+    const sz = attrs.ScaleZ !== undefined ? Math.abs(num(attrs, "ScaleZ", 1)) : undefined;
 
     if (boxedScale === "worldSize") {
       // ScaleX is the world width outright, so the shape is normalised into it: our renderers
       // draw a model at localExtent x screen.scale x unitsPerLocal, and that has to come out
       // equal to ScaleX.
       const size = localSize(geo);
-      const scaleX = num(attrs, "ScaleX", 1) / (size.width * perLocal);
-      const scaleY = attrs.ScaleY !== undefined ? num(attrs, "ScaleY", 1) / (size.height * perLocal) : undefined;
       // Depth has no local extent to divide by (a flat model's is zero), so it follows X - the
       // same thing every other placement system does with Z.
-      const scaleZ = attrs.ScaleZ !== undefined ? num(attrs, "ScaleZ", 1) / (size.width * perLocal) : undefined;
-      return { x: x1, y: y1, z: z1, scale: scaleX, scaleY, scaleZ, rotate };
+      return {
+        x: x1,
+        y: y1,
+        z: z1,
+        scale: sx / (size.width * perLocal),
+        scaleY: sy === undefined ? undefined : sy / (size.height * perLocal),
+        scaleZ: sz === undefined ? undefined : sz / (size.width * perLocal),
+        rotate,
+      };
     }
 
     // perNode: ScaleX multiplies a render size measured in node units, so a show's ScaleX
@@ -157,10 +186,15 @@ export function screenFromAttrs(
     //
     //     localExtent x ourScale x unitsPerLocal  ==  ScaleX x localExtent
     //     => ourScale = ScaleX / unitsPerLocal
-    const scaleX = num(attrs, "ScaleX", 1) / perLocal;
-    const scaleYRaw = attrs.ScaleY !== undefined ? num(attrs, "ScaleY", 1) / perLocal : undefined;
-    const scaleZRaw = attrs.ScaleZ !== undefined ? num(attrs, "ScaleZ", 1) / perLocal : undefined;
-    return { x: x1, y: y1, z: z1, scale: scaleX, scaleY: scaleYRaw, scaleZ: scaleZRaw, rotate };
+    return {
+      x: x1,
+      y: y1,
+      z: z1,
+      scale: sx / perLocal,
+      scaleY: sy === undefined ? undefined : sy / perLocal,
+      scaleZ: sz === undefined ? undefined : sz / perLocal,
+      rotate,
+    };
   }
 
   if (system === "polyLine") {

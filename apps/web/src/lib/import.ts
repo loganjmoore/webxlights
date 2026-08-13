@@ -3,6 +3,7 @@ import {
   appliedPlacementFor,
   chooseBoxedScaleReading,
   computeGeometryFromAttrs,
+  negativeScaleAttrs,
   screenFromAttrs,
   type BoxedScaleChoice,
   type ModelGeometry,
@@ -33,6 +34,12 @@ export interface ImportSummary {
   placement: { boxed: number; twoPoint: number; threePoint: number; polyLine: number };
   // Which reading of ScaleX the boxed models were placed with, and what it was decided from.
   boxedScale: BoxedScaleChoice;
+  // How many models stored a negative scale. The importer reads those as magnitudes, because in
+  // xLights a negative scale is how a model whose local Y runs the other way is drawn upright,
+  // not a mirror - taking it literally stood trees on their points. Reported because it is a
+  // real decision about someone's show: a file where this is 0 but models still import upside
+  // down is saying the cause is something else.
+  negativeScales: number;
 }
 
 // SPEC ch11 §2.1. Which attributes mean what depends on the model's placement system, which
@@ -75,7 +82,9 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
   }));
 
   const placement = { boxed: 0, twoPoint: 0, threePoint: 0, polyLine: 0 };
+  let negativeScales = 0;
   for (const m of parsed.models) {
+    if (negativeScaleAttrs(m.attrs).length > 0) negativeScales++;
     const applied = appliedPlacementFor(m.displayAs, m.attrs);
     if (applied === "twoPoint") placement.twoPoint++;
     else if (applied === "threePoint") placement.threePoint++;
@@ -98,5 +107,5 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
   }));
   if (viewObjects.length > 0) await api.bulkUpsertViewObjects(layoutId, viewObjects);
 
-  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length, placement, boxedScale };
+  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length, placement, boxedScale, negativeScales };
 }

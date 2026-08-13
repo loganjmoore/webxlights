@@ -433,6 +433,9 @@ async function handleFileChange(e: Event): Promise<void> {
       (summary.boxedScale.decided
         ? ` — boxed sizes read as ${BOXED_SCALE_LABEL[summary.boxedScale.reading]}, matched against ${summary.boxedScale.referenceCount} models sized by their endpoints`
         : ` — boxed sizes read as ${BOXED_SCALE_LABEL[summary.boxedScale.reading]} (nothing in this file to check it against)`) +
+      (summary.negativeScales
+        ? ` — ${summary.negativeScales} ${summary.negativeScales === 1 ? "model" : "models"} had a negative scale, read as upright`
+        : "") +
       (summary.unsupported.length ? ` — unsupported types kept but not rendered: ${summary.unsupported.join(", ")}` : "");
   } catch (err) {
     importMessage.value = err instanceof Error ? `Import failed: ${err.message}` : "Import failed";
