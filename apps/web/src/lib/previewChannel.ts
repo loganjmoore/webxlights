@@ -1,3 +1,4 @@
+import { toRaw } from "vue";
 import type { AudioSeries } from "@webxlights/engine";
 import type { ModelRecord, SequenceBody } from "./api";
 
@@ -50,6 +51,35 @@ export interface PreviewAudio {
 }
 
 export type PreviewMessage = PreviewSnapshot | PreviewTransport | PreviewHello | PreviewCommand | PreviewAudio;
+
+// Every message on this channel goes through here, because BroadcastChannel structured-clones
+// its payload and a Vue reactive object is a Proxy, which structured clone refuses. Passing a
+// ref's `.value` straight in throws "could not be cloned" - and because the throw happens
+// synchronously inside an event handler, it reached the app's global error overlay and took
+// down the whole sequencer tab over a preview window that failed to sync.
+//
+// So: unwrap to plain data first, and treat a send that still fails as a preview that didn't
+// update rather than as a fatal error. `toRaw` handles the common case cheaply (it returns the
+// underlying object a ref/reactive wraps); the JSON round trip is the fallback for anything
+// still holding a nested proxy, and it is only paid when the cheap path wasn't enough.
+export function postPreviewMessage(channel: BroadcastChannel | null, message: PreviewMessage): boolean {
+  if (!channel) return false;
+  const plain = toRaw(message);
+  try {
+    channel.postMessage(plain);
+    return true;
+  } catch {
+    try {
+      channel.postMessage(JSON.parse(JSON.stringify(plain)) as PreviewMessage);
+      return true;
+    } catch (err) {
+      // A preview window that misses one update is a cosmetic problem; it asks for a fresh
+      // snapshot when it reloads. Crashing the tab that owns the audio is not.
+      console.warn("preview sync skipped a message", err);
+      return false;
+    }
+  }
+}
 
 export function previewChannelName(sequenceId: number): string {
   return `webxlights-preview-${sequenceId}`;

@@ -1,5 +1,19 @@
 # Changelog
 
+## The popped-out preview no longer takes the sequencer down with it
+
+Opening the pop-out threw `Failed to execute 'postMessage' on 'BroadcastChannel': could not be cloned` and put the sequencer tab behind a "Something went wrong" overlay.
+
+BroadcastChannel structured-clones its payload, and a Vue reactive object is a Proxy, which structured clone refuses. The snapshot sent when a preview window says hello carried `models` straight from a `ref`, so it was a proxy — and because the throw happened synchronously inside an event handler it reached the app's global error boundary and took down the tab that owns the audio.
+
+Two changes, because either one alone leaves the failure mode:
+
+- **The snapshot is unwrapped to plain data** before it goes on the channel, the same way `body` already was.
+- **Every message now goes through one helper** that unwraps reactivity, falls back to a JSON round trip, and treats a send that still fails as a preview that missed an update rather than as a fatal error. A preview window asks for a fresh snapshot when it reloads; crashing the sequencer over it was never the right trade.
+
+Verified by driving the real pop-out: the window opens, reports "Following sequencer", renders the house, and its Play button drives the sequencer tab's audio — with the fix reverted, the same script reproduces the overlay and the transport does nothing.
+
+
 ## Trees stood on their points, and models imported at default sizes
 
 Both reported from a real show ("trees are upside down… the models are also not necessarily the correct scale"), and both reproduced by importing tree variants through the real app and looking at them.
