@@ -19,15 +19,24 @@ import { transformedHalfExtents } from "./transform";
 // fine.
 export type PlacementSystem = "boxed" | "twoPoint" | "threePoint";
 
-// From xLights' model classes: which ModelScreenLocation each DisplayAs uses. Poly Line's
-// PolyPointScreenLocation (NumPoints/PointData) is a fourth system, still unimplemented - it
-// falls back to boxed, same as before, rather than being silently mis-placed by the two-point
-// math (see PARITY.md).
+// Which system each DisplayAs uses, confirmed against the xLights manual's own Layout
+// descriptions rather than inferred from the shape alone: a Single Line is drawn
+// between a green start handle and a blue end handle (two point); Candy Canes add a third
+// handle; and Icicles are placed by dragging "the green or top blue pixel to hang the icicles
+// at an angle and then ... the lower blue pixel to cause the drop to shear" - three handles,
+// so Icicles is a three-point model, not the two-point one this originally assumed. Arches are
+// the same shape of prop as Candy Canes (a run along a line with an arc height) and are
+// treated as three-point too; the manual's Arches page documents its properties but not its
+// handles, so that one is inference rather than quotation.
+//
+// Poly Line's PolyPointScreenLocation (NumPoints/PointData) is a fourth system, still
+// unimplemented - it falls back to boxed rather than being silently mis-placed by two-point
+// math that doesn't describe it (see PARITY.md).
 const PLACEMENT_BY_TYPE: Record<string, PlacementSystem> = {
   "Single Line": "twoPoint",
-  Icicles: "twoPoint",
   Arches: "threePoint",
   "Candy Canes": "threePoint",
+  Icicles: "threePoint",
 };
 
 export function placementSystemFor(displayAs: string): PlacementSystem {
@@ -118,6 +127,14 @@ export function screenFromAttrs(
   // Three point: Height is a multiple of the model's length (xLights' own convention - an arch
   // with height 1 is as tall as it is wide), which is what makes a 5-arch set import as arches
   // rather than as flat lines.
+  //
+  // When the attribute is absent, keep the shape's own proportions instead of assuming
+  // height == length. Defaulting Height to 1 is badly wrong for the props that have it: a run
+  // of icicles is a fraction as deep as it is wide, and squaring it up would drop the drops
+  // most of the way down the yard.
+  if (attrs.Height === undefined) {
+    return { x, y, z, scale, scaleY: scale, scaleZ: scale, rotate };
+  }
   const height = num(attrs, "Height", 1);
   const scaleY = (length * height) / (size.height * unitsPerLocal);
   return { x, y, z, scale, scaleY, scaleZ: scale, rotate };

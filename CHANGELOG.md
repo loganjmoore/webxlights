@@ -1,5 +1,13 @@
 # Changelog
 
+## Placement corrected against the xLights manual
+
+Checking the placement systems against the manual's own Layout documentation, rather than against inference from each prop's shape, found one wrong mapping and one bad default.
+
+- **Icicles is three-point, not two-point** — the manual places it by dragging "the green or top blue pixel to hang the icicles at an angle and then ... the lower blue pixel to cause the drop to shear". Three handles.
+- **A three-point model with no `Height` keeps its own proportions** instead of defaulting `Height` to 1 ("as tall as it is wide"). Roughly right for an arch; badly wrong for icicles, which would have hung most of the way down the yard.
+- Confirmed rather than assumed from the same source: "XYZ are the center point of the model", "ScaleXYZ determine the size of the model", and that a Single Line runs between a green start handle and a blue end handle while Candy Canes add a third. Arches stay an inference — the manual documents their properties but not their handles.
+
 ## Restore the M6 work that PRs #2–#10 reverted
 
 PR #1 (25 effects, the full value-curve and transition systems, audio reactivity) merged on 10 Aug. The parallel `claude/xlights-visual-drag-drop-hild31` branch behind PRs #2–#10 had been cut from main *before* that merge, so merging it reverted those files — `main` has been running 15 effects, one value-curve type and fade-only transitions ever since, with `packages/engine/src/effects/{garlands,curtain,plasma,galaxy,fan,marquee,circles,text,pictures,vuMeter}.ts` and `audio.ts` simply gone. Recovered by cherry-picking `refs/pull/1/head` onto current main.
