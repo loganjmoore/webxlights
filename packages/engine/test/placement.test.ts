@@ -26,7 +26,7 @@ describe("xLights placement systems (SPEC ch11 §2.1)", () => {
     expect(placementSystemFor("Tree")).toBe("boxed");
     expect(placementSystemFor("Custom")).toBe("boxed");
     expect(placementSystemFor("Single Line")).toBe("twoPoint");
-    expect(placementSystemFor("Icicles")).toBe("twoPoint");
+    expect(placementSystemFor("Icicles")).toBe("threePoint"); // three handles: start, end, shear
     expect(placementSystemFor("Arches")).toBe("threePoint");
     expect(placementSystemFor("Candy Canes")).toBe("threePoint");
     // Poly Line's own PolyPointScreenLocation isn't implemented - it must fall back to boxed,
@@ -102,6 +102,13 @@ describe("xLights placement systems (SPEC ch11 §2.1)", () => {
 
     const renderedHeight = transformedHalfExtents(g, { scale: tall.scale, scaleY: tall.scaleY, rotateDeg: 0 }).halfH * 2 * SPACING;
     expect(renderedHeight).toBeCloseTo(200, 4); // Height 1 == as tall as it is wide
+  });
+
+  it("a three-point model with no Height keeps its own proportions", () => {
+    // Defaulting Height to 1 would make a run of icicles as deep as it is wide.
+    const g = geo("Icicles", { NumStrings: "1", NodesPerString: "60" });
+    const screen = screenFromAttrs("Icicles", { WorldPosX: "0", WorldPosY: "0", X2: "250", Y2: "0" }, g, SPACING);
+    expect(screen.scaleY).toBeCloseTo(screen.scale);
   });
 
   it("a missing endpoint vector falls back to the boxed reading instead of collapsing", () => {

@@ -776,6 +776,28 @@ lighting hardware, and the Render/Postgres deployment path (the local run swaps 
   it wraps to 0 at position 1.0 — a curtain that had just finished opening slammed closed for
   one frame at the end of the effect. The final cycle now holds at 1.
 
+## Placement corrected against the xLights manual (not just inferred)
+
+The placement systems were derived from how xLights *stores* models plus reasoning about each
+prop's shape. Checking that against the manual's own Layout documentation turned up one wrong
+mapping and one bad default:
+
+- **Icicles is a three-point model, not two-point.** The manual describes placing it by
+  dragging "the green or top blue pixel to hang the icicles at an angle and then ... the lower
+  blue pixel to cause the drop to shear" - three handles, not two.
+- **A three-point model with no `Height` attribute now keeps its own proportions** instead of
+  defaulting `Height` to 1. That default means "as tall as it is wide", which is roughly right
+  for an arch and badly wrong for the prop this correction just moved into the category: a run
+  of icicles is a fraction as deep as it is wide, and squaring it up would hang the drops most
+  of the way down the yard.
+
+Also confirmed rather than assumed, from the same source: "XYZ are the center point of the
+model" and "ScaleXYZ determine the size of the model" (boxed models), and that a Single Line is
+drawn between a green start handle and a blue end handle while Candy Canes add a third. Arches
+remain an inference - the manual documents their properties (# Arches, Arc Degrees, Arch Tilt)
+but not their handles - and they're treated as three-point on the grounds that they're the same
+shape of prop as Candy Canes.
+
 ## Bugs found only by actually running the UI (not caught by typecheck/lint)
 
 - **`overflow-y: auto` with no explicit `overflow-x` silently computes `overflow-x` to `auto` too**: `SequencerGrid.vue`'s `.grid-scroll-viewport` needed vertical scroll only (the canvas handles its own horizontal sizing, scrolled by the page's outer `.h-scroll` wrapper) — but per the CSS Overflow spec, when one of `overflow-x`/`overflow-y` is non-`visible` and the other is left at the `visible` default, the `visible` one computes to `auto` too. This turned `.grid-scroll-viewport` into a second, narrower horizontal scroll container that silently clipped the widened (post-M10) canvas to its own ~880px box, before the outer wrapper's scroll ever got a chance to reveal the rest — invisible in code review (the CSS reads correctly as "vertical scroll only"), only caught by actually zooming in and scrolling in a live browser and finding effects that `getImageData` proved were drawn but weren't on screen. Fixed with an explicit `overflow-x: visible`. General lesson: never set only one of `overflow-x`/`overflow-y` without deciding what the other one should compute to.
