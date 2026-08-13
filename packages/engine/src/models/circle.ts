@@ -1,4 +1,5 @@
 import type { ModelGeometry, ModelNode } from "./types";
+import { ringRadiusForNodeCount } from "./units";
 
 export interface CircleParams {
   strings: number;
@@ -16,6 +17,9 @@ export function computeCircle(params: CircleParams): ModelGeometry {
 
   const nodes: ModelNode[] = [];
   const numLayers = layerSizes.length;
+  // Outer ring sized so adjacent nodes sit ~1 local unit apart, the same unit every other
+  // model type uses (units.ts) - not a normalized unit circle.
+  const outerRadius = ringRadiusForNodeCount(Math.max(...layerSizes));
   let idx = 0;
   for (let layer = 0; layer < numLayers; layer++) {
     const size = layerSizes[layer]!;
@@ -23,8 +27,8 @@ export function computeCircle(params: CircleParams): ModelGeometry {
     const radius = numLayers > 1 ? 1 - (layer / (numLayers - 1)) * (1 - centerPercent / 100) : 1;
     for (let n = 0; n < size; n++) {
       const angle = (n / size) * 2 * Math.PI;
-      const screenX = Math.cos(angle) * radius;
-      const screenY = Math.sin(angle) * radius;
+      const screenX = Math.cos(angle) * radius * outerRadius;
+      const screenY = Math.sin(angle) * radius * outerRadius;
       nodes.push({ bufX: n, bufY: layer, screenX, screenY, string: layer, indexInString: n });
       idx++;
     }

@@ -1,4 +1,5 @@
 import type { ModelGeometry, ModelNode } from "./types";
+import { ringRadiusForNodeCount } from "./units";
 
 export interface StarParams {
   strings: number;
@@ -23,8 +24,9 @@ export function computeStar(params: StarParams): ModelGeometry {
     const pointPhase = (t * points) % 1;
     const triangle = pointPhase < 0.5 ? pointPhase * 2 : 2 - pointPhase * 2;
     const radius = 1 / ratio + (1 - 1 / ratio) * triangle;
-    const screenX = Math.cos(angle) * radius;
-    const screenY = Math.sin(angle) * radius;
+    // scaled into node units (units.ts), like every other model type
+    const screenX = Math.cos(angle) * radius * ringRadiusForNodeCount(total);
+    const screenY = Math.sin(angle) * radius * ringRadiusForNodeCount(total);
     nodes.push({ bufX: n, bufY: 0, screenX, screenY, string: 0, indexInString: n });
   }
   return { width: total, height: 1, nodes };

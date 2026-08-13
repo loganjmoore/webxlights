@@ -587,6 +587,49 @@ Reading a two- or three-point model as boxed puts it half its own length off-pos
 - **Not verified against a real xLights layout yet.** The repo's own fixture carries no positioning attributes at all, which is why this shipped wrong and stayed wrong. The math is unit-tested (span, angle, midpoint, Height), but confirming that an imported show *looks* like it does in xLights needs a real `xlights_rgbeffects.xml` with known positions to compare against.
 - Still unimplemented, recorded rather than approximated: Poly Line's `PolyPointScreenLocation` (`NumPoints`/`PointData`) - it falls back to boxed rather than being run through two-point math that doesn't apply to it - and the three-point `Shear`/`Angle` attributes.
 
+## Import scale: one unit convention, and what ScaleX actually multiplies (user-reported, screenshot-verified)
+
+Placement (the previous pass) fixed *where* two- and three-point models go. Side-by-side
+screenshots of the same 120-model show in real xLights and in webXLights showed the layout was
+still wrong in a second, independent way: models came out at wildly different sizes and piled
+on top of each other rather than spread across a yard.
+
+Two causes, both about units.
+
+**1. `screenX/screenY` didn't mean the same thing per model type.** Matrix, Single Line and
+Icicles placed nodes one unit apart (a 50-node line is 49 units long). Circle, Star and Wreath
+placed theirs on a *normalized unit circle*, so a 50-node ring and a 500-node ring were both 2
+units across. Auditing every type made the spread obvious - the ratio of buffer width to local
+extent ran from 1.02 (Matrix) to 26.29 (Star). `models/units.ts` now states the convention
+("one local unit == the spacing between two adjacent nodes") and the ring types scale their
+radius by `n / 2pi` to match it. Effect rendering is unaffected: effects address nodes through
+`bufX/bufY`, and `screenX/screenY` is purely layout-space position.
+
+**2. `ScaleX` was taken at face value.** xLights' ScaleX/Y/Z multiply the model's *render
+size*, which is measured in node units - so a real show's ScaleX values are tuned against node
+counts. Our renderers draw a model at `localExtent x screen.scale x unitsPerLocal`, so
+importing ScaleX unchanged inflated every boxed model by exactly `unitsPerLocal` (4x) on top of
+the per-type inconsistency above. Boxed placement now divides through:
+`ourScale = ScaleX / unitsPerLocal`, applied independently on X and Y so a model that is wide
+and short in xLights stays wide and short here.
+
+Rendering the same synthetic yard through the old and new code makes the difference concrete:
+the world bounding box went from **699 x 1840** (one model sprawling over everything, the rest
+crushed into two rows - which is exactly what the reported screenshot showed) to **514 x 460**,
+with each prop distinguishable. `test/yard-layout.test.ts` keeps the structural properties that
+told us it was broken: a yard-shaped bounding box, no single model covering more than 60% of
+the layout, distinct model centres, and two-point models spanning their declared run.
+`test/placement.test.ts` adds the cross-type invariant directly - two model types with the same
+ScaleX and the same node count must land within a small factor of each other, where rings used
+to be ~25x too small.
+
+**Still unverified against the real file.** These are structural fixes derived from comparing
+the two screenshots and from xLights' documented scale semantics, checked with unit tests and a
+synthetic yard - not from importing the user's own `xlights_rgbeffects.xml` and diffing
+positions. The absolute constant relating xLights world units to ours, and per-type render-size
+conventions for the odd shapes (Window Frame's buffer is an unwrapped perimeter, 132x1, so its
+buffer dimensions are not a spatial box), still want a real file to pin down.
+
 ## Bugs found only by actually running the UI (not caught by typecheck/lint)
 
 - **`overflow-y: auto` with no explicit `overflow-x` silently computes `overflow-x` to `auto` too**: `SequencerGrid.vue`'s `.grid-scroll-viewport` needed vertical scroll only (the canvas handles its own horizontal sizing, scrolled by the page's outer `.h-scroll` wrapper) — but per the CSS Overflow spec, when one of `overflow-x`/`overflow-y` is non-`visible` and the other is left at the `visible` default, the `visible` one computes to `auto` too. This turned `.grid-scroll-viewport` into a second, narrower horizontal scroll container that silently clipped the widened (post-M10) canvas to its own ~880px box, before the outer wrapper's scroll ever got a chance to reveal the rest — invisible in code review (the CSS reads correctly as "vertical scroll only"), only caught by actually zooming in and scrolling in a live browser and finding effects that `getImageData` proved were drawn but weren't on screen. Fixed with an explicit `overflow-x: visible`. General lesson: never set only one of `overflow-x`/`overflow-y` without deciding what the other one should compute to.
