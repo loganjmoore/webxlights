@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { DEFAULT_PALETTE_HEX, EFFECT_SCHEMAS, type BlendMode } from "@webxlights/engine";
-import type { SequenceEffect } from "../lib/api";
+import type { EffectParamValue, SequenceEffect } from "../lib/api";
 
 const MAX_COLORS = 6; // matches real xLights' Color tab swatch count
 
@@ -21,7 +21,7 @@ const BLEND_MODES: BlendMode[] = [
 
 const props = defineProps<{ effect: SequenceEffect | null }>();
 const emit = defineEmits<{
-  update: [params: Record<string, number | boolean | string>];
+  update: [params: Record<string, EffectParamValue>];
   updatePalette: [palette: string[]];
   updateBlend: [patch: { blendMode?: BlendMode; mix?: number }];
   updateTransition: [transition: { inDurationMs?: number; outDurationMs?: number }];
@@ -30,7 +30,7 @@ const emit = defineEmits<{
 const schema = computed(() => (props.effect ? EFFECT_SCHEMAS[props.effect.name] : undefined));
 const palette = computed(() => props.effect?.palette ?? DEFAULT_PALETTE_HEX);
 
-function setParam(key: string, value: number | boolean | string): void {
+function setParam(key: string, value: EffectParamValue): void {
   if (!props.effect) return;
   emit("update", { ...props.effect.params, [key]: value });
 }

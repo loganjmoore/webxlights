@@ -3,13 +3,13 @@
 export interface EffectParamSpec {
   key: string;
   label: string;
-  type: "intSlider" | "floatSlider" | "checkbox" | "choice";
+  type: "intSlider" | "floatSlider" | "checkbox" | "choice" | "text" | "image";
   min?: number;
   max?: number;
   step?: number;
   options?: string[]; // choice type only
   default: number | boolean | string;
-  valueCurve?: boolean; // has a "VC" button in xLights (stubbed until M6)
+  valueCurve?: boolean; // param accepts a ValueCurve as well as a flat number (valueCurve.ts)
 }
 
 export interface EffectSchema {
@@ -169,6 +169,140 @@ export const SHOCKWAVE_EFFECT_SCHEMA: EffectSchema = {
   ],
 };
 
+export const GARLANDS_EFFECT_SCHEMA: EffectSchema = {
+  name: "Garlands",
+  params: [
+    { key: "type", label: "Type", type: "intSlider", min: 0, max: 4, default: 0 },
+    { key: "spacing", label: "Spacing", type: "intSlider", min: 1, max: 100, default: 10, valueCurve: true },
+    { key: "speed", label: "Speed", type: "intSlider", min: 0, max: 50, default: 10, valueCurve: true },
+    { key: "fillPct", label: "Fill", type: "intSlider", min: 0, max: 100, default: 100, valueCurve: true },
+  ],
+};
+
+export const CURTAIN_EFFECT_SCHEMA: EffectSchema = {
+  name: "Curtain",
+  params: [
+    { key: "edge", label: "Edge", type: "choice", options: ["left", "right", "center", "top", "bottom"], default: "center" },
+    { key: "movement", label: "Movement", type: "choice", options: ["open", "close", "open then close", "close then open"], default: "open" },
+    { key: "swagPct", label: "Swag", type: "intSlider", min: 0, max: 100, default: 0, valueCurve: true },
+    { key: "repeat", label: "Repeat", type: "intSlider", min: 1, max: 10, default: 1 },
+    { key: "speed", label: "Speed", type: "intSlider", min: 0, max: 50, default: 10, valueCurve: true },
+  ],
+};
+
+export const PLASMA_EFFECT_SCHEMA: EffectSchema = {
+  name: "Plasma",
+  params: [
+    { key: "style", label: "Style", type: "intSlider", min: 1, max: 4, default: 1 },
+    { key: "lineDensity", label: "Line Density", type: "intSlider", min: 1, max: 10, default: 3, valueCurve: true },
+    { key: "speed", label: "Speed", type: "intSlider", min: 0, max: 50, default: 10, valueCurve: true },
+    { key: "colors", label: "Colors", type: "choice", options: ["palette", "rainbow"], default: "rainbow" },
+  ],
+};
+
+export const GALAXY_EFFECT_SCHEMA: EffectSchema = {
+  name: "Galaxy",
+  params: [
+    { key: "centerXPct", label: "Center X", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "centerYPct", label: "Center Y", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "startRadius", label: "Start Radius", type: "intSlider", min: 0, max: 200, default: 1, valueCurve: true },
+    { key: "endRadius", label: "End Radius", type: "intSlider", min: 0, max: 200, default: 20, valueCurve: true },
+    { key: "startAngleDeg", label: "Start Angle", type: "intSlider", min: 0, max: 360, default: 0, valueCurve: true },
+    { key: "revolutionsDeg", label: "Revolutions", type: "intSlider", min: 90, max: 3600, default: 1440, valueCurve: true },
+    { key: "startWidth", label: "Start Width", type: "intSlider", min: 1, max: 50, default: 5, valueCurve: true },
+    { key: "endWidth", label: "End Width", type: "intSlider", min: 1, max: 50, default: 2, valueCurve: true },
+    { key: "durationPct", label: "Duration", type: "intSlider", min: 1, max: 100, default: 100, valueCurve: true },
+    { key: "reverse", label: "Reverse", type: "checkbox", default: false },
+    { key: "blendEdges", label: "Blend Edges", type: "checkbox", default: true },
+    { key: "inward", label: "Inward", type: "checkbox", default: false },
+  ],
+};
+
+export const FAN_EFFECT_SCHEMA: EffectSchema = {
+  name: "Fan",
+  params: [
+    { key: "centerXPct", label: "Center X", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "centerYPct", label: "Center Y", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "startRadiusPct", label: "Start Radius", type: "intSlider", min: 0, max: 100, default: 10, valueCurve: true },
+    { key: "endRadiusPct", label: "End Radius", type: "intSlider", min: 0, max: 100, default: 80, valueCurve: true },
+    { key: "startAngleDeg", label: "Start Angle", type: "intSlider", min: 0, max: 360, default: 0, valueCurve: true },
+    { key: "revolutionsDeg", label: "Revolutions", type: "intSlider", min: 0, max: 3600, default: 720, valueCurve: true },
+    { key: "bladeCount", label: "Blades", type: "intSlider", min: 1, max: 10, default: 3 },
+    { key: "bladeWidthDeg", label: "Blade Width", type: "intSlider", min: 1, max: 360, default: 40, valueCurve: true },
+    { key: "bladeAngleDeg", label: "Blade Angle", type: "intSlider", min: -180, max: 180, default: 30, valueCurve: true },
+    { key: "elementCount", label: "Num Elements", type: "intSlider", min: 1, max: 8, default: 1 },
+    { key: "elementWidthPct", label: "Element Width", type: "intSlider", min: 1, max: 100, default: 100, valueCurve: true },
+    { key: "reverse", label: "Reverse", type: "checkbox", default: false },
+    { key: "blendEdges", label: "Blend Edges", type: "checkbox", default: true },
+  ],
+};
+
+export const MARQUEE_EFFECT_SCHEMA: EffectSchema = {
+  name: "Marquee",
+  params: [
+    { key: "bandCount", label: "Bands", type: "intSlider", min: 1, max: 10, default: 3 },
+    { key: "bandSize", label: "Band Size", type: "intSlider", min: 1, max: 50, default: 4, valueCurve: true },
+    { key: "skipSize", label: "Skip Size", type: "intSlider", min: 0, max: 50, default: 2, valueCurve: true },
+    { key: "thickness", label: "Thickness", type: "intSlider", min: 1, max: 10, default: 1, valueCurve: true },
+    { key: "stagger", label: "Stagger", type: "intSlider", min: -20, max: 20, default: 0, valueCurve: true },
+    { key: "speed", label: "Speed", type: "intSlider", min: 0, max: 50, default: 10, valueCurve: true },
+    { key: "reverse", label: "Reverse", type: "checkbox", default: false },
+  ],
+};
+
+export const CIRCLES_EFFECT_SCHEMA: EffectSchema = {
+  name: "Circles",
+  params: [
+    { key: "count", label: "Count", type: "intSlider", min: 1, max: 50, default: 5, valueCurve: true },
+    { key: "size", label: "Size", type: "intSlider", min: 1, max: 50, default: 4, valueCurve: true },
+    { key: "movement", label: "Movement", type: "choice", options: ["bounce", "radial", "explode", "none"], default: "bounce" },
+    { key: "speed", label: "Speed", type: "intSlider", min: 0, max: 50, default: 10, valueCurve: true },
+    { key: "fade", label: "Fade Edges", type: "checkbox", default: false },
+    { key: "bubbles", label: "Bubbles", type: "checkbox", default: false },
+  ],
+};
+
+export const TEXT_EFFECT_SCHEMA: EffectSchema = {
+  name: "Text",
+  params: [
+    { key: "text", label: "Text", type: "text", default: "MERRY CHRISTMAS" },
+    { key: "scale", label: "Size", type: "intSlider", min: 1, max: 4, default: 1 },
+    { key: "movement", label: "Movement", type: "choice", options: ["none", "left", "right", "up", "down"], default: "left" },
+    { key: "speed", label: "Speed", type: "intSlider", min: 0, max: 50, default: 1, valueCurve: true },
+    { key: "xOffsetPct", label: "X Offset", type: "intSlider", min: -100, max: 100, default: 0, valueCurve: true },
+    { key: "yOffsetPct", label: "Y Offset", type: "intSlider", min: -100, max: 100, default: 0, valueCurve: true },
+    { key: "perCharacterColor", label: "Color per Character", type: "checkbox", default: false },
+  ],
+};
+
+export const PICTURES_EFFECT_SCHEMA: EffectSchema = {
+  name: "Pictures",
+  params: [
+    { key: "image", label: "Image", type: "image", default: "" },
+    { key: "scaleMode", label: "Scale", type: "choice", options: ["fit", "stretch", "none"], default: "fit" },
+    { key: "movement", label: "Movement", type: "choice", options: ["none", "left", "right", "up", "down", "scaled"], default: "none" },
+    { key: "speed", label: "Speed", type: "intSlider", min: 0, max: 50, default: 1, valueCurve: true },
+    { key: "transparentBlack", label: "Black is Transparent", type: "checkbox", default: false },
+    { key: "brightnessPct", label: "Brightness", type: "intSlider", min: 0, max: 100, default: 100, valueCurve: true },
+  ],
+};
+
+export const VU_METER_EFFECT_SCHEMA: EffectSchema = {
+  name: "VU Meter",
+  params: [
+    {
+      key: "type",
+      label: "Type",
+      type: "choice",
+      options: ["Spectrum", "Volume Bars", "Level Bar", "Level Pulse", "Level Color", "Intensity Wave", "Waveform"],
+      default: "Spectrum",
+    },
+    { key: "bars", label: "Bars", type: "intSlider", min: 1, max: 32, default: 12, valueCurve: true },
+    { key: "gainPct", label: "Gain", type: "intSlider", min: 0, max: 300, default: 100, valueCurve: true },
+    { key: "sensitivityPct", label: "Sensitivity", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+  ],
+};
+
 export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   On: ON_EFFECT_SCHEMA,
   Bars: BARS_EFFECT_SCHEMA,
@@ -185,7 +319,21 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Wave: WAVE_EFFECT_SCHEMA,
   Pinwheel: PINWHEEL_EFFECT_SCHEMA,
   Shockwave: SHOCKWAVE_EFFECT_SCHEMA,
+  Garlands: GARLANDS_EFFECT_SCHEMA,
+  Curtain: CURTAIN_EFFECT_SCHEMA,
+  Plasma: PLASMA_EFFECT_SCHEMA,
+  Galaxy: GALAXY_EFFECT_SCHEMA,
+  Fan: FAN_EFFECT_SCHEMA,
+  Marquee: MARQUEE_EFFECT_SCHEMA,
+  Circles: CIRCLES_EFFECT_SCHEMA,
+  Text: TEXT_EFFECT_SCHEMA,
+  Pictures: PICTURES_EFFECT_SCHEMA,
+  "VU Meter": VU_METER_EFFECT_SCHEMA,
 };
+
+// Effects that read the analysed audio track rather than only their own params - the UI warns
+// when one of these is placed in a sequence with no audio loaded.
+export const AUDIO_REACTIVE_EFFECTS = new Set<string>(["VU Meter"]);
 
 export function defaultParamsFor(effectName: string): Record<string, number | boolean | string> {
   const schema = EFFECT_SCHEMAS[effectName];
