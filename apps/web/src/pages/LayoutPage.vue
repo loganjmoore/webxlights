@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import { propertyFieldsFor } from "@webxlights/engine";
+import {
+  appliedPlacementFor,
+  computeGeometryFromAttrs,
+  propertyFieldsFor,
+  screenFromAttrs,
+  type BoxedScaleReading,
+  type ModelGeometry,
+} from "@webxlights/engine";
 import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { confirm } from "../lib/confirm";
@@ -10,6 +17,9 @@ import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas from "../components/LayoutCanvas.vue";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
 import ModelPalette from "../components/ModelPalette.vue";
+
+// The canvases' local-unit-to-world factor, same value LayoutCanvas and the importer use.
+const NODE_SPACING = 4;
 
 const route = useRoute();
 const projectId = computed(() => Number(route.params.projectId));
@@ -23,6 +33,48 @@ const assignErrors = ref<Record<number, string>>({});
 const importing = ref(false);
 const importMessage = ref("");
 const reportMessage = ref("");
+
+// How a boxed model's ScaleX is read. The importer decides this per file from the models it can
+// already measure (engine/models/boxedScale.ts), but the two readings differ by a model's node
+// count, so when a show has nothing to check against, the wrong call is dramatic and obvious -
+// one prop swallowing the yard. This is the one-click way out: flip it, look, keep whichever is
+// right. Nothing is lost either way, because raw_attrs is what gets re-read.
+const BOXED_SCALE_LABEL: Record<BoxedScaleReading, string> = {
+  perNode: "ScaleX × node count",
+  worldSize: "ScaleX as world size",
+};
+const boxedScale = ref<BoxedScaleReading>("perNode");
+const rescaling = ref(false);
+
+async function setBoxedScale(reading: BoxedScaleReading): Promise<void> {
+  if (!layout.value || reading === boxedScale.value) return;
+  boxedScale.value = reading;
+  rescaling.value = true;
+  try {
+    const boxedModels = models.value.filter((m) => m.supported && appliedPlacementFor(m.type, m.raw_attrs) === "boxed");
+    await Promise.all(
+      boxedModels.map(async (model) => {
+        let geo: ModelGeometry | null;
+        try {
+          geo = computeGeometryFromAttrs(model.type, model.raw_attrs);
+        } catch {
+          geo = null;
+        }
+        const screen = screenFromAttrs(model.type, model.raw_attrs, geo, NODE_SPACING, reading);
+        // Position and rotation don't depend on the reading; only rewrite what does, so a model
+        // that has since been dragged or resized by hand keeps where it was put.
+        const updated = await api.updateModel(layout.value!.id, model.id, {
+          screen: { ...model.screen, scale: screen.scale, scaleY: screen.scaleY, scaleZ: screen.scaleZ },
+        });
+        const idx = models.value.findIndex((m) => m.id === model.id);
+        if (idx !== -1) models.value[idx] = updated;
+      }),
+    );
+    importMessage.value = `Boxed model sizes re-read as ${BOXED_SCALE_LABEL[reading]} (${boxedModels.length} models).`;
+  } finally {
+    rescaling.value = false;
+  }
+}
 
 // Placement can't be verified from inside the app - the maths is unit-tested and the placement
 // systems are confirmed against the xLights manual, but whether a real show lands where it does
@@ -373,10 +425,14 @@ async function handleFileChange(e: Event): Promise<void> {
     // those attributes aren't named what the importer expects in this file - worth seeing
     // rather than silently falling back to the boxed reading.
     const { boxed, twoPoint, threePoint, polyLine } = summary.placement;
+    boxedScale.value = summary.boxedScale.reading;
     importMessage.value =
       `Imported ${summary.imported} models` +
       (summary.groups ? `, ${summary.groups} groups` : "") +
       ` — placement: ${boxed} boxed, ${twoPoint} two-point, ${threePoint} three-point, ${polyLine} poly-line` +
+      (summary.boxedScale.decided
+        ? ` — boxed sizes read as ${BOXED_SCALE_LABEL[summary.boxedScale.reading]}, matched against ${summary.boxedScale.referenceCount} models sized by their endpoints`
+        : ` — boxed sizes read as ${BOXED_SCALE_LABEL[summary.boxedScale.reading]} (nothing in this file to check it against)`) +
       (summary.unsupported.length ? ` — unsupported types kept but not rendered: ${summary.unsupported.join(", ")}` : "");
   } catch (err) {
     importMessage.value = err instanceof Error ? `Import failed: ${err.message}` : "Import failed";
@@ -408,6 +464,18 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
         {{ importing ? "Importing..." : "Import xlights_rgbeffects.xml" }}
         <input type="file" accept=".xml" @change="handleFileChange" :disabled="importing" hidden />
       </label>
+      <span v-if="models.length" class="boxed-scale" title="How ScaleX sizes models that aren't placed by their endpoints. If one prop swallows the yard, it's this.">
+        Boxed sizes:
+        <button
+          v-for="reading in (['perNode', 'worldSize'] as BoxedScaleReading[])"
+          :key="reading"
+          :class="{ active: boxedScale === reading }"
+          :disabled="rescaling"
+          @click="setBoxedScale(reading)"
+        >
+          {{ BOXED_SCALE_LABEL[reading] }}
+        </button>
+      </span>
       <button
         class="report-btn"
         :disabled="models.length === 0"
@@ -652,6 +720,22 @@ header h1 {
 }
 .controllers-link {
   margin-left: auto;
+}
+.boxed-scale {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #888;
+}
+.boxed-scale button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+}
+.boxed-scale button.active {
+  background: #e8c468;
+  color: #111;
+  border-color: #e8c468;
 }
 .import-btn {
   cursor: pointer;

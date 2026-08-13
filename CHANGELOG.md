@@ -1,5 +1,13 @@
 # Changelog
 
+## Imported layouts: right way up, right size
+
+Two defects found by importing a full synthetic yard through the real app and looking at it, and by a report from a real show ("the trees look upside down, as well as the arches").
+
+- **A run drawn right-to-left came out upside down.** A three-point model takes its angle from the vector between its endpoints, and for a right-to-left run that vector points backwards — so the model was turned through 180°, which also turns over the axis the arc rises on. An arch became a bowl and a candy cane hooked at the bottom. In xLights the third handle is what decides which side the arc rises to, and which end you anchored from doesn't change it. A backwards vector is now folded into a mirror along the model's own X axis: same line, same endpoints, same node order, but "up" stays up. A negative `Height` still flips the arc, because that sign is deliberate.
+- **Boxed model sizes are no longer a guess.** `ScaleX` has two possible readings — a multiplier on a node-unit render size, or the world width outright — and they differ by a factor of the model's node count, so on a 32-wide matrix they differ by 32×. Get it wrong and one prop swallows the whole yard. xLights' documentation says only "ScaleXYZ determine the size of the model", so the importer now decides per file from evidence in the file: a prop cannot be wider than the spread of the models' own positions (decisive when it fires), and failing that, boxed props should be in the same size league as the models sized by their endpoints, which can be measured without knowing the reading. The import banner says which reading was used and what it was matched against, and the Layout page has a **Boxed sizes** toggle to flip it in one click if the call was wrong — nothing is lost either way, since `raw_attrs` is what gets re-read.
+
+
 ## Value curves, transitions and audio reactivity reach the UI
 
 Three features that were fully implemented in the engine, tested, and documented on the Docs page — but that nothing in the app could actually reach.

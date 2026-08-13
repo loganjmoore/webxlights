@@ -1,5 +1,12 @@
 import { parseRgbEffectsXml } from "@webxlights/formats";
-import { appliedPlacementFor, computeGeometryFromAttrs, screenFromAttrs, type ModelGeometry } from "@webxlights/engine";
+import {
+  appliedPlacementFor,
+  chooseBoxedScaleReading,
+  computeGeometryFromAttrs,
+  screenFromAttrs,
+  type BoxedScaleChoice,
+  type ModelGeometry,
+} from "@webxlights/engine";
 import { api, type GroupUpsertPayload, type ModelUpsertPayload, type ViewObjectUpsertPayload } from "./api";
 
 // The canvases' local-unit-to-world factor (LayoutCanvas/LayoutCanvas3D's NODE_SPACING).
@@ -24,6 +31,8 @@ export interface ImportSummary {
   // two/three-point path fired at all - a yard full of arches and rooflines reporting zero
   // two/three-point models means those attributes aren't named what we expect in that file.
   placement: { boxed: number; twoPoint: number; threePoint: number; polyLine: number };
+  // Which reading of ScaleX the boxed models were placed with, and what it was decided from.
+  boxedScale: BoxedScaleChoice;
 }
 
 // SPEC ch11 §2.1. Which attributes mean what depends on the model's placement system, which
@@ -42,12 +51,22 @@ export interface ImportSummary {
 export async function importRgbEffects(layoutId: number, xmlText: string): Promise<ImportSummary> {
   const parsed = parseRgbEffectsXml(xmlText);
 
+  // How to read a boxed model's ScaleX isn't knowable in the abstract, but it is knowable for
+  // this file - see engine/models/boxedScale.ts. Decided once, up front, so every model in the
+  // show is placed by the same rule.
+  const boxedScale = chooseBoxedScaleReading(
+    parsed.models.filter((m) => m.supported).map((m) => ({ displayAs: m.displayAs, attrs: m.attrs })),
+    NODE_SPACING,
+  );
+
   const models: ModelUpsertPayload[] = parsed.models.map((m, i) => ({
     name: m.name,
     type: m.displayAs,
     supported: m.supported,
     raw_attrs: m.attrs,
-    screen: { ...screenFromAttrs(m.displayAs, m.attrs, geometryOf(m.displayAs, m.attrs, m.supported), NODE_SPACING) },
+    screen: {
+      ...screenFromAttrs(m.displayAs, m.attrs, geometryOf(m.displayAs, m.attrs, m.supported), NODE_SPACING, boxedScale.reading),
+    },
     strings: m.attrs.NumStrings ? parseInt(m.attrs.NumStrings, 10) : null,
     nodes_per_string: m.attrs.NodesPerString ? parseInt(m.attrs.NodesPerString, 10) : null,
     string_type: m.attrs.StringType ?? null,
@@ -79,5 +98,5 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
   }));
   if (viewObjects.length > 0) await api.bulkUpsertViewObjects(layoutId, viewObjects);
 
-  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length, placement };
+  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length, placement, boxedScale };
 }
