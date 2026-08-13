@@ -39,9 +39,14 @@ export function computeTree(params: TreeParams): ModelGeometry {
       node.screenX = Math.cos(angle) * radius;
       node.screenY = node.bufY;
     } else {
+      // Round: the strands wrap around a cone, so the wrap belongs on the Z axis. Folding it
+      // into screenY (a "depth cue") collapsed the cone into a filled triangle in both the 2D
+      // and 3D views - the single most visible difference against real xLights' 3D layout,
+      // where a mega tree reads as a cone with an elliptical base.
       const angle = strandT * (degrees * Math.PI) / 180;
       node.screenX = Math.cos(angle) * radius;
-      node.screenY = node.bufY + Math.sin(angle) * radius * 0.3; // slight depth cue in 2D
+      node.screenY = node.bufY;
+      node.screenZ = Math.sin(angle) * radius;
     }
   }
   return geo;

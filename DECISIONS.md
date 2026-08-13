@@ -630,6 +630,37 @@ positions. The absolute constant relating xLights world units to ours, and per-t
 conventions for the odd shapes (Window Frame's buffer is an unwrapped perimeter, 132x1, so its
 buffer dimensions are not a spatial box), still want a real file to pin down.
 
+## Models get a real Z axis: a 360-degree tree is a cone, not a triangle
+
+The remaining structural difference between the reported screenshots. In real xLights' 3D
+layout a mega tree reads as a cone - you can see the strands wrap and the base is an ellipse.
+In webXLights it was a solid filled triangle.
+
+`computeTree` was already computing the cone correctly, then throwing the wrap away: the Round
+style folded `sin(angle) * radius * 0.3` into `screenY` as a "slight depth cue in 2D", because
+`ModelNode` had nowhere else to put it. Both 3D views then placed every node of a model at the
+model's single Z, so nothing had depth and the wrap only served to smear the triangle.
+
+- **`ModelNode.screenZ?: number`** (optional - most props really are flat against a wall or a
+  lawn and leave it undefined). Tree's Round style now puts the wrap there and leaves `screenY`
+  as the strand height; Flat and Ribbon are unchanged, and no other type claims depth it
+  doesn't have.
+- **`nodeWorldOffset` returns `{x, y, z}`** and `transformedHalfExtents` returns `halfD`, so
+  depth flows through the one shared transform both canvases already use rather than each view
+  inventing its own. `ScreenTransform.scaleZ` scales it; `RotateZ` deliberately doesn't touch
+  it, since that rotation spins the model in its own X/Y plane.
+- **`HousePreview` now uses that shared transform too.** It had been placing nodes at
+  `screenX * scale` directly, which ignored per-axis scale and rotation entirely - so the
+  sequencer's preview could show a show in a different shape from the layout it was built in.
+- This is also what makes `scaleZ` mean something. The previous pass persisted it and said
+  plainly that it had no visible effect because every model was planar; that's no longer true
+  for models with real depth.
+
+Verified by rendering a 24x30 360-degree tree top-down (X against Z): concentric rings, X span
+12.0 and Z span 12.0, where before every node sat at Z=0. `test/transform.test.ts` asserts the
+wrap lands on Z, that a round tree is as deep as it is wide, that a strand's height is
+uncontaminated by the wrap, that flat props stay at Z=0, and that RotateZ leaves depth alone.
+
 ## Bugs found only by actually running the UI (not caught by typecheck/lint)
 
 - **`overflow-y: auto` with no explicit `overflow-x` silently computes `overflow-x` to `auto` too**: `SequencerGrid.vue`'s `.grid-scroll-viewport` needed vertical scroll only (the canvas handles its own horizontal sizing, scrolled by the page's outer `.h-scroll` wrapper) — but per the CSS Overflow spec, when one of `overflow-x`/`overflow-y` is non-`visible` and the other is left at the `visible` default, the `visible` one computes to `auto` too. This turned `.grid-scroll-viewport` into a second, narrower horizontal scroll container that silently clipped the widened (post-M10) canvas to its own ~880px box, before the outer wrapper's scroll ever got a chance to reveal the rest — invisible in code review (the CSS reads correctly as "vertical scroll only"), only caught by actually zooming in and scrolling in a live browser and finding effects that `getImageData` proved were drawn but weren't on screen. Fixed with an explicit `overflow-x: visible`. General lesson: never set only one of `overflow-x`/`overflow-y` without deciding what the other one should compute to.
