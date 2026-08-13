@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appliedPlacementFor, placementSystemFor, screenFromAttrs } from "../src/models/placement";
+import { appliedPlacementFor, negativeScaleAttrs, placementSystemFor, screenFromAttrs } from "../src/models/placement";
 import { computeGeometryFromAttrs } from "../src/models/fromAttrs";
 import type { ModelGeometry } from "../src/models/types";
 import { transformedHalfExtents } from "../src/models/transform";
@@ -242,5 +242,51 @@ describe("placement reporting and attribute tolerance", () => {
     expect(lower.x).toBeCloseTo(upper.x);
     expect(lower.scale).toBeCloseTo(upper.scale);
     expect(appliedPlacementFor("Single Line", { x2: "300", y2: "0" })).toBe("twoPoint");
+  });
+});
+
+// Reported from a real show, twice: "trees are upside down". Reproduced by giving a Tree a
+// negative ScaleY, which is what xLights stores for a model whose local Y runs opposite to
+// ours - its render buffer's row 0 is the top, ours is the bottom.
+describe("a negative scale is a frame convention, not an instruction to mirror", () => {
+  const TREE = { NumStrings: "16", NodesPerString: "50", WorldPosX: "200", WorldPosY: "200", ScaleX: "150", ScaleZ: "150" };
+
+  it("imports a tree the same way up whether or not ScaleY was stored negative", () => {
+    const g = geo("Tree", TREE);
+    const upright = screenFromAttrs("Tree", { ...TREE, ScaleY: "200" }, g, SPACING);
+    const flipped = screenFromAttrs("Tree", { ...TREE, ScaleY: "-200" }, g, SPACING);
+    expect(flipped.scaleY).toBeCloseTo(upright.scaleY!);
+    expect(flipped.scaleY).toBeGreaterThan(0);
+  });
+
+  it("does the same for X and Z, so an asymmetric prop isn't mirrored either", () => {
+    const g = geo("Tree", TREE);
+    const screen = screenFromAttrs("Tree", { ...TREE, ScaleX: "-150", ScaleY: "-200", ScaleZ: "-150" }, g, SPACING);
+    expect(screen.scale).toBeGreaterThan(0);
+    expect(screen.scaleY).toBeGreaterThan(0);
+    expect(screen.scaleZ).toBeGreaterThan(0);
+  });
+
+  it("holds under both readings of ScaleX", () => {
+    const g = geo("Tree", TREE);
+    for (const reading of ["perNode", "worldSize"] as const) {
+      const screen = screenFromAttrs("Tree", { ...TREE, ScaleY: "-200" }, g, SPACING, reading);
+      expect(screen.scaleY, reading).toBeGreaterThan(0);
+    }
+  });
+
+  it("reports which attributes were negative rather than swallowing the decision", () => {
+    expect(negativeScaleAttrs({ ScaleX: "150", ScaleY: "-200" })).toEqual(["ScaleY"]);
+    expect(negativeScaleAttrs({ ScaleX: "-1", ScaleY: "-2", ScaleZ: "-3" })).toEqual(["ScaleX", "ScaleY", "ScaleZ"]);
+    expect(negativeScaleAttrs({ ScaleX: "150" })).toEqual([]);
+    expect(negativeScaleAttrs({})).toEqual([]);
+  });
+
+  it("leaves RotateZ alone - a deliberate half turn is still a half turn", () => {
+    // If a show's models really do carry RotateZ=180 they are upside down in xLights too, so
+    // silently ignoring it would be inventing a layout the user never made.
+    const g = geo("Tree", TREE);
+    const screen = screenFromAttrs("Tree", { ...TREE, ScaleY: "200", RotateZ: "180" }, g, SPACING);
+    expect(screen.rotate).toBe(180);
   });
 });

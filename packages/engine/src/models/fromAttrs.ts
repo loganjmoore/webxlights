@@ -23,6 +23,24 @@ const float = (v: string | undefined, fallback: number): number => {
 const csvInts = (v: string | undefined): number[] | undefined =>
   v ? v.split(",").map((s) => parseInt(s.trim(), 10)).filter(Number.isFinite) : undefined;
 
+// xLights' model XML used generic `parm1`/`parm2`/`parm3` for a model's counts until the
+// 2026.04 release renamed them to descriptive fields (`NumStrings`, `NodesPerString`, ...),
+// keeping the old names readable. Every show saved before that release - which is most of the
+// shows that exist - therefore stores its counts under the old names, and reading only the new
+// ones meant silently falling back to library defaults for every model in the file: a 32x100
+// matrix imported as 16x50, a 24-string tree as 16. The sizes were then wrong for reasons no
+// amount of placement work could fix.
+//
+// parm1/2/3 map onto whichever descriptive fields a type has, in the order xLights lists them,
+// because the rename replaced them in place.
+function count(attrs: Record<string, string>, names: string[], fallback: number): number {
+  for (const name of names) {
+    const parsed = parseInt(attrs[name] ?? "", 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
 // SPEC ch11 §2.1 attribute table -> the engine's own geometry params. One bag of raw
 // XML attributes in (xLights' own "typed-prefix attribute bag" convention), one
 // ModelGeometry out. Returns null for a DisplayAs this engine doesn't render (M1 scope
@@ -31,52 +49,52 @@ export function computeGeometryFromAttrs(displayAs: string, attrs: Record<string
   switch (displayAs) {
     case "Matrix":
       return computeVerticalMatrixTopLeft({
-        strings: int(attrs.NumStrings, 16),
-        nodesPerString: int(attrs.NodesPerString, 50),
+        strings: count(attrs, ["NumStrings", "parm1"], 16),
+        nodesPerString: count(attrs, ["NodesPerString", "parm2"], 50),
       });
     case "Single Line":
       return computeSingleLine({
-        strings: int(attrs.NumStrings, 1),
-        nodesPerString: int(attrs.NodesPerString, 50),
+        strings: count(attrs, ["NumStrings", "parm1"], 1),
+        nodesPerString: count(attrs, ["NodesPerString", "parm2"], 50),
       });
     case "Poly Line": {
       // Poly Line is the one type whose shape is stored in its placement attributes: without
       // PointData it really is a straight run; with it, the vertices are the model
       // (models/polyPoints.ts).
-      const totalNodes = int(attrs.NodesPerString, 50);
+      const totalNodes = count(attrs, ["NodesPerString", "parm2"], 50);
       return computePolyLine({ totalNodes, points: parsePolyPointPath(attrs, totalNodes)?.local });
     }
     case "Arches":
       return computeArches({
-        archCount: int(attrs.NumArches, 1),
-        nodesPerArch: int(attrs.NodesPerArch, 50),
+        archCount: count(attrs, ["NumArches", "parm1"], 1),
+        nodesPerArch: count(attrs, ["NodesPerArch", "parm2"], 50),
         arcDegrees: float(attrs.Arc, 180),
       });
     case "Candy Canes":
       return computeCandyCanes({
-        caneCount: int(attrs.NumCanes, 3),
-        nodesPerCane: int(attrs.NodesPerCane, 18),
+        caneCount: count(attrs, ["NumCanes", "parm1"], 3),
+        nodesPerCane: count(attrs, ["NodesPerCane", "parm2"], 18),
       });
     case "Circle":
       return computeCircle({
-        strings: int(attrs.NumStrings, 1),
-        nodesPerString: int(attrs.NodesPerString, 50),
+        strings: count(attrs, ["NumStrings", "parm1"], 1),
+        nodesPerString: count(attrs, ["NodesPerString", "parm2"], 50),
         centerPercent: float(attrs.centerPercent, 0),
         layerSizes: csvInts(attrs.LayerSizes),
       });
     case "Star":
       return computeStar({
-        strings: int(attrs.NumStrings, 1),
-        nodesPerString: int(attrs.NodesPerString, 50),
-        points: int(attrs.StarPoints, 5),
+        strings: count(attrs, ["NumStrings", "parm1"], 1),
+        nodesPerString: count(attrs, ["NodesPerString", "parm2"], 50),
+        points: count(attrs, ["StarPoints", "parm3"], 5),
         outerToInnerRatio: float(attrs.starRatio, 2.618034),
       });
     case "Tree": {
       const treeType = int(attrs.TreeType, 0);
       const style = treeType === 1 ? "Flat" : treeType === 2 ? "Ribbon" : "Round";
       return computeTree({
-        strings: int(attrs.NumStrings, 16),
-        nodesPerString: int(attrs.NodesPerString, 50),
+        strings: count(attrs, ["NumStrings", "parm1"], 16),
+        nodesPerString: count(attrs, ["NodesPerString", "parm2"], 50),
         style,
         degrees: float(attrs.TreeDegrees, 360),
         bottomTopRatio: float(attrs.TreeBottomTopRatio, 6.0),
@@ -89,21 +107,21 @@ export function computeGeometryFromAttrs(displayAs: string, attrs: Record<string
       // DropPattern attribute is unaffected (csvInts(attrs.DropPattern) wins); this fallback
       // only fires for a drag-created model or an import that genuinely omits the attribute.
       return computeIcicles({
-        strings: int(attrs.NumStrings, 1),
-        nodesPerString: int(attrs.NodesPerString, 80),
+        strings: count(attrs, ["NumStrings", "parm1"], 1),
+        nodesPerString: count(attrs, ["NodesPerString", "parm2"], 80),
         dropPattern: csvInts(attrs.DropPattern) ?? [2, 4, 6, 4],
       });
     case "Window Frame":
       return computeWindowFrame({
-        top: int(attrs.TopNodes, 16),
-        leftRight: int(attrs.SideNodes, 50),
-        bottom: int(attrs.BottomNodes, 16),
+        top: count(attrs, ["TopNodes", "parm1"], 16),
+        leftRight: count(attrs, ["SideNodes", "parm2"], 50),
+        bottom: count(attrs, ["BottomNodes", "parm3"], 16),
         direction: attrs.Rotation === "Counter Clockwise" ? "Counter Clockwise" : "Clockwise",
       });
     case "Wreath":
       return computeWreath({
-        strings: int(attrs.NumStrings, 1),
-        nodesPerString: int(attrs.NodesPerString, 50),
+        strings: count(attrs, ["NumStrings", "parm1"], 1),
+        nodesPerString: count(attrs, ["NodesPerString", "parm2"], 50),
       });
     case "Custom":
       return attrs.CustomModel ? parseCustomModelGrid(attrs.CustomModel) : null;

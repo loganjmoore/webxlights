@@ -1,5 +1,13 @@
 # Changelog
 
+## Trees stood on their points, and models imported at default sizes
+
+Both reported from a real show ("trees are upside down… the models are also not necessarily the correct scale"), and both reproduced by importing tree variants through the real app and looking at them.
+
+- **A negative scale was being taken literally.** xLights stores a negative `ScaleY` for a model whose local Y runs opposite to ours — its render buffer's row 0 is the top, ours is the bottom. That sign is how such a model is drawn *upright*, not an instruction to mirror it, so applying it to geometry that was already the right way up flipped it: a mega tree stood on its point. Only the magnitude is used now. The cost is that a model somebody deliberately mirrored comes in unmirrored; the alternative was every tree in every show upside down, and the asymmetric props (trees, icicles, window frames) are exactly the ones it ruins. The import banner reports how many models this touched — so a file where it fires on nothing yet still imports upside down is telling you the cause is something else (`RotateZ`, most likely, which is left alone because a deliberate half turn is still a half turn).
+- **xLights' `parm1`/`parm2`/`parm3` weren't read at all.** Those generic attribute names held every model's counts until the 2026.04 release renamed them to descriptive fields, keeping the old names readable — so every show saved before that release stores its counts under names the importer ignored, and silently imported at library defaults. A 32×100 matrix came in as 16×50, a 24-string tree as 16. No amount of placement work could have made those sizes right. Both spellings are now accepted, with the descriptive name winning when a file carries both.
+
+
 ## Imported layouts: right way up, right size
 
 Two defects found by importing a full synthetic yard through the real app and looking at it, and by a report from a real show ("the trees look upside down, as well as the arches").
