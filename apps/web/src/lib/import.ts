@@ -1,5 +1,5 @@
 import { parseRgbEffectsXml } from "@webxlights/formats";
-import { computeGeometryFromAttrs, screenFromAttrs, type ModelGeometry } from "@webxlights/engine";
+import { appliedPlacementFor, computeGeometryFromAttrs, screenFromAttrs, type ModelGeometry } from "@webxlights/engine";
 import { api, type GroupUpsertPayload, type ModelUpsertPayload, type ViewObjectUpsertPayload } from "./api";
 
 // The canvases' local-unit-to-world factor (LayoutCanvas/LayoutCanvas3D's NODE_SPACING).
@@ -19,6 +19,11 @@ export interface ImportSummary {
   imported: number;
   unsupported: string[];
   groups: number;
+  // How many models each of xLights' placement systems actually accounted for. Surfaced in the
+  // import banner because it's the one thing that says, against a real show, whether the
+  // two/three-point path fired at all - a yard full of arches and rooflines reporting zero
+  // two/three-point models means those attributes aren't named what we expect in that file.
+  placement: { boxed: number; twoPoint: number; threePoint: number };
 }
 
 // SPEC ch11 §2.1. Which attributes mean what depends on the model's placement system, which
@@ -48,6 +53,14 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
     order: i,
   }));
 
+  const placement = { boxed: 0, twoPoint: 0, threePoint: 0 };
+  for (const m of parsed.models) {
+    const applied = appliedPlacementFor(m.displayAs, m.attrs);
+    if (applied === "twoPoint") placement.twoPoint++;
+    else if (applied === "threePoint") placement.threePoint++;
+    else placement.boxed++;
+  }
+
   await api.bulkUpsertModels(layoutId, models);
 
   const groups: GroupUpsertPayload[] = parsed.groups
@@ -63,5 +76,5 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
   }));
   if (viewObjects.length > 0) await api.bulkUpsertViewObjects(layoutId, viewObjects);
 
-  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length };
+  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length, placement };
 }
