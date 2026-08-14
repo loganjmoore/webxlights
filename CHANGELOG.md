@@ -1,5 +1,12 @@
 # Changelog
 
+## The model list collapses to names, and the resize handles are visible
+
+- **A row per model, not a panel per model.** Every row in the Layout sidebar carried a type, a channel and a controller dropdown, which on a hundred-model show made the list impossible to scan. Rows are now just names with a caret; clicking one expands that model's details in place — type, channel, controller assignment, position/scale/rotate, properties and delete. Only the sole selected model expands, since a marquee selection of thirty props opening thirty panels would be worse than the flat list it replaces.
+- **The resize handles were there, and invisible.** They were drawn 8px across in the same gold as the lit nodes, so on a dense prop they read as three more lights rather than as controls. They're now larger, white-filled with a dark border, standing off the model's own bounds, on a dashed selection box drawn dark-then-light so it survives over a bright model. The grab maths subtracts the new standoff, so a model doesn't grow by it on every drag.
+- **The property grid was showing schema defaults on legacy files.** It read only xLights' descriptive attribute names while the geometry reads those *and* the older `parm1`/`parm2`/`parm3` — so a matrix built from `parm1="32"` displayed "# Strings 16" next to a shape that was visibly 32 wide. Both spellings are read now, matching what the geometry actually used.
+
+
 ## The popped-out preview no longer takes the sequencer down with it
 
 Opening the pop-out threw `Failed to execute 'postMessage' on 'BroadcastChannel': could not be cloned` and put the sequencer tab behind a "Something went wrong" overlay.

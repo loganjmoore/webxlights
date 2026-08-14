@@ -5,6 +5,7 @@ import {
   appliedPlacementFor,
   computeGeometryFromAttrs,
   propertyFieldsFor,
+  propertyValueFor,
   screenFromAttrs,
   type BoxedScaleReading,
   type ModelGeometry,
@@ -100,6 +101,13 @@ const selectedModelId = computed(() => (selectedIds.value.length === 1 ? selecte
 const selectedModels = computed(() => models.value.filter((m) => selectedIds.value.includes(m.id)));
 const viewMode = ref<"2d" | "3d">("2d");
 const selectedModel = computed(() => models.value.find((m) => m.id === selectedModelId.value) ?? null);
+
+// A row expands only when it is the *only* thing selected. A marquee selection of thirty props
+// opening thirty panels would be worse than the flat list this replaces, and every control in
+// the panel edits one model.
+function isExpanded(model: ModelRecord): boolean {
+  return selectedModelId.value === model.id;
+}
 const renamingModelId = ref<number | null>(null);
 const renameValue = ref("");
 
@@ -557,25 +565,98 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
               @keydown.escape="cancelRename"
               @blur="commitRename(m)"
             />
-            <span v-else @dblclick.stop="startRename(m)">{{ m.name }}</span>
-            <span class="type">{{ m.type }}</span>
-            <span v-if="m.start_channel" class="channel">ch {{ m.start_channel }}</span>
-            <div class="controller-assign">
-              <select :value="m.controller_id ?? ''" @change="assignController(m, ($event.target as HTMLSelectElement).value)">
-                <option value="">No controller</option>
-                <option v-for="c in controllers" :key="c.id" :value="c.id">{{ c.name }}</option>
-              </select>
-              <input
-                v-if="m.controller_id != null"
-                type="number"
-                min="0"
-                class="offset-input"
-                :value="m.controller_offset ?? 0"
-                title="Channel offset within the controller's span"
-                @change="updateOffset(m, ($event.target as HTMLInputElement).value)"
-              />
+            <span v-else class="model-name" @dblclick.stop="startRename(m)">
+              <span class="caret" :class="{ open: isExpanded(m) }">&#9656;</span>{{ m.name }}
+            </span>
+
+            <!-- A show has a hundred-odd models, and a row per model carrying a type, a channel
+                 and a controller dropdown made the list impossible to scan. Only the model being
+                 worked on shows its details; everything else is a name. -->
+            <div v-if="isExpanded(m)" class="model-detail" @click.stop>
+              <p class="detail-meta">
+                <span class="type">{{ m.type }}</span>
+                <span v-if="m.start_channel" class="channel">ch {{ m.start_channel }}</span>
+              </p>
+              <div class="controller-assign">
+                <select :value="m.controller_id ?? ''" @change="assignController(m, ($event.target as HTMLSelectElement).value)">
+                  <option value="">No controller</option>
+                  <option v-for="c in controllers" :key="c.id" :value="c.id">{{ c.name }}</option>
+                </select>
+                <input
+                  v-if="m.controller_id != null"
+                  type="number"
+                  min="0"
+                  class="offset-input"
+                  :value="m.controller_offset ?? 0"
+                  title="Channel offset within the controller's span"
+                  @change="updateOffset(m, ($event.target as HTMLInputElement).value)"
+                />
+              </div>
+              <p v-if="assignErrors[m.id]" class="assign-error">{{ assignErrors[m.id] }}</p>
+
+            <div v-if="selectedModel" class="position-panel">
+              <h2>Position</h2>
+              <label>
+                X
+                <input type="number" :value="selectedModel.screen.x ?? 0" @change="handlePositionField('x', ($event.target as HTMLInputElement).value)" />
+              </label>
+              <label>
+                Y
+                <input type="number" :value="selectedModel.screen.y ?? 0" @change="handlePositionField('y', ($event.target as HTMLInputElement).value)" />
+              </label>
+              <label>
+                Z
+                <input type="number" :value="selectedModel.screen.z ?? 0" @change="handlePositionField('z', ($event.target as HTMLInputElement).value)" />
+              </label>
+              <label>
+                Scale X
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  :value="selectedModel.screen.scale ?? 1"
+                  @change="handlePositionField('scale', ($event.target as HTMLInputElement).value)"
+                />
+              </label>
+              <label>
+                Scale Y
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  :value="selectedModel.screen.scaleY ?? selectedModel.screen.scale ?? 1"
+                  title="Defaults to Scale X (uniform) until set independently"
+                  @change="handlePositionField('scaleY', ($event.target as HTMLInputElement).value)"
+                />
+              </label>
+              <label>
+                Rotate
+                <input type="number" :value="selectedModel.screen.rotate ?? 0" @change="handlePositionField('rotate', ($event.target as HTMLInputElement).value)" />
+              </label>
+              <button class="delete-btn" @click="handleDelete(selectedModel.id)">Delete model</button>
             </div>
-            <p v-if="assignErrors[m.id]" class="assign-error">{{ assignErrors[m.id] }}</p>
+
+            <div v-if="selectedModel && propertyFields.length" class="properties-panel">
+              <h2>Properties</h2>
+              <label v-for="field in propertyFields" :key="field.key">
+                {{ field.label }}
+                <select
+                  v-if="field.type === 'select'"
+                  :value="propertyValueFor(field, selectedModel.raw_attrs)"
+                  @change="updateProperty(field.key, ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+                <input
+                  v-else
+                  :type="field.type === 'number' ? 'number' : 'text'"
+                  :step="field.step ?? 1"
+                  :value="propertyValueFor(field, selectedModel.raw_attrs)"
+                  @change="updateProperty(field.key, ($event.target as HTMLInputElement).value)"
+                />
+              </label>
+            </div>
+            </div>
           </li>
         </ul>
         <p v-if="models.length === 0" class="empty">No models yet — import a show to get started.</p>
@@ -589,68 +670,6 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           <button class="delete-btn" @click="deleteModels([...selectedIds])">Delete {{ selectedIds.length }} models</button>
         </div>
 
-        <div v-if="selectedModel" class="position-panel">
-          <h2>Position</h2>
-          <label>
-            X
-            <input type="number" :value="selectedModel.screen.x ?? 0" @change="handlePositionField('x', ($event.target as HTMLInputElement).value)" />
-          </label>
-          <label>
-            Y
-            <input type="number" :value="selectedModel.screen.y ?? 0" @change="handlePositionField('y', ($event.target as HTMLInputElement).value)" />
-          </label>
-          <label>
-            Z
-            <input type="number" :value="selectedModel.screen.z ?? 0" @change="handlePositionField('z', ($event.target as HTMLInputElement).value)" />
-          </label>
-          <label>
-            Scale X
-            <input
-              type="number"
-              step="0.1"
-              min="0.1"
-              :value="selectedModel.screen.scale ?? 1"
-              @change="handlePositionField('scale', ($event.target as HTMLInputElement).value)"
-            />
-          </label>
-          <label>
-            Scale Y
-            <input
-              type="number"
-              step="0.1"
-              min="0.1"
-              :value="selectedModel.screen.scaleY ?? selectedModel.screen.scale ?? 1"
-              title="Defaults to Scale X (uniform) until set independently"
-              @change="handlePositionField('scaleY', ($event.target as HTMLInputElement).value)"
-            />
-          </label>
-          <label>
-            Rotate
-            <input type="number" :value="selectedModel.screen.rotate ?? 0" @change="handlePositionField('rotate', ($event.target as HTMLInputElement).value)" />
-          </label>
-          <button class="delete-btn" @click="handleDelete(selectedModel.id)">Delete model</button>
-        </div>
-
-        <div v-if="selectedModel && propertyFields.length" class="properties-panel">
-          <h2>Properties</h2>
-          <label v-for="field in propertyFields" :key="field.key">
-            {{ field.label }}
-            <select
-              v-if="field.type === 'select'"
-              :value="selectedModel.raw_attrs[field.key] ?? field.default"
-              @change="updateProperty(field.key, ($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
-            </select>
-            <input
-              v-else
-              :type="field.type === 'number' ? 'number' : 'text'"
-              :step="field.step ?? 1"
-              :value="selectedModel.raw_attrs[field.key] ?? field.default"
-              @change="updateProperty(field.key, ($event.target as HTMLInputElement).value)"
-            />
-          </label>
-        </div>
         </template>
       </aside>
       <div class="canvas-wrap">
@@ -813,12 +832,37 @@ header h1 {
 .model-list li.unsupported {
   opacity: 0.5;
 }
+.model-name {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.caret {
+  display: inline-block;
+  color: #666;
+  font-size: 0.65rem;
+  transition: transform 0.12s ease;
+}
+.caret.open {
+  transform: rotate(90deg);
+  color: #e8c468;
+}
+.model-detail {
+  margin: 0.35rem 0 0.2rem;
+  padding: 0.4rem 0.1rem 0.1rem;
+  border-top: 1px solid #3a3320;
+  cursor: default;
+}
+.detail-meta {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0 0 0.35rem;
+}
 .model-list .type {
   color: #888;
   font-size: 0.75rem;
 }
 .model-list .channel {
-  display: block;
   color: #666;
   font-size: 0.7rem;
 }

@@ -70,3 +70,33 @@ export const MODEL_PROPERTY_SCHEMAS: Record<string, PropertyField[]> = {
 export function propertyFieldsFor(displayAs: string): PropertyField[] {
   return MODEL_PROPERTY_SCHEMAS[displayAs] ?? [];
 }
+
+// The generic names xLights used for these counts before its 2026.04 release renamed them.
+// fromAttrs.ts reads both, so the property grid has to as well: a show saved under the old names
+// otherwise showed the *schema default* next to geometry built from the file's real value - "#
+// Strings 16" beside a matrix that is visibly 32 wide. Editing the field writes the descriptive
+// name, which then wins, so a model heals the moment it is touched either way.
+const LEGACY_KEYS: Record<string, string> = {
+  NumStrings: "parm1",
+  NumArches: "parm1",
+  NumCanes: "parm1",
+  TopNodes: "parm1",
+  NodesPerString: "parm2",
+  NodesPerArch: "parm2",
+  NodesPerCane: "parm2",
+  SideNodes: "parm2",
+  StarPoints: "parm3",
+  BottomNodes: "parm3",
+};
+
+/** What a property field is actually worth for a model, honouring the legacy attribute names. */
+export function propertyValueFor(
+  field: PropertyField,
+  attrs: Record<string, string>,
+): string | number {
+  const direct = attrs[field.key];
+  if (direct !== undefined) return direct;
+  const legacy = LEGACY_KEYS[field.key];
+  if (legacy !== undefined && attrs[legacy] !== undefined) return attrs[legacy]!;
+  return field.default;
+}
