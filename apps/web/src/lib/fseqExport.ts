@@ -6,6 +6,10 @@ import {
   createRowSequencer,
   DEFAULT_PALETTE,
   toRenderPalette,
+  channelBlockBytes,
+  channelColorsFrom,
+  channelsPerNodeFor,
+  defaultChannelColorFrom,
   nodeColorsToChannelBytes,
   planGroupRendering,
   scatterGroupColors,
@@ -29,7 +33,10 @@ function extractRgbOrder(stringType: string | null): string {
 export function channelCountForModel(model: Pick<ModelRecord, "type" | "raw_attrs">): number {
   try {
     const geo = computeGeometryFromAttrs(model.type, model.raw_attrs);
-    return geo ? geo.nodes.length * 3 : 0;
+    // Not always three: a Channel Block drives one device per channel, so it is one byte each.
+    // Assuming three would have a 24-channel relay board claim 72, shifting every model after it
+    // on the controller by 48 - which lights the wrong props, and does it silently.
+    return geo ? geo.nodes.length * channelsPerNodeFor(model.type) : 0;
   } catch {
     return 0;
   }
@@ -66,7 +73,15 @@ export function exportSequenceToFseq(
     }
   });
   const rgbOrders = supported.map((m) => extractRgbOrder(m.string_type));
-  const byteCounts = geometries.map((g) => (g ? g.nodes.length * 3 : 0));
+  // A Channel Block's channels are single devices - relays, AC lights, a smoke machine - so each
+  // takes one byte, and which of the rendered pixel's channels drives it is the model's own
+  // Channel Color setting.
+  const singleChannel = supported.map((m) =>
+    m.type === "Channel Block"
+      ? { colors: channelColorsFrom(m.raw_attrs), fallback: defaultChannelColorFrom(m.raw_attrs) }
+      : null,
+  );
+  const byteCounts = geometries.map((g, i) => (g ? g.nodes.length * channelsPerNodeFor(supported[i]!.type) : 0));
 
   const activeControllers = controllers.filter((c) => c.active);
   const controllerSpanEnd = activeControllers.reduce((max, c) => Math.max(max, c.start_channel - 1 + c.channel_count), 0);
@@ -159,7 +174,8 @@ export function exportSequenceToFseq(
           if (parentIndex !== undefined && c.a > 0) nodeColors[parentIndex] = c;
         });
       }
-      const bytes = nodeColorsToChannelBytes(nodeColors, rgbOrders[i]);
+      const block = singleChannel[i];
+      const bytes = block ? channelBlockBytes(nodeColors, block.colors, block.fallback) : nodeColorsToChannelBytes(nodeColors, rgbOrders[i]);
       try {
         frame.set(bytes, byteOffsets[i]!);
       } catch (err) {

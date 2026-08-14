@@ -30,7 +30,7 @@ written down. Status here means:
 | **Model types** | | xLights ships 21; we render 17 |
 | Arches, Candy Cane, Circle, Custom, Icicles, Matrix, PolyLine, Single Line, Star, Tree, Window Frame, Wreath | ✅ | |
 | Spinner, Cube, Sphere, Channel Block, Image | ✅ | Spinner's arms, hollow centre, arc, start angle and zig-zag wiring; Cube as a box or a cylinder, with real depth and an unwrapped buffer (the manual: "while the model is 3D, xLights renders the effects in 2D"); Sphere with degrees and both latitudes; Channel Block as a row of independent cells, one per device. Image is a *single-channel prop* — "blow-molds, inflatables, incandescent cutouts" — so one node is its whole geometry; the picture itself is a layout-view concern this engine doesn't draw |
-| Channel Block — per-channel "Channel Color" | ❌ | Which of the RGB values drives each output channel. Belongs to channel assignment on export rather than to geometry |
+| Channel Block — per-channel "Channel Color" | ✅ | Both the model-wide default and the per-channel list. And with it the thing that actually mattered: a Channel Block now emits **one byte per channel**, not three. It drives single devices — relays, AC lights, a smoke machine — so three-per-channel had a 24-channel relay board claim 72, shifting every model after it on the controller by 48 and lighting the wrong props, silently |
 | Label | 🚫 | "A simple text model that displays a line of text directly in the layout and preview. It does not control any lights or channels" — an annotation, not a prop |
 | DMX, DMX Moving Head Advance, Servo | 🚫 | Fixture control, not pixel rendering |
 | Download / import models from the vendor library | ❌ | |

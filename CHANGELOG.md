@@ -1,5 +1,18 @@
 # Changelog
 
+## A Channel Block was claiming three times the channels it needed
+
+The Channel Block model shipped a fortnight's worth of PRs ago with the right geometry and the wrong output. Every model in this app put three bytes on the wire per node, because every model until then was an RGB pixel.
+
+A Channel Block isn't. The manual describes it as a way to *"model generic channel to be used or AC Lights, relays, smoke machines"* — **each channel drives one device, so each takes one byte.**
+
+At three bytes a channel, a 24-channel relay board claims 72. Every model after it on that controller is shifted by 48 channels. Nothing errors; the wrong props light. It's the same class of failure as the overlapping-channel bug the visualiser exists to find, arriving by a different route — and it was in code I wrote earlier in this same run.
+
+With it, the setting that decides *which* of a rendered pixel's channels supplies that byte: **Channel Color**, model-wide and per channel. *"If set to 'White' all three RGB channel values will be use... If set to 'Red' only the Red channel values will be use."*
+
+White takes the **brightest** of the three rather than their average. An average would put a pure red effect out at a third power, which reads as a relay that never quite closes. And an unknown colour in the per-channel list becomes White rather than being dropped — dropping it would shift every channel after it along by one, which is the same silent mis-addressing all over again.
+
+
 ## The radial effect wheel
 
 *"Double-click empty sequencer grid area displays a radial effect wheel for quick effect placement."*

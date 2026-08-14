@@ -89,7 +89,13 @@ export const MODEL_PROPERTY_SCHEMAS: Record<string, PropertyField[]> = {
     { key: "StartLatitude", label: "Southern Latitude %", type: "number", default: 0 },
     { key: "EndLatitude", label: "Northern Latitude %", type: "number", default: 0 },
   ],
-  "Channel Block": [{ key: "NumChannels", label: "# Channels", type: "number", default: 1 }],
+  "Channel Block": [
+    { key: "NumChannels", label: "# Channels", type: "number", default: 1 },
+    // "What color in the sequencer will 'activate' this channel block channel." White uses all
+    // three; a named colour uses only that one.
+    { key: "ChannelColor", label: "Channel Color", type: "select", default: "White", options: ["White", "Red", "Green", "Blue"] },
+    { key: "ChannelColors", label: "Indiv Colors (comma-separated)", type: "text", default: "" },
+  ],
   // Image has no geometry to edit - the whole prop is one channel - so it has no fields rather
   // than fields that would do nothing.
 };
