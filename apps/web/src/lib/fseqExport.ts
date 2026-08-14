@@ -1,15 +1,20 @@
 import { writeFseqV2 } from "@webxlights/formats";
 import {
+  applyGroupBase,
   computeGeometryFromAttrs,
   computeSubModel,
   createRowSequencer,
   DEFAULT_PALETTE,
   hexToRgba,
   nodeColorsToChannelBytes,
+  planGroupRendering,
+  scatterGroupColors,
   type AudioSeries,
   type ModelGeometry,
+  type RGBA,
 } from "@webxlights/engine";
-import type { ControllerRecord, ModelRecord, SequenceBody, SequenceRecord } from "./api";
+import type { ControllerRecord, ModelGroupRecord, ModelRecord, SequenceBody, SequenceRecord } from "./api";
+import { groupRenderSpecs } from "./groupRendering";
 
 const SEED = 12345;
 
@@ -45,6 +50,9 @@ export function exportSequenceToFseq(
   // The analysed track, so an audio-reactive effect exports the same frames the preview shows.
   // Omitted (no audio loaded) those effects render as "no audio", not as silence.
   audio?: AudioSeries,
+  // Model groups, so group rows export. Omitted, a sequence's group rows contribute nothing -
+  // which is what this export did for every group row before groups rendered at all.
+  groups: ModelGroupRecord[] = [],
 ): Uint8Array {
   const frameMs = sequence.frame_ms;
   const frameCount = Math.max(1, Math.ceil(sequence.duration_ms / frameMs));
@@ -114,14 +122,36 @@ export function exportSequenceToFseq(
       .filter((s): s is NonNullable<typeof s> => s !== null);
   });
 
+  // Group rows get one sequencer over the group's composed buffer, and their output is scattered
+  // back onto the member models. Planned by the same code the preview uses, so the two can't
+  // disagree about how a group is laid out.
+  const geometryByModelId = new Map<number, ModelGeometry>();
+  supported.forEach((model, i) => {
+    const geo = geometries[i];
+    if (geo) geometryByModelId.set(model.id, geo);
+  });
+  const groupSequencers = planGroupRendering(groupRenderSpecs(groups, geometryByModelId, body)).map((job) => ({
+    job,
+    sequencer: createRowSequencer(job.row, frameMs, SEED, DEFAULT_PALETTE, audio),
+  }));
+
   const frames: Uint8Array[] = [];
   for (let f = 0; f < frameCount; f++) {
     const atMs = f * frameMs;
     const frame = new Uint8Array(channelCount);
+
+    const groupBase = new Map<number, RGBA[]>();
+    for (const { job, sequencer } of groupSequencers) {
+      scatterGroupColors(job, sequencer.renderFrameAt(atMs), groupBase);
+    }
+
     supported.forEach((model, i) => {
       const sequencer = sequencers[i];
       if (!sequencer) return;
       const nodeColors = sequencer.renderFrameAt(atMs);
+      // A group is the less specific statement about a prop, so the model's own rows sit on top
+      // of it and its sub-models on top of those - the same order the preview uses.
+      applyGroupBase(nodeColors, groupBase.get(model.id));
       for (const sub of subSequencers[i] ?? []) {
         const subColors = sub.sequencer.renderFrameAt(atMs);
         subColors.forEach((c, n) => {

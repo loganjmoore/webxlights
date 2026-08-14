@@ -58,11 +58,12 @@ written down. Status here means:
 | Colour settings — palette | ✅ | Up to 6 swatches |
 | Colour settings — **colour curves** | ❌ | A colour that varies across the effect, like a value curve |
 | Layers | ⚠️ | Up to 5, bottom-to-top |
-| Layer blending — 24 modes | ⚠️ | 18 implemented. The manual documents these with screenshots and the advice "experience is much better than reading about it" rather than defining them in words, so the eight added beyond the original ten follow what their names unambiguously mean (a mask hides, an unmask reveals, a shadow darkens); whether each matches xLights pixel for pixel is unverified. Bottom-Top and Left-Right need the pixel's position, which the blend function isn't given |
-| Layer blending — Morph, Suppress Until Frame, Freeze At Frame, Canvas | ❌ | |
+| Layer blending — 24 modes | ⚠️ | 19 implemented, including Canvas. The manual documents these with screenshots and the advice "experience is much better than reading about it" rather than defining them in words, so the eight added beyond the original ten follow what their names unambiguously mean (a mask hides, an unmask reveals, a shadow darkens); whether each matches xLights pixel for pixel is unverified. Bottom-Top and Left-Right need the pixel's position, which the blend function isn't given |
+| Layer blending — Canvas | ✅ | The layer is handed what the layers underneath it drew instead of a blank buffer, and its output replaces theirs — including where it cleared a pixel, which a Normal blend would have quietly kept |
+| Layer blending — Morph, Suppress Until Frame, Freeze At Frame | ❌ | |
 | Transitions | ✅ | All 16 types, in and out |
 | Mix slider | ✅ | |
-| **Layer settings — Render Style (buffer styles)** | ⚠️ | The six that mean something for a single model are implemented (Default, Per Preview, Single Line, As Pixel, Horizontal/Vertical Per Strand). The rest describe how several models in a *group* are arranged relative to each other, which needs group rendering this app doesn't have |
+| Layer settings — Render Style (buffer styles) | ✅ | All of them. Six for a single model (Default, Per Preview, Single Line, As Pixel, Horizontal/Vertical Per Strand) and the fourteen that arrange a *group's* members into one shared buffer (the four Stacked variants, Horizontal/Vertical Per Model, the two Per Model/Strand, both Overlays, Single Line as a Pixel, and the three Per Model ones that render on each prop separately). A group's Default is Per Preview, per the manual |
 | Layer settings — Transformation (rotate/flip) | ✅ | Rotate 90 either way, rotate 180, flip H/V |
 | Layer settings — Blur | ✅ | Alpha-weighted, so a blur softens coverage rather than dragging colour towards black |
 | Layer settings — Sub-buffer | ✅ | The effect is handed a smaller buffer, per the manual's own distinction from a mask |
@@ -81,23 +82,23 @@ written down. Status here means:
 
 ## Chapter 4 — Built-in effects
 
-xLights ships 55 effects. We render 40.
+xLights ships 55 effects. We render 43.
 
-**Implemented (40):** Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill, Fire,
-Galaxy, Garlands, Life, Lightning, Lines, Marquee, Meteors, Morph, Off, On, Pictures, Pinwheel,
-Fireworks, Music, Plasma, Ripple, Shape, Shimmer, Shockwave, Single Strand, Snow Storm,
-Snowflakes, Spirals, Spirograph, Strobe, Tendrils, Text, Tree, Twinkle, VU Meter, Wave.
+**Implemented (43):** Adjust, Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill,
+Fire, Galaxy, Garlands, Kaleidoscope, Life, Lightning, Lines, Marquee, Meteors, Morph, Off, On,
+Pictures, Pinwheel, Fireworks, Music, Plasma, Ripple, Shape, Shimmer, Shockwave, Single Strand,
+Snow Storm, Snowflakes, Spirals, Spirograph, Strobe, Tendrils, Text, Tree, Twinkle, VU Meter,
+Warp, Wave.
+
+Kaleidoscope, Warp and Adjust are **canvas-mode** effects: they modify the layer below them
+rather than drawing their own, and render nothing on any other blend mode — which is what the
+manual means by Kaleidoscope "by itself it does nothing". The layer stack now seeds a Canvas
+layer's buffer with what the layers underneath produced, which is what makes them possible; the
+props panel says so when one is placed on a layer that isn't in Canvas mode.
 
 **Missing, and renderable with what the engine already has (1):** Sketch — the path itself is
 easy to draw; what it needs is the Effect Assist editor to *trace* one, since the manual's whole
 workflow is drawing the sketch over a background image.
-
-**Missing, needs a canvas the render pipeline doesn't have (3):** Kaleidoscope, Warp and Adjust
-all modify *the layer below them* rather than drawing their own. The manual is explicit that
-Kaleidoscope "is a canvas mode effect. By itself it does nothing", and describes Adjust as "used
-Canvas mode to offset channel values". That needs the layer stack to expose what is underneath,
-which it doesn't. (Adjust was previously listed as renderable here — reading its own page shows
-it isn't, and it belongs with the canvas effects.)
 
 **Missing, needs a definition file (2):** Guitar (a tab/track) and State (state definitions).
 
@@ -141,16 +142,20 @@ Moving Head + Servo (DMX fixtures).
 
 Layer settings were the largest single lever, because they apply to every effect at once rather
 than adding one more, and the panel is now complete: render style, transformation, blur,
-sub-buffer, roto-zoom and persistent. Only Render Style is still partial, and for a reason that
-belongs to something else — thirteen of its nineteen styles describe how several models in a
-*group* are arranged, so they wait on group rendering rather than on the panel.
+sub-buffer, roto-zoom and persistent — including the group render styles, now that groups render
+at all.
 
 Sub-models now import and render, which was the piece real sequences leaned on hardest. What is
 left of them is an in-app editor for creating one, which matters far less than not losing the
 ones a show already has.
 
-The largest gaps remaining are group rendering (which the thirteen group render styles depend
-on), the nine unimplemented model types, and the effects that need a canvas.
+Group rows now render, which had been the quietest serious gap in the app: a group row could be
+created and sequenced and would autosave, but both the preview and the `.fseq` export dropped it,
+so effects placed on a group reached nothing at all. Real sequences target groups constantly —
+37% of one real show's sequenced elements — so this was whole passages of a show going dark
+without an error anywhere.
+
+The largest gap remaining is the nine unimplemented model types.
 
 After that, the missing effects are worth taking in batches by how much machinery they share:
 the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Lines) before the

@@ -2,21 +2,29 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as THREE from "three";
 import {
+  applyGroupBase,
   computeGeometryFromAttrs,
   computeSubModel,
   DEFAULT_PALETTE,
   geometryCenter,
   hexToRgba,
   nodeWorldOffset,
+  planGroupRendering,
+  scatterGroupColors,
   renderRowAtMs,
   type AudioSeries,
   type ModelGeometry,
+  type RGBA,
 } from "@webxlights/engine";
-import type { ModelRecord, SequenceBody } from "../lib/api";
+import type { ModelGroupRecord, ModelRecord, SequenceBody } from "../lib/api";
+import { groupRenderSpecs } from "../lib/groupRendering";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 
 const props = defineProps<{
   models: ModelRecord[];
+  // A group row renders across several models at once, so the preview needs the memberships as
+  // well as the models themselves.
+  groups?: ModelGroupRecord[];
   body: SequenceBody;
   playheadMs: number;
   frameMs: number;
@@ -58,6 +66,10 @@ function buildGeometryCache(): void {
   }
 }
 
+function geometryByModelId(): Map<number, ModelGeometry> {
+  return new Map(rowEntries.map((e) => [e.model.id, e.geometry]));
+}
+
 function totalNodeCount(): number {
   return rowEntries.reduce((sum, e) => sum + e.geometry.nodes.length, 0);
 }
@@ -95,6 +107,15 @@ function updateColors(): void {
   const colorAttr = points.geometry.getAttribute("color") as THREE.BufferAttribute;
   const arr = colorAttr.array as Float32Array;
 
+  // Group rows first: a group says what the whole yard is doing, so it is the base a model's own
+  // effects sit on top of. Rendered once per group rather than once per member, because that is
+  // the point of a group render style - one buffer spanning several props.
+  const groupBase = new Map<number, RGBA[]>();
+  for (const job of planGroupRendering(groupRenderSpecs(props.groups ?? [], geometryByModelId(), props.body))) {
+    const colors = renderRowAtMs(job.row, props.playheadMs, props.frameMs, SEED, DEFAULT_PALETTE, props.audio);
+    scatterGroupColors(job, colors, groupBase);
+  }
+
   for (const entry of rowEntries) {
     const rowEffects = props.body.rows
       .filter((r) => r.elementType === "model" && r.elementId === entry.model.id)
@@ -108,6 +129,8 @@ function updateColors(): void {
       DEFAULT_PALETTE,
       props.audio,
     );
+
+    applyGroupBase(nodeColors, groupBase.get(entry.model.id));
 
     // A sub-model borrows its parent's lights, so whatever it renders is written back onto the
     // parent's nodes. Drawn after the parent's own rows, which is the order xLights uses: a

@@ -3,7 +3,7 @@ import { rgba } from "../src/color";
 import { computeSingleLine } from "../src/models/line";
 import { computeVerticalMatrixTopLeft } from "../src/models/matrix";
 import { createRowSequencer, renderRowAtMs, type RenderableEffect } from "../src/renderFrame";
-import { EFFECT_SCHEMAS, defaultParamsFor } from "../src/effects/schema";
+import { CANVAS_ONLY_EFFECTS, EFFECT_SCHEMAS, defaultParamsFor } from "../src/effects/schema";
 import type { AudioSeries } from "../src/audio";
 import type { ValueCurve } from "../src/valueCurve";
 
@@ -113,7 +113,11 @@ describe("Effect registry", () => {
     // Text and Pictures need content, and VU Meter needs audio; everything else should paint
     // with nothing but its defaults - a schema whose name doesn't match the renderFrame switch
     // would silently render an empty layer, which is exactly what this catches.
-    const needsContent = new Set(["Pictures"]);
+    //
+    // The canvas effects are excluded because rendering nothing on a blank buffer is *correct*
+    // for them - they modify the layer below. The test below covers them instead, with the
+    // canvas they need, so they aren't simply exempted.
+    const needsContent = new Set(["Pictures", ...CANVAS_ONLY_EFFECTS]);
     const series: AudioSeries = { frameMs: 50, bandCount: 2, frames: [{ level: 1, bands: [1, 1] }] };
 
     for (const name of Object.keys(EFFECT_SCHEMAS)) {
@@ -121,6 +125,42 @@ describe("Effect registry", () => {
       const effect: RenderableEffect = { name, startMs: 0, endMs: 1000, params: defaultParamsFor(name) };
       const colors = renderRowAtMs({ geometry: matrix, effects: [effect] }, 400, 50, 42, PALETTE, series);
       expect(colors.some((c) => c.a > 0), `"${name}" rendered an empty frame with default params`).toBe(true);
+    }
+  });
+
+  it("every canvas effect actually changes the layer underneath it", () => {
+    // The other half of the guard above. A canvas effect that didn't match the renderFrame
+    // switch would leave the layer below untouched - which looks like a working sequence, since
+    // the layer below still shows, and is the reason this needs its own assertion rather than
+    // an exemption.
+    const under: RenderableEffect = {
+      name: "Bars",
+      startMs: 0,
+      endMs: 1000,
+      params: defaultParamsFor("Bars"),
+    };
+    const baseline = renderRowAtMs({ geometry: matrix, effects: [under] }, 400, 50, 42, PALETTE);
+
+    for (const name of CANVAS_ONLY_EFFECTS) {
+      const canvasLayer: RenderableEffect = {
+        name,
+        startMs: 0,
+        endMs: 1000,
+        params: defaultParamsFor(name),
+        blendMode: "Canvas",
+      };
+      const withCanvas = renderRowAtMs({ geometry: matrix, effects: [under, canvasLayer] }, 400, 50, 42, PALETTE);
+      expect(withCanvas, `"${name}" left the layer below untouched`).not.toEqual(baseline);
+    }
+  });
+
+  it("a canvas effect on its own renders nothing, which is what the manual says it should", () => {
+    // Kaleidoscope "by itself does nothing". Without a canvas there is nothing underneath to
+    // modify, and inventing something to draw would be worse than drawing nothing.
+    for (const name of CANVAS_ONLY_EFFECTS) {
+      const effect: RenderableEffect = { name, startMs: 0, endMs: 1000, params: defaultParamsFor(name) };
+      const colors = renderRowAtMs({ geometry: matrix, effects: [effect] }, 400, 50, 42, PALETTE);
+      expect(colors.every((c) => c.a === 0), `"${name}" drew something with no canvas`).toBe(true);
     }
   });
 

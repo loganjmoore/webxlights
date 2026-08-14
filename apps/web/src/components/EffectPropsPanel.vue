@@ -4,6 +4,7 @@ import {
   DEFAULT_PALETTE_HEX,
   EFFECT_SCHEMAS,
   BLEND_MODES,
+  CANVAS_ONLY_EFFECTS,
   LAYER_TRANSFORMS,
   RENDER_STYLES,
   PATTERNED_TRANSITION_TYPES,
@@ -72,6 +73,13 @@ function setTransitionMs(field: "inDurationMs" | "outDurationMs", ms: string): v
   if (Number.isNaN(value)) return;
   patchTransition({ [field]: Math.max(0, value) });
 }
+
+// Kaleidoscope, Warp and Adjust have nothing to work on unless the layer is in Canvas mode -
+// they would render an empty layer with no error, which is exactly the kind of silence worth
+// spending a line of UI on.
+const needsCanvas = computed(
+  () => !!props.effect && CANVAS_ONLY_EFFECTS.has(props.effect.name) && props.effect.blendMode !== "Canvas",
+);
 
 const transition = computed<TransitionSpec>(() => props.effect?.transition ?? {});
 // Blinds/Slide Bars/Checkerboard are the types whose "adjust" knob means anything (it sets the
@@ -165,6 +173,11 @@ function curveable(p: EffectParamSpec): boolean {
             <span class="value">{{ Math.round((effect.mix ?? 0) * 100) }}</span>
           </span>
         </label>
+        <p v-if="needsCanvas" class="hint warn">
+          {{ effect.name }} modifies the layer below it rather than drawing its own, so it needs
+          the Canvas blend mode and a layer underneath. On any other mode it is handed a blank
+          buffer and renders nothing.
+        </p>
       </div>
 
       <div class="blend-panel">
@@ -442,6 +455,11 @@ function curveable(p: EffectParamSpec): boolean {
   margin: 0.2rem 0 0;
   color: #666;
   font-size: 0.65rem;
+}
+/* A layer that will render nothing as configured - louder than an ordinary hint, because the
+   symptom is silence rather than an error. */
+.hint.warn {
+  color: #a8631a;
 }
 .value {
   text-align: right;
