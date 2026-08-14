@@ -33,7 +33,7 @@ written down. Status here means:
 | DMX, DMX Moving Head Advance, Servo | 🚫 | Fixture control, not pixel rendering |
 | Download / import models from the vendor library | ❌ | |
 | Model groups (add, modify, delete, rename, clone, delete-empty) | ⚠️ | Add/modify/delete/rename; no clone, no delete-empty |
-| **SubModels** (node range, draw model, sub-buffer, generate slices) | ❌ | Used heavily by real sequences |
+| **SubModels** (node range, sub-buffer) | ⚠️ | Imported from `<subModel>` elements, resolved to their own geometry, listed under their parent in the sequencer, and rendered in both the preview and the `.fseq` export. No editor for creating them in-app yet, and Draw Model / Generate Slices aren't implemented |
 | Objects — 2D background image | ❌ | The photo of the house behind the layout |
 | Objects — Mesh (3D `.obj`) | 🚫 | No OBJ loader |
 | Objects — Grid | ✅ | Gridlines view object |
@@ -63,11 +63,11 @@ written down. Status here means:
 | Transitions | ✅ | All 16 types, in and out |
 | Mix slider | ✅ | |
 | **Layer settings — Render Style (buffer styles)** | ⚠️ | The six that mean something for a single model are implemented (Default, Per Preview, Single Line, As Pixel, Horizontal/Vertical Per Strand). The rest describe how several models in a *group* are arranged relative to each other, which needs group rendering this app doesn't have |
-| **Layer settings — Transformation (rotate/flip)** | ❌ | |
-| **Layer settings — Blur** | ❌ | |
-| **Layer settings — Sub-buffer** | ❌ | Restricts an effect to part of the model |
-| **Layer settings — Persistent** | ❌ | Don't clear the buffer between frames |
-| **Roto-Zoom** | ❌ | Rotation presets, pivot, zoom |
+| Layer settings — Transformation (rotate/flip) | ✅ | Rotate 90 either way, rotate 180, flip H/V |
+| Layer settings — Blur | ✅ | Alpha-weighted, so a blur softens coverage rather than dragging colour towards black |
+| Layer settings — Sub-buffer | ✅ | The effect is handed a smaller buffer, per the manual's own distinction from a mask |
+| Layer settings — Persistent | ✅ | The scrub path replays the effect's frames into one buffer (capped at 600); the sequential export path keeps the buffer between frames it is already walking |
+| Roto-Zoom | ✅ | Rotation, zoom and pivot. xLights' preset rotation *sequences* over the effect's life are not separated out — this is the single turn the panel's own sliders describe |
 | Value curves | ✅ | All 16 types + custom point editor |
 | Effect presets | ❌ | Save/apply/import/export named effect settings |
 | Views | ❌ | Named subsets of rows |
@@ -137,12 +137,17 @@ Moving Head + Servo (DMX fixtures).
 ## What this says about priorities
 
 Layer settings were the largest single lever, because they apply to every effect at once rather
-than adding one more: render style, transformation, blur and sub-buffer are now in. What remains
-of that panel is Persistent (needs the buffer to survive between frames) and Roto-Zoom.
+than adding one more, and the panel is now complete: render style, transformation, blur,
+sub-buffer, roto-zoom and persistent. Only Render Style is still partial, and for a reason that
+belongs to something else — thirteen of its nineteen styles describe how several models in a
+*group* are arranged, so they wait on group rendering rather than on the panel.
 
-Sub-models are now the biggest single gap, and what real sequences lean on hardest — an imported
-`.xsq` that uses them renders wrong today, not merely plainly. Group render styles need group
-rendering, which is its own piece of work.
+Sub-models now import and render, which was the piece real sequences leaned on hardest. What is
+left of them is an in-app editor for creating one, which matters far less than not losing the
+ones a show already has.
+
+The largest gaps remaining are group rendering (which the thirteen group render styles depend
+on), the nine unimplemented model types, and the effects that need a canvas.
 
 After that, the missing effects are worth taking in batches by how much machinery they share:
 the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Lines) before the

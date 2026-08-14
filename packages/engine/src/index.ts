@@ -5,6 +5,7 @@ export * from "./models/bounds";
 export * from "./models/transform";
 export * from "./models/placement";
 export * from "./models/polyPoints";
+export * from "./models/subModel";
 export * from "./models/boxedScale";
 export * from "./models/units";
 export * from "./models/matrix";

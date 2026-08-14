@@ -3,6 +3,7 @@ import { RenderBuffer } from "../src/renderBuffer";
 import { rgba } from "../src/color";
 import {
   applyBlur,
+  applyRotoZoom,
   applyTransform,
   isFullSubBuffer,
   renderWithLayerSettings,
@@ -178,5 +179,43 @@ describe("the settings compose, and cost nothing when unset", () => {
     // flip across the whole model would have put it.
     expect(target.getPixel(3, 0).a).toBe(255);
     expect(target.getPixel(7, 0).a).toBe(0);
+  });
+});
+
+describe("Roto-Zoom", () => {
+  it("does nothing at the identity", () => {
+    const b = filled(5, 5, (x, y) => (x === 1 && y === 1 ? RED : CLEAR));
+    applyRotoZoom(b, { rotation: 0, zoom: 1 });
+    expect(litPixels(b)).toEqual([[1, 1]]);
+    applyRotoZoom(b, undefined);
+    expect(litPixels(b)).toEqual([[1, 1]]);
+  });
+
+  it("turns the effect about the buffer's centre by default", () => {
+    const b = filled(5, 5, (x, y) => (x === 4 && y === 2 ? RED : CLEAR)); // right of centre
+    applyRotoZoom(b, { rotation: 90 });
+    expect(litPixels(b)).toEqual([[2, 4]]); // a quarter turn anticlockwise puts it above centre
+  });
+
+  it("turns about a pivot when given one", () => {
+    const b = filled(5, 5, (x, y) => (x === 1 && y === 0 ? RED : CLEAR));
+    applyRotoZoom(b, { rotation: 180, pivotX: 0, pivotY: 0 });
+    expect(litPixels(b)).toEqual([]); // rotated off the buffer, not wrapped around it
+  });
+
+  it("magnifies above 1 and shrinks below it", () => {
+    const big = filled(9, 9, (x, y) => (Math.abs(x - 4) <= 1 && Math.abs(y - 4) <= 1 ? RED : CLEAR));
+    applyRotoZoom(big, { zoom: 2 });
+    expect(litPixels(big).length).toBeGreaterThan(9);
+
+    const small = filled(9, 9, (x, y) => (Math.abs(x - 4) <= 3 && Math.abs(y - 4) <= 3 ? RED : CLEAR));
+    applyRotoZoom(small, { zoom: 0.5 });
+    expect(litPixels(small).length).toBeLessThan(49);
+  });
+
+  it("leaves ground uncovered by the turn transparent rather than smearing it", () => {
+    const b = filled(5, 5, () => RED);
+    applyRotoZoom(b, { zoom: 0.5 });
+    expect(litPixels(b).length).toBeLessThan(25);
   });
 });

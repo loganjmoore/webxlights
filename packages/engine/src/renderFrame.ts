@@ -268,6 +268,37 @@ function renderStateful(
   }
 }
 
+// The Persistent layer setting: "does not clear the display buffer before rendering each frame.
+// The result is the preview frame remains until overwritten by a subsequent frame."
+//
+// A stateless effect is a pure function of its frame, so persistence can only be produced by
+// actually drawing every frame from the effect's start into one buffer - which is what this
+// does. Stateful effects already replay this way, so they need nothing extra; a persistent
+// stateful effect is simply its normal replay.
+//
+// The cost is linear in how far into the effect the playhead is, the same cost stateful effects
+// already pay, and it is only paid by layers that ask for it.
+function renderPersistent(
+  buffer: RenderBuffer,
+  palette: RGBA[],
+  effect: RenderableEffect,
+  atMs: number,
+  frameMs: number,
+  seed: number,
+  audio: AudioSeries | undefined,
+): void {
+  const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
+  const cap = Math.min(framesElapsed, MAX_PERSISTENT_FRAMES);
+  for (let f = framesElapsed - cap; f <= framesElapsed; f++) {
+    renderStateless(buffer, palette, effect, effect.startMs + f * frameMs, seed, audio);
+  }
+}
+
+// Long effects would otherwise make a single scrub replay tens of thousands of frames. Past this
+// many the oldest traces have been painted over many times anyway, so the visible result is the
+// same and the cost stops growing.
+const MAX_PERSISTENT_FRAMES = 600;
+
 // Renders one row (model or group) at a given playhead time: finds effects active at atMs
 // (row.effects array order = layer order, bottom-to-top, Normal blend - M2's data model has
 // no explicit layer index yet), composites via the M3 layer stack, and maps to node colors.
@@ -295,6 +326,7 @@ export function renderRowAtMs(
       // render down to it (layerSettings.ts).
       renderWithLayerSettings(buffer, effect.layer, (target) => {
         if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(target, palette, effect, atMs, frameMs, seed);
+        else if (effect.layer?.persistent) renderPersistent(target, palette, effect, atMs, frameMs, seed, audio);
         else renderStateless(target, palette, effect, atMs, seed, audio);
         if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
       });
@@ -328,7 +360,10 @@ export function createRowSequencer(
   palette: RGBA[],
   audio?: AudioSeries,
 ): RowSequencer {
-  const statefulStates = new Map<number, unknown>(); // keyed by index into row.effects
+  // Keyed by index into row.effects for a stateful effect's own state, and by "persist:<index>"
+  // for a persistent layer's kept buffer - two different things that both live for as long as
+  // the sequencer does and are both scoped to one layer.
+  const statefulStates = new Map<number | string, unknown>();
 
   function renderFrameAt(atMs: number): RGBA[] {
     const activeWithIndex = row.effects
@@ -346,6 +381,19 @@ export function createRowSequencer(
         renderWithLayerSettings(buffer, effect.layer, (target) => {
           if (STATEFUL_EFFECTS.has(effect.name)) {
             renderStatefulIncremental(target, palette, effect, atMs, frameMs, seed, index, statefulStates);
+          } else if (effect.layer?.persistent) {
+            // Sequential export walks the frames in order anyway, so persistence here is just a
+            // matter of keeping the buffer around instead of replaying into a fresh one.
+            const key = `persist:${index}`;
+            let kept = statefulStates.get(key) as RenderBuffer | undefined;
+            if (!kept || kept.width !== target.width || kept.height !== target.height) {
+              kept = new RenderBuffer(target.width, target.height);
+              statefulStates.set(key, kept);
+            }
+            renderStateless(kept, palette, effect, atMs, seed, audio);
+            for (let y = 0; y < target.height; y++) {
+              for (let x = 0; x < target.width; x++) target.setPixel(x, y, kept.getPixel(x, y));
+            }
           } else {
             renderStateless(target, palette, effect, atMs, seed, audio);
           }
@@ -370,7 +418,7 @@ function renderStatefulIncremental(
   frameMs: number,
   seed: number,
   key: number,
-  states: Map<number, unknown>,
+  states: Map<number | string, unknown>,
 ): void {
   const palette = effect.palette ?? rowPalette;
   const duration = effect.endMs - effect.startMs || 1;

@@ -1,5 +1,31 @@
 # Changelog
 
+## The Layer Settings panel, finished
+
+**Roto-Zoom** and **Persistent** were the two controls still missing, and the panel is now 6 of 6.
+
+- **Roto-Zoom** turns and scales what an effect drew, about a pivot. Like the transformation before it, it samples backwards from each destination pixel rather than scattering forwards — scattering leaves holes wherever the source grid stretches. Ground the turn uncovers is left transparent rather than smeared, so the layers underneath still show through; a rotation that pushed the effect off its own buffer would otherwise drag the edge pixels across the model.
+- **Persistent** is the manual's *"does not clear the display buffer before rendering each frame"*. A stateless effect is a pure function of its frame, so persistence can't be read off one — it has to be produced by actually drawing every frame since the effect started into one buffer. That's what the scrub path does, capped at 600 frames because past that the oldest traces have been painted over anyway and the cost would otherwise grow without bound. The sequential export path already walks frames in order, so there it is just a matter of keeping the buffer instead of replaying into a fresh one. A test drives both paths over the same twenty frames and requires them to agree — two routes to the same picture is exactly the shape of bug that ships a preview which doesn't match the `.fseq`.
+
+Both are wired into the props panel, so they reach every effect. Zoom is stored as a multiplier but edited as a percentage; the pivot sliders only appear once there is a turn or a zoom for them to be about.
+
+That leaves Render Style as the only partial entry in the panel, and for a reason that belongs elsewhere: thirteen of its nineteen styles describe how several models in a *group* are arranged relative to each other, so they wait on group rendering rather than on this panel.
+
+
+## SubModels
+
+The gap real sequences leaned on hardest. A sub-model is a named subset of a model's nodes — the star on a mega tree, one arch of a set — addressable in the sequencer as its own row. A show that sequences them and is imported without them doesn't merely lose detail: those rows have nowhere to land, so whole passages render on nothing.
+
+- **Imported.** xLights stores them as `<subModel>` elements *nested inside* `<model>`, not as attributes, which is why the lossless raw-attribute bag never carried them. Both kinds are read: node-range sub-models (rows of `1-5,9,12-14`) and sub-buffer ones (a rectangle of the parent's buffer).
+- **Resolved to geometry.** The parent's nodes are shared, not copied — a sub-model node keeps its `screenX`/`screenY` so it lights up in the same place in the yard; only the buffer coordinates are rebuilt, because having its own buffer is the whole point of it being a separate row. A descending range like `9-5` reverses the node order rather than being treated as a mistake, which is how a sub-model is made to run the other way along a string.
+- **Sequenced.** Sub-model rows appear directly under their parent model. They're keyed by parent id *and* name — several sub-models share one parent id, so matching on the id alone would collapse them into one row and silently merge everyone's effects.
+- **Rendered, in both places.** A sub-model borrows its parent's lights, so what it renders is written back onto the parent's nodes, after the parent's own rows. The `.fseq` export does this the same way the preview does — otherwise a show looks right on screen and plays wrong in the yard.
+
+A sub-model that selects no node the parent actually has is dropped rather than kept as an empty row, which would silently swallow every effect put on it.
+
+Still missing: an in-app editor for creating one, and xLights' Draw Model and Generate Slices tools. Losing the ones a show already has was the expensive part.
+
+
 ## Eight more layer blending modes
 
 10 of 24 becomes 18: **1 is Mask**, **2 is Mask**, **1 is Unmask**, **2 is Unmask**, **Shadow 1 on 2**, **Shadow 2 on 1**, **Layered** and **Brightness**.

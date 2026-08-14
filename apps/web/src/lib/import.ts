@@ -32,6 +32,7 @@ export interface ImportSummary {
   // two/three-point path fired at all - a yard full of arches and rooflines reporting zero
   // two/three-point models means those attributes aren't named what we expect in that file.
   placement: { boxed: number; twoPoint: number; threePoint: number; polyLine: number };
+  subModels: number;
   // Which reading of ScaleX the boxed models were placed with, and what it was decided from.
   boxedScale: BoxedScaleChoice;
   // How many models stored a negative scale. The importer reads those as magnitudes, because in
@@ -76,6 +77,9 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
     },
     strings: m.attrs.NumStrings ? parseInt(m.attrs.NumStrings, 10) : null,
     nodes_per_string: m.attrs.NodesPerString ? parseInt(m.attrs.NodesPerString, 10) : null,
+    // Sub-models are nested elements rather than attributes, so they arrive alongside the
+    // attribute bag instead of inside it (formats/rgbeffects.ts).
+    sub_models: m.subModels,
     string_type: m.attrs.StringType ?? null,
     start_channel: m.attrs.StartChannel ?? null,
     order: i,
@@ -107,5 +111,6 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
   }));
   if (viewObjects.length > 0) await api.bulkUpsertViewObjects(layoutId, viewObjects);
 
-  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length, placement, boxedScale, negativeScales };
+  const subModels = parsed.models.reduce((n, m) => n + m.subModels.length, 0);
+  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length, placement, boxedScale, negativeScales, subModels };
 }

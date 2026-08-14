@@ -14,6 +14,7 @@ import {
   type LayerSettings,
   type LayerTransform,
   type RenderStyle,
+  type RotoZoom,
   type SubBuffer,
   type TransitionSpec,
   type TransitionType,
@@ -92,6 +93,18 @@ function patchSubBuffer(changes: Partial<SubBuffer>): void {
 function resetSubBuffer(): void {
   patchLayer({ subBuffer: { x1: 0, y1: 0, x2: 100, y2: 100 } });
 }
+
+const rotoZoom = computed<RotoZoom>(() => layer.value.rotoZoom ?? {});
+function patchRotoZoom(changes: Partial<RotoZoom>): void {
+  patchLayer({ rotoZoom: { ...rotoZoom.value, ...changes } });
+}
+function resetRotoZoom(): void {
+  patchLayer({ rotoZoom: undefined });
+}
+// Zoom is held as a multiplier but edited as a percentage, because a slider stepping in
+// hundredths of a multiplier is unreadable and xLights' own control is a percentage too.
+const zoomPct = computed(() => Math.round((rotoZoom.value.zoom ?? 1) * 100));
+const rotoZoomTouched = computed(() => (rotoZoom.value.rotation ?? 0) !== 0 || (rotoZoom.value.zoom ?? 1) !== 1);
 const subBufferTrimmed = computed(() => {
   const s = subBuffer.value;
   return s.x1 > 0 || s.y1 > 0 || s.x2 < 100 || s.y2 < 100;
@@ -271,6 +284,61 @@ function curveable(p: EffectParamSpec): boolean {
             <span class="value">{{ layer.blur ?? 1 }}</span>
           </span>
         </label>
+        <label class="blend-row">
+          <input
+            type="checkbox"
+            :checked="layer.persistent === true"
+            @change="patchLayer({ persistent: ($event.target as HTMLInputElement).checked })"
+          />
+          Persistent — each frame layers on top of the last instead of clearing
+        </label>
+
+        <p class="hint">
+          Roto-zoom — turns and scales what the effect drew, about the pivot. Anything the turn
+          uncovers stays transparent, so the layers under it still show through.
+        </p>
+        <label class="blend-row">
+          Rotation
+          <span class="blend-inline">
+            <input
+              type="range"
+              min="-180"
+              max="180"
+              :value="rotoZoom.rotation ?? 0"
+              @input="patchRotoZoom({ rotation: Number(($event.target as HTMLInputElement).value) })"
+            />
+            <span class="value">{{ rotoZoom.rotation ?? 0 }}°</span>
+          </span>
+        </label>
+        <label class="blend-row">
+          Zoom
+          <span class="blend-inline">
+            <input
+              type="range"
+              min="10"
+              max="400"
+              :value="zoomPct"
+              @input="patchRotoZoom({ zoom: Number(($event.target as HTMLInputElement).value) / 100 })"
+            />
+            <span class="value">{{ zoomPct }}%</span>
+          </span>
+        </label>
+        <template v-if="rotoZoomTouched">
+          <label v-for="axis in (['pivotX', 'pivotY'] as const)" :key="axis" class="blend-row">
+            {{ axis === 'pivotX' ? 'Pivot X' : 'Pivot Y' }}
+            <span class="blend-inline">
+              <input
+                type="range"
+                min="0"
+                max="100"
+                :value="rotoZoom[axis] ?? 50"
+                @input="patchRotoZoom({ [axis]: Number(($event.target as HTMLInputElement).value) })"
+              />
+              <span class="value">{{ rotoZoom[axis] ?? 50 }}</span>
+            </span>
+          </label>
+          <button class="reset-sub" @click="resetRotoZoom">No roto-zoom</button>
+        </template>
 
         <p class="hint">
           Sub-buffer — the part of the model this effect draws on, as percentages. The effect

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { rgba } from "../src/color";
 import { computeSingleLine } from "../src/models/line";
-import { renderRowAtMs } from "../src/renderFrame";
+import { createRowSequencer, renderRowAtMs } from "../src/renderFrame";
 import { defaultParamsFor, EFFECT_SCHEMAS } from "../src/effects/schema";
 
 const RED = rgba(255, 0, 0, 255);
@@ -109,5 +109,43 @@ describe("renderRowAtMs (M4 frame-render pipeline)", () => {
 
     const additive = renderRowAtMs({ geometry, effects }, 500, 50, 1, [RED]);
     expect(additive[0]).toEqual(rgba(255, 0, 255, 255)); // Additive: red + blue = magenta
+  });
+});
+
+// Persistent (manual: Sequencer > Layers > Layer Settings): "does not clear the display buffer
+// before rendering each frame. The result is the preview frame remains until overwritten by a
+// subsequent frame." A chase is the clearest witness - normally two lit nodes travelling along
+// the strand, but with the buffer kept it paints the strand in behind itself.
+describe("Persistent layer setting", () => {
+  const geometry = computeSingleLine({ strings: 1, nodesPerString: 20 });
+  const chase = { chaseSizePct: 10, cycles: 1, offsetPct: 0 };
+  const lit = (colors: ReturnType<typeof renderRowAtMs>) => colors.filter((c) => c.a > 0).length;
+
+  it("keeps what earlier frames drew, where a normal layer would have cleared it", () => {
+    const plain = { name: "SingleStrand", startMs: 0, endMs: 1000, params: chase };
+    const persistent = { ...plain, layer: { persistent: true } };
+
+    const atStart = lit(renderRowAtMs({ geometry, effects: [persistent] }, 0, 50, 1, [RED]));
+    const later = lit(renderRowAtMs({ geometry, effects: [persistent] }, 600, 50, 1, [RED]));
+    expect(later).toBeGreaterThan(atStart);
+    expect(later).toBeGreaterThan(lit(renderRowAtMs({ geometry, effects: [plain] }, 600, 50, 1, [RED])));
+  });
+
+  it("changes nothing for a layer that hasn't asked for it", () => {
+    const effects = [{ name: "SingleStrand", startMs: 0, endMs: 1000, params: chase }];
+    const off = renderRowAtMs({ geometry, effects: [{ ...effects[0]!, layer: { persistent: false } }] }, 600, 50, 1, [RED]);
+    expect(off).toEqual(renderRowAtMs({ geometry, effects }, 600, 50, 1, [RED]));
+  });
+
+  it("renders the same through the sequential export path as through a scrub", () => {
+    // The two paths reach persistence differently - the exporter keeps one buffer across the
+    // frames it is already walking, a scrub replays them - so they have to be checked against
+    // each other or the exported .fseq can differ from what the preview showed.
+    const effects = [{ name: "SingleStrand", startMs: 0, endMs: 1000, params: chase, layer: { persistent: true } }];
+    const sequencer = createRowSequencer({ geometry, effects }, 50, 1, [RED]);
+    for (let f = 0; f < 20; f++) {
+      const atMs = f * 50;
+      expect(sequencer.renderFrameAt(atMs)).toEqual(renderRowAtMs({ geometry, effects }, atMs, 50, 1, [RED]));
+    }
   });
 });

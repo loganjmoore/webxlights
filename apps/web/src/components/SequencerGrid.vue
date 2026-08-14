@@ -3,9 +3,11 @@ import { computed, onMounted, ref, watch } from "vue";
 import type { SequenceBody, SequenceEffect } from "../lib/api";
 
 export interface GridRow {
-  elementType: "model" | "group";
+  elementType: "model" | "group" | "submodel";
   elementId: number;
   name: string;
+  /** Set only for sub-model rows; names which sub-model of `elementId` this is. */
+  subName?: string;
 }
 
 export type ContextMenuTarget =

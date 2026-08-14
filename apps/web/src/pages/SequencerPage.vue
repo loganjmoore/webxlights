@@ -88,7 +88,7 @@ const pxPerMs = computed(() => {
 const selectedEffect = computed(() => (store.selectedEffectId ? store.findEffect(store.selectedEffectId) : null));
 
 function rowKey(row: GridRow): string {
-  return `${row.elementType}:${row.elementId}`;
+  return `${row.elementType}:${row.elementId}:${row.subName ?? ""}`;
 }
 function hiddenStorageKey(): string {
   return `webxlights.sequencer.hiddenRows.${sequenceId.value}`;
@@ -122,7 +122,9 @@ function hideAllRows(): void {
 }
 const visibleRows = computed(() => rows.value.filter((r) => !hiddenRowKeys.value.has(rowKey(r))));
 function effectCountFor(row: GridRow): number {
-  const found = store.body.rows.find((r) => r.elementType === row.elementType && r.elementId === row.elementId);
+  const found = store.body.rows.find(
+    (r) => r.elementType === row.elementType && r.elementId === row.elementId && (r.subName ?? undefined) === row.subName,
+  );
   return found?.effects.length ?? 0;
 }
 
@@ -135,8 +137,18 @@ async function loadRows(): Promise<void> {
     api.listModels(layout.id),
     api.listModelGroups(layout.id),
   ]);
+  // Sub-model rows sit directly under the model they belong to, which is where xLights puts
+  // them and where anyone looking for "the star on the mega tree" will look for them.
   rows.value = [
-    ...models.map((m) => ({ elementType: "model" as const, elementId: m.id, name: m.name })),
+    ...models.flatMap((m) => [
+      { elementType: "model" as const, elementId: m.id, name: m.name },
+      ...(m.sub_models ?? []).map((sm) => ({
+        elementType: "submodel" as const,
+        elementId: m.id,
+        subName: sm.name,
+        name: `${m.name} / ${sm.name}`,
+      })),
+    ]),
     ...groups.map((g) => ({ elementType: "group" as const, elementId: g.id, name: g.name })),
   ];
   modelRecords.value = models;
@@ -225,7 +237,7 @@ function armEffect(name: string): void {
 
 function handlePlace(row: GridRow, startMs: number, endMs: number): void {
   if (!pendingEffectName.value) return;
-  store.addEffect(row.elementType, row.elementId, {
+  store.addEffect(row.elementType, row.elementId, row.subName, {
     id: newEffectId(),
     name: pendingEffectName.value,
     startMs,
@@ -250,7 +262,7 @@ const DEFAULT_DROPPED_EFFECT_MS = 1000;
 // you size the effect in one motion) is untouched and still the way to place a specific length.
 function handleDropEffect(row: GridRow, name: string, startMs: number): void {
   const endMs = Math.min(startMs + DEFAULT_DROPPED_EFFECT_MS, store.sequence?.duration_ms ?? startMs + DEFAULT_DROPPED_EFFECT_MS);
-  store.addEffect(row.elementType, row.elementId, {
+  store.addEffect(row.elementType, row.elementId, row.subName, {
     id: newEffectId(),
     name,
     startMs,
@@ -308,10 +320,10 @@ function handleContextAction(action: string): void {
       clipboard.value = store.copyEffect(effect.id);
       store.deleteEffect(effect.id);
     } else if (action === "paste") {
-      if (clipboard.value) store.pasteEffectAt(row.elementType, row.elementId, clipboard.value, ms);
+      if (clipboard.value) store.pasteEffectAt(row.elementType, row.elementId, row.subName, clipboard.value, ms);
     } else if (action === "duplicate") {
       const copy = store.copyEffect(effect.id);
-      if (copy) store.pasteEffectAt(row.elementType, row.elementId, copy, effect.endMs);
+      if (copy) store.pasteEffectAt(row.elementType, row.elementId, row.subName, copy, effect.endMs);
     } else if (action === "delete") {
       store.deleteEffect(effect.id);
     }
@@ -475,7 +487,7 @@ function onKeydown(e: KeyboardEvent): void {
   } else if ((e.metaKey || e.ctrlKey) && e.key === "v") {
     if (clipboard.value) {
       const row = visibleRows.value[0]; // pasting onto a hidden row would look like paste did nothing
-      if (row) store.pasteEffectAt(row.elementType, row.elementId, clipboard.value, playheadMs.value);
+      if (row) store.pasteEffectAt(row.elementType, row.elementId, row.subName, clipboard.value, playheadMs.value);
     }
   }
 }

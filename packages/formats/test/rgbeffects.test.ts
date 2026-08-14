@@ -71,3 +71,50 @@ describe("parseRgbEffectsXml", () => {
     expect(result.unsupportedTypes).toEqual(["Mesh"]);
   });
 });
+
+// xLights stores SubModels as <subModel> elements nested inside <model>, not as attributes, so
+// the lossless raw-attribute bag never carried them and every sub-model row in an imported
+// sequence had nowhere to land.
+describe("SubModels", () => {
+  const xml = `<?xml version="1.0"?>
+<xrgb>
+  <models>
+    <model name="Mega Tree" DisplayAs="Tree 360" parm1="16" parm2="50">
+      <subModel name="Star" layout="horizontal" type="ranges" line0="1-10" />
+      <subModel name="Trunk" layout="vertical" line0="20-25" line1="26-31" />
+      <subModel name="TopHalf" type="subbuffer" subBuffer="0,50,100,100" />
+      <subModel name="Empty" line0="" />
+    </model>
+    <model name="Arch" DisplayAs="Arches" parm1="1" parm2="20" />
+  </models>
+</xrgb>`;
+
+  it("reads each sub-model's rows from its numbered line attributes", () => {
+    const parsed = parseRgbEffectsXml(xml);
+    const tree = parsed.models.find((m) => m.name === "Mega Tree")!;
+    const star = tree.subModels.find((s) => s.name === "Star")!;
+    expect(star.rows).toEqual(["1-10"]);
+    expect(star.type).toBe("ranges");
+
+    const trunk = tree.subModels.find((s) => s.name === "Trunk")!;
+    expect(trunk.rows).toEqual(["20-25", "26-31"]);
+    expect(trunk.vertical).toBe(true);
+  });
+
+  it("reads a sub-buffer sub-model", () => {
+    const tree = parseRgbEffectsXml(xml).models.find((m) => m.name === "Mega Tree")!;
+    const half = tree.subModels.find((s) => s.name === "TopHalf")!;
+    expect(half.type).toBe("subbuffer");
+    expect(half.subBuffer).toBe("0,50,100,100");
+  });
+
+  it("skips a sub-model with no nodes rather than importing an empty row", () => {
+    const tree = parseRgbEffectsXml(xml).models.find((m) => m.name === "Mega Tree")!;
+    expect(tree.subModels.map((s) => s.name)).not.toContain("Empty");
+  });
+
+  it("gives a model with no sub-models an empty list, not undefined", () => {
+    const arch = parseRgbEffectsXml(xml).models.find((m) => m.name === "Arch")!;
+    expect(arch.subModels).toEqual([]);
+  });
+});
