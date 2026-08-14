@@ -1,5 +1,31 @@
 # Changelog
 
+## Finding the beats in a track
+
+The timing generators could put marks at a rate you chose — every 50ms, or 120 to the minute. Neither follows the song. This adds marks where the sound actually rises, which is what makes a timing track usable for sequencing *to a song* rather than to a click.
+
+The method is spectral flux: how much the spectrum rose between one frame and the next, summed across the bands. A drum hit lifts many bands at once and spikes; a sustained note holds its bands steady and produces nothing after its attack. Only rises count — a note ending is not an onset, and counting falls would double every hit.
+
+**The threshold is local, not global.** A quiet verse and a loud chorus have different baselines, so a fixed threshold either floods the chorus with marks or finds nothing in the verse. Each frame is compared against its own neighbourhood instead, which is what lets one sensitivity setting work across a whole song.
+
+Three controls, each earning its place:
+
+- **Sensitivity** maps onto a multiple of the local baseline rather than a raw threshold, because the useful range of a raw threshold depends on the track and the useful range of a multiple doesn't.
+- **Minimum gap**, because a drum hit spreads over several frames and without it one beat becomes a cluster — which reads as a working detector until you zoom in.
+- **Spectrum range**, so you can follow the kick or the hats instead of everything at once.
+
+Plus keep-every-Nth, which is roughly how bars come from beats.
+
+### The tempo is reported, not used
+
+The detector estimates a tempo from the gaps between its own marks, folded into the range people read tempos in. It is only ever shown, never acted on: it answers the question you actually have when looking at a track full of new marks — *did this find the beat, or find noise?* Using it to snap or quantise would take marks that are right and move them somewhere wrong.
+
+It declines to answer rather than guessing when the gaps aren't consistent, and one long pause between sections doesn't drag the estimate down.
+
+### Where it lives
+
+In the engine, not the web app. It is arithmetic over the analysed audio the renderer already produces, so it belongs where it can be tested against a *synthesised* track — a hit on frame 10 either produces a mark at 500ms or it doesn't, where a real song's beats are a judgement call.
+
 ## Papagayo `.pgo` import
 
 Papagayo is what people used to break lyrics into phonemes before xLights could do it itself, and a lot of existing singing faces were built with it. Its files import now: each voice becomes three timing tracks — phrases, words and phonemes — and the phonemes track is what a Faces effect reads.
