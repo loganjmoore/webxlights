@@ -5,6 +5,7 @@
     <model name="Arch 1" DisplayAs="Arches" NumArches="5" NodesPerArch="50" Arc="180" StartChannel=">Mega Tree:1" StringType="RGB Nodes"/>
     <model name="Porch Roofline" DisplayAs="Single Line" NumStrings="1" NodesPerString="120" StartChannel="1201" StringType="RGB Nodes"/>
     <model name="Spinner Prop" DisplayAs="Spinner" NumStrings="4" ArmsPerString="5" NodesPerArm="10" StartChannel="2000" StringType="RGB Nodes"/>
+    <model name="Garage Label" DisplayAs="Label" Text="Garage" StartChannel="1" StringType="RGB Nodes"/>
   </models>
   <modelGroups>
     <modelGroup name="ALL" DisplayAs="ModelGroup" models="Mega Tree,Arch 1,Porch Roofline,Spinner Prop" layout="minimalGrid"/>

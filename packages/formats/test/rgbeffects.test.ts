@@ -11,7 +11,7 @@ const fixture = readFileSync(
 describe("parseRgbEffectsXml", () => {
   it("parses all models with their raw attribute bag", () => {
     const result = parseRgbEffectsXml(fixture);
-    expect(result.models).toHaveLength(4);
+    expect(result.models).toHaveLength(5);
     const tree = result.models.find((m) => m.name === "Mega Tree")!;
     expect(tree.displayAs).toBe("Tree");
     expect(tree.attrs.NumStrings).toBe("16");
@@ -21,8 +21,10 @@ describe("parseRgbEffectsXml", () => {
   it("flags supported vs unsupported DisplayAs types", () => {
     const result = parseRgbEffectsXml(fixture);
     const supported = result.models.filter((m) => m.supported).map((m) => m.name);
-    expect(supported).toEqual(["Mega Tree", "Arch 1", "Porch Roofline"]);
-    expect(result.unsupportedTypes).toEqual(["Spinner"]);
+    // Spinner used to be in this fixture as the unsupported one. It renders now, so the fixture
+    // names a type that genuinely doesn't: a Label is a text annotation, not lights.
+    expect(supported).toEqual(["Mega Tree", "Arch 1", "Porch Roofline", "Spinner Prop"]);
+    expect(result.unsupportedTypes).toEqual(["Label"]);
   });
 
   it("parses model groups with member lists", () => {

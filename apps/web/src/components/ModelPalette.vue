@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// M13: the 11 of PARITY.md's 12 supported model types that have a real geometry default
-// (Custom needs a real grid to render - see GOAL-M13.md cut #1 - dragging one out here would
-// place a permanently geometry-less model, so it's excluded rather than faked).
+// Every supported model type that has a real geometry default. Custom is excluded because it
+// needs a real grid to render - dragging one out here would place a permanently geometry-less
+// model - and so is Image, which is a picture of a prop rather than something to draw in a yard
+// from nothing.
 const MODEL_TYPES = [
   "Matrix",
   "Single Line",
@@ -14,6 +15,10 @@ const MODEL_TYPES = [
   "Icicles",
   "Window Frame",
   "Wreath",
+  "Spinner",
+  "Cube",
+  "Sphere",
+  "Channel Block",
 ] as const;
 
 // Must match LayoutCanvas.vue's onDrop MIME check exactly.

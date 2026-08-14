@@ -11,6 +11,10 @@ import { computeWindowFrame } from "./windowFrame";
 import { computeWreath } from "./wreath";
 import { parseCustomModelGrid } from "./custom";
 import { parsePolyPointPath } from "./polyPoints";
+import { computeSpinner } from "./spinner";
+import { computeCube } from "./cube";
+import { computeSphere } from "./sphere";
+import { computeChannelBlock, computeImageModel } from "./channelBlock";
 
 const int = (v: string | undefined, fallback: number): number => {
   const n = v === undefined ? NaN : parseInt(v, 10);
@@ -123,6 +127,42 @@ export function computeGeometryFromAttrs(displayAs: string, attrs: Record<string
         strings: count(attrs, ["NumStrings", "parm1"], 1),
         nodesPerString: count(attrs, ["NodesPerString", "parm2"], 50),
       });
+    case "Spinner":
+      return computeSpinner({
+        strings: count(attrs, ["NumStrings", "parm1"], 1),
+        nodesPerArm: count(attrs, ["LightsPerArm", "NodesPerArm", "parm2"], 10),
+        armsPerString: count(attrs, ["ArmsPerString", "NumArms", "parm3"], 8),
+        hollowPercent: float(attrs.Hollow, 20),
+        arcDegrees: float(attrs.Arc, 360),
+        startAngleDegrees: float(attrs.StartAngle, 0),
+        zigZag: attrs.ZigZag === "true" || attrs.ZigZag === "1",
+      });
+    case "Cube":
+      return computeCube({
+        // xLights names these on the model directly rather than through parm1/2/3, because a cube
+        // has three counts and the old scheme only had room for the two most types use.
+        width: count(attrs, ["Width", "parm1"], 5),
+        height: count(attrs, ["Height", "parm2"], 5),
+        depth: count(attrs, ["Depth", "parm3"], 5),
+        style: attrs.Style === "Cylinder" ? "Cylinder" : "Cube",
+        strings: count(attrs, ["NumStrings", "Strings"], 1),
+        // "Zig Zag: wiring winds back and forth" is xLights' own default for a cube.
+        zigZag: attrs.StrandStyle !== "No Zig Zag",
+      });
+    case "Sphere":
+      return computeSphere({
+        strings: count(attrs, ["NumStrings", "parm1"], 16),
+        nodesPerString: count(attrs, ["NodesPerString", "parm2"], 25),
+        degrees: float(attrs.Degrees, 360),
+        southernLatitude: float(attrs.StartLatitude, 0),
+        northernLatitude: float(attrs.EndLatitude, 0),
+      });
+    case "Channel Block":
+      return computeChannelBlock({ channels: count(attrs, ["NumChannels", "parm1"], 1) });
+    case "Image":
+      // A single-channel prop: the picture is how it is drawn in the layout, not something this
+      // engine lights per pixel.
+      return computeImageModel();
     case "Custom":
       return attrs.CustomModel ? parseCustomModelGrid(attrs.CustomModel) : null;
     default:

@@ -65,6 +65,33 @@ export const MODEL_PROPERTY_SCHEMAS: Record<string, PropertyField[]> = {
     { key: "NumStrings", label: "# Strings", type: "number", default: 1 },
     { key: "NodesPerString", label: "Nodes/String", type: "number", default: 50 },
   ],
+  Spinner: [
+    { key: "NumStrings", label: "# Strings", type: "number", default: 1 },
+    { key: "ArmsPerString", label: "Arms/String", type: "number", default: 8 },
+    { key: "LightsPerArm", label: "Lights/Arm", type: "number", default: 10 },
+    { key: "Hollow", label: "Hollow %", type: "number", default: 20 },
+    { key: "Arc", label: "Arc (degrees)", type: "number", default: 360 },
+    { key: "StartAngle", label: "Start Angle", type: "number", default: 0 },
+    { key: "ZigZag", label: "Zig Zag", type: "select", default: "false", options: ["false", "true"] },
+  ],
+  Cube: [
+    { key: "Width", label: "Width", type: "number", default: 5 },
+    { key: "Height", label: "Height", type: "number", default: 5 },
+    { key: "Depth", label: "Depth", type: "number", default: 5 },
+    { key: "Style", label: "Style", type: "select", default: "Cube", options: ["Cube", "Cylinder"] },
+    { key: "NumStrings", label: "# Strings", type: "number", default: 1 },
+    { key: "StrandStyle", label: "Strand Style", type: "select", default: "Zig Zag", options: ["Zig Zag", "No Zig Zag"] },
+  ],
+  Sphere: [
+    { key: "NumStrings", label: "# Strings", type: "number", default: 16 },
+    { key: "NodesPerString", label: "Nodes/String", type: "number", default: 25 },
+    { key: "Degrees", label: "Degrees", type: "number", default: 360 },
+    { key: "StartLatitude", label: "Southern Latitude %", type: "number", default: 0 },
+    { key: "EndLatitude", label: "Northern Latitude %", type: "number", default: 0 },
+  ],
+  "Channel Block": [{ key: "NumChannels", label: "# Channels", type: "number", default: 1 }],
+  // Image has no geometry to edit - the whole prop is one channel - so it has no fields rather
+  // than fields that would do nothing.
 };
 
 export function propertyFieldsFor(displayAs: string): PropertyField[] {
@@ -81,6 +108,9 @@ const LEGACY_KEYS: Record<string, string> = {
   NumArches: "parm1",
   NumCanes: "parm1",
   TopNodes: "parm1",
+  ArmsPerString: "parm3",
+  LightsPerArm: "parm2",
+  NumChannels: "parm1",
   NodesPerString: "parm2",
   NodesPerArch: "parm2",
   NodesPerCane: "parm2",

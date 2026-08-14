@@ -27,9 +27,11 @@ written down. Status here means:
 | Replace model | ❌ | |
 | Model settings (per-type geometry) | ⚠️ | Only the attributes our geometry reads — see PARITY |
 | Setting start channels (auto + manual) | ⚠️ | Manual per-model start channel; no auto-allocation pass |
-| **Model types** | | xLights ships 21; we render 12 |
+| **Model types** | | xLights ships 21; we render 17 |
 | Arches, Candy Cane, Circle, Custom, Icicles, Matrix, PolyLine, Single Line, Star, Tree, Window Frame, Wreath | ✅ | |
-| Channel Block, Cube, Sphere, Spinner, Image, Label | ❌ | |
+| Spinner, Cube, Sphere, Channel Block, Image | ✅ | Spinner's arms, hollow centre, arc, start angle and zig-zag wiring; Cube as a box or a cylinder, with real depth and an unwrapped buffer (the manual: "while the model is 3D, xLights renders the effects in 2D"); Sphere with degrees and both latitudes; Channel Block as a row of independent cells, one per device. Image is a *single-channel prop* — "blow-molds, inflatables, incandescent cutouts" — so one node is its whole geometry; the picture itself is a layout-view concern this engine doesn't draw |
+| Channel Block — per-channel "Channel Color" | ❌ | Which of the RGB values drives each output channel. Belongs to channel assignment on export rather than to geometry |
+| Label | 🚫 | "A simple text model that displays a line of text directly in the layout and preview. It does not control any lights or channels" — an annotation, not a prop |
 | DMX, DMX Moving Head Advance, Servo | 🚫 | Fixture control, not pixel rendering |
 | Download / import models from the vendor library | ❌ | |
 | Model groups (add, modify, delete, rename, clone, delete-empty) | ⚠️ | Add/modify/delete/rename; no clone, no delete-empty |
@@ -155,7 +157,9 @@ so effects placed on a group reached nothing at all. Real sequences target group
 37% of one real show's sequenced elements — so this was whole passages of a show going dark
 without an error anywhere.
 
-The largest gap remaining is the nine unimplemented model types.
+What is left is smaller and more scattered than it was: colour curves, effect presets, views, a
+sub-model editor, the Effect Assist path editor Sketch needs, preferences, and the controller
+visualiser. No single one of them is load-bearing the way group rendering was.
 
 After that, the missing effects are worth taking in batches by how much machinery they share:
 the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Lines) before the

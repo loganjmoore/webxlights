@@ -1,5 +1,19 @@
 # Changelog
 
+## Five more model types
+
+**12 of xLights' 21 becomes 17.** Spinner, Cube, Sphere, Channel Block and Image now import, render and appear in the drag-create palette. Until now a show containing any of them imported them as labelled placeholders — kept, but inert.
+
+- **Spinner** — arms radiating from a centre, with hollow percentage, arc spread, start angle and zig-zag wiring. The buffer is arms × lights-per-arm, so running across it goes *around* the spinner and running up it goes outwards along every arm at once. Zig-zag reverses the wiring on alternate arms without moving a light: a bulb doesn't change position because of how the wire reaches it.
+- **Cube** — the manual is precise about the tension here: *"while the model is 3D, xLights renders the effects in 2D."* So the nodes stand in a real box — `screenZ` carries the depth, and the preview shows a box rather than a flat grid — while the *buffer* is the box unwrapped, each depth layer laid side by side. Cylinder is the same nodes wrapped round instead of folded square, with Width becoming the circumference.
+- **Sphere** — strings running pole to pole, each at its own longitude, between a southern and a northern latitude. Its buffer is strings × nodes-per-string, which is the same buffer a matrix of those counts would get, so an effect written for a matrix works on it unchanged. Half a sphere spreads the *same* strings over 180° rather than dropping half of them.
+- **Channel Block** — not a shape at all: *"can be used to model generic channel to be used or AC Lights, relays, smoke machines."* A row of independent cells, one per channel, so a chase across the buffer steps through the devices in order. Giving it a shape it doesn't physically have would be worse than admitting it's a strip of switches. (Its per-channel Channel Color setting isn't implemented — that's channel assignment on export, not geometry, and the coverage doc says so.)
+- **Image** — *"used to represent single channel props like blow-molds, inflatables or incandescent cutouts."* The whole prop is one channel, so one node is the honest geometry; the picture is how the layout draws it, not something to light per pixel.
+
+**Label stays out, and that's the right answer**: *"a simple text model that displays a line of text directly in the layout and preview. It does not control any lights or channels."* It's an annotation. It's now recorded as a deliberate non-goal rather than a gap, and it's what the tests use as their example of a genuinely unsupported type — a role Spinner used to play, before it became real.
+
+Each type is also in the property grid, reading the pre-2026.04 `parm1`/`parm2`/`parm3` names as well as the descriptive ones — otherwise every one of these would import at a library default instead of its real size, which is most of the shows that exist.
+
 ## Canvas mode, and the three effects that needed it
 
 Kaleidoscope, Warp and Adjust have sat in the coverage doc under *"needs a canvas the render pipeline doesn't have"* for three passes. They aren't ordinary effects: each one **modifies the layer below it** rather than drawing anything of its own. The manual is blunt about it — Kaleidoscope *"is a canvas mode effect. By itself it does nothing."*
