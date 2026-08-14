@@ -4,8 +4,19 @@ import { useRoute, useRouter } from "vue-router";
 import { parseXsq } from "@webxlights/formats";
 import { describeMapping, mapXsqToBody } from "../lib/xsqConvert";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
-import { api, type SequenceSummary } from "../lib/api";
+import { api, type ModelGroupRecord, type ModelRecord, type SequenceSummary } from "../lib/api";
 import { decodeAudioFile } from "../lib/audio";
+import {
+  applyMapping,
+  donorRows,
+  donorTimingTrackNames,
+  mappingTargets,
+  type DonorRow,
+  type EffectMapping,
+  type MappingTarget,
+} from "../lib/importMapping";
+import ImportMappingDialog from "../components/ImportMappingDialog.vue";
+import type { ParsedXsq } from "@webxlights/formats";
 
 const route = useRoute();
 const router = useRouter();
@@ -111,38 +122,84 @@ async function convertXsqToFseq(e: Event): Promise<void> {
   }
 }
 
+// Importing a `.xsq` is two steps now: read the file, then say where its effects land. The
+// mapping step is the point of the feature - the manual's own use case is "importing purchased
+// sequences from different vendors", where none of the donor's names are yours, and matching by
+// name alone silently imported almost nothing.
+const pendingImport = ref<{
+  parsed: ParsedXsq;
+  fileName: string;
+  targets: MappingTarget[];
+  donors: DonorRow[];
+  timingTrackNames: string[];
+} | null>(null);
+
 async function importXsq(e: Event): Promise<void> {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
+  input.value = "";
   if (!file) return;
 
   importing.value = true;
   importMessage.value = "";
   try {
-    const text = await file.text();
-    const parsed = parseXsq(text);
-
+    const parsed = parseXsq(await file.text());
     const layouts = await api.listLayouts(projectId.value);
     const layout = layouts[0];
-    const models = layout ? await api.listModels(layout.id) : [];
-    const groups = layout ? await api.listModelGroups(layout.id) : [];
+    const [models, groups]: [ModelRecord[], ModelGroupRecord[]] = await Promise.all([
+      layout ? api.listModels(layout.id) : Promise.resolve([]),
+      layout ? api.listModelGroups(layout.id) : Promise.resolve([]),
+    ]);
+
+    const targets = mappingTargets(models, groups);
+    if (targets.length === 0) {
+      // The manual is blunt about this: "If there are no models or groups displayed on the
+      // Sequencer, then you won't be presented with any models to import to."
+      importMessage.value = "This project has no models yet, so there's nowhere for the effects to go.";
+      return;
+    }
+
+    pendingImport.value = {
+      parsed,
+      fileName: file.name.replace(/\.xsq$/i, ""),
+      targets,
+      donors: donorRows(parsed),
+      timingTrackNames: donorTimingTrackNames(parsed),
+    };
+  } catch (err) {
+    importMessage.value = err instanceof Error ? `Import failed: ${err.message}` : "Import failed";
+  } finally {
+    importing.value = false;
+  }
+}
+
+async function confirmImport(mapping: EffectMapping, timingTracks: string[]): Promise<void> {
+  const pending = pendingImport.value;
+  if (!pending) return;
+  pendingImport.value = null;
+  importing.value = true;
+  try {
+    const { parsed, fileName, targets } = pending;
+    const applied = applyMapping(parsed, targets, mapping, timingTracks);
     const record = await api.createSequence(projectId.value, {
-      name: file.name.replace(/\.xsq$/i, ""),
+      name: fileName,
       frame_ms: parsed.frameMs,
       duration_ms: parsed.durationMs,
       audio_filename: parsed.mediaFilename || undefined,
     });
+    await api.saveSequenceBody(record.id, applied.body);
 
-    const mapped = mapXsqToBody(parsed, models, groups);
-    const { rows, timingTracks } = mapped.body;
+    const parts = [`${applied.mappedCount} rows`];
+    if (applied.unusedDonorNames.length) {
+      parts.push(`left behind: ${applied.unusedDonorNames.join(", ")}`);
+    }
+    if (parsed.unsupportedEffectNames.length) {
+      parts.push(`effects without full param translation: ${parsed.unsupportedEffectNames.join(", ")}`);
+    }
+    importMessage.value = `Imported ${parts.join(" — ")}`;
 
-    await api.saveSequenceBody(record.id, { rows, timingTracks });
-
-    importMessage.value = `Imported ${describeMapping(mapped, parsed)}`;
-
-    // The sequencer route is where the user actually looks - a message set here would be
-    // thrown away by this navigation (this page's importMessage never renders again), so it
-    // rides along as a query param instead of silently vanishing.
+    // The sequencer route is where the user actually looks - a message set here would be thrown
+    // away by this navigation, so it rides along as a query param instead of vanishing.
     router.push({
       name: "sequencer",
       params: { projectId: projectId.value, sequenceId: record.id },
@@ -152,7 +209,6 @@ async function importXsq(e: Event): Promise<void> {
     importMessage.value = err instanceof Error ? `Import failed: ${err.message}` : "Import failed";
   } finally {
     importing.value = false;
-    input.value = "";
   }
 }
 
@@ -161,6 +217,15 @@ onMounted(load);
 
 <template>
   <main class="sequences-page">
+    <ImportMappingDialog
+      v-if="pendingImport"
+      :targets="pendingImport.targets"
+      :donors="pendingImport.donors"
+      :timing-track-names="pendingImport.timingTrackNames"
+      :file-name="pendingImport.fileName"
+      @cancel="pendingImport = null"
+      @confirm="confirmImport"
+    />
     <header>
       <router-link :to="`/projects/${projectId}/layout`">&larr; Layout</router-link>
       <h1>Sequences</h1>

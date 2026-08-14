@@ -1,5 +1,32 @@
 # Changelog
 
+## The import mapping dialog
+
+Importing a `.xsq` matched donor rows to your models **by exact name**. That is fine for a sequence built on your own layout, and useless for the case the manual is actually about — "importing purchased sequences from different vendors" — where none of the names are yours and the import silently brought in almost nothing.
+
+So the mapping is now something you see and change before anything is created: every model and group in your layout gets a row, and you say which of the donor's rows feeds it.
+
+**The donor's effect counts are shown**, because that is what the choice is made on. A row with two effects and a row with two hundred look identical by name, and the manual says the same: the counts help "you decide which elements are worth mapping".
+
+**Names are still matched for you, as a starting point** — exactly first, then case- and space-insensitively, so "Arch 1" finds "arch1". Nothing fuzzier than that. A wrong guess puts someone else's effects on the wrong prop, and the entire point of the dialog is that you can see what it decided.
+
+One donor row can feed several of your models, which is the manual's "these items can still be used multiple times even when grayed out" — a vendor's single arch often drives four of yours. Timing tracks are ticked separately from the models, because they belong to the sequence rather than to any row, and a phoneme track is frequently the thing you actually wanted.
+
+Mappings save and load, and a loaded one can **replace** what's there or **add** to it, so several can be stacked.
+
+### Convert and Import still agree
+
+Tools > Convert has nowhere to put a dialog — it takes a file and hands back a file — so it maps by name, which is exactly what the dialog starts from before anyone touches it. Both now go through one function. A converter that matched names differently from the importer would produce an `.fseq` that didn't match what importing the same sequence would show, and trusting those two to agree is the whole reason to convert rather than import.
+
+Two behaviours changed as a result, and both are improvements worth naming:
+
+- **A donor row with no effects no longer creates an empty row.** It rendered nothing and cluttered the sequencer.
+- **An unmatched donor row is only reported if it had effects on it.** Nothing was lost otherwise, and a vendor sequence carries plenty of empty rows — listing them buries the ones that actually had sequencing.
+
+### The saved mapping file
+
+xLights saves an `.xmap`. That format isn't documented in the manual, and guessing at it would produce files that look like xLights' and aren't. This writes its own JSON, with an extension that says so.
+
 ## Finding the beats in a track
 
 The timing generators could put marks at a rate you chose — every 50ms, or 120 to the minute. Neither follows the song. This adds marks where the sound actually rises, which is what makes a timing track usable for sequencing *to a song* rather than to a click.
