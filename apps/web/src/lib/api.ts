@@ -1,7 +1,7 @@
 import type { EffectPreset } from "./effectPresets";
 import type { BackgroundImage } from "./backgroundImage";
 import type { SongBoundary } from "./songRegions";
-import type { BlendMode, LayerSettings, PictureImage, StoredSwatch, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
+import type { BlendMode, LayerSettings, PictureImage, StateSpec, StoredSwatch, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
 
 export class ApiError extends Error {
   status: number;
@@ -66,6 +66,9 @@ export interface ModelRecord {
   // xLights SubModels: named subsets of this model's nodes, each addressable as its own
   // sequencer row (engine/models/subModel.ts).
   sub_models?: SubModelSpec[] | null;
+  // xLights model States: named sets of this model's nodes that the State effect turns on by
+  // name (engine/models/states.ts).
+  states?: StateSpec[] | null;
   string_type: string | null;
   start_channel: string | null;
   channel_count: number | null;
@@ -128,6 +131,7 @@ export interface ModelUpsertPayload {
   strings?: number | null;
   nodes_per_string?: number | null;
   sub_models?: SubModelSpec[];
+  states?: StateSpec[];
   string_type?: string | null;
   start_channel?: string | null;
   channel_count?: number;

@@ -32,6 +32,7 @@ class ModelEntityController extends Controller
             'models.*.params' => ['array'],
             'models.*.raw_attrs' => ['array'],
             'models.*.sub_models' => ['array'],
+            'models.*.states' => ['array'],
             'models.*.screen' => ['array'],
             'models.*.strings' => ['nullable', 'integer'],
             'models.*.nodes_per_string' => ['nullable', 'integer'],
@@ -51,6 +52,7 @@ class ModelEntityController extends Controller
                         'params' => $m['params'] ?? [],
                         'raw_attrs' => $m['raw_attrs'] ?? [],
                         'sub_models' => $m['sub_models'] ?? [],
+                        'states' => $m['states'] ?? [],
                         'screen' => $m['screen'] ?? [],
                         'strings' => $m['strings'] ?? null,
                         'nodes_per_string' => $m['nodes_per_string'] ?? null,
@@ -90,6 +92,15 @@ class ModelEntityController extends Controller
             'sub_models.*.rows.*' => ['string', 'max:2000'],
             'sub_models.*.subBuffer' => ['nullable', 'string', 'max:200'],
             'sub_models.*.vertical' => ['boolean'],
+            // The in-app state editor (Layout page), replaced wholesale for the same reason.
+            // The manual caps a definition at 40 states; that is enforced where they are edited
+            // rather than here, so an import carrying more doesn't quietly lose the rest.
+            'states' => ['sometimes', 'array'],
+            'states.*.name' => ['required', 'string', 'max:200'],
+            'states.*.entries' => ['array'],
+            'states.*.entries.*.name' => ['required', 'string', 'max:200'],
+            'states.*.entries.*.nodes' => ['required', 'string', 'max:2000'],
+            'states.*.entries.*.color' => ['nullable', 'string', 'max:9'],
             'controller_id' => ['sometimes', 'nullable', 'integer', 'exists:controllers,id'],
             'controller_offset' => ['sometimes', 'nullable', 'integer', 'min:0'],
             // Channel geometry lives in packages/engine (TS-only) - the client computes this

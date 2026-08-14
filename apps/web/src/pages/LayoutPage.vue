@@ -13,9 +13,11 @@ import {
   screenFromAttrs,
   type BoxedScaleReading,
   type ModelGeometry,
+  type StateSpec,
   type SubModelSpec,
 } from "@webxlights/engine";
 import SubModelEditor from "../components/SubModelEditor.vue";
+import StateEditor from "../components/StateEditor.vue";
 import { allocateStartChannels, controllerLayouts, slotBarStyle, unassignedModels } from "../lib/controllerLayout";
 import { backgroundFrom, clampOpacity, prepareBackground, type BackgroundImage } from "../lib/backgroundImage";
 import { ALL_MODELS, modelsInPreview, previewNames } from "../lib/layoutPreviews";
@@ -391,6 +393,14 @@ async function updateSubModels(subModels: SubModelSpec[]): Promise<void> {
   if (idx !== -1) models.value[idx] = updated;
 }
 
+async function updateStates(states: StateSpec[]): Promise<void> {
+  if (!layout.value || !selectedModel.value) return;
+  const model = selectedModel.value;
+  const updated = await api.updateModel(layout.value.id, model.id, { states });
+  const idx = models.value.findIndex((m) => m.id === model.id);
+  if (idx !== -1) models.value[idx] = updated;
+}
+
 async function updateProperty(key: string, raw: string): Promise<void> {
   if (!layout.value || !selectedModel.value) return;
   const model = selectedModel.value;
@@ -731,6 +741,7 @@ async function handleFileChange(e: Event): Promise<void> {
         ? ` — boxed sizes read as ${BOXED_SCALE_LABEL[summary.boxedScale.reading]}, matched against ${summary.boxedScale.referenceCount} models sized by their endpoints`
         : ` — boxed sizes read as ${BOXED_SCALE_LABEL[summary.boxedScale.reading]} (nothing in this file to check it against)`) +
       (summary.subModels ? ` — ${summary.subModels} sub-models` : "") +
+      (summary.states ? ` — ${summary.states} state definitions` : "") +
       (summary.negativeScales
         ? ` — ${summary.negativeScales} ${summary.negativeScales === 1 ? "model" : "models"} had a negative scale, read as upright`
         : "") +
@@ -1069,6 +1080,9 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
                 :geometry="selectedGeometry"
                 @update="updateSubModels"
               />
+            </div>
+            <div v-if="selectedModel" class="properties-panel">
+              <StateEditor :states="selectedModel.states ?? []" :geometry="selectedGeometry" @update="updateStates" />
             </div>
             <div v-if="selectedModel && propertyFields.length" class="properties-panel">
               <h2>Properties</h2>

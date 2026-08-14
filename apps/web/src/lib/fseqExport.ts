@@ -5,7 +5,6 @@ import {
   computeSubModel,
   createRowSequencer,
   DEFAULT_PALETTE,
-  toRenderPalette,
   channelBlockBytes,
   channelColorsFrom,
   channelsPerNodeFor,
@@ -19,6 +18,7 @@ import {
 } from "@webxlights/engine";
 import type { ControllerRecord, ModelGroupRecord, ModelRecord, SequenceBody, SequenceRecord } from "./api";
 import { groupRenderSpecs } from "./groupRendering";
+import { toRenderableEffects } from "./renderableEffects";
 
 const SEED = 12345;
 
@@ -107,10 +107,10 @@ export function exportSequenceToFseq(
   const sequencers = supported.map((model, i) => {
     const geo = geometries[i];
     if (!geo) return null;
-    const rowEffects = body.rows
-      .filter((r) => r.elementType === "model" && r.elementId === model.id)
-      .flatMap((r) => r.effects)
-      .map((e) => ({ ...e, palette: toRenderPalette(e.palette) }));
+    const rowEffects = toRenderableEffects(
+      body.rows.filter((r) => r.elementType === "model" && r.elementId === model.id).flatMap((r) => r.effects),
+      { timingTracks: body.timingTracks, model },
+    );
     return createRowSequencer({ geometry: geo, effects: rowEffects }, frameMs, SEED, DEFAULT_PALETTE, audio);
   });
 
@@ -124,10 +124,12 @@ export function exportSequenceToFseq(
       .map((spec) => {
         const sub = computeSubModel(geo, spec);
         if (!sub) return null;
-        const rowEffects = body.rows
-          .filter((r) => r.elementType === "submodel" && r.elementId === model.id && r.subName === spec.name)
-          .flatMap((r) => r.effects)
-          .map((e) => ({ ...e, palette: toRenderPalette(e.palette) }));
+        const rowEffects = toRenderableEffects(
+          body.rows
+            .filter((r) => r.elementType === "submodel" && r.elementId === model.id && r.subName === spec.name)
+            .flatMap((r) => r.effects),
+          { timingTracks: body.timingTracks },
+        );
         if (rowEffects.length === 0) return null;
         return {
           parentIndices: sub.parentIndices,

@@ -33,6 +33,8 @@ export interface ImportSummary {
   // two/three-point models means those attributes aren't named what we expect in that file.
   placement: { boxed: number; twoPoint: number; threePoint: number; polyLine: number };
   subModels: number;
+  /** How many state definitions came across, so an import can say whether it found any. */
+  states: number;
   // Which reading of ScaleX the boxed models were placed with, and what it was decided from.
   boxedScale: BoxedScaleChoice;
   // How many models stored a negative scale. The importer reads those as magnitudes, because in
@@ -80,6 +82,8 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
     // Sub-models are nested elements rather than attributes, so they arrive alongside the
     // attribute bag instead of inside it (formats/rgbeffects.ts).
     sub_models: m.subModels,
+    // State definitions arrive the same way and for the same reason.
+    states: m.states,
     string_type: m.attrs.StringType ?? null,
     start_channel: m.attrs.StartChannel ?? null,
     order: i,
@@ -112,5 +116,6 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
   if (viewObjects.length > 0) await api.bulkUpsertViewObjects(layoutId, viewObjects);
 
   const subModels = parsed.models.reduce((n, m) => n + m.subModels.length, 0);
-  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length, placement, boxedScale, negativeScales, subModels };
+  const states = parsed.models.reduce((n, m) => n + m.states.length, 0);
+  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length, placement, boxedScale, negativeScales, subModels, states };
 }
