@@ -24,7 +24,7 @@ written down. Status here means:
 | Add models by drag-create | ✅ | 11-type palette |
 | Multiple model instances at once | ✅ | Clone the selected model N times in one action, each copy offset from the last so the run isn't one indistinguishable pile |
 | Copy / clone a model | ✅ | Copies geometry, sub-models and string type; deliberately **not** the controller assignment, since two models on the same channels is a show-day bug nothing errors on and a clone is exactly how you'd make one by accident |
-| Replace model | ❌ | |
+| Replace model | ✅ | Change what a model *is* while keeping where it is and what it's wired to. Deleting and recreating loses its position, its controller assignment and its sub-models — which is most of the work that went into it |
 | Model settings (per-type geometry) | ⚠️ | Only the attributes our geometry reads — see PARITY |
 | Setting start channels (auto + manual) | ⚠️ | Manual per-model start channel; no auto-allocation pass |
 | **Model types** | | xLights ships 21; we render 17 |
@@ -124,7 +124,7 @@ Moving Head + Servo (DMX fixtures).
 | Backup and recovery | ⚠️ | Sequence version snapshots; no show-folder backup |
 | Tools — Test | ❌ | Channel test patterns against live output |
 | Tools — Convert | ❌ | Between sequence formats |
-| Tools — Generate custom model | ❌ | From a photo of the prop |
+| Tools — Generate custom model | ✅ | From a picture of the prop: bright pixels become nodes, with a threshold, a grid width, and the four wiring orders. Each cell takes the *brightest* pixel of the block it covers rather than their average — a single-pixel wire frame averaged over a block disappears, and a wire-frame prop is exactly what this is for |
 | Tools — FPP Connect | ✅ | Upload + playlist sync |
 | Tools — Lua scripting | 🚫 | |
 | View — windows, perspectives | ❌ | |

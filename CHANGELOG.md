@@ -1,5 +1,19 @@
 # Changelog
 
+## Generate a Custom model from a photo, and Replace Model
+
+**Generate Custom Model** builds a model from a picture of the prop. The props that most need one — a hand-made snowflake, a wire-frame reindeer — are exactly the ones with no library entry, and hand-writing a node grid for anything past a dozen nodes is why people don't.
+
+Bright pixels become nodes, with a threshold, a grid width and all four wiring orders. Three things it gets right on purpose:
+
+- **Each cell takes the brightest pixel of the block it covers, not their average.** A single-pixel wire frame averaged over a block disappears — and a wire-frame prop is exactly what this is for.
+- **A transparent pixel is never a node**, whatever colour it nominally holds. A PNG cut-out is the most likely input, and its background is transparent rather than black; reading colour alone would fill the whole grid.
+- **All four wiring orders are offered, because the number *is* the channel order.** A prop wired back and forth but numbered straight will chase backwards on alternate rows — which looks like a broken effect rather than a mis-numbered model.
+
+A test asserts the grid it writes is one `parseCustomModelGrid` reads back. That's the whole contract of the format, and it's the kind of thing that's easy to get subtly wrong and never notice.
+
+**Replace Model** changes what a model *is* while keeping where it is and what it's wired to. Deleting and recreating loses its position, its controller assignment and its sub-models — which is most of the work that went into it. `raw_attrs` is cleared on the swap: the attributes are per-type, and a Tree's `TreeDegrees` left on an Arches model is a value nothing reads that would reappear if the type were ever changed back.
+
 ## Audio scrubbing
 
 Drag across the waveform and the track plays under the pointer. It's how a downbeat gets found by ear rather than by counting — a plain seek moves the playhead in silence, which is what makes lining effects up to music slow without this.
