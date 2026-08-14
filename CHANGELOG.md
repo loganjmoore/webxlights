@@ -1,5 +1,20 @@
 # Changelog
 
+## Views
+
+xLights' sequencer Views: *"a view is used to be able to easily select a list of models **and the sequence in which they are to be displayed** on the sequencer."* Named, ordered subsets of the grid's rows, picked from the toolbar.
+
+They're saved on the **layout**, not the sequence, because the manual is explicit: *"views work across sequences, so once you have setup a view with the models that you require, if you open any sequence, that view is available to use in that sequence."* A per-sequence copy would have to be duplicated into every new sequence and would drift apart the moment a model was renamed.
+
+The **Master View** isn't stored at all — it's *"a special (system created) view"* containing every row, which makes it exactly the absence of a selection.
+
+The order is the point of a view, so it's editable in place with up/down arrows rather than by rebuilding the list. A row a view names that the layout no longer has is skipped rather than left as a gap — which is what happens as soon as a model is deleted after a view was saved.
+
+Views ride in the layout's existing settings JSON rather than earning a table: a view is a name and an ordered list of row keys, read and written whole, and nothing joins against one. The write merges rather than replacing the column, so it can't clobber anything else stored there — there's a test for exactly that.
+
+This is distinct from the existing Models panel, which stays: that's a per-sequence scratch toggle kept in localStorage, and a view is a saved, shared, ordered thing.
+
+
 ## Colour curves, and the last of the blend modes
 
 **Blend modes are now 24 of 24.** Colour curves are in, both kinds.

@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { EFFECT_SCHEMAS, defaultParamsFor, type AudioSeries, type BlendMode, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
-import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
+import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequencerView, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
@@ -31,6 +31,10 @@ const groupRecords = ref<ModelGroupRecord[]>([]);
 // import/export or collaborate across users the way real sequence content does.
 const hiddenRowKeys = ref<Set<string>>(new Set());
 const showModelsPanel = ref(false);
+const showViewsPanel = ref(false);
+const layoutId = ref<number | null>(null);
+const newViewName = ref("");
+const viewError = ref("");
 const controllers = ref<ControllerRecord[]>([]);
 const exportError = ref<string | null>(null);
 const peaks = ref<PeakBucket[]>([]);
@@ -91,6 +95,67 @@ const selectedEffect = computed(() => (store.selectedEffectId ? store.findEffect
 function rowKey(row: GridRow): string {
   return `${row.elementType}:${row.elementId}:${row.subName ?? ""}`;
 }
+async function saveViews(next: SequencerView[]): Promise<void> {
+  if (layoutId.value === null) return;
+  viewError.value = "";
+  try {
+    views.value = (await api.replaceViews(layoutId.value, next)).views;
+  } catch (err) {
+    // The whole list is replaced in one call, so a failure leaves the server holding the previous
+    // set. Showing the error and re-reading is better than leaving the panel displaying a view
+    // that isn't saved.
+    viewError.value = err instanceof Error ? err.message : "Couldn't save views";
+    if (layoutId.value !== null) views.value = (await api.listViews(layoutId.value)).views;
+  }
+}
+
+function addView(): void {
+  const name = newViewName.value.trim();
+  if (!name) return;
+  if (views.value.some((v) => v.name === name)) {
+    viewError.value = `There is already a view called "${name}".`;
+    return;
+  }
+  // A new view starts with the rows currently on the grid, in the order they are in - which is
+  // what you were looking at when you decided to make one.
+  void saveViews([...views.value, { name, rowKeys: visibleRows.value.map(rowKey) }]);
+  newViewName.value = "";
+  activeViewName.value = name;
+}
+
+function deleteView(name: string): void {
+  if (activeViewName.value === name) activeViewName.value = null;
+  void saveViews(views.value.filter((v) => v.name !== name));
+}
+
+function toggleRowInView(row: GridRow): void {
+  const view = activeView.value;
+  if (!view) return;
+  const key = rowKey(row);
+  const rowKeys = view.rowKeys.includes(key)
+    ? view.rowKeys.filter((k) => k !== key)
+    : [...view.rowKeys, key];
+  void saveViews(views.value.map((v) => (v.name === view.name ? { ...v, rowKeys } : v)));
+}
+
+// Up/down within the view, matching xLights' own arrows: the order is the point of a view, so it
+// has to be editable without rebuilding the whole list.
+function moveInView(key: string, delta: number): void {
+  const view = activeView.value;
+  if (!view) return;
+  const from = view.rowKeys.indexOf(key);
+  const to = from + delta;
+  if (from < 0 || to < 0 || to >= view.rowKeys.length) return;
+  const rowKeys = [...view.rowKeys];
+  const [moved] = rowKeys.splice(from, 1);
+  rowKeys.splice(to, 0, moved!);
+  void saveViews(views.value.map((v) => (v.name === view.name ? { ...v, rowKeys } : v)));
+}
+
+function rowNameFor(key: string): string {
+  return rows.value.find((r) => rowKey(r) === key)?.name ?? `${key} (missing)`;
+}
+
 function hiddenStorageKey(): string {
   return `webxlights.sequencer.hiddenRows.${sequenceId.value}`;
 }
@@ -121,7 +186,28 @@ function hideAllRows(): void {
   hiddenRowKeys.value = new Set(rows.value.map(rowKey));
   saveHiddenRows();
 }
-const visibleRows = computed(() => rows.value.filter((r) => !hiddenRowKeys.value.has(rowKey(r))));
+// xLights' Views (manual: Sequencer > Views): "a view is used to be able to easily select a list
+// of models *and the sequence in which they are to be displayed* on the sequencer". They live on
+// the layout because "views work across sequences", so one set up here is available in every
+// sequence of the project - which is also why they are saved rather than kept in localStorage the
+// way the Models panel's scratch toggles are.
+//
+// The Master View is not stored: it is "a special (system created) view" containing every row, so
+// it is simply the absence of a selection.
+const views = ref<SequencerView[]>([]);
+const activeViewName = ref<string | null>(null);
+const activeView = computed(() => views.value.find((v) => v.name === activeViewName.value) ?? null);
+
+const visibleRows = computed(() => {
+  const shown = rows.value.filter((r) => !hiddenRowKeys.value.has(rowKey(r)));
+  const view = activeView.value;
+  if (!view) return shown;
+  // A view names its rows *in order*, so the grid follows the view rather than the layout. Rows
+  // the view doesn't name are dropped; a named row the layout no longer has is skipped rather
+  // than left as a gap, which is what happens when a model is deleted after a view was saved.
+  const byKey = new Map(shown.map((r) => [rowKey(r), r]));
+  return view.rowKeys.map((k) => byKey.get(k)).filter((r): r is GridRow => !!r);
+});
 function effectCountFor(row: GridRow): number {
   const found = store.body.rows.find(
     (r) => r.elementType === row.elementType && r.elementId === row.elementId && (r.subName ?? undefined) === row.subName,
@@ -155,6 +241,8 @@ async function loadRows(): Promise<void> {
   modelRecords.value = models;
   groupRecords.value = groups;
   controllers.value = await api.listControllers(Number(route.params.projectId));
+  layoutId.value = layout.id;
+  views.value = (await api.listViews(layout.id)).views;
   loadHiddenRows();
 }
 
@@ -546,6 +634,15 @@ watch(sequenceId, async (id) => {
       <span v-if="exportError" class="export-error">{{ exportError }}</span>
       <button @click="snapshotNow" :disabled="!store.sequence">Snapshot</button>
       <button @click="toggleHistory" :disabled="!store.sequence">History</button>
+      <select
+        v-model="activeViewName"
+        title="Which view the grid is showing. The Master View is every row."
+        :disabled="rows.length === 0"
+      >
+        <option :value="null">Master View</option>
+        <option v-for="v in views" :key="v.name" :value="v.name">{{ v.name }}</option>
+      </select>
+      <button :class="{ active: showViewsPanel }" @click="showViewsPanel = !showViewsPanel">Views</button>
       <button :class="{ active: showModelsPanel }" @click="showModelsPanel = !showModelsPanel">
         Models{{ hiddenRowKeys.size ? ` (${visibleRows.length}/${rows.length})` : "" }}
       </button>
@@ -612,6 +709,63 @@ watch(sequenceId, async (id) => {
         </li>
         <li v-if="versions.length === 0" class="empty">No snapshots yet — click "Snapshot" to create one.</li>
       </ul>
+    </div>
+
+    <div v-if="showViewsPanel" class="models-panel">
+      <div class="models-panel-head">
+        <h2>Views</h2>
+        <div class="models-panel-actions">
+          <input v-model="newViewName" type="text" placeholder="New view name" @keyup.enter="addView" />
+          <button :disabled="!newViewName.trim()" @click="addView">Add view</button>
+        </div>
+      </div>
+      <p class="timing-note">
+        A view is a named list of rows and the order they show in. Views are saved with the
+        layout, so one set up here is available in every sequence of this project.
+      </p>
+      <p v-if="viewError" class="export-error">{{ viewError }}</p>
+
+      <ul v-if="views.length">
+        <li v-for="v in views" :key="v.name">
+          <label>
+            <input type="radio" :value="v.name" :checked="activeViewName === v.name" @change="activeViewName = v.name" />
+            {{ v.name }}
+            <span class="row-type">{{ v.rowKeys.length }} row{{ v.rowKeys.length === 1 ? "" : "s" }}</span>
+          </label>
+          <button class="row-effect-count" @click="deleteView(v.name)">Delete</button>
+        </li>
+      </ul>
+      <p v-else class="empty">No views yet. The grid is showing the Master View — every row.</p>
+
+      <template v-if="activeView">
+        <div class="models-panel-head">
+          <h2>Rows in "{{ activeView.name }}"</h2>
+        </div>
+        <ul>
+          <li v-for="(key, i) in activeView.rowKeys" :key="key">
+            <label>{{ rowNameFor(key) }}</label>
+            <span class="models-panel-actions">
+              <button :disabled="i === 0" title="Move up" @click="moveInView(key, -1)">↑</button>
+              <button :disabled="i === activeView.rowKeys.length - 1" title="Move down" @click="moveInView(key, 1)">↓</button>
+            </span>
+          </li>
+          <li v-if="activeView.rowKeys.length === 0" class="empty">
+            This view has no rows yet — tick some below.
+          </li>
+        </ul>
+        <div class="models-panel-head">
+          <h2>Add or remove rows</h2>
+        </div>
+        <ul>
+          <li v-for="row in rows" :key="rowKey(row)">
+            <label>
+              <input type="checkbox" :checked="activeView.rowKeys.includes(rowKey(row))" @change="toggleRowInView(row)" />
+              {{ row.name }}
+              <span class="row-type">{{ row.elementType }}</span>
+            </label>
+          </li>
+        </ul>
+      </template>
     </div>
 
     <div v-if="showModelsPanel" class="models-panel">
