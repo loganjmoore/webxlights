@@ -117,7 +117,11 @@ describe("Effect registry", () => {
     // The canvas effects are excluded because rendering nothing on a blank buffer is *correct*
     // for them - they modify the layer below. The test below covers them instead, with the
     // canvas they need, so they aren't simply exempted.
-    const needsContent = new Set(["Pictures", ...CANVAS_ONLY_EFFECTS]);
+    //
+    // State is excluded for the same shape of reason: everything it draws comes from the model's
+    // own state definitions, so with nothing but its defaults there is nothing to light. It gets
+    // its own assertion below, with the definitions and the labels it is driven by.
+    const needsContent = new Set(["Pictures", "State", ...CANVAS_ONLY_EFFECTS]);
     const series: AudioSeries = { frameMs: 50, bandCount: 2, frames: [{ level: 1, bands: [1, 1] }] };
 
     for (const name of Object.keys(EFFECT_SCHEMAS)) {
@@ -162,6 +166,24 @@ describe("Effect registry", () => {
       const colors = renderRowAtMs({ geometry: matrix, effects: [effect] }, 400, 50, 42, PALETTE);
       expect(colors.every((c) => c.a === 0), `"${name}" drew something with no canvas`).toBe(true);
     }
+  });
+
+  it("State renders through the pipeline once it has the definitions and labels that drive it", () => {
+    // The other half of the exemption above, and the only place the *plumbing* is checked: a
+    // state effect's data has to survive renderRowAtMs and reach the effect with the model's own
+    // nodes attached, or the effect renders nothing and looks like a broken definition.
+    const effect: RenderableEffect = {
+      name: "State",
+      startMs: 0,
+      endMs: 1000,
+      params: { ...defaultParamsFor("State"), useTimingTrack: true },
+      data: {
+        states: [{ name: "wink", nodes: "1-4" }],
+        timing: [{ startMs: 0, endMs: 1000, label: "wink" }],
+      },
+    };
+    const colors = renderRowAtMs({ geometry: matrix, effects: [effect] }, 400, 50, 42, PALETTE);
+    expect(colors.filter((c) => c.a > 0)).toHaveLength(4);
   });
 
   it("defaultParamsFor covers every param the schema declares", () => {
