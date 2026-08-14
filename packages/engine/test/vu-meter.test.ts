@@ -6,7 +6,7 @@ import { VU_METER_TYPES, renderVuMeter, type VuMeterParams } from "../src/effect
 import { labelsFromTrack } from "../src/timing";
 
 const PALETTE = [rgba(255, 0, 0), rgba(0, 255, 0), rgba(0, 0, 255)];
-const BASE: VuMeterParams = { type: "Spectrogram", bars: 4, gainPct: 100, sensitivityPct: 50, timingTrack: "" };
+const BASE: VuMeterParams = { type: "Spectrogram", bars: 4, gainPct: 100, sensitivityPct: 50, timingTrack: "", startNote: 48, endNote: 84 };
 
 function frame(level: number, bands: number[]): AudioFrame {
   return { level, bands };
@@ -292,5 +292,90 @@ describe("VU Meter level types", () => {
       }
     }
     expect(found).toBe(true);
+  });
+});
+
+// The note-range types. A note is a frequency and a band is a range of them, so these only work
+// when the series says where its bands sit - which is why the analyser now records that.
+describe("VU Meter note-range types", () => {
+  // Four bands spanning 100Hz-1600Hz on a log-ish layout: the third covers 400-800Hz, which holds
+  // C5 (523Hz).
+  const EDGES = [100, 200, 400, 800, 1600];
+
+  function renderNotes(type: VuMeterParams["type"], bands: number[], over: Partial<VuMeterParams> = {}, w = 8, h = 8): RenderBuffer {
+    const buf = new RenderBuffer(w, h);
+    renderVuMeter(buf, PALETTE, { ...BASE, type, bars: 1, ...over }, {
+      frameIndexInEffect: 0,
+      positionInEffect01: 0.5,
+      seed: 1,
+      audio: frame(1, bands),
+      audioBandEdgesHz: EDGES,
+      clock: { atMs: 0, startMs: 0, endMs: 1000, frameMs: 50 },
+    });
+    return buf;
+  }
+
+  it("listens to the notes it was given and ignores the rest of the spectrum", () => {
+    // C5 is 523Hz, inside band 2 (400-800Hz). Energy in band 0 alone shouldn't reach it.
+    const inRange = renderNotes("Note On", [0, 0, 1, 0], { startNote: 72, endNote: 72 });
+    const outOfRange = renderNotes("Note On", [1, 0, 0, 0], { startNote: 72, endNote: 72 });
+    expect(inRange.getPixel(0, 0).a).toBeGreaterThan(0);
+    expect(outOfRange.getPixel(0, 0).a).toBe(0);
+  });
+
+  it("renders nothing when the series doesn't say where its bands sit", () => {
+    // Rather than quietly widening to the whole spectrum, which would look like it was working.
+    const buf = new RenderBuffer(8, 8);
+    renderVuMeter(buf, PALETTE, { ...BASE, type: "Note On" }, {
+      frameIndexInEffect: 0,
+      positionInEffect01: 0.5,
+      seed: 1,
+      audio: frame(1, [1, 1, 1, 1]),
+      clock: { atMs: 0, startMs: 0, endMs: 1000, frameMs: 50 },
+    });
+    expect(litCount(buf)).toBe(0);
+  });
+
+  it("Note Level Pulse waits for the sensitivity to be crossed", () => {
+    const quiet = renderNotes("Note Level Pulse", [0, 0, 0.2, 0], { startNote: 72, endNote: 72, sensitivityPct: 50 });
+    const loud = renderNotes("Note Level Pulse", [0, 0, 0.9, 0], { startNote: 72, endNote: 72, sensitivityPct: 50 });
+    expect(litCount(quiet)).toBe(0);
+    expect(litCount(loud)).toBeGreaterThan(0);
+  });
+
+  it("Note Level Bar moves further the louder the range gets", () => {
+    const soft = renderNotes("Note Level Bar", [0, 0, 0.6, 0], { startNote: 72, endNote: 72, sensitivityPct: 50 });
+    const loud = renderNotes("Note Level Bar", [0, 0, 1, 0], { startNote: 72, endNote: 72, sensitivityPct: 50 });
+    const columnOf = (buf: RenderBuffer): number => {
+      for (let x = 0; x < buf.width; x++) if (buf.getPixel(x, 0).a > 0) return x;
+      return -1;
+    };
+    expect(columnOf(loud)).toBeGreaterThan(columnOf(soft));
+  });
+
+  it("Node Level Jump 100 fills the height and Node Level Jump follows the range", () => {
+    expect(litCount(renderNotes("Node Level Jump 100", [0, 0, 0.6, 0], { startNote: 72, endNote: 72, sensitivityPct: 50 }))).toBe(64);
+    const partial = litCount(renderNotes("Node Level Jump", [0, 0, 0.6, 0], { startNote: 72, endNote: 72, sensitivityPct: 50 }));
+    expect(partial).toBeGreaterThan(0);
+    expect(partial).toBeLessThan(64);
+  });
+
+  it("Dominant Frequency Colour picks its colour from which band is loudest", () => {
+    // The whole audible range, so the dominant band can be at either end of it.
+    const low = renderNotes("Dominant Frequency Colour", [1, 0, 0, 0], { startNote: 24, endNote: 108 });
+    const high = renderNotes("Dominant Frequency Colour", [0, 0, 0, 1], { startNote: 24, endNote: 108 });
+    expect(low.getPixel(0, 0)).not.toEqual(high.getPixel(0, 0));
+  });
+
+  it("the gradient version blends where the stepped one snaps", () => {
+    const stepped = renderNotes("Dominant Frequency Colour", [0, 1, 0, 0], { startNote: 24, endNote: 108 });
+    const blended = renderNotes("Dominant Frequency Colour Gradient", [0, 1, 0, 0], { startNote: 24, endNote: 108 });
+    expect(stepped.getPixel(0, 0)).not.toEqual(blended.getPixel(0, 0));
+  });
+
+  it("Frame Waveform draws the frame's own level as a centred band", () => {
+    const quiet = render({ type: "Frame Waveform" }, frame(0.1, [0.1]), 8, 8);
+    const loud = render({ type: "Frame Waveform" }, frame(1, [1]), 8, 8);
+    expect(litCount(loud)).toBeGreaterThan(litCount(quiet));
   });
 });

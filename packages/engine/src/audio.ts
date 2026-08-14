@@ -17,6 +17,16 @@ export interface AudioSeries {
   frameMs: number;
   bandCount: number;
   frames: AudioFrame[];
+  /**
+   * The frequency each band starts at, plus one closing edge - so `bandEdgesHz.length` is
+   * `bandCount + 1`.
+   *
+   * Carried because a band index means nothing on its own: the VU Meter's note types are given a
+   * *note range* ("C3 to C6") and have to find which bands that covers, which needs the layout the
+   * analysis chose and the sample rate it chose it against. Optional so a hand-built series in a
+   * test doesn't have to invent one.
+   */
+  bandEdgesHz?: number[];
 }
 
 export const SILENT_AUDIO_FRAME: AudioFrame = { level: 0, bands: [] };
@@ -138,7 +148,14 @@ export function analyzeAudio(
     bands: rawBands[f]!.map((v) => Math.min(1, v / maxBand)),
   }));
 
-  return { frameMs, bandCount, frames };
+  return {
+    frameMs,
+    bandCount,
+    frames,
+    // Bin i of the transform is i * sampleRate / WINDOW_SIZE Hz, so the band edges in bins become
+    // edges in hertz - which is what anything reasoning about notes rather than bars needs.
+    bandEdgesHz: bandEdges.map((bin) => (bin * sampleRate) / WINDOW_SIZE),
+  };
 }
 
 function logBandEdges(binCount: number, bandCount: number): number[] {
@@ -152,6 +169,41 @@ function logBandEdges(binCount: number, bandCount: number): number[] {
   // guarantee strictly non-decreasing edges even when bandCount > binCount
   for (let b = 1; b < edges.length; b++) if (edges[b]! < edges[b - 1]!) edges[b] = edges[b - 1]!;
   return edges;
+}
+
+/** The frequency of a MIDI note - A4 (69) is 440Hz and each semitone is a twelfth of an octave. */
+export function noteFrequency(midi: number): number {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+/**
+ * The bands covering a note range, as [from, to) indices.
+ *
+ * Returns null when the series doesn't say where its bands sit - a test fixture, or a series built
+ * before this was recorded. The note types then have nothing meaningful to narrow to, and say so
+ * by rendering nothing rather than by quietly using the whole spectrum.
+ */
+export function bandsForNoteRange(series: AudioSeries | undefined, startMidi: number, endMidi: number): [number, number] | null {
+  const edges = series?.bandEdgesHz;
+  if (!edges || edges.length < 2) return null;
+  const lowHz = noteFrequency(Math.min(startMidi, endMidi));
+  const highHz = noteFrequency(Math.max(startMidi, endMidi));
+
+  let from = 0;
+  let to = edges.length - 1;
+  for (let b = 0; b < edges.length - 1; b++) {
+    if (edges[b + 1]! > lowHz) {
+      from = b;
+      break;
+    }
+  }
+  for (let b = edges.length - 2; b >= 0; b--) {
+    if (edges[b]! < highHz) {
+      to = b + 1;
+      break;
+    }
+  }
+  return from < to ? [from, to] : null;
 }
 
 export function audioFrameAt(series: AudioSeries | undefined, atMs: number): AudioFrame {

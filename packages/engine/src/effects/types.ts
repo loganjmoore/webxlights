@@ -22,6 +22,11 @@ export interface FrameContext {
    * and a sequential render see the same history - where keeping state in the effect would not.
    */
   audioAt?: (atMs: number) => AudioFrame;
+  /**
+   * Where the analysed bands sit in hertz (audio.ts). Needed by anything given a *note* range
+   * rather than a band index; absent when the sequence has no analysed track.
+   */
+  audioBandEdgesHz?: readonly number[];
   // Wall-clock position, for the effects whose source is the sequence's own timeline rather than
   // their own parameters. `positionInEffect01` can't stand in: a countdown counts real seconds,
   // and a timing cell is at an absolute millisecond.
