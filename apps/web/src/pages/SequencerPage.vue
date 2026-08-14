@@ -20,6 +20,15 @@ import {
 } from "../lib/effectPresets";
 import { buildCommands, commandForEvent, isTypingTarget } from "../lib/commands";
 import { formatTime, loadPreferences, sanitize, savePreferences, type Preferences } from "../lib/preferences";
+import {
+  loadPerspectives,
+  panelsFrom,
+  removePerspective,
+  savePerspectives,
+  upsertPerspective,
+  type PanelId,
+  type Perspective,
+} from "../lib/perspectives";
 import { REGION_COLORS, boundariesFromTimingTrack, effectsInRegion, rebaseEffects, regionAt, regionsFrom } from "../lib/songRegions";
 import CommandPalette from "../components/CommandPalette.vue";
 import EffectWheel from "../components/EffectWheel.vue";
@@ -97,6 +106,54 @@ function generateTimingTrack(): void {
 }
 
 const showFppPanel = ref(false);
+
+// xLights' View > Perspectives: a saved arrangement of which panels are showing. This page has a
+// lot of them now - Views, Presets, Regions, Preferences, Models, Timing, FPP - and getting back
+// to a working arrangement after opening three of them is otherwise a matter of remembering.
+const perspectives = ref<Perspective[]>(loadPerspectives(typeof localStorage === "undefined" ? null : localStorage));
+const newPerspectiveName = ref("");
+
+const openPanels = computed<Record<PanelId, boolean>>(() => ({
+  models: showModelsPanel.value,
+  timing: showTimingPanel.value,
+  views: showViewsPanel.value,
+  presets: showPresetsPanel.value,
+  regions: showRegionsPanel.value,
+  prefs: showPrefsPanel.value,
+  fpp: showFppPanel.value,
+  preview: true, // the house preview is always mounted; kept in the list so a saved one restores
+}));
+
+function persistPerspectives(next: Perspective[]): void {
+  perspectives.value = next;
+  savePerspectives(typeof localStorage === "undefined" ? null : localStorage, next);
+}
+
+function savePerspective(): void {
+  const name = newPerspectiveName.value.trim();
+  if (!name) return;
+  persistPerspectives(upsertPerspective(perspectives.value, { name, panels: panelsFrom(openPanels.value) }));
+  newPerspectiveName.value = "";
+}
+
+function applyPerspective(name: string): void {
+  const perspective = perspectives.value.find((p) => p.name === name);
+  if (!perspective) return;
+  const on = new Set(perspective.panels);
+  // Every panel is set, not just the ones in the list - restoring an arrangement means closing
+  // what it didn't have open as much as opening what it did.
+  showModelsPanel.value = on.has("models");
+  showTimingPanel.value = on.has("timing");
+  showViewsPanel.value = on.has("views");
+  showPresetsPanel.value = on.has("presets");
+  showRegionsPanel.value = on.has("regions");
+  showPrefsPanel.value = on.has("prefs");
+  showFppPanel.value = on.has("fpp");
+}
+
+function deletePerspective(name: string): void {
+  persistPerspectives(removePerspective(perspectives.value, name));
+}
 const fppChromiumCapable = isChromiumLanCapable();
 const fppHost = ref("");
 const fppSystemInfo = ref<FppSystemInfo | null>(null);
@@ -1065,6 +1122,26 @@ watch(sequenceId, async (id) => {
         These are yours, not the show's — they're kept in this browser rather than saved with the
         project, so two people editing the same sequence don't change each other's settings.
       </p>
+      <div class="models-panel-head"><h2>Perspectives</h2></div>
+      <p class="timing-note">
+        A saved arrangement of which panels are showing. Applying one closes what it didn't have
+        open as well as opening what it did.
+      </p>
+      <div class="models-panel-actions">
+        <input v-model="newPerspectiveName" type="text" placeholder="Name this arrangement" @keyup.enter="savePerspective" />
+        <button :disabled="!newPerspectiveName.trim()" @click="savePerspective">Save</button>
+      </div>
+      <ul v-if="perspectives.length">
+        <li v-for="p in perspectives" :key="p.name">
+          <label>{{ p.name }}</label>
+          <span class="models-panel-actions">
+            <button @click="applyPerspective(p.name)">Apply</button>
+            <button @click="deletePerspective(p.name)">×</button>
+          </span>
+        </li>
+      </ul>
+
+      <div class="models-panel-head"><h2>Settings</h2></div>
       <label class="blend-row">
         Time display
         <select :value="prefs.timeFormat" @change="patchPrefs({ timeFormat: ($event.target as HTMLSelectElement).value as Preferences['timeFormat'] })">

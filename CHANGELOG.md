@@ -1,5 +1,18 @@
 # Changelog
 
+## Perspectives
+
+A saved arrangement of which panels are showing. This page has a lot of them now — Views, Presets, Regions, Preferences, Models, Timing, FPP — and getting back to a working arrangement after opening three of them is otherwise a matter of remembering which ones you had.
+
+**Applying one sets every panel**, not just the ones it lists. Restoring an arrangement means closing what it didn't have open as much as opening what it did; a half-applied arrangement isn't the arrangement.
+
+**Saving over a name replaces rather than duplicating.** Two perspectives called "Sequencing" are indistinguishable in the picker, and picking the wrong one is exactly the failure a picker exists to avoid. The list is kept sorted so its order doesn't depend on the order things were saved in.
+
+A panel name the app no longer has is dropped on load rather than restored — otherwise a panel renamed or removed since the perspective was saved would come back as one that doesn't exist.
+
+Stored per-browser, like preferences and for the same reason: an arrangement of panels belongs to the person looking at them, not to the show.
+
+
 ## Layout previews, and the pixel editor
 
 **Layout previews** are a named view of *some* of the models — a way to work on the roofline without the mega tree in the way. All Models, Default and Unassigned are built in; any other preview is one the models name for themselves.

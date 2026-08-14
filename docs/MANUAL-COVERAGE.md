@@ -127,7 +127,8 @@ Moving Head + Servo (DMX fixtures).
 | Tools — Generate custom model | ✅ | From a picture of the prop: bright pixels become nodes, with a threshold, a grid width, and the four wiring orders. Each cell takes the *brightest* pixel of the block it covers rather than their average — a single-pixel wire frame averaged over a block disappears, and a wire-frame prop is exactly what this is for |
 | Tools — FPP Connect | ✅ | Upload + playlist sync |
 | Tools — Lua scripting | 🚫 | |
-| View — windows, perspectives | ❌ | |
+| View — perspectives | ✅ | Saved arrangements of which panels are showing. Applying one closes what it didn't have open as well as opening what it did — a half-applied arrangement isn't the arrangement. A panel name the app no longer has is dropped on load rather than restored as a panel that doesn't exist |
+| View — windows (detachable panels) | ❌ | The popped-out preview is the one detachable window; the rest are panels in the page |
 | Import — sequence, effects from another sequence | ⚠️ | `.xsq` import; no per-effect import mapping |
 | Audio menu | ❌ | |
 
