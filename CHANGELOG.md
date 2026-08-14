@@ -1,5 +1,23 @@
 # Changelog
 
+## Keyboard shortcuts and a command palette, from one registry
+
+xLights documents around sixty keyboard shortcuts. We had a handful, dispatched from a `switch` statement — the arrangement where a shortcut, a help list and a palette drift apart until a documented key quietly does nothing.
+
+So all three now come from **one registry**. A command carries its own key, which means a shortcut can't exist without a command, and a command can't be given a key nothing dispatches.
+
+**What's in it:** transport (play, start, end, nudge), timing (`t` to add a mark, `s` to split the one the playhead is inside), edit (delete, copy, paste, duplicate, undo, redo), zoom, and **all fifteen of xLights' single-letter effect shortcuts** — `b` Bars, `f` Fire, `r` Ripple, and the rest.
+
+Three details that are easy to get wrong and are pinned by tests:
+
+- **Case is significant**, as it is in xLights: `o` is On and `O` is Off, `f` is Fire and `F` is Fan. Lower-casing the key would collapse each pair, and which effect you got would depend on list order.
+- **Modifier commands match before bare letters.** `c` is xLights' Curtain shortcut, so without that ordering every Ctrl+C would also drop an effect on the grid.
+- **`=` counts as `+`.** On most layouts the zoom-in key is typed without shift, so accepting only `+` makes the documented shortcut do nothing on a US keyboard.
+
+A further test asserts **no two commands answer the same key** — two matches means the second is unreachable, and which one loses depends on list order rather than on a decision anyone made.
+
+**The command palette** (Ctrl+Shift+K, the key the manual documents) searches the same registry, ranks a prefix match above one buried mid-string, and shows each command's key beside it — which is how anyone learns sixty shortcuts without reading a list of them. It also carries the commands that have no key at all, like Export .fseq: a command reachable only through a menu is exactly what a palette exists to replace.
+
 ## A photo of the house behind the layout
 
 The 2D layout's background image — the thing that turns it from a diagram into a plan of *a particular house*. Pick a photo, and props can be placed where they physically are instead of by eye against an empty grid. An opacity slider keeps it from competing with the props.

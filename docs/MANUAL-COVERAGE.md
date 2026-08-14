@@ -77,8 +77,8 @@ written down. Status here means:
 | Song structure regions | ❌ | |
 | Singing faces / phoneme breakdown | 🚫 | Needs face definitions |
 | Pixel editor (matrix drawing tool) | ❌ | |
-| Command palette | ❌ | |
-| Keyboard shortcuts | ⚠️ | A handful; xLights documents ~60 |
+| Command palette | ✅ | Ctrl+Shift+K, per the manual. Searchable, ranked so a prefix match beats one buried mid-string, and every entry shows the key it also answers to — which is how anyone learns sixty shortcuts without reading a list of them |
+| Keyboard shortcuts | ✅ | Transport, timing (including **s** to split a mark), edit, zoom, and all fifteen of xLights' single-letter effect shortcuts. Case is significant, as it is in xLights — **o** is On and **O** is Off. Every shortcut and every palette entry comes from one registry, so a key can't exist without a command or a command be given a key nothing dispatches |
 | Render all / render on save | ⚠️ | We render on demand and on export |
 | Export model as video / render-and-export | ❌ | |
 

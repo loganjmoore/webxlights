@@ -18,6 +18,8 @@ import {
   presetFromEffect,
   type EffectPreset,
 } from "../lib/effectPresets";
+import { buildCommands, commandForEvent, isTypingTarget } from "../lib/commands";
+import CommandPalette from "../components/CommandPalette.vue";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type ContextMenuTarget, type GridRow } from "../components/SequencerGrid.vue";
 import EffectContextMenu from "../components/EffectContextMenu.vue";
@@ -656,30 +658,94 @@ function openPreviewWindow(): void {
   // A window opened now won't have its listener attached yet; it says hello when it's ready.
 }
 
-function onKeydown(e: KeyboardEvent): void {
-  if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "SELECT") return;
+// Every keyboard shortcut and every palette entry comes from one registry (lib/commands.ts).
+// xLights documents around sixty shortcuts, and keeping a switch statement, a help list and a
+// palette in agreement by hand is exactly what drifts until a documented key does nothing.
+const paletteOpen = ref(false);
 
-  if (e.code === "Space") {
-    e.preventDefault();
-    togglePlay();
-  } else if (e.code === "Home") {
-    seekTo(0);
-  } else if (e.key === "t") {
+// The row a keyboard-placed effect lands on: the one the selection is on, falling back to the
+// first visible row. Without a fallback the effect shortcuts would silently do nothing until
+// something had been clicked.
+function keyboardTargetRow(): GridRow | undefined {
+  return presetTargetRow.value;
+}
+
+const commands = computed(() =>
+  buildCommands({
+    togglePlay,
+    seekStart: () => seekTo(0),
+    seekEnd: () => seekTo(store.sequence?.duration_ms ?? 0),
+    nudgePlayhead: (delta) => seekTo(Math.max(0, playheadMs.value + delta)),
+    addTimingMark: addTimingMarkAtPlayhead,
+    splitTimingMark: splitTimingMarkAtPlayhead,
+    deleteSelected: () => {
+      if (store.selectedEffectId) store.deleteEffect(store.selectedEffectId);
+    },
+    copySelected: () => {
+      if (store.selectedEffectId) clipboard.value = store.copyEffect(store.selectedEffectId);
+    },
+    pasteAtPlayhead: () => {
+      const row = keyboardTargetRow();
+      if (clipboard.value && row) store.pasteEffectAt(row.elementType, row.elementId, row.subName, clipboard.value, playheadMs.value);
+    },
+    duplicateSelected: () => {
+      const copy = store.selectedEffectId ? store.copyEffect(store.selectedEffectId) : null;
+      const row = keyboardTargetRow();
+      if (copy && row) store.pasteEffectAt(row.elementType, row.elementId, row.subName, copy, copy.endMs);
+    },
+    undo: () => store.undo(),
+    redo: () => store.redo(),
+    zoomIn: () => {
+      zoomLevel.value = Math.min(2, zoomLevel.value + 1);
+    },
+    zoomOut: () => {
+      zoomLevel.value = Math.max(0, zoomLevel.value - 1);
+    },
+    placeEffect: (name) => {
+      const row = keyboardTargetRow();
+      if (!row) return;
+      store.addEffect(row.elementType, row.elementId, row.subName, {
+        id: newEffectId(),
+        name,
+        startMs: playheadMs.value,
+        endMs: playheadMs.value + 1000,
+        params: defaultParamsFor(name),
+      });
+    },
+    openPalette: () => {
+      paletteOpen.value = true;
+    },
+    exportFseq,
+    snapshot: () => void snapshotNow(),
+  }),
+);
+
+function onKeydown(e: KeyboardEvent): void {
+  // The palette owns the keyboard while it is open - its own arrow keys and Enter would otherwise
+  // also be scrubbing the playhead behind it.
+  if (paletteOpen.value) return;
+  if (isTypingTarget(e.target)) return;
+
+  const command = commandForEvent(commands.value, e);
+  if (!command) return;
+  e.preventDefault();
+  command.run();
+}
+
+// xLights' "s": splits the timing mark the playhead is inside, which is how a beat gets halved
+// without counting. Falls back to simply adding a mark when the playhead isn't inside one.
+function splitTimingMarkAtPlayhead(): void {
+  store.ensureDefaultTimingTrack();
+  const track = store.body.timingTracks[0];
+  if (!track) return;
+  const marks = [...track.marks].sort((a, b) => a - b);
+  const before = [...marks].reverse().find((m) => m < playheadMs.value);
+  const after = marks.find((m) => m > playheadMs.value);
+  if (before === undefined || after === undefined) {
     addTimingMarkAtPlayhead();
-  } else if (e.key === "Delete" || e.key === "Backspace") {
-    if (store.selectedEffectId) store.deleteEffect(store.selectedEffectId);
-  } else if ((e.metaKey || e.ctrlKey) && e.key === "z") {
-    e.preventDefault();
-    if (e.shiftKey) store.redo();
-    else store.undo();
-  } else if ((e.metaKey || e.ctrlKey) && e.key === "c") {
-    if (store.selectedEffectId) clipboard.value = store.copyEffect(store.selectedEffectId);
-  } else if ((e.metaKey || e.ctrlKey) && e.key === "v") {
-    if (clipboard.value) {
-      const row = visibleRows.value[0]; // pasting onto a hidden row would look like paste did nothing
-      if (row) store.pasteEffectAt(row.elementType, row.elementId, row.subName, clipboard.value, playheadMs.value);
-    }
+    return;
   }
+  store.addTimingMark(0, Math.round((before + after) / 2));
 }
 
 onMounted(async () => {
@@ -741,6 +807,7 @@ watch(sequenceId, async (id) => {
         <option :value="null">Master View</option>
         <option v-for="v in views" :key="v.name" :value="v.name">{{ v.name }}</option>
       </select>
+      <button title="Command palette (Ctrl+Shift+K)" @click="paletteOpen = true">⌘K</button>
       <button :class="{ active: showViewsPanel }" @click="showViewsPanel = !showViewsPanel">Views</button>
       <button :class="{ active: showPresetsPanel }" @click="showPresetsPanel = !showPresetsPanel">
         Presets{{ presets.length ? ` (${presets.length})` : "" }}
@@ -812,6 +879,8 @@ watch(sequenceId, async (id) => {
         <li v-if="versions.length === 0" class="empty">No snapshots yet — click "Snapshot" to create one.</li>
       </ul>
     </div>
+
+    <CommandPalette :open="paletteOpen" :commands="commands" @close="paletteOpen = false" />
 
     <div v-if="showPresetsPanel" class="models-panel">
       <div class="models-panel-head">
