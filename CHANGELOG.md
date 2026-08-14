@@ -1,5 +1,22 @@
 # Changelog
 
+## 3D layout: one axis at a time, a ground to stand on, and a way back
+
+- **Dragging moves X and Y; hold Z for depth.** Free 3D dragging — what `DragControls` does, moving a model in whatever plane happens to face the camera — makes the other two axes drift every time you nudge one. A drag now moves a prop along the house and up the wall, and depth is an explicit modifier you hold. The hint in the corner says which mode the next drag will use.
+- **Nothing sinks into the lawn.** A model's *lowest node* stops at the ground, so a prop rests on it rather than being buried to its middle. The floor is never above where a model already was, so a show that deliberately places something low doesn't get it yanked up the first time it's nudged sideways. The same rule applies to 2D drags, since that canvas is a front elevation on the same axis.
+- **There's a ground to see.** A show carrying an xLights Gridlines object already drew one; everything else now gets a faint default grid at the same height. Without it, "nothing goes below the ground" is a rule that fires invisibly — a prop stops moving and it reads as a bug.
+- **Reset view.** A button on the 3D canvas returns the camera to the default framing. That default now stands slightly *above* ground height rather than below it, which is a more sensible place to be returned to once there's a lawn in the scene.
+
+The depth mapping is the interesting part. The obvious constructions — intersect a plane holding the axis, or take the closest point between the axis and the pointer ray — both collapse in exactly the view a depth drag is most wanted from: looking at the front of the house, where the depth axis points straight at the camera. One sends the intersection to infinity, the other divides by zero. Measuring the axis *on screen* degrades gracefully instead, and its sensitivity is capped to the view's own vertical scale — without that cap a 130px drag moved a prop eleven hundred units, most of a yard.
+
+
+## The model list collapses to names, and the resize handles are visible
+
+- **A row per model, not a panel per model.** Every row in the Layout sidebar carried a type, a channel and a controller dropdown, which on a hundred-model show made the list impossible to scan. Rows are now just names with a caret; clicking one expands that model's details in place — type, channel, controller assignment, position/scale/rotate, properties and delete. Only the sole selected model expands, since a marquee selection of thirty props opening thirty panels would be worse than the flat list it replaces.
+- **The resize handles were there, and invisible.** They were drawn 8px across in the same gold as the lit nodes, so on a dense prop they read as three more lights rather than as controls. They're now larger, white-filled with a dark border, standing off the model's own bounds, on a dashed selection box drawn dark-then-light so it survives over a bright model. The grab maths subtracts the new standoff, so a model doesn't grow by it on every drag.
+- **The property grid was showing schema defaults on legacy files.** It read only xLights' descriptive attribute names while the geometry reads those *and* the older `parm1`/`parm2`/`parm3` — so a matrix built from `parm1="32"` displayed "# Strings 16" next to a shape that was visibly 32 wide. Both spellings are read now, matching what the geometry actually used.
+
+
 ## The popped-out preview no longer takes the sequencer down with it
 
 Opening the pop-out threw `Failed to execute 'postMessage' on 'BroadcastChannel': could not be cloned` and put the sequencer tab behind a "Something went wrong" overlay.

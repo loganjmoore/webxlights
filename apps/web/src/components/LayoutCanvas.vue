@@ -21,8 +21,13 @@ const hoverCursor = ref("default");
 const NODE_SPACING = 4; // px per local geometry unit, before the auto-fit scale
 const NODE_RADIUS = 2;
 const PLACEHOLDER_HALF = 15; // fixed screen-px half-extent for unsupported-model boxes
-const HANDLE_HALF = 4; // screen-px half-size of a resize handle square
-const HANDLE_HIT_PAD = 4; // extra screen-px of grab room around each handle
+// Handles were drawn at 4px half-size in the same gold as the nodes, which on a dense layout
+// read as three more lit pixels rather than as controls - "I still do not see corner handles"
+// was the actual report. Bigger, white-filled with a dark outline, and with a clear gap between
+// the model and the box they sit on.
+const HANDLE_HALF = 6; // screen-px half-size of a resize handle square
+const HANDLE_HIT_PAD = 5; // extra screen-px of grab room around each handle
+const HANDLE_INSET = 6; // screen-px the handle box stands off the model's own bounds
 
 // Corner handles scale both axes; edge handles scale the one they're on. `ax`/`ay` are the
 // handle's position in the model's own unrotated frame, as a fraction of its half-extents.
@@ -180,12 +185,15 @@ function handleScreenPos(
   model: ModelRecord,
   half: { halfW: number; halfH: number },
   handle: { ax: number; ay: number },
-  t: { toScreenX: (x: number) => number; toScreenY: (y: number) => number },
+  t: { fitScale: number; toScreenX: (x: number) => number; toScreenY: (y: number) => number },
 ): { sx: number; sy: number } {
   const { x, y } = positionFor(model);
   const rad = ((model.screen.rotate ?? 0) * Math.PI) / 180;
-  const lx = handle.ax * half.halfW * NODE_SPACING;
-  const ly = handle.ay * half.halfH * NODE_SPACING;
+  // The standoff is applied in the model's own frame, so it rotates with the box rather than
+  // drifting to one side once a model is turned.
+  const insetLocal = HANDLE_INSET / Math.max(t.fitScale, 1e-6);
+  const lx = handle.ax * (half.halfW * NODE_SPACING + insetLocal);
+  const ly = handle.ay * (half.halfH * NODE_SPACING + insetLocal);
   const wx = x + lx * Math.cos(rad) - ly * Math.sin(rad);
   const wy = y + lx * Math.sin(rad) + ly * Math.cos(rad);
   return { sx: t.toScreenX(wx), sy: t.toScreenY(wy) };
@@ -206,25 +214,36 @@ function drawHandles(ctx: CanvasRenderingContext2D, t: ReturnType<typeof compute
   const half = localHalfExtents(sole.model, sole.geo);
   if (half.halfW <= 0 || half.halfH <= 0) return;
 
-  // outline of the (rotated) box the handles sit on, so it's clear what's being resized
-  ctx.strokeStyle = "rgba(232, 196, 104, 0.55)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
+  // The box the handles sit on, dashed so it reads as a selection rather than as part of the
+  // show, and drawn twice - dark underneath - so it stays visible over lit nodes.
   const corners = HANDLES.filter((h) => h.axes === "xy");
-  corners.forEach((h, i) => {
-    const { sx, sy } = handleScreenPos(sole.model, half, h, t);
-    if (i === 0) ctx.moveTo(sx, sy);
-    else ctx.lineTo(sx, sy);
-  });
-  ctx.closePath();
+  const boxPath = () => {
+    ctx.beginPath();
+    corners.forEach((h, i) => {
+      const { sx, sy } = handleScreenPos(sole.model, half, h, t);
+      if (i === 0) ctx.moveTo(sx, sy);
+      else ctx.lineTo(sx, sy);
+    });
+    ctx.closePath();
+  };
+  ctx.setLineDash([5, 4]);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.75)";
+  boxPath();
   ctx.stroke();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "#e8c468";
+  boxPath();
+  ctx.stroke();
+  ctx.setLineDash([]);
 
-  ctx.fillStyle = "#e8c468";
-  ctx.strokeStyle = "#111116";
+  // White squares with a dark border: the one thing on this canvas that is never a light.
   for (const h of HANDLES) {
     const { sx, sy } = handleScreenPos(sole.model, half, h, t);
+    ctx.fillStyle = "#111116";
+    ctx.fillRect(sx - HANDLE_HALF - 1, sy - HANDLE_HALF - 1, HANDLE_HALF * 2 + 2, HANDLE_HALF * 2 + 2);
+    ctx.fillStyle = h.axes === "xy" ? "#ffffff" : "#e8c468";
     ctx.fillRect(sx - HANDLE_HALF, sy - HANDLE_HALF, HANDLE_HALF * 2, HANDLE_HALF * 2);
-    ctx.strokeRect(sx - HANDLE_HALF, sy - HANDLE_HALF, HANDLE_HALF * 2, HANDLE_HALF * 2);
   }
 }
 
@@ -430,8 +449,13 @@ function onPointerMove(e: PointerEvent): void {
     const currentScaleY = current.scaleY ?? currentScaleX;
     const MIN_SCALE = 0.02;
     const { handle, baseHalfW, baseHalfH } = resizeState;
-    const nextScaleX = handle.axes === "y" || baseHalfW <= 0 ? currentScaleX : Math.max(MIN_SCALE, Math.abs(lx) / baseHalfW);
-    const nextScaleY = handle.axes === "x" || baseHalfH <= 0 ? currentScaleY : Math.max(MIN_SCALE, Math.abs(ly) / baseHalfH);
+    // The handles stand off the model's own bounds by HANDLE_INSET so they're visible against a
+    // dense prop; take that back off here, or the model would grow by the standoff on every grab.
+    const inset = HANDLE_INSET / Math.max(t.fitScale, 1e-6) / NODE_SPACING;
+    const reachX = Math.max(0, Math.abs(lx) - inset);
+    const reachY = Math.max(0, Math.abs(ly) - inset);
+    const nextScaleX = handle.axes === "y" || baseHalfW <= 0 ? currentScaleX : Math.max(MIN_SCALE, reachX / baseHalfW);
+    const nextScaleY = handle.axes === "x" || baseHalfH <= 0 ? currentScaleY : Math.max(MIN_SCALE, reachY / baseHalfH);
     resizePreview.value = { modelId: model.id, scale: nextScaleX, scaleY: nextScaleY };
     draw();
     return;
