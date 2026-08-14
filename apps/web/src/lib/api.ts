@@ -1,4 +1,4 @@
-import type { BlendMode, LayerSettings, PictureImage, TransitionSpec, ValueCurve } from "@webxlights/engine";
+import type { BlendMode, LayerSettings, PictureImage, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
 
 export class ApiError extends Error {
   status: number;
@@ -54,6 +54,9 @@ export interface ModelRecord {
   screen: { x?: number; y?: number; z?: number; scale?: number; scaleY?: number; scaleZ?: number; rotate?: number };
   strings: number | null;
   nodes_per_string: number | null;
+  // xLights SubModels: named subsets of this model's nodes, each addressable as its own
+  // sequencer row (engine/models/subModel.ts).
+  sub_models?: SubModelSpec[] | null;
   string_type: string | null;
   start_channel: string | null;
   channel_count: number | null;
@@ -104,6 +107,7 @@ export interface ModelUpsertPayload {
   screen?: Record<string, unknown>;
   strings?: number | null;
   nodes_per_string?: number | null;
+  sub_models?: SubModelSpec[];
   string_type?: string | null;
   start_channel?: string | null;
   channel_count?: number;
@@ -158,7 +162,10 @@ export interface SequenceEffect {
 }
 
 export interface SequenceRow {
-  elementType: "model" | "group";
+  // "submodel" rows carry their parent model's id in elementId and name the sub-model in
+  // subName, because a sub-model has no id of its own - it lives on its parent's record.
+  elementType: "model" | "group" | "submodel";
+  subName?: string;
   elementId: number;
   effects: SequenceEffect[];
 }

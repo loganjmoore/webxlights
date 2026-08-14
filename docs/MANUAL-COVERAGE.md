@@ -33,7 +33,7 @@ written down. Status here means:
 | DMX, DMX Moving Head Advance, Servo | 🚫 | Fixture control, not pixel rendering |
 | Download / import models from the vendor library | ❌ | |
 | Model groups (add, modify, delete, rename, clone, delete-empty) | ⚠️ | Add/modify/delete/rename; no clone, no delete-empty |
-| **SubModels** (node range, draw model, sub-buffer, generate slices) | ❌ | Used heavily by real sequences |
+| **SubModels** (node range, sub-buffer) | ⚠️ | Imported from `<subModel>` elements, resolved to their own geometry, listed under their parent in the sequencer, and rendered in both the preview and the `.fseq` export. No editor for creating them in-app yet, and Draw Model / Generate Slices aren't implemented |
 | Objects — 2D background image | ❌ | The photo of the house behind the layout |
 | Objects — Mesh (3D `.obj`) | 🚫 | No OBJ loader |
 | Objects — Grid | ✅ | Gridlines view object |
@@ -140,9 +140,12 @@ Layer settings were the largest single lever, because they apply to every effect
 than adding one more: render style, transformation, blur and sub-buffer are now in. What remains
 of that panel is Persistent (needs the buffer to survive between frames) and Roto-Zoom.
 
-Sub-models are now the biggest single gap, and what real sequences lean on hardest — an imported
-`.xsq` that uses them renders wrong today, not merely plainly. Group render styles need group
-rendering, which is its own piece of work.
+Sub-models now import and render, which was the piece real sequences leaned on hardest. What is
+left of them is an in-app editor for creating one, which matters far less than not losing the
+ones a show already has.
+
+The largest gaps remaining are group rendering (which the thirteen group render styles depend
+on), the nine unimplemented model types, and the effects that need a canvas.
 
 After that, the missing effects are worth taking in batches by how much machinery they share:
 the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Lines) before the

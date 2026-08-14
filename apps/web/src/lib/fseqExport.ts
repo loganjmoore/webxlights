@@ -1,6 +1,7 @@
 import { writeFseqV2 } from "@webxlights/formats";
 import {
   computeGeometryFromAttrs,
+  computeSubModel,
   createRowSequencer,
   DEFAULT_PALETTE,
   hexToRgba,
@@ -90,6 +91,29 @@ export function exportSequenceToFseq(
     return createRowSequencer({ geometry: geo, effects: rowEffects }, frameMs, SEED, DEFAULT_PALETTE, audio);
   });
 
+  // Sub-model rows get their own sequencer over the sub-model's geometry, and their output is
+  // written back onto the parent's nodes. The export has to do this the same way the preview
+  // does, or a show looks right on screen and plays wrong in the yard.
+  const subSequencers = supported.map((model, i) => {
+    const geo = geometries[i];
+    if (!geo) return [];
+    return (model.sub_models ?? [])
+      .map((spec) => {
+        const sub = computeSubModel(geo, spec);
+        if (!sub) return null;
+        const rowEffects = body.rows
+          .filter((r) => r.elementType === "submodel" && r.elementId === model.id && r.subName === spec.name)
+          .flatMap((r) => r.effects)
+          .map((e) => ({ ...e, palette: e.palette?.map(hexToRgba) }));
+        if (rowEffects.length === 0) return null;
+        return {
+          parentIndices: sub.parentIndices,
+          sequencer: createRowSequencer({ geometry: sub.geometry, effects: rowEffects }, frameMs, SEED, DEFAULT_PALETTE, audio),
+        };
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null);
+  });
+
   const frames: Uint8Array[] = [];
   for (let f = 0; f < frameCount; f++) {
     const atMs = f * frameMs;
@@ -98,6 +122,13 @@ export function exportSequenceToFseq(
       const sequencer = sequencers[i];
       if (!sequencer) return;
       const nodeColors = sequencer.renderFrameAt(atMs);
+      for (const sub of subSequencers[i] ?? []) {
+        const subColors = sub.sequencer.renderFrameAt(atMs);
+        subColors.forEach((c, n) => {
+          const parentIndex = sub.parentIndices[n];
+          if (parentIndex !== undefined && c.a > 0) nodeColors[parentIndex] = c;
+        });
+      }
       const bytes = nodeColorsToChannelBytes(nodeColors, rgbOrders[i]);
       try {
         frame.set(bytes, byteOffsets[i]!);

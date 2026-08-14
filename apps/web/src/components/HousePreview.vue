@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as THREE from "three";
 import {
   computeGeometryFromAttrs,
+  computeSubModel,
   DEFAULT_PALETTE,
   geometryCenter,
   hexToRgba,
@@ -107,6 +108,32 @@ function updateColors(): void {
       DEFAULT_PALETTE,
       props.audio,
     );
+
+    // A sub-model borrows its parent's lights, so whatever it renders is written back onto the
+    // parent's nodes. Drawn after the parent's own rows, which is the order xLights uses: a
+    // sub-model is the more specific statement about those nodes.
+    for (const spec of entry.model.sub_models ?? []) {
+      const sub = computeSubModel(entry.geometry, spec);
+      if (!sub) continue;
+      const subEffects = props.body.rows
+        .filter((r) => r.elementType === "submodel" && r.elementId === entry.model.id && r.subName === spec.name)
+        .flatMap((r) => r.effects)
+        .map((e) => ({ ...e, palette: e.palette?.map(hexToRgba) }));
+      if (subEffects.length === 0) continue;
+      const subColors = renderRowAtMs(
+        { geometry: sub.geometry, effects: subEffects },
+        props.playheadMs,
+        props.frameMs,
+        SEED,
+        DEFAULT_PALETTE,
+        props.audio,
+      );
+      subColors.forEach((c, i) => {
+        const parentIndex = sub.parentIndices[i];
+        if (parentIndex !== undefined && c.a > 0) nodeColors[parentIndex] = c;
+      });
+    }
+
     nodeColors.forEach((c, i) => {
       const idx = (entry.offset + i) * 3;
       const brightness = c.a / 255;

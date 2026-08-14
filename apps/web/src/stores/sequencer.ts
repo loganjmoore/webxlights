@@ -73,18 +73,23 @@ export const useSequencerStore = defineStore("sequencer", () => {
     body.value = next;
   }
 
-  function ensureRow(elementType: "model" | "group", elementId: number) {
-    let row = body.value.rows.find((r) => r.elementType === elementType && r.elementId === elementId);
+  function ensureRow(elementType: "model" | "group" | "submodel", elementId: number, subName: string | undefined) {
+    // A sub-model row is identified by its parent's id *and* its own name: several sub-models
+    // share one parent id, so matching on the id alone would collapse them into one row and
+    // silently merge everyone's effects.
+    let row = body.value.rows.find(
+      (r) => r.elementType === elementType && r.elementId === elementId && (r.subName ?? undefined) === subName,
+    );
     if (!row) {
-      row = { elementType, elementId, effects: [] };
+      row = subName === undefined ? { elementType, elementId, effects: [] } : { elementType, elementId, subName, effects: [] };
       body.value.rows.push(row);
     }
     return row;
   }
 
-  function addEffect(elementType: "model" | "group", elementId: number, effect: SequenceEffect): void {
+  function addEffect(elementType: "model" | "group" | "submodel", elementId: number, subName: string | undefined, effect: SequenceEffect): void {
     pushUndoSnapshot();
-    ensureRow(elementType, elementId).effects.push(effect);
+    ensureRow(elementType, elementId, subName).effects.push(effect);
   }
 
   function applyEffectPatch(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params" | "palette" | "blendMode" | "mix" | "transition" | "layer">>): void {
@@ -128,10 +133,10 @@ export const useSequencerStore = defineStore("sequencer", () => {
     return effect ? (JSON.parse(JSON.stringify(effect)) as SequenceEffect) : null;
   }
 
-  function pasteEffectAt(elementType: "model" | "group", elementId: number, copied: SequenceEffect, atMs: number): void {
+  function pasteEffectAt(elementType: "model" | "group" | "submodel", elementId: number, subName: string | undefined, copied: SequenceEffect, atMs: number): void {
     const duration = copied.endMs - copied.startMs;
     const clone = JSON.parse(JSON.stringify(copied)) as SequenceEffect;
-    addEffect(elementType, elementId, { ...clone, id: newEffectId(), startMs: atMs, endMs: atMs + duration });
+    addEffect(elementType, elementId, subName, { ...clone, id: newEffectId(), startMs: atMs, endMs: atMs + duration });
   }
 
   function addTimingMark(trackIndex: number, ms: number): void {
