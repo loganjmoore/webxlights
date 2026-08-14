@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { rgba } from "../src/color";
 import { RenderBuffer } from "../src/renderBuffer";
-import { isBlackKey, parsePianoKeys, renderPiano, type PianoParams } from "../src/effects/piano";
+import { isBlackKey, midiKeyName, parsePianoKeys, renderPiano, type PianoParams } from "../src/effects/piano";
 import { labelsFromTrack } from "../src/timing";
 import type { FrameContext } from "../src/effects/types";
 
@@ -160,5 +160,18 @@ describe("Piano effect", () => {
     expect(on.length).toBeGreaterThan(0);
     // The low band is the low keys: everything lit is in the left quarter of the keyboard.
     expect(Math.max(...on)).toBeLessThan(buffer.width / 2);
+  });
+});
+
+describe("key names", () => {
+  it("names a key in the form the label parser reads back", () => {
+    // Used when a MIDI file becomes timing labels: a track labelled "C4 E4 G4" says what it is at
+    // a glance, where "60 64 67" doesn't. The two have to mean the same thing.
+    expect(midiKeyName(60)).toBe("C4");
+    expect(midiKeyName(61)).toBe("C#4");
+    expect(midiKeyName(72)).toBe("C5");
+    for (let midi = 21; midi <= 108; midi++) {
+      expect(parsePianoKeys(midiKeyName(midi)), `${midi} did not round-trip`).toEqual([midi]);
+    }
   });
 });

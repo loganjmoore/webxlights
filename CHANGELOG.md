@@ -1,5 +1,31 @@
 # Changelog
 
+## A MIDI file becomes a timing track
+
+The Piano effect lists a MIDI file as one of its notes sources. Shipping the effect left that as the one real gap, so this fills it — but as an *import* rather than as a second way for the effect to read notes.
+
+That's the decision worth stating. A `.mid` becomes a **timing track** whose cells are labelled with the keys sounding in them, and the effect reads it exactly as it reads a hand-typed one. The notes end up visible and editable: a wrong chord is a label you can retype, not a file you have to re-export from something else. It also means the same import serves anything else driven by labels.
+
+### The reader
+
+Formats 0, 1 and 2; running status; tempo changes; SMPTE as well as metrical division. Three things in it are the ones that actually bite:
+
+- **A note-on with velocity 0 is a note-off.** It's the usual way real files end notes. Read as a start, every note in such a file stays open forever.
+- **Tempo changes are pooled across all tracks.** Format 1 keeps the tempo map in the first track alone and it applies to every other one; reading tempo per-track leaves the notes running at the default 120bpm.
+- **Overlapping notes of one pitch pair one at a time.** Closing every open note on the first note-off gives one long note and one that never ends.
+
+Events it doesn't need — controller, pitch bend, program change, sysex, other meta — are skipped by their own lengths rather than guessed at, because a wrong guess at any of them turns the rest of the track into noise.
+
+### Turning notes into cells
+
+Boundaries come from note **ends** as well as note starts. A bass note held under a melody has to still be down when the melody moves; a track built from onsets alone would release it the moment anything else started. Between boundaries the label lists everything sounding, and a stretch with nothing sounding gets no label at all, so the keyboard empties instead of holding the last chord.
+
+Labels are written as note names by default (`C4 E4 G4`), which say what they are when you expand the track; MIDI numbers are the other option. A test walks every key from A0 to C8 and asserts the effect's own parser reads back exactly the key that was written.
+
+Two of the manual's Piano settings live here rather than on the effect, because they describe the file and not the rendering: **Midi Start Time Adjust** ("in case they are slightly off from each other") and **Midi Speed Adjust**.
+
+A negative start adjustment can push notes off the front of the sequence. A note *straddling* zero is clamped to it — it's still playing when the sequence starts — while one that ends before zero is dropped. Clamping both ends of an early note to zero instead leaves a zero-length note that disappears later, somewhere with much less to say about why; a test caught exactly that.
+
 ## Two effects that weren't actually blocked: State and Piano
 
 Both were recorded in the coverage doc as needing "definition files" we didn't have. Re-reading their manual pages showed that neither does.

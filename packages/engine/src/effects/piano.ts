@@ -70,6 +70,20 @@ export function parsePianoKeys(label: string): number[] {
   return out;
 }
 
+const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+/**
+ * The name of a key, in the form `parsePianoKeys` reads back.
+ *
+ * The inverse of the note-and-octave form above, and used when a MIDI file is turned into timing
+ * labels: a track labelled "C4 E4 G4" says what it is when you look at it, where "60 64 67"
+ * doesn't. Sharps rather than flats, arbitrarily but consistently - the two name the same key.
+ */
+export function midiKeyName(midi: number): string {
+  const semitone = ((midi % 12) + 12) % 12;
+  return `${NOTE_NAMES[semitone]}${Math.floor(midi / 12) - 1}`;
+}
+
 /** The keys drawn, low to high - every key in range, or only the white ones. */
 function keysInRange(params: PianoParams): number[] {
   const from = Math.max(0, Math.min(127, Math.round(params.startMidi)));

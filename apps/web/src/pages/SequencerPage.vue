@@ -6,6 +6,8 @@ import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, ty
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
+import { parseMidi, type ParsedMidi } from "@webxlights/formats";
+import { ALL_TRACKS, describeMidiImport, midiTrackChoices, timingTrackFromMidi } from "../lib/midiTiming";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
 import { openPanelWindow, openPreviewChannel, postPreviewMessage, previewUrlFor, type PreviewMessage } from "../lib/previewChannel";
@@ -114,6 +116,51 @@ function generateTimingTrack(): void {
   const ms = isBpm ? Math.round(60000 / timingBpm.value) : timingIntervalMs.value;
   const name = isBpm ? `Metronome ${timingBpm.value}bpm` : `${timingIntervalMs.value}ms`;
   store.generateTimingMarks(name, ms);
+}
+
+// A MIDI file's notes as a timing track — which is what makes the Piano effect's "Midi file"
+// notes source work here. The file is parsed on pick so its tracks can be offered by name, and
+// the track is only added once the Track, adjust and speed settings have been chosen.
+const midiFile = shallowRef<ParsedMidi | null>(null);
+const midiFileName = ref("");
+const midiTrack = ref(ALL_TRACKS);
+const midiStartAdjustMs = ref(0);
+const midiSpeedPct = ref(100);
+const midiLabelAs = ref<"notes" | "midi">("notes");
+const midiMessage = ref("");
+const midiChoices = computed(() => (midiFile.value ? midiTrackChoices(midiFile.value) : []));
+
+async function pickMidiFile(e: Event): Promise<void> {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  midiMessage.value = "";
+  try {
+    midiFile.value = parseMidi(new Uint8Array(await file.arrayBuffer()));
+    midiFileName.value = file.name.replace(/\.mid[i]?$/i, "");
+    midiTrack.value = midiChoices.value[0] ?? ALL_TRACKS;
+    if (midiChoices.value.length === 0) midiMessage.value = "That file has no notes in it.";
+  } catch (err) {
+    midiFile.value = null;
+    midiMessage.value = err instanceof Error ? err.message : "Couldn't read that MIDI file.";
+  }
+}
+
+function addMidiTimingTrack(): void {
+  const parsed = midiFile.value;
+  if (!parsed) return;
+  const track = timingTrackFromMidi(parsed, {
+    track: midiTrack.value,
+    startAdjustMs: midiStartAdjustMs.value,
+    speedPct: midiSpeedPct.value,
+    labelAs: midiLabelAs.value,
+    name: midiFileName.value || "MIDI Notes",
+  });
+  if (track.marks.length === 0) {
+    midiMessage.value = "Nothing to add — that track's notes all fall before the sequence starts.";
+    return;
+  }
+  store.addTimingTrack(track);
+  midiMessage.value = describeMidiImport(track, parsed);
 }
 
 const showFppPanel = ref(false);
@@ -1075,6 +1122,28 @@ watch(sequenceId, async (id) => {
         </template>
         <button @click="generateTimingTrack">Generate</button>
       </div>
+
+      <p class="timing-note">
+        Or import a MIDI file's notes as a track. Each cell is labelled with the keys sounding in
+        it, which is what the Piano effect reads — and being a timing track rather than a hidden
+        file, a wrong chord is a label you can retype.
+      </p>
+      <div class="timing-row">
+        <input type="file" accept=".mid,.midi,audio/midi" @change="pickMidiFile" />
+        <template v-if="midiChoices.length">
+          <select v-model="midiTrack">
+            <option v-for="choice in midiChoices" :key="choice" :value="choice">{{ choice }}</option>
+          </select>
+          <select v-model="midiLabelAs">
+            <option value="notes">Note names</option>
+            <option value="midi">MIDI numbers</option>
+          </select>
+          <label class="midi-field">Start adjust <input v-model.number="midiStartAdjustMs" type="number" step="50" /> ms</label>
+          <label class="midi-field">Speed <input v-model.number="midiSpeedPct" type="number" min="1" step="5" /> %</label>
+          <button @click="addMidiTimingTrack">Add track</button>
+        </template>
+      </div>
+      <p v-if="midiMessage" class="timing-note">{{ midiMessage }}</p>
     </div>
 
     <div v-if="showFppPanel" class="fpp-panel">
@@ -1730,6 +1799,16 @@ header button.active {
   margin: 0 0 0.5rem;
   color: #888;
   font-size: 0.8rem;
+}
+.midi-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: #aaa;
+}
+.midi-field input {
+  width: 4.5rem;
 }
 .timing-row {
   display: flex;
