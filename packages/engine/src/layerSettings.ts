@@ -7,9 +7,10 @@ import { rgba, type RGBA } from "./color";
 // currently fills a whole house can be turned sideways, softened, or confined to the left half
 // of it without Fire knowing any of it happened.
 //
-// Implemented here: Transformation, Blur and Sub Buffer. Render Style (the 19 buffer layouts),
-// Persistent and Roto-Zoom are not - see docs/MANUAL-COVERAGE.md. Persistent in particular needs
-// the buffer to survive between frames, which this render pipeline deliberately doesn't do.
+// Implemented here: Transformation, Blur, Sub Buffer and Roto-Zoom. Render Style lives in
+// renderStyle.ts, because it changes where the *nodes* sit in the buffer rather than what gets
+// drawn into it; Persistent lives in renderFrame.ts, because it is the one setting that is about
+// time rather than about a single frame.
 
 export type LayerTransform =
   | "None"
@@ -40,6 +41,17 @@ export interface SubBuffer {
   y2: number; // 0..100, top
 }
 
+/** xLights' Roto-Zoom panel: turn and scale the effect within its own buffer. */
+export interface RotoZoom {
+  /** Degrees, positive anticlockwise, matching the engine's rotation convention. */
+  rotation?: number;
+  /** 1 = unchanged. Above 1 magnifies the effect, below shrinks it. */
+  zoom?: number;
+  /** Where the turn and the zoom happen, as percentages of the buffer. Defaults to the centre. */
+  pivotX?: number;
+  pivotY?: number;
+}
+
 export interface LayerSettings {
   /** Which buffer layout the effect renders into (renderStyle.ts). */
   renderStyle?: import("./renderStyle").RenderStyle;
@@ -47,6 +59,15 @@ export interface LayerSettings {
   /** 1 = untouched. Higher averages each pixel with more of its neighbours. */
   blur?: number;
   subBuffer?: SubBuffer;
+  rotoZoom?: RotoZoom;
+  /**
+   * Don't clear the buffer between frames, so each frame layers on top of the last.
+   *
+   * The manual's own description: "The term came from high persistence scopes where each trace
+   * just kept layering on top of previous traces." Handled in renderFrame.ts rather than here,
+   * because it is the only layer setting that is about *time* rather than about one frame.
+   */
+  persistent?: boolean;
 }
 
 export const FULL_SUB_BUFFER: SubBuffer = { x1: 0, y1: 0, x2: 100, y2: 100 };
@@ -173,6 +194,41 @@ export function applyBlur(buffer: RenderBuffer, blur: number | undefined): void 
   }
 }
 
+// Turns and scales what the effect drew, about a pivot. Sampled backwards from each destination
+// pixel like the transformation above, and for the same reason: scattering forwards leaves holes
+// wherever the source grid stretches.
+export function applyRotoZoom(buffer: RenderBuffer, rotoZoom: RotoZoom | undefined): void {
+  if (!rotoZoom) return;
+  const rotation = rotoZoom.rotation ?? 0;
+  const zoom = rotoZoom.zoom ?? 1;
+  if (rotation === 0 && zoom === 1) return;
+
+  const { width, height } = buffer;
+  const source: RGBA[] = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) source.push(buffer.getPixel(x, y));
+  }
+
+  const px = ((rotoZoom.pivotX ?? 50) / 100) * (width - 1);
+  const py = ((rotoZoom.pivotY ?? 50) / 100) * (height - 1);
+  // The inverse transform: undo the zoom, then undo the turn.
+  const rad = (-rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const scale = zoom === 0 ? 1 : 1 / zoom;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dx = (x - px) * scale;
+      const dy = (y - py) * scale;
+      const sx = Math.round(px + dx * cos - dy * sin);
+      const sy = Math.round(py + dx * sin + dy * cos);
+      const inside = sx >= 0 && sx < width && sy >= 0 && sy < height;
+      buffer.setPixel(x, y, inside ? source[sy * width + sx]! : rgba(0, 0, 0, 0));
+    }
+  }
+}
+
 /**
  * Runs one layer's effect through its settings and lands the result on `target`.
  *
@@ -187,7 +243,7 @@ export function renderWithLayerSettings(
   settings: LayerSettings | undefined,
   render: (buffer: RenderBuffer) => void,
 ): void {
-  if (!settings || (isFullSubBuffer(settings.subBuffer) && !settings.transform && !settings.blur)) {
+  if (!settings || (isFullSubBuffer(settings.subBuffer) && !settings.transform && !settings.blur && !settings.rotoZoom)) {
     render(target);
     return;
   }
@@ -196,6 +252,7 @@ export function renderWithLayerSettings(
   const work = rect.width === target.width && rect.height === target.height ? target : new RenderBuffer(rect.width, rect.height);
   render(work);
   applyTransform(work, settings.transform);
+  applyRotoZoom(work, settings.rotoZoom);
   applyBlur(work, settings.blur);
 
   if (work === target) return;

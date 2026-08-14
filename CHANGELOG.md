@@ -1,5 +1,17 @@
 # Changelog
 
+## The Layer Settings panel, finished
+
+**Roto-Zoom** and **Persistent** were the two controls still missing, and the panel is now 6 of 6.
+
+- **Roto-Zoom** turns and scales what an effect drew, about a pivot. Like the transformation before it, it samples backwards from each destination pixel rather than scattering forwards — scattering leaves holes wherever the source grid stretches. Ground the turn uncovers is left transparent rather than smeared, so the layers underneath still show through; a rotation that pushed the effect off its own buffer would otherwise drag the edge pixels across the model.
+- **Persistent** is the manual's *"does not clear the display buffer before rendering each frame"*. A stateless effect is a pure function of its frame, so persistence can't be read off one — it has to be produced by actually drawing every frame since the effect started into one buffer. That's what the scrub path does, capped at 600 frames because past that the oldest traces have been painted over anyway and the cost would otherwise grow without bound. The sequential export path already walks frames in order, so there it is just a matter of keeping the buffer instead of replaying into a fresh one. A test drives both paths over the same twenty frames and requires them to agree — two routes to the same picture is exactly the shape of bug that ships a preview which doesn't match the `.fseq`.
+
+Both are wired into the props panel, so they reach every effect. Zoom is stored as a multiplier but edited as a percentage; the pivot sliders only appear once there is a turn or a zoom for them to be about.
+
+That leaves Render Style as the only partial entry in the panel, and for a reason that belongs elsewhere: thirteen of its nineteen styles describe how several models in a *group* are arranged relative to each other, so they wait on group rendering rather than on this panel.
+
+
 ## SubModels
 
 The gap real sequences leaned on hardest. A sub-model is a named subset of a model's nodes — the star on a mega tree, one arch of a set — addressable in the sequencer as its own row. A show that sequences them and is imported without them doesn't merely lose detail: those rows have nowhere to land, so whole passages render on nothing.
