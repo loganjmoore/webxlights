@@ -2,7 +2,6 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { DragControls } from "three/examples/jsm/controls/DragControls.js";
 import { computeGeometryFromAttrs, geometryCenter, nodeWorldOffset, transformedHalfExtents, type ModelGeometry, type ScreenTransform } from "@webxlights/engine";
 import type { ModelRecord, ViewObjectRecord } from "../lib/api";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
@@ -15,15 +14,27 @@ const emit = defineEmits<{
 
 const NODE_SPACING = 4; // matches LayoutCanvas (2D) and HousePreview's local-unit-to-px scale
 const PICK_DEPTH = 12; // flat 2D models get a thin box for raycasting, not zero-volume
+const CLICK_SLOP = 4; // px of pointer travel still counted as a click rather than a drag
+const GROUND_GRID_SPAN = 4000;
+const GROUND_GRID_SPACING = 100;
+
+// Y is up in this scene, so the ground is the XZ plane and Z is depth into the yard. A drag
+// therefore moves a prop along the house (X) and up the wall (Y) by default, which is what
+// nearly every placement is; depth is the rarer one and gets an explicit modifier rather than
+// being mixed into the same gesture. Free 3D dragging - what DragControls does, moving in
+// whatever plane happens to face the camera - makes the other two axes drift every time you
+// nudge one, which is why this drags itself rather than using DragControls.
+const AXIS_Z = new THREE.Vector3(0, 0, 1);
+const zAxisMode = ref(false);
 
 const containerRef = ref<HTMLDivElement | null>(null);
 let setup: SceneSetup | null = null;
 let orbit: OrbitControls | null = null;
-let dragControls: DragControls | null = null;
 let points: THREE.Points | null = null;
 let selectionHelper: THREE.BoxHelper | null = null;
 let rafId: number | null = null;
 let gridLines: THREE.LineSegments[] = [];
+let groundGrid: THREE.LineSegments | null = null;
 
 // M15.7: real xLights' Gridlines view_object - a flat reference grid, most commonly used as a
 // ground plane (RotateX=-90 in the real file this was verified against). Three.js's built-in
@@ -63,6 +74,20 @@ function buildViewObjects(): void {
     setup.scene.add(mesh);
     gridLines.push(mesh);
   }
+
+  // Without a ground you can see, "nothing goes below the ground" is a rule that fires
+  // invisibly - a prop stops moving and it reads as a bug. A show that carries its own
+  // Gridlines gets that; everything else gets a faint default one at the same height.
+  if (groundGrid) {
+    setup.scene.remove(groundGrid);
+    groundGrid = null;
+  }
+  if (gridLines.length === 0) {
+    groundGrid = buildGridLines(GROUND_GRID_SPAN, GROUND_GRID_SPAN, GROUND_GRID_SPACING);
+    groundGrid.position.set(0, groundY(), 0);
+    (groundGrid.material as THREE.LineBasicMaterial).opacity = 0.18;
+    setup.scene.add(groundGrid);
+  }
 }
 
 interface RowEntry {
@@ -72,6 +97,8 @@ interface RowEntry {
   transform: ScreenTransform;
   offset: number;
   pickMesh: THREE.Mesh;
+  /** How far the anchor has to sit above the ground for the model's lowest node to rest on it. */
+  halfHeightWorld: number;
 }
 let rowEntries: RowEntry[] = [];
 let downPoint: { x: number; y: number } | null = null;
@@ -144,7 +171,7 @@ function buildScene(): void {
     mesh.position.set(model.screen.x ?? 0, model.screen.y ?? 0, model.screen.z ?? 0);
     mesh.userData.modelId = model.id;
     setup.scene.add(mesh);
-    rowEntries.push({ model, geometry: geo, center: geometryCenter(geo), transform, offset, pickMesh: mesh });
+    rowEntries.push({ model, geometry: geo, center: geometryCenter(geo), transform, offset, pickMesh: mesh, halfHeightWorld: halfH * NODE_SPACING });
     offset += geo.nodes.length;
   }
 
@@ -156,40 +183,6 @@ function buildScene(): void {
   points = new THREE.Points(geo, material);
   points.raycast = () => {}; // display only - never the pick target, see comment above
   setup.scene.add(points);
-
-  if (dragControls) dragControls.dispose();
-  dragControls = new DragControls(
-    rowEntries.map((e) => e.pickMesh),
-    setup.camera,
-    setup.renderer.domElement,
-  );
-  dragControls.addEventListener("dragstart", (e) => {
-    if (orbit) orbit.enabled = false;
-    const modelId = (e.object as THREE.Object3D).userData.modelId as number;
-    emit("select", modelId);
-  });
-  dragControls.addEventListener("drag", (e) => {
-    const mesh = e.object as THREE.Object3D;
-    const entry = rowEntries.find((r) => r.pickMesh === mesh);
-    if (!entry || !points) return;
-    const posAttr = points.geometry.getAttribute("position") as THREE.BufferAttribute;
-    const arr = posAttr.array as Float32Array;
-    entry.geometry.nodes.forEach((node, i) => {
-      const idx = (entry.offset + i) * 3;
-      const off = nodeWorldOffset(node, entry.center, entry.transform);
-      arr[idx] = mesh.position.x + off.x * NODE_SPACING;
-      arr[idx + 1] = mesh.position.y + off.y * NODE_SPACING;
-      arr[idx + 2] = mesh.position.z + off.z * NODE_SPACING;
-    });
-    posAttr.needsUpdate = true;
-    if (selectionHelper && selectionHelper.object === mesh) selectionHelper.update();
-  });
-  dragControls.addEventListener("dragend", (e) => {
-    if (orbit) orbit.enabled = true;
-    const mesh = e.object as THREE.Object3D;
-    const modelId = mesh.userData.modelId as number;
-    emit("move", modelId, mesh.position.x, mesh.position.y, mesh.position.z);
-  });
 
   updateSelectionHighlight();
 }
@@ -228,7 +221,7 @@ function fitCameraToScene(): void {
   const cy = (minY + maxY) / 2;
   const span = Math.max(maxX - minX, maxY - minY, 10);
   const { camera } = setup;
-  camera.position.set(cx, cy - span * 0.6, span * 1.1);
+  camera.position.set(cx, Math.max(cy + span * 0.12, groundY() + span * 0.1), span * 1.15);
   camera.near = 1;
   camera.far = span * 6;
   camera.updateProjectionMatrix();
@@ -238,21 +231,209 @@ function fitCameraToScene(): void {
   }
 }
 
-function onPointerDown(e: PointerEvent): void {
-  downPoint = { x: e.clientX, y: e.clientY };
+// The ground the layout stands on. A show that carries a Gridlines view object puts it where
+// that object sits; anything else gets y=0, which is where every importer writes a prop that
+// rests on the lawn.
+function groundY(): number {
+  for (const obj of props.viewObjects ?? []) {
+    if (obj.type !== "Gridlines" || obj.raw_attrs.Active === "0") continue;
+    const y = parseFloat(obj.raw_attrs.WorldPosY ?? "");
+    if (Number.isFinite(y)) return y;
+  }
+  return 0;
 }
-function onPointerUp(e: PointerEvent): void {
-  if (!downPoint || !setup) return;
-  const moved = Math.hypot(e.clientX - downPoint.x, e.clientY - downPoint.y);
-  downPoint = null;
-  if (moved > 4) return; // a camera-orbit drag or a model drag, not a plain click
 
+// Lowest the anchor can go before the model's own lowest node would be underground.
+function floorFor(entry: RowEntry): number {
+  return groundY() + entry.halfHeightWorld;
+}
+
+function pointerRay(e: PointerEvent): THREE.Ray | null {
+  if (!setup) return null;
   const rect = setup.renderer.domElement.getBoundingClientRect();
   const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(ndc, setup.camera);
+  return raycaster.ray;
+}
+
+// Where a ray crosses the constant-depth plane a model currently sits in.
+function rayOnDepthPlane(ray: THREE.Ray, depth: number): THREE.Vector3 | null {
+  const plane = new THREE.Plane(AXIS_Z.clone(), -depth);
+  const hit = new THREE.Vector3();
+  return ray.intersectPlane(plane, hit) ? hit : null;
+}
+
+function projectToScreen(p: THREE.Vector3): THREE.Vector2 | null {
+  if (!setup) return null;
+  const rect = setup.renderer.domElement.getBoundingClientRect();
+  const v = p.clone().project(setup.camera);
+  return new THREE.Vector2((v.x * 0.5 + 0.5) * rect.width, (-v.y * 0.5 + 0.5) * rect.height);
+}
+
+// How pointer movement turns into depth, worked out once per drag.
+//
+// Geometry can't answer this on its own. The obvious constructions - intersect a plane holding
+// the axis, or take the closest point between the axis and the pointer ray - both collapse in
+// exactly the view a depth drag is most wanted from: looking at the front of the house, where
+// the depth axis points straight at the camera. The first sends the intersection to infinity,
+// the second divides by zero. Measuring the axis on screen instead degrades gracefully: while
+// there is a direction to project onto, the model tracks the pointer along it; once the axis is
+// too close to head-on to have one, vertical movement drives depth, dragging down bringing a
+// prop towards the viewer.
+const AXIS_PROBE = 100; // world units, long enough to measure a direction from
+const HEAD_ON_PX = 20; // shorter than this on screen and the axis has no usable direction
+
+interface DepthMapping {
+  dir: THREE.Vector2 | null; // screen direction of +Z, null when head-on
+  unitsPerPixel: number;
+}
+
+function depthMappingAt(origin: THREE.Vector3): DepthMapping {
+  const a0 = projectToScreen(origin);
+  const along = projectToScreen(origin.clone().addScaledVector(AXIS_Z, AXIS_PROBE));
+  const up = projectToScreen(origin.clone().add(new THREE.Vector3(0, AXIS_PROBE, 0)));
+  if (!a0 || !along) return { dir: null, unitsPerPixel: 1 };
+
+  // The vertical scale is the yardstick for how fast any drag should move, and the ceiling on
+  // how fast this one may: as the axis turns towards the camera its screen length collapses, and
+  // world-units-per-pixel taken straight from it runs away - a 130px drag moved a prop eleven
+  // hundred units before this cap, which is most of a yard.
+  const upLen = up ? up.clone().sub(a0).length() : 0;
+  const verticalUnitsPerPixel = AXIS_PROBE / Math.max(upLen, 1);
+
+  const screenAxis = along.clone().sub(a0);
+  const len = screenAxis.length();
+  if (len >= HEAD_ON_PX) {
+    return {
+      dir: screenAxis.divideScalar(len),
+      unitsPerPixel: Math.min(AXIS_PROBE / len, verticalUnitsPerPixel),
+    };
+  }
+  return { dir: null, unitsPerPixel: verticalUnitsPerPixel };
+}
+
+interface DragState {
+  entry: RowEntry;
+  start: THREE.Vector3;
+  /** Offset from the pointer to the anchor at grab time, so the model doesn't jump to the cursor. */
+  grabPlane: THREE.Vector3;
+  pointer: { x: number; y: number };
+  depth: DepthMapping;
+  moved: boolean;
+}
+let dragState: DragState | null = null;
+
+function applyDragPosition(entry: RowEntry, position: THREE.Vector3): void {
+  const mesh = entry.pickMesh;
+  mesh.position.copy(position);
+  if (!points) return;
+  const posAttr = points.geometry.getAttribute("position") as THREE.BufferAttribute;
+  const arr = posAttr.array as Float32Array;
+  entry.geometry.nodes.forEach((node, i) => {
+    const idx = (entry.offset + i) * 3;
+    const off = nodeWorldOffset(node, entry.center, entry.transform);
+    arr[idx] = mesh.position.x + off.x * NODE_SPACING;
+    arr[idx + 1] = mesh.position.y + off.y * NODE_SPACING;
+    arr[idx + 2] = mesh.position.z + off.z * NODE_SPACING;
+  });
+  posAttr.needsUpdate = true;
+  if (selectionHelper && selectionHelper.object === mesh) selectionHelper.update();
+}
+
+function onPointerDown(e: PointerEvent): void {
+  downPoint = { x: e.clientX, y: e.clientY };
+  if (!setup) return;
+  const ray = pointerRay(e);
+  if (!ray) return;
+  const raycaster = new THREE.Raycaster();
+  raycaster.set(ray.origin, ray.direction);
+  const hit = raycaster.intersectObjects(rowEntries.map((r) => r.pickMesh))[0];
+  if (!hit) return;
+
+  const entry = rowEntries.find((r) => r.pickMesh === hit.object);
+  if (!entry) return;
+  const start = entry.pickMesh.position.clone();
+  const planeHit = rayOnDepthPlane(ray, start.z);
+  dragState = {
+    entry,
+    start,
+    grabPlane: planeHit ? start.clone().sub(planeHit) : new THREE.Vector3(),
+    pointer: { x: e.clientX, y: e.clientY },
+    depth: depthMappingAt(start),
+    moved: false,
+  };
+  if (orbit) orbit.enabled = false;
+  emit("select", entry.model.id);
+}
+
+function onPointerMove(e: PointerEvent): void {
+  if (!dragState) return;
+  const ray = pointerRay(e);
+  if (!ray) return;
+  const { entry, start, grabPlane, pointer, depth } = dragState;
+  const next = start.clone();
+
+  if (zAxisMode.value) {
+    const dx = e.clientX - pointer.x;
+    const dy = e.clientY - pointer.y;
+    next.z = start.z + (depth.dir ? (dx * depth.dir.x + dy * depth.dir.y) : dy) * depth.unitsPerPixel;
+  } else {
+    const planeHit = rayOnDepthPlane(ray, start.z);
+    if (!planeHit) return;
+    next.x = planeHit.x + grabPlane.x;
+    next.y = planeHit.y + grabPlane.y;
+  }
+
+  // A prop can rest on the lawn but never sink into it, whichever axis is being dragged. The
+  // floor is never above where the model already was: a show that places something below ground
+  // on purpose shouldn't have it yanked upwards the first time it's nudged sideways.
+  next.y = Math.max(next.y, Math.min(floorFor(entry), start.y));
+  dragState.moved = true;
+  applyDragPosition(entry, next);
+}
+
+function onPointerUp(e: PointerEvent): void {
+  if (dragState) {
+    const { entry, moved } = dragState;
+    dragState = null;
+    downPoint = null;
+    if (orbit) orbit.enabled = true;
+    if (moved) {
+      const p = entry.pickMesh.position;
+      emit("move", entry.model.id, p.x, p.y, p.z);
+      return;
+    }
+    emit("select", entry.model.id);
+    return;
+  }
+
+  if (!downPoint || !setup) return;
+  const moved = Math.hypot(e.clientX - downPoint.x, e.clientY - downPoint.y);
+  downPoint = null;
+  if (moved > CLICK_SLOP) return; // a camera-orbit drag, not a plain click
+
+  const ray = pointerRay(e);
+  if (!ray) return;
+  const raycaster = new THREE.Raycaster();
+  raycaster.set(ray.origin, ray.direction);
   const hit = raycaster.intersectObjects(rowEntries.map((r) => r.pickMesh))[0];
   emit("select", hit ? ((hit.object.userData.modelId as number) ?? null) : null);
+}
+
+// Held, not toggled: a modifier you have to keep down can't be left on by accident, and the
+// hint in the corner says which mode a drag is about to use.
+function onKeyDown(e: KeyboardEvent): void {
+  const tag = (e.target as HTMLElement | null)?.tagName;
+  if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+  if (e.key === "z" || e.key === "Z") zAxisMode.value = true;
+}
+function onKeyUp(e: KeyboardEvent): void {
+  if (e.key === "z" || e.key === "Z") zAxisMode.value = false;
+}
+// Releasing the key over another window would otherwise leave depth mode stuck on.
+function onWindowBlur(): void {
+  zAxisMode.value = false;
 }
 
 onMounted(() => {
@@ -266,8 +447,12 @@ onMounted(() => {
   fitCameraToScene();
 
   container.addEventListener("pointerdown", onPointerDown);
+  container.addEventListener("pointermove", onPointerMove);
   container.addEventListener("pointerup", onPointerUp);
   window.addEventListener("resize", handleResize);
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+  window.addEventListener("blur", onWindowBlur);
 
   const animate = () => {
     orbit?.update();
@@ -286,10 +471,13 @@ function handleResize(): void {
 onBeforeUnmount(() => {
   const container = containerRef.value;
   container?.removeEventListener("pointerdown", onPointerDown);
+  container?.removeEventListener("pointermove", onPointerMove);
   container?.removeEventListener("pointerup", onPointerUp);
   window.removeEventListener("resize", handleResize);
+  window.removeEventListener("keydown", onKeyDown);
+  window.removeEventListener("keyup", onKeyUp);
+  window.removeEventListener("blur", onWindowBlur);
   if (rafId) cancelAnimationFrame(rafId);
-  dragControls?.dispose();
   orbit?.dispose();
   if (setup && container) disposeScene(setup, container);
 });
@@ -300,13 +488,58 @@ watch(() => props.selectedModelId, updateSelectionHighlight);
 </script>
 
 <template>
-  <div ref="containerRef" class="layout-canvas-3d"></div>
+  <div class="layout-canvas-3d-wrap">
+    <div ref="containerRef" class="layout-canvas-3d"></div>
+    <div class="view-hud">
+      <span class="axis-hint" :class="{ active: zAxisMode }">
+        {{ zAxisMode ? "Dragging depth (Z)" : "Dragging X / Y — hold Z for depth" }}
+      </span>
+      <button type="button" @click="fitCameraToScene">Reset view</button>
+    </div>
+  </div>
 </template>
 
 <style scoped>
+.layout-canvas-3d-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
 .layout-canvas-3d {
   width: 100%;
   height: 100%;
+}
+.view-hud {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+.axis-hint {
+  padding: 0.2rem 0.45rem;
+  border-radius: 3px;
+  background: rgba(17, 17, 22, 0.8);
+  color: #888;
+}
+.axis-hint.active {
+  color: #111;
+  background: #e8c468;
+}
+.view-hud button {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.75rem;
+  color: #ddd;
+  background: rgba(17, 17, 22, 0.85);
+  border: 1px solid #555;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.view-hud button:hover {
+  border-color: #e8c468;
+  color: #e8c468;
 }
 .layout-canvas-3d :deep(canvas) {
   display: block;

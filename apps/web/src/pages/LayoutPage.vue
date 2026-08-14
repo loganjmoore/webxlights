@@ -5,6 +5,7 @@ import {
   appliedPlacementFor,
   computeGeometryFromAttrs,
   propertyFieldsFor,
+  transformedHalfExtents,
   propertyValueFor,
   screenFromAttrs,
   type BoxedScaleReading,
@@ -196,8 +197,34 @@ async function updateScreen(modelId: number, patch: Partial<{ x: number; y: numb
 // The 2D canvas moves the whole selection at once, so this takes a batch. Each model still
 // gets its own PATCH - ModelEntityController::update is per-model, and a drag of a handful of
 // props isn't worth a bulk endpoint that would need its own screen-merge semantics.
+// The same rule the 3D view enforces while dragging: the 2D canvas is a front elevation on the
+// same Y axis, so a drag there can put a prop underground just as easily. The floor is never
+// above where the model already was, so a show that deliberately places something low doesn't
+// get it yanked up the first time it's nudged sideways.
+function groundedY(model: ModelRecord, y: number): number {
+  let geo: ModelGeometry | null;
+  try {
+    geo = computeGeometryFromAttrs(model.type, model.raw_attrs);
+  } catch {
+    geo = null;
+  }
+  if (!geo) return y;
+  const halfH = transformedHalfExtents(geo, {
+    scale: model.screen.scale ?? 1,
+    scaleY: model.screen.scaleY,
+    scaleZ: model.screen.scaleZ,
+    rotateDeg: model.screen.rotate ?? 0,
+  }).halfH * NODE_SPACING;
+  return Math.max(y, Math.min(halfH, model.screen.y ?? 0));
+}
+
 async function handleMove(moves: Array<{ id: number; x: number; y: number }>): Promise<void> {
-  await Promise.all(moves.map((m) => updateScreen(m.id, { x: m.x, y: m.y })));
+  await Promise.all(
+    moves.map((m) => {
+      const model = models.value.find((mm) => mm.id === m.id);
+      return updateScreen(m.id, { x: m.x, y: model ? groundedY(model, m.y) : m.y });
+    }),
+  );
 }
 
 // Corner/edge handles on the 2D canvas. scaleZ follows scaleX so a model resized in the 2D
