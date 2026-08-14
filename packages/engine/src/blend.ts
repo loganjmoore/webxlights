@@ -10,7 +10,37 @@ export type BlendMode =
   | "Max"
   | "Min"
   | "1 reveals 2"
-  | "2 reveals 1";
+  | "2 reveals 1"
+  | "1 is Mask"
+  | "2 is Mask"
+  | "1 is Unmask"
+  | "2 is Unmask"
+  | "Shadow 1 on 2"
+  | "Shadow 2 on 1"
+  | "Layered"
+  | "Brightness";
+
+// The set the props panel offers, in the manual's own order.
+export const BLEND_MODES: BlendMode[] = [
+  "Normal",
+  "Effect 1",
+  "Effect 2",
+  "Average",
+  "Additive",
+  "Subtractive",
+  "Max",
+  "Min",
+  "1 reveals 2",
+  "2 reveals 1",
+  "1 is Mask",
+  "2 is Mask",
+  "1 is Unmask",
+  "2 is Unmask",
+  "Shadow 1 on 2",
+  "Shadow 2 on 1",
+  "Layered",
+  "Brightness",
+];
 
 const clamp255 = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));
 
@@ -18,13 +48,32 @@ function value(c: RGBA): number {
   return rgbToHsv(c).v; // 0..1
 }
 
+// Keeps `subject`'s colour, dimmed by how bright `by` is: a bright shadow layer darkens most.
+function shadow(subject: RGBA, by: RGBA): RGBA {
+  const level = 1 - value(by);
+  return rgba(clamp255(subject.r * level), clamp255(subject.g * level), clamp255(subject.b * level), subject.a);
+}
+
 function isBlack(c: RGBA): boolean {
   return c.r === 0 && c.g === 0 && c.b === 0 && (c.a === 0 || c.a === undefined);
 }
 
-// SPEC ch9 §5.2 "Layer Method": fg = this layer's pixel, bg = accumulated result of the
-// layers below it. M3 scope = the 10 modes in the goal prompt; the other 14 (masks, shadow,
-// highlight, split-screen, brightness-multiply, layered) are a documented ceiling.
+// SPEC ch9 §5.2 / manual "Layer Blending": fg is this layer's pixel ("layer 1" in the manual's
+// wording), bg is the accumulated result of the layers below it ("layer 2").
+//
+// A caveat worth stating plainly: the manual documents these modes with screenshots and the
+// advice "put two effects on a model and step through each of the layering modes to see what
+// they will look like. Experience is much better than reading about it." It never defines them
+// in words. The eight added beyond the original ten are therefore implemented from what their
+// names unambiguously mean - a mask hides, an unmask reveals, a shadow darkens, Layered picks
+// whichever layer has something to show - rather than from a specification. They behave sensibly
+// and consistently; whether each matches xLights pixel for pixel is unverified, and recorded as
+// such in docs/MANUAL-COVERAGE.md.
+//
+// Bottom-Top and Left-Right (the split-screen pair) are deliberately absent: they need the
+// pixel's position in the buffer, and this function is given only the two colours. Adding a
+// position parameter for two modes would put a coordinate through every blend call in the
+// engine, so they wait for a reason bigger than themselves.
 export function blendPixel(fg: RGBA, bg: RGBA, mode: BlendMode, effectMixThreshold: number): RGBA {
   switch (mode) {
     case "Normal": {
@@ -93,6 +142,35 @@ export function blendPixel(fg: RGBA, bg: RGBA, mode: BlendMode, effectMixThresho
       return value(fg) > effectMixThreshold ? fg : bg;
     case "2 reveals 1":
       return value(bg) > effectMixThreshold ? bg : fg;
+
+    // A mask hides: where this layer has something lit, the layer below is punched out.
+    case "1 is Mask":
+      return isBlack(fg) ? bg : rgba(0, 0, 0, 0);
+    case "2 is Mask":
+      return isBlack(bg) ? fg : rgba(0, 0, 0, 0);
+
+    // An unmask is the converse - the layer below shows only through what this layer lights.
+    case "1 is Unmask":
+      return isBlack(fg) ? rgba(0, 0, 0, 0) : bg;
+    case "2 is Unmask":
+      return isBlack(bg) ? rgba(0, 0, 0, 0) : fg;
+
+    // A shadow keeps one layer's colour and dims it by how dark the other is.
+    case "Shadow 1 on 2":
+      return shadow(bg, fg);
+    case "Shadow 2 on 1":
+      return shadow(fg, bg);
+
+    // Layered shows this layer wherever it has anything to show, and the layer below elsewhere -
+    // the same idea as Normal, but decided per pixel rather than blended.
+    case "Layered":
+      return isBlack(fg) ? bg : fg;
+
+    // Brightness uses this layer purely as a dimmer over the one below.
+    case "Brightness": {
+      const level = value(fg);
+      return rgba(clamp255(bg.r * level), clamp255(bg.g * level), clamp255(bg.b * level), bg.a);
+    }
     default:
       return bg;
   }

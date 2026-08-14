@@ -1,5 +1,16 @@
 # Changelog
 
+## Eight more layer blending modes
+
+10 of 24 becomes 18: **1 is Mask**, **2 is Mask**, **1 is Unmask**, **2 is Unmask**, **Shadow 1 on 2**, **Shadow 2 on 1**, **Layered** and **Brightness**.
+
+Worth stating plainly: the manual documents these with screenshots and the advice *"put two effects on a model and step through each of the layering modes to see what they will look like. Experience is much better than reading about it."* It never defines them in words. So these follow what their names unambiguously mean — a mask hides, an unmask reveals, a shadow darkens, Layered picks whichever layer has something to show, Brightness uses one layer as a dimmer over the other. They behave sensibly and consistently; whether each matches xLights pixel for pixel is unverified, and the coverage doc says so.
+
+**Bottom-Top** and **Left-Right** are deliberately absent. They need the pixel's position in the buffer, and the blend function is given only two colours — threading a coordinate through every blend call in the engine for two modes is a change that should wait for a reason bigger than itself.
+
+The props panel now reads its mode list from the engine rather than keeping its own copy, so a mode can't be implemented and left unofferable — which is exactly what had happened to all ten of the originals before they were wired up.
+
+
 ## Three more effects: Music, Fireworks and Tree
 
 35 of 55 becomes 38.

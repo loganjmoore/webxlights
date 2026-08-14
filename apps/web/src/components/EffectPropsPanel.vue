@@ -3,6 +3,7 @@ import { computed } from "vue";
 import {
   DEFAULT_PALETTE_HEX,
   EFFECT_SCHEMAS,
+  BLEND_MODES,
   LAYER_TRANSFORMS,
   RENDER_STYLES,
   PATTERNED_TRANSITION_TYPES,
@@ -22,19 +23,6 @@ import ValueCurveEditor from "./ValueCurveEditor.vue";
 
 const MAX_COLORS = 6; // matches real xLights' Color tab swatch count
 
-// The 10 of 24 real xLights "Layer Method" modes this engine implements (see blend.ts).
-const BLEND_MODES: BlendMode[] = [
-  "Normal",
-  "Effect 1",
-  "Effect 2",
-  "Average",
-  "Additive",
-  "Subtractive",
-  "Max",
-  "Min",
-  "1 reveals 2",
-  "2 reveals 1",
-];
 
 const props = defineProps<{ effect: SequenceEffect | null }>();
 const emit = defineEmits<{

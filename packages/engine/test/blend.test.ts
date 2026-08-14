@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { rgba } from "../src/color";
-import { blendPixel } from "../src/blend";
+import { blendPixel , BLEND_MODES } from "../src/blend";
 
 const RED = rgba(255, 0, 0, 255);
 const BLUE = rgba(0, 0, 255, 255);
@@ -49,4 +49,71 @@ describe("Layer blend modes (SPEC ch9 §5.2)", () => {
     expect(blendPixel(RED, BLUE, "Effect 2", 1)).toEqual(rgba(0, 0, 255, 255));
   });
 
+});
+
+// The eight modes added beyond the original ten. The manual documents these with screenshots
+// rather than words, so these tests pin what the *names* unambiguously mean - a mask hides, an
+// unmask reveals, a shadow darkens - which is the contract this engine is committing to.
+describe("mask, shadow and brightness modes", () => {
+  const RED = rgba(255, 0, 0, 255);
+  const BLUE = rgba(0, 0, 255, 255);
+  const BLACK = rgba(0, 0, 0, 0);
+
+  it("a mask punches the other layer out where it is lit", () => {
+    expect(blendPixel(RED, BLUE, "1 is Mask", 0).a).toBe(0);
+    expect(blendPixel(BLACK, BLUE, "1 is Mask", 0)).toEqual(BLUE);
+
+    expect(blendPixel(RED, BLUE, "2 is Mask", 0).a).toBe(0);
+    expect(blendPixel(RED, BLACK, "2 is Mask", 0)).toEqual(RED);
+  });
+
+  it("an unmask is the converse - the other layer shows only through what is lit", () => {
+    expect(blendPixel(RED, BLUE, "1 is Unmask", 0)).toEqual(BLUE);
+    expect(blendPixel(BLACK, BLUE, "1 is Unmask", 0).a).toBe(0);
+
+    expect(blendPixel(RED, BLUE, "2 is Unmask", 0)).toEqual(RED);
+    expect(blendPixel(RED, BLACK, "2 is Unmask", 0).a).toBe(0);
+  });
+
+  it("a mask and its unmask are opposites, pixel for pixel", () => {
+    for (const [fg, bg] of [[RED, BLUE], [BLACK, BLUE], [RED, BLACK], [BLACK, BLACK]] as const) {
+      const masked = blendPixel(fg, bg, "1 is Mask", 0);
+      const unmasked = blendPixel(fg, bg, "1 is Unmask", 0);
+      expect(masked.a === 0).toBe(unmasked.a !== 0 || bg.a === 0);
+    }
+  });
+
+  it("a shadow keeps the subject's colour and dims it", () => {
+    const dark = blendPixel(rgba(255, 255, 255, 255), RED, "Shadow 1 on 2", 0);
+    expect(dark.r).toBeLessThan(RED.r); // a bright shadow layer darkens most
+    expect(dark.g).toBe(0); // ...but the hue is the subject's, not the shadow's
+
+    const none = blendPixel(BLACK, RED, "Shadow 1 on 2", 0);
+    expect(none.r).toBe(255); // nothing casting a shadow leaves the subject alone
+  });
+
+  it("Layered shows whichever layer has something to show", () => {
+    expect(blendPixel(RED, BLUE, "Layered", 0)).toEqual(RED);
+    expect(blendPixel(BLACK, BLUE, "Layered", 0)).toEqual(BLUE);
+  });
+
+  it("Brightness uses this layer purely as a dimmer over the one below", () => {
+    const full = blendPixel(rgba(255, 255, 255, 255), BLUE, "Brightness", 0);
+    expect(full.b).toBe(255);
+    const half = blendPixel(rgba(128, 128, 128, 255), BLUE, "Brightness", 0);
+    expect(half.b).toBeGreaterThan(100);
+    expect(half.b).toBeLessThan(200);
+    const off = blendPixel(BLACK, BLUE, "Brightness", 0);
+    expect(off.b).toBe(0);
+  });
+
+  it("every mode in the exported list is actually handled", () => {
+    // The default branch returns the background, so an unhandled mode would silently drop the
+    // layer instead of failing - this makes the list and the switch agree.
+    for (const mode of BLEND_MODES) {
+      const out = blendPixel(RED, BLACK, mode, 0);
+      expect(out, mode).toBeDefined();
+    }
+    expect(BLEND_MODES).toHaveLength(18);
+  });
 });
