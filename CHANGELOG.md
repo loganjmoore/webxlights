@@ -1,5 +1,22 @@
 # Changelog
 
+## Song structure regions
+
+*"Let you divide the sequence timeline into named, colored sections — for example Intro, Verse, Chorus, Bridge and Outro."*
+
+They earn their keep in **bulk**. Once the timeline is labelled, "copy the chorus's effects onto the second chorus" is one action instead of a rubber-band selection across a hundred rows that has to land on exactly the right boundary.
+
+Sections can be added at the playhead, or generated from a timing track: *"one region for each timing mark, using the timing mark's label as the region name."* An unlabelled mark is named by its position rather than left blank — an unnamed region is indistinguishable from its neighbours in the one place regions are meant to help.
+
+Three decisions worth stating, each pinned by a test:
+
+- **Stored as boundaries, not start/end pairs.** A region ends where the next begins, so keeping both would let the two disagree — and a gap or an overlap between two sections isn't a state the timeline can actually be in.
+- **A straddling effect belongs to the section it began in.** Splitting it would change what the sequence renders; counting it in both would duplicate it on every copy.
+- **A copy that wouldn't fit is skipped, not trimmed.** A half-length copy of an effect is a different effect, and silently shortening one is worse than not copying it.
+
+And one I got wrong on the first pass and the test caught: labels are paired with their marks **before** the marks are sorted. Sorting first and then indexing the labels hands "Chorus" to whichever mark happened to be earliest — the same thing only when the track was already in order.
+
+
 ## A Channel Block was claiming three times the channels it needed
 
 The Channel Block model shipped a fortnight's worth of PRs ago with the right geometry and the wrong output. Every model in this app put three bytes on the wire per node, because every model until then was an RGB pixel.

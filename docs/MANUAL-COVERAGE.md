@@ -50,7 +50,7 @@ written down. Status here means:
 | Timeline + waveform, zoom, scroll | ✅ | 3 zoom levels |
 | Audio scrubbing | ❌ | Play-on-drag over the waveform |
 | Time display format | ✅ | Minutes:seconds, plain seconds, or frames — frames counted against the sequence's own frame rate, since a 20ms sequence and a 50ms one number the same second very differently |
-| Timeline tags | ❌ | |
+| Timeline tags | ⚠️ | A region boundary is a named point on the timeline, which is what a tag is; xLights' separate tag list, with its own colours and independent of the section structure, isn't offered |
 | Timing tracks | ✅ | Fixed interval + metronome generation |
 | Audio-generated timing tracks (beats/bars/lyrics) | ⚠️ | Interval/BPM only; no onset detection |
 | Adding effects (drag, double-click, drop) | ✅ | |
@@ -74,7 +74,7 @@ written down. Status here means:
 | Value curves | ✅ | All 16 types + custom point editor |
 | Effect presets | ✅ | Save an effect's whole configuration under a named group, apply it at the playhead, import and export `.xpreset` files. Saved on the layout, since presets are global in xLights rather than belonging to one sequence. Missing: presets spanning several layers or models at once, and Smart Presets |
 | Views | ✅ | Named, *ordered* subsets of the sequencer's rows, with a picker in the toolbar. Saved on the layout, because the manual is explicit that "views work across sequences" — a per-sequence copy would have to be duplicated into every new sequence and would drift. The Master View isn't stored: it is "a special (system created) view" containing every row, so it is simply the absence of a selection. Missing: the eye icon that hides a model across all sequences (this app's Models panel is the per-sequence equivalent) |
-| Song structure regions | ❌ | |
+| Song structure regions | ⚠️ | Named, coloured sections of the timeline, created at the playhead or from a timing track's labels — "one region for each timing mark, using the timing mark's label as the region name". Plus the bulk action they exist for: copying one section's effects onto another, rebased on the target's start. Missing: per-region palette application, exporting a region as its own sequence, and Song Structure Views |
 | Singing faces / phoneme breakdown | 🚫 | Needs face definitions |
 | Pixel editor (matrix drawing tool) | ❌ | |
 | Command palette | ✅ | Ctrl+Shift+K, per the manual. Searchable, ranked so a prefix match beats one buried mid-string, and every entry shows the key it also answers to — which is how anyone learns sixty shortcuts without reading a list of them |

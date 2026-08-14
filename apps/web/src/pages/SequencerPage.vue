@@ -20,6 +20,7 @@ import {
 } from "../lib/effectPresets";
 import { buildCommands, commandForEvent, isTypingTarget } from "../lib/commands";
 import { formatTime, loadPreferences, sanitize, savePreferences, type Preferences } from "../lib/preferences";
+import { REGION_COLORS, boundariesFromTimingTrack, effectsInRegion, rebaseEffects, regionAt, regionsFrom } from "../lib/songRegions";
 import CommandPalette from "../components/CommandPalette.vue";
 import EffectWheel from "../components/EffectWheel.vue";
 import { newEffectId, setAutosaveDebounce, useSequencerStore } from "../stores/sequencer";
@@ -666,6 +667,51 @@ function openPreviewWindow(): void {
 // Every keyboard shortcut and every palette entry comes from one registry (lib/commands.ts).
 // xLights documents around sixty shortcuts, and keeping a switch statement, a help list and a
 // palette in agreement by hand is exactly what drifts until a documented key does nothing.
+// Song structure regions (lib/songRegions.ts): named, coloured sections of the timeline. They
+// earn their keep in bulk - once the timeline is labelled, "copy the chorus onto the second
+// chorus" is one action instead of a rubber-band selection across a hundred rows that has to land
+// on exactly the right boundary.
+const showRegionsPanel = ref(false);
+const regionCopyFrom = ref("");
+const regionCopyTo = ref("");
+const songRegions = computed(() => regionsFrom(store.body.songBoundaries ?? [], store.sequence?.duration_ms ?? 0));
+const currentRegion = computed(() => regionAt(songRegions.value, playheadMs.value));
+
+function addBoundaryHere(): void {
+  store.snapshot();
+  const boundaries = [...(store.body.songBoundaries ?? []), { ms: playheadMs.value, name: `Section ${(store.body.songBoundaries?.length ?? 0) + 1}` }];
+  store.body.songBoundaries = boundaries;
+}
+function renameBoundary(index: number, name: string): void {
+  const boundaries = [...(store.body.songBoundaries ?? [])];
+  const boundary = boundaries[index];
+  if (!boundary) return;
+  boundaries[index] = { ...boundary, name };
+  store.body.songBoundaries = boundaries;
+}
+function removeBoundary(index: number): void {
+  store.snapshot();
+  store.body.songBoundaries = (store.body.songBoundaries ?? []).filter((_, i) => i !== index);
+}
+function regionsFromTrack(trackIndex: number): void {
+  const track = store.body.timingTracks[trackIndex];
+  if (!track) return;
+  store.snapshot();
+  store.body.songBoundaries = boundariesFromTimingTrack(track);
+}
+// "Copy effects between regions" - the bulk action regions exist for.
+function copyRegionEffects(): void {
+  const from = songRegions.value.find((r) => r.name === regionCopyFrom.value);
+  const to = songRegions.value.find((r) => r.name === regionCopyTo.value);
+  if (!from || !to || from === to) return;
+  store.snapshot();
+  for (const row of store.body.rows) {
+    for (const copy of rebaseEffects(effectsInRegion(row.effects, from), from, to, newEffectId)) {
+      store.addEffect(row.elementType, row.elementId, row.subName, copy);
+    }
+  }
+}
+
 const paletteOpen = ref(false);
 
 // The radial effect wheel, opened by double-clicking empty grid. It carries where it was opened
@@ -851,6 +897,9 @@ watch(sequenceId, async (id) => {
       </select>
       <button title="Command palette (Ctrl+Shift+K)" @click="paletteOpen = true">⌘K</button>
       <button :class="{ active: showPrefsPanel }" @click="showPrefsPanel = !showPrefsPanel">Preferences</button>
+      <button :class="{ active: showRegionsPanel }" @click="showRegionsPanel = !showRegionsPanel">
+        Regions{{ currentRegion ? `: ${currentRegion.name}` : "" }}
+      </button>
       <button :class="{ active: showViewsPanel }" @click="showViewsPanel = !showViewsPanel">Views</button>
       <button :class="{ active: showPresetsPanel }" @click="showPresetsPanel = !showPresetsPanel">
         Presets{{ presets.length ? ` (${presets.length})` : "" }}
@@ -925,6 +974,62 @@ watch(sequenceId, async (id) => {
 
     <CommandPalette :open="paletteOpen" :commands="commands" @close="paletteOpen = false" />
     <EffectWheel v-if="wheel" :x="wheel.x" :y="wheel.y" @pick="placeFromWheel" @close="wheel = null" />
+
+    <div v-if="showRegionsPanel" class="models-panel">
+      <div class="models-panel-head">
+        <h2>Song structure</h2>
+        <div class="models-panel-actions">
+          <button :disabled="!store.sequence" @click="addBoundaryHere">Add boundary at playhead</button>
+          <select v-if="store.body.timingTracks.length" @change="regionsFromTrack(Number(($event.target as HTMLSelectElement).value))">
+            <option value="">Create from timing track…</option>
+            <option v-for="(t, i) in store.body.timingTracks" :key="i" :value="i">{{ t.name }}</option>
+          </select>
+        </div>
+      </div>
+      <p class="timing-note">
+        Named, coloured sections of the timeline — Intro, Verse, Chorus. Creating them from a
+        timing track uses each mark's label as the section name.
+      </p>
+
+      <ul v-if="songRegions.length">
+        <li v-for="(region, i) in songRegions" :key="i">
+          <label>
+            <span class="region-swatch" :style="{ background: REGION_COLORS[region.colorIndex] }" />
+            <input
+              type="text"
+              :value="region.name"
+              @change="renameBoundary(i, ($event.target as HTMLInputElement).value)"
+            />
+          </label>
+          <span class="row-effect-count">
+            {{ Math.round(region.startMs / 1000) }}s–{{ Math.round(region.endMs / 1000) }}s
+          </span>
+          <button @click="removeBoundary(i)">×</button>
+        </li>
+      </ul>
+      <p v-else class="empty">No sections yet.</p>
+
+      <template v-if="songRegions.length > 1">
+        <div class="models-panel-head"><h2>Copy a section's effects</h2></div>
+        <div class="models-panel-actions">
+          <select v-model="regionCopyFrom">
+            <option value="">From…</option>
+            <option v-for="r in songRegions" :key="`f-${r.startMs}`" :value="r.name">{{ r.name }}</option>
+          </select>
+          <select v-model="regionCopyTo">
+            <option value="">To…</option>
+            <option v-for="r in songRegions" :key="`t-${r.startMs}`" :value="r.name">{{ r.name }}</option>
+          </select>
+          <button :disabled="!regionCopyFrom || !regionCopyTo || regionCopyFrom === regionCopyTo" @click="copyRegionEffects">
+            Copy
+          </button>
+        </div>
+        <p class="timing-note">
+          Effects are rebased on the target's start, so a chorus copied onto a later chorus lands
+          in step with it. Anything that wouldn't fit is skipped rather than trimmed.
+        </p>
+      </template>
+    </div>
 
     <div v-if="showPrefsPanel" class="models-panel">
       <div class="models-panel-head"><h2>Preferences</h2></div>
@@ -1325,6 +1430,14 @@ header select {
 }
 .history-panel .empty {
   color: #666;
+}
+.region-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 0.3rem;
+  vertical-align: middle;
 }
 .models-panel {
   padding: 0.6rem 1rem;
