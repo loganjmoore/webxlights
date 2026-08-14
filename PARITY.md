@@ -43,7 +43,7 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 
 | Feature | Status | Notes |
 |---|---|---|
-| Effects implemented | ⚠️ | 25 of ~56 named effects (On, Bars, Color Wash, Fire, Meteors, Butterfly, SingleStrand, Snowflakes, Spirals, Twinkle, Strobe, Ripple, Wave, Pinwheel, Shockwave, Garlands, Curtain, Plasma, Galaxy, Fan, Marquee, Circles, Text, Pictures, VU Meter) |
+| Effects implemented | ⚠️ | 29 of 55 named effects (On, Off, Bars, Color Wash, Fire, Meteors, Butterfly, SingleStrand, Snowflakes, Snow Storm, Spirals, Twinkle, Shimmer, Strobe, Ripple, Wave, Pinwheel, Shockwave, Garlands, Curtain, Fill, Plasma, Galaxy, Fan, Marquee, Circles, Text, Pictures, VU Meter). The full list, and which of the remaining 26 need infrastructure we don't have, is in docs/MANUAL-COVERAGE.md |
 | Each implemented effect's default/common render path | ✅ | Faithful to the SPEC's math; rarer option combinations (alternate directions, other render methods, etc.) are per-effect documented ceilings — see DECISIONS.md M3/M6 notes |
 | Per-effect Color palette | ⚠️ | Real xLights' Color tab: 1–6 swatches per effect (M15.3), editable via the Sequencer's effect panel, falling back to the app-wide default when unset. Multi-color blending across the palette (`multiColorBlend`) already existed for effects that use it; still missing real xLights' per-swatch checkboxes ("C"/"c" toggles), palette presets, and the "colors reflect music" audio-reactive option |
 | Shader (ISF), Liquid, Glediator, Video, VUMeter | ❌ | Non-goal for v1 / no audio-reactive pipeline yet |

@@ -32,6 +32,10 @@ import { renderCircles, type CirclesParams } from "./effects/circles";
 import { renderText, type TextParams } from "./effects/text";
 import { renderPictures, type PicturesParams } from "./effects/pictures";
 import { renderVuMeter, type VuMeterParams } from "./effects/vuMeter";
+import { renderOff, type OffParams } from "./effects/off";
+import { renderShimmer, type ShimmerParams } from "./effects/shimmer";
+import { renderFill, type FillParams } from "./effects/fill";
+import { createSnowStormState, renderSnowStorm, type SnowStormParams, type SnowStormState } from "./effects/snowStorm";
 import type { FrameContext } from "./effects/types";
 import { resolveParamsAtPosition } from "./valueCurve";
 import { applyTransitions, type TransitionSpec } from "./transition";
@@ -66,7 +70,7 @@ const MAX_LAYERS = 5;
 // Effects with per-frame state (heat map / particle list) that must be simulated forward
 // frame-by-frame from the effect's start to reach `atMs` - correct for a scrubbing preview
 // (not a real-time constraint), cheap at typical effect lengths (a few hundred frames).
-const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe"]);
+const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe", "Snow Storm"]);
 
 function positionOf(effect: RenderableEffect, atMs: number): number {
   const duration = effect.endMs - effect.startMs || 1;
@@ -101,6 +105,15 @@ function renderStateless(
   const params = paramsAt(effect, positionInEffect01);
 
   switch (effect.name) {
+    case "Off":
+      renderOff(buffer, params as unknown as OffParams);
+      break;
+    case "Shimmer":
+      renderShimmer(buffer, palette, params as unknown as ShimmerParams, ctx);
+      break;
+    case "Fill":
+      renderFill(buffer, palette, params as unknown as FillParams, ctx);
+      break;
     case "On":
       renderOn(buffer, palette, params as unknown as OnParams, ctx);
       break;
@@ -205,6 +218,12 @@ function renderStateful(
     for (let f = 0; f <= framesElapsed; f++) {
       const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as StrobeParams;
       renderStrobe(buffer, palette, params, state);
+    }
+  } else if (effect.name === "Snow Storm") {
+    const state = createSnowStormState(buffer.width, buffer.height, paramsAt(effect, 0) as unknown as SnowStormParams, seed);
+    for (let f = 0; f <= framesElapsed; f++) {
+      const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as SnowStormParams;
+      renderSnowStorm(buffer, palette, params, state);
     }
   }
 }
@@ -345,5 +364,13 @@ function renderStatefulIncremental(
       states.set(key, state);
     }
     renderStrobe(buffer, palette, params as unknown as StrobeParams, state);
+  } else if (effect.name === "Snow Storm") {
+    const snowParams = params as unknown as SnowStormParams;
+    let state = states.get(key) as SnowStormState | undefined;
+    if (!state) {
+      state = createSnowStormState(buffer.width, buffer.height, snowParams, seed);
+      states.set(key, state);
+    }
+    renderSnowStorm(buffer, palette, snowParams, state);
   }
 }

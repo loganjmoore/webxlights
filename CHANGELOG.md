@@ -1,5 +1,17 @@
 # Changelog
 
+## Four more effects from the manual: Off, Shimmer, Fill and Snow Storm
+
+Taking the coverage inventory in order, these four are the ones that need nothing the engine doesn't already have. 25 of 55 becomes 29.
+
+- **Off** — every pixel off. The part that isn't a no-op is **Transparent**: an opaque Off hides the layers under it, which is the point when it's used to punch a gap in a sequence; a transparent one leaves them showing, which is the point when it gates another layer. Rendering nothing at all would only ever give the second.
+- **Shimmer** — lights turning rapidly on and off, with Duty Factor as the share of each cycle they're on. **Use All Colors** changes what the effect *is* rather than just its colour: the manual calls it "a pulse rather than a shimmer with the selected colors pulsing off and on in sequence", so it steps one palette colour per cycle.
+- **Fill** — fills from an edge to a position, cut into bands by Band Size and Skip Size. The direction names describe where the fill *starts*, and the manual is explicit that Left "starts at right and moves left" — the opposite of what the word suggests on its own.
+- **Snow Storm** — particles blowing rather than falling (that's Snowflakes), each leaving a fading trail. Stateful, so it runs through both the scrub and sequential-export paths. Particles wrap at the edges rather than respawning, so the storm keeps its density instead of thinning out.
+
+A pre-existing guard test — "every schema in the palette actually renders something through the pipeline" — caught Snow Storm rendering an empty frame, because it had been wired into the sequential-export path but not the scrubbing one. That test existed precisely for this and did its job.
+
+
 ## Read the xLights manual, and built the layer settings it documents
 
 All 176 pages of the [xLights manual](https://manual.xlights.org/xlights) are now catalogued in `docs/MANUAL-COVERAGE.md` — every documented feature with a status against this app. It is deliberately separate from PARITY.md: that file records what was built and how faithfully, this one records what *exists in xLights*, so a gap can't hide by never being written down. It puts the count plainly: 55 effects to our 25, 21 model types to our 12, and a Layer Settings panel we had none of.
