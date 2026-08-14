@@ -81,20 +81,23 @@ written down. Status here means:
 
 ## Chapter 4 — Built-in effects
 
-xLights ships 55 effects. We render 38.
+xLights ships 55 effects. We render 40.
 
-**Implemented (38):** Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill, Fire,
-Galaxy, Garlands, Life, Lightning, Lines, Marquee, Meteors, Off, On, Pictures, Pinwheel,
+**Implemented (40):** Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill, Fire,
+Galaxy, Garlands, Life, Lightning, Lines, Marquee, Meteors, Morph, Off, On, Pictures, Pinwheel,
 Fireworks, Music, Plasma, Ripple, Shape, Shimmer, Shockwave, Single Strand, Snow Storm,
-Snowflakes, Spirals, Spirograph, Strobe, Text, Tree, Twinkle, VU Meter, Wave.
+Snowflakes, Spirals, Spirograph, Strobe, Tendrils, Text, Tree, Twinkle, VU Meter, Wave.
 
-**Missing, and renderable with what the engine already has (5):**
-Adjust, Morph, Sketch, Tendrils, Warp.
+**Missing, and renderable with what the engine already has (1):** Sketch — the path itself is
+easy to draw; what it needs is the Effect Assist editor to *trace* one, since the manual's whole
+workflow is drawing the sketch over a background image.
 
-**Missing, needs a canvas the render pipeline doesn't have (2):** Kaleidoscope and Warp both
-modify *the layer below them* rather than drawing their own; the manual is explicit that
-Kaleidoscope "is a canvas mode effect. By itself it does nothing." That needs the layer stack to
-expose what is underneath, which it doesn't.
+**Missing, needs a canvas the render pipeline doesn't have (3):** Kaleidoscope, Warp and Adjust
+all modify *the layer below them* rather than drawing their own. The manual is explicit that
+Kaleidoscope "is a canvas mode effect. By itself it does nothing", and describes Adjust as "used
+Canvas mode to offset channel values". That needs the layer stack to expose what is underneath,
+which it doesn't. (Adjust was previously listed as renderable here — reading its own page shows
+it isn't, and it belongs with the canvas effects.)
 
 **Missing, needs a definition file (2):** Guitar (a tab/track) and State (state definitions).
 
