@@ -1,5 +1,46 @@
 # Changelog
 
+## Perspectives
+
+A saved arrangement of which panels are showing. This page has a lot of them now — Views, Presets, Regions, Preferences, Models, Timing, FPP — and getting back to a working arrangement after opening three of them is otherwise a matter of remembering which ones you had.
+
+**Applying one sets every panel**, not just the ones it lists. Restoring an arrangement means closing what it didn't have open as much as opening what it did; a half-applied arrangement isn't the arrangement.
+
+**Saving over a name replaces rather than duplicating.** Two perspectives called "Sequencing" are indistinguishable in the picker, and picking the wrong one is exactly the failure a picker exists to avoid. The list is kept sorted so its order doesn't depend on the order things were saved in.
+
+A panel name the app no longer has is dropped on load rather than restored — otherwise a panel renamed or removed since the perspective was saved would come back as one that doesn't exist.
+
+Stored per-browser, like preferences and for the same reason: an arrangement of panels belongs to the person looking at them, not to the show.
+
+
+## Layout previews, and the pixel editor
+
+**Layout previews** are a named view of *some* of the models — a way to work on the roofline without the mega tree in the way. All Models, Default and Unassigned are built in; any other preview is one the models name for themselves.
+
+A model's preview comes from its own attribute or from a **group** it belongs to, which is how a whole section of a yard moves into one in a single edit. The named list is computed from the models rather than stored: a preview with no models has nothing to show, and one that existed only in a list would linger after the last model left it. **Unassigned** exists for the same reason it does in xLights — it's what makes a model that was missed findable rather than invisible.
+
+**The pixel editor** is the matrix drawing tool: *"amend a picture or draw your own pictures or animations."* Eight colour wells, left button draws, right erases, drag to paint a stroke.
+
+It draws **straight into the Pictures effect's image**, which is where this app already stores a picture — so what's drawn renders on the model immediately, with no file to save and reload. That's the whole point of it over a paint program: the grid *is* the model. It flips y between the display and the buffer, or everything drawn would render upside down on the prop.
+
+### A control that was missing entirely
+
+Wiring the editor turned up that `decodeImageForEffect` had existed for some time **with no control anywhere in the app**. A Pictures effect could hold an image only if one had arrived with an imported sequence — there was no way to put one there. It has a file picker now, next to the editor.
+
+## Generate a Custom model from a photo, and Replace Model
+
+**Generate Custom Model** builds a model from a picture of the prop. The props that most need one — a hand-made snowflake, a wire-frame reindeer — are exactly the ones with no library entry, and hand-writing a node grid for anything past a dozen nodes is why people don't.
+
+Bright pixels become nodes, with a threshold, a grid width and all four wiring orders. Three things it gets right on purpose:
+
+- **Each cell takes the brightest pixel of the block it covers, not their average.** A single-pixel wire frame averaged over a block disappears — and a wire-frame prop is exactly what this is for.
+- **A transparent pixel is never a node**, whatever colour it nominally holds. A PNG cut-out is the most likely input, and its background is transparent rather than black; reading colour alone would fill the whole grid.
+- **All four wiring orders are offered, because the number *is* the channel order.** A prop wired back and forth but numbered straight will chase backwards on alternate rows — which looks like a broken effect rather than a mis-numbered model.
+
+A test asserts the grid it writes is one `parseCustomModelGrid` reads back. That's the whole contract of the format, and it's the kind of thing that's easy to get subtly wrong and never notice.
+
+**Replace Model** changes what a model *is* while keeping where it is and what it's wired to. Deleting and recreating loses its position, its controller assignment and its sub-models — which is most of the work that went into it. `raw_attrs` is cleared on the swap: the attributes are per-type, and a Tree's `TreeDegrees` left on an Arches model is a value nothing reads that would reappear if the type were ever changed back.
+
 ## Audio scrubbing
 
 Drag across the waveform and the track plays under the pointer. It's how a downbeat gets found by ear rather than by counting — a plain seek moves the playhead in silence, which is what makes lining effects up to music slow without this.

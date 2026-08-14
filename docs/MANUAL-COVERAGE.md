@@ -24,7 +24,7 @@ written down. Status here means:
 | Add models by drag-create | ✅ | 11-type palette |
 | Multiple model instances at once | ✅ | Clone the selected model N times in one action, each copy offset from the last so the run isn't one indistinguishable pile |
 | Copy / clone a model | ✅ | Copies geometry, sub-models and string type; deliberately **not** the controller assignment, since two models on the same channels is a show-day bug nothing errors on and a clone is exactly how you'd make one by accident |
-| Replace model | ❌ | |
+| Replace model | ✅ | Change what a model *is* while keeping where it is and what it's wired to. Deleting and recreating loses its position, its controller assignment and its sub-models — which is most of the work that went into it |
 | Model settings (per-type geometry) | ⚠️ | Only the attributes our geometry reads — see PARITY |
 | Setting start channels (auto + manual) | ⚠️ | Manual per-model start channel; no auto-allocation pass |
 | **Model types** | | xLights ships 21; we render 17 |
@@ -33,14 +33,14 @@ written down. Status here means:
 | Channel Block — per-channel "Channel Color" | ✅ | Both the model-wide default and the per-channel list. And with it the thing that actually mattered: a Channel Block now emits **one byte per channel**, not three. It drives single devices — relays, AC lights, a smoke machine — so three-per-channel had a 24-channel relay board claim 72, shifting every model after it on the controller by 48 and lighting the wrong props, silently |
 | Label | 🚫 | "A simple text model that displays a line of text directly in the layout and preview. It does not control any lights or channels" — an annotation, not a prop |
 | DMX, DMX Moving Head Advance, Servo | 🚫 | Fixture control, not pixel rendering |
-| Download / import models from the vendor library | ❌ | |
+| Download / import models from the vendor library | ❌ | Needs xLights' vendor model web service. A third-party network dependency rather than a piece of app work |
 | Model groups (add, modify, delete, rename, clone, delete-empty) | ⚠️ | Add/modify/delete/rename; no clone, no delete-empty |
 | SubModels (node range, sub-buffer) | ⚠️ | Imported, resolved to their own geometry, listed under their parent in the sequencer, rendered in both the preview and the `.fseq` export, and now **created and edited in-app** on the Layout page - with a live count of what each spec actually resolves to, since a range list is easy to get wrong by one and the symptom otherwise is a row that renders on nothing. Missing: xLights' Draw Model and Generate Slices tools |
 | Objects — 2D background image | ✅ | A photo of the house behind the 2D layout, with an opacity slider. Downscaled on the client before it is stored, since a phone photo is several megabytes and this row is read on every page load. Composited as a sibling of the canvas rather than drawn into it, so it costs nothing per drag frame |
 | Objects — Mesh (3D `.obj`) | 🚫 | No OBJ loader |
 | Objects — Grid | ✅ | Gridlines view object |
-| Objects — Pictures | ❌ | |
-| Layout previews (multiple named previews) | ❌ | One preview |
+| Objects — Pictures | ⚠️ | The Pictures *effect* now has a file picker and the pixel editor — until this, `decodeImageForEffect` existed with no control anywhere, so a Pictures effect could only hold an image that arrived with an import. Layout-level picture *objects* (decorations in the layout view) are still absent |
+| Layout previews (multiple named previews) | ✅ | All Models, Default and Unassigned, plus any preview the models name for themselves. A model's preview comes from its own attribute or from a group it's in, so a whole section moves in one edit. Named previews are computed from the models rather than stored — one that existed only in a list would linger after the last model left it |
 | Moving models: drag, linked sets, bulk rotate, align | ⚠️ | Drag and multi-drag; no linked sets, bulk rotate or align |
 
 ## Chapter 4 — Sequencer tab
@@ -76,11 +76,11 @@ written down. Status here means:
 | Views | ✅ | Named, *ordered* subsets of the sequencer's rows, with a picker in the toolbar. Saved on the layout, because the manual is explicit that "views work across sequences" — a per-sequence copy would have to be duplicated into every new sequence and would drift. The Master View isn't stored: it is "a special (system created) view" containing every row, so it is simply the absence of a selection. Missing: the eye icon that hides a model across all sequences (this app's Models panel is the per-sequence equivalent) |
 | Song structure regions | ⚠️ | Named, coloured sections of the timeline, created at the playhead or from a timing track's labels — "one region for each timing mark, using the timing mark's label as the region name". Plus the bulk action they exist for: copying one section's effects onto another, rebased on the target's start. Missing: per-region palette application, exporting a region as its own sequence, and Song Structure Views |
 | Singing faces / phoneme breakdown | 🚫 | Needs face definitions |
-| Pixel editor (matrix drawing tool) | ❌ | |
+| Pixel editor (matrix drawing tool) | ✅ | Draws straight into the Pictures effect's image, so what's drawn renders on the model immediately — no file to save and reload. Eight colour wells, left-draws/right-erases, drag to stroke. The grid is the model's own, and it flips y so a drawing doesn't render upside down |
 | Command palette | ✅ | Ctrl+Shift+K, per the manual. Searchable, ranked so a prefix match beats one buried mid-string, and every entry shows the key it also answers to — which is how anyone learns sixty shortcuts without reading a list of them |
 | Keyboard shortcuts | ✅ | Transport, timing (including **s** to split a mark), edit, zoom, and all fifteen of xLights' single-letter effect shortcuts. Case is significant, as it is in xLights — **o** is On and **O** is Off. Every shortcut and every palette entry comes from one registry, so a key can't exist without a command or a command be given a key nothing dispatches |
 | Render all / render on save | ⚠️ | We render on demand and on export |
-| Export model as video / render-and-export | ❌ | |
+| Export model as video / render-and-export | ❌ | Not blocked — the renderer already produces every frame, and `MediaRecorder` on a canvas would encode them. Simply not built yet |
 
 ## Chapter 4 — Built-in effects
 
@@ -122,14 +122,15 @@ Moving Head + Servo (DMX fixtures).
 | New sequence, sequence settings | ✅ | |
 | Preferences | ⚠️ | A Preferences panel with the settings that drive something here: time display format, default effect length, snap-to-timing marks, and the autosave interval (0 turns it off). Kept per-browser rather than with the project — a preference belongs to the person at the keyboard, and one that travelled with the show would let two people editing it change each other's. xLights' remaining Settings tabs configure machinery this app doesn't have (output devices, backup paths, services); offering them would be controls with nothing behind them, and a test asserts no such preference exists |
 | Backup and recovery | ⚠️ | Sequence version snapshots; no show-folder backup |
-| Tools — Test | ❌ | Channel test patterns against live output |
-| Tools — Convert | ❌ | Between sequence formats |
-| Tools — Generate custom model | ❌ | From a photo of the prop |
+| Tools — Test | 🚫 | Channel test patterns sent live to controllers. A browser can't open a UDP socket, so E1.31/DDP output can't come from this app at all — which is why FPP Connect uploads a `.fseq` to a player instead. Genuinely blocked rather than not done |
+| Tools — Convert | ❌ | Between sequence formats. Not blocked: this app already reads `.xsq` and writes `.fseq`, so a converter is wiring those two together without opening the sequence. Simply not built yet |
+| Tools — Generate custom model | ✅ | From a picture of the prop: bright pixels become nodes, with a threshold, a grid width, and the four wiring orders. Each cell takes the *brightest* pixel of the block it covers rather than their average — a single-pixel wire frame averaged over a block disappears, and a wire-frame prop is exactly what this is for |
 | Tools — FPP Connect | ✅ | Upload + playlist sync |
 | Tools — Lua scripting | 🚫 | |
-| View — windows, perspectives | ❌ | |
+| View — perspectives | ✅ | Saved arrangements of which panels are showing. Applying one closes what it didn't have open as well as opening what it did — a half-applied arrangement isn't the arrangement. A panel name the app no longer has is dropped on load rather than restored as a panel that doesn't exist |
+| View — windows (detachable panels) | ❌ | Not blocked: the popped-out preview already shows the pattern (a second window synced over `BroadcastChannel`), and the other panels could follow it. Simply not built yet |
 | Import — sequence, effects from another sequence | ⚠️ | `.xsq` import; no per-effect import mapping |
-| Audio menu | ❌ | |
+| Audio menu | ⚠️ | Loading and replacing a sequence's track is on the Sequencer page. xLights' menu also offers waveform-derived timing generation beyond interval/BPM, which needs onset detection this app doesn't have |
 
 ## Chapter 4 — Controllers tab
 
@@ -141,6 +142,25 @@ Moving Head + Servo (DMX fixtures).
 | Auto start-channel allocation | ✅ | First-fit packing of every unassigned model into the first active controller with room, starting after everything already there. Existing assignments are never moved — a hand-placed model is usually where it is because a physical port starts there. Reports what it couldn't place and why |
 
 ---
+
+## What is left, and why
+
+Four rows still read ❌, and they divide cleanly:
+
+**Not blocked, simply not built** — Tools > Convert (this app already reads `.xsq` and writes
+`.fseq`; a converter is wiring those together), export model as video (`MediaRecorder` over the
+frames the renderer already produces), and detachable panel windows (the popped-out preview
+already shows the pattern). Any of the three is a normal piece of work.
+
+**Blocked on something outside the app** — the vendor model library needs xLights' own web
+service, and Tools > Test needs to send E1.31/DDP live, which a browser cannot do at all: it has
+no UDP socket. That last one is why FPP Connect uploads a `.fseq` to a player instead, and it is
+marked 🚫 rather than ❌ because no amount of work here changes it.
+
+The eleven unimplemented effects are the same shape: Faces, Piano and State need face and state
+definition files; Duplicate needs to render another model's layer; Moving Head and Servo are DMX
+fixtures; Shader, Liquid, Glediator and Video were recorded as non-goals at the start and remain
+so. Every effect renderable with what this engine has is implemented.
 
 ## What this says about priorities
 

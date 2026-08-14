@@ -4,6 +4,8 @@ import { useRoute } from "vue-router";
 import {
   appliedPlacementFor,
   computeGeometryFromAttrs,
+  DEFAULT_GENERATE_OPTIONS,
+  generateCustomModel,
   GROUP_RENDER_STYLES,
   propertyFieldsFor,
   transformedHalfExtents,
@@ -16,6 +18,7 @@ import {
 import SubModelEditor from "../components/SubModelEditor.vue";
 import { allocateStartChannels, controllerLayouts, slotBarStyle, unassignedModels } from "../lib/controllerLayout";
 import { backgroundFrom, clampOpacity, prepareBackground, type BackgroundImage } from "../lib/backgroundImage";
+import { ALL_MODELS, modelsInPreview, previewNames } from "../lib/layoutPreviews";
 import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { confirm } from "../lib/confirm";
@@ -155,11 +158,32 @@ async function clearBackground(): Promise<void> {
   await api.replaceBackground(layout.value.id, null);
 }
 
+// xLights' Layout Previews: a named view of some of the models, so a roofline can be worked on
+// without the mega tree in the way. Which preview a model is in comes from the model, or from a
+// group it belongs to - so creating one is nothing more than typing a name onto a model.
+const activePreview = ref<string>(ALL_MODELS);
+const availablePreviews = computed(() => previewNames(models.value, groups.value));
+const previewModels = computed(() => modelsInPreview(models.value, groups.value, activePreview.value));
+
+async function setModelPreview(name: string): Promise<void> {
+  const model = selectedModel.value;
+  if (!layout.value || !model) return;
+  const raw_attrs = { ...model.raw_attrs };
+  // An empty name removes the attribute rather than storing "": a model with a blank preview is
+  // in none, which is what Unassigned means, and an empty string would read as a preview called
+  // nothing at all.
+  if (name.trim()) raw_attrs.Preview = name.trim();
+  else delete raw_attrs.Preview;
+  const updated = await api.updateModel(layout.value.id, model.id, { raw_attrs });
+  const idx = models.value.findIndex((m) => m.id === model.id);
+  if (idx !== -1) models.value[idx] = updated;
+}
+
 const modelFilter = ref("");
 const filteredModels = computed(() => {
   const needle = modelFilter.value.trim().toLowerCase();
-  if (!needle) return models.value;
-  return models.value.filter((m) => {
+  if (!needle) return previewModels.value;
+  return previewModels.value.filter((m) => {
     const controllerName = controllers.value.find((c) => c.id === m.controller_id)?.name ?? "";
     return [m.name, m.type, controllerName].some((field) => field.toLowerCase().includes(needle));
   });
@@ -174,6 +198,26 @@ const looseModels = computed(() => unassignedModels(models.value));
 const collisionCount = computed(() =>
   controllerViews.value.reduce((n, view) => n + view.slots.filter((s) => s.collidesWith.length > 0).length, 0),
 );
+// The types Replace can swap between: every one with a real geometry default, so a replaced
+// model renders straight away rather than becoming a placeholder.
+const MODEL_TYPES_FOR_REPLACE = [
+  "Matrix",
+  "Single Line",
+  "Poly Line",
+  "Arches",
+  "Candy Canes",
+  "Circle",
+  "Star",
+  "Tree",
+  "Icicles",
+  "Window Frame",
+  "Wreath",
+  "Spinner",
+  "Cube",
+  "Sphere",
+  "Channel Block",
+] as const;
+
 const groups = ref<ModelGroupRecord[]>([]);
 const selectedGroupId = ref<number | null>(null);
 const selectedGroup = computed(() => groups.value.find((g) => g.id === selectedGroupId.value) ?? null);
@@ -405,6 +449,74 @@ async function handleCreate(type: string, x: number, y: number): Promise<void> {
 // Copies are offset from the original rather than placed on top of it, or the whole run would be
 // one indistinguishable pile that has to be dragged apart before it can be told apart.
 const cloneCount = ref(1);
+
+// xLights' Tools > Generate Custom Model: build a Custom model from a picture of the prop. The
+// props that most need one - a hand-made snowflake, a wire-frame reindeer - are exactly the ones
+// with no library entry, and hand-writing a grid for anything past a dozen nodes is why people
+// don't.
+const generateOptions = ref({ ...DEFAULT_GENERATE_OPTIONS });
+const generateNote = ref("");
+
+async function generateFromImage(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !layout.value) return;
+  generateNote.value = "";
+  try {
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("no canvas");
+    ctx.drawImage(bitmap, 0, 0);
+    const { data } = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+    bitmap.close();
+
+    const model = generateCustomModel(data, canvas.width, canvas.height, generateOptions.value);
+    if (model.nodeCount === 0) {
+      generateNote.value = "Nothing bright enough to make a node. Try lowering the threshold.";
+      return;
+    }
+    const [created] = await api.bulkUpsertModels(layout.value.id, [
+      {
+        name: nextNameForType("Custom"),
+        type: "Custom",
+        supported: true,
+        params: {},
+        raw_attrs: { CustomModel: model.grid },
+        screen: { x: 0, y: 0, z: 0, scale: 1, rotate: 0 },
+        order: models.value.length,
+      },
+    ]);
+    if (!created) return;
+    models.value = [...models.value, created];
+    selectedIds.value = [created.id];
+    generateNote.value = `Made a ${model.width}×${model.height} model with ${model.nodeCount} nodes.`;
+  } catch {
+    // A file picker is where the wrong file gets chosen; a throw here would take the page down.
+    generateNote.value = `Couldn't read "${file.name}".`;
+  }
+}
+
+// xLights' Replace Model: change what a model *is* while keeping where it is and what it's
+// wired to. Retyping a prop by deleting and recreating loses its position, its controller
+// assignment and its sub-models - which is most of the work that went into it.
+async function replaceModelType(type: string): Promise<void> {
+  const model = selectedModel.value;
+  if (!layout.value || !model || !type || type === model.type) return;
+  // raw_attrs is cleared rather than carried: the attributes are per-type, and a Tree's
+  // TreeDegrees on an Arches model is an attribute nothing reads that would reappear if it were
+  // ever changed back. Every type has a sensible geometry default, so an empty bag renders.
+  const updated = await api.updateModel(layout.value.id, model.id, {
+    type,
+    raw_attrs: {},
+    ...(model.controller_id != null ? { channel_count: channelCountForModel({ type, raw_attrs: {} }) } : {}),
+  });
+  const idx = models.value.findIndex((m) => m.id === model.id);
+  if (idx !== -1) models.value[idx] = updated;
+}
 
 async function cloneSelectedModel(): Promise<void> {
   const source = selectedModel.value;
@@ -793,6 +905,27 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
             Clone
           </button>
           <input v-model.number="cloneCount" type="number" min="1" max="50" class="clone-count" title="How many copies" />
+          <select
+            :value="selectedModel?.type ?? ''"
+            :disabled="!selectedModel"
+            title="Change what this model is, keeping its position and wiring"
+            @change="replaceModelType(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">Replace with…</option>
+            <option v-for="t in MODEL_TYPES_FOR_REPLACE" :key="t" :value="t">{{ t }}</option>
+          </select>
+          <select v-model="activePreview" title="Which preview the layout is showing">
+            <option v-for="p in availablePreviews" :key="p" :value="p">{{ p }}</option>
+          </select>
+          <input
+            v-if="selectedModel"
+            type="text"
+            class="clone-count preview-name"
+            placeholder="In preview…"
+            :value="selectedModel.raw_attrs?.Preview ?? ''"
+            title="Which preview this model is in. Blank means none."
+            @change="setModelPreview(($event.target as HTMLInputElement).value)"
+          />
           <input v-model="modelFilter" type="search" placeholder="Filter by name, type or controller" />
           <label class="background-pick" title="A photo of the house, behind the layout">
             Backdrop
@@ -813,6 +946,35 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           <span v-if="modelFilter" class="controller-meta">{{ filteredModels.length }}/{{ models.length }}</span>
         </div>
         <p v-if="backgroundError" class="export-error">{{ backgroundError }}</p>
+        <div class="model-filter">
+          <label class="background-pick" title="Build a Custom model from a picture of the prop">
+            From photo
+            <input type="file" accept="image/*" @change="generateFromImage" />
+          </label>
+          <input
+            v-model.number="generateOptions.columns"
+            type="number"
+            min="2"
+            max="200"
+            class="clone-count"
+            title="Grid width in cells"
+          />
+          <input
+            v-model.number="generateOptions.threshold"
+            type="range"
+            min="1"
+            max="255"
+            class="background-opacity"
+            title="How bright a pixel has to be to become a node"
+          />
+          <select v-model="generateOptions.order" title="Wiring order - this is the channel order">
+            <option value="rows">Rows</option>
+            <option value="rowsZigZag">Rows, zig-zag</option>
+            <option value="columns">Columns</option>
+            <option value="columnsZigZag">Columns, zig-zag</option>
+          </select>
+        </div>
+        <p v-if="generateNote" class="controller-meta">{{ generateNote }}</p>
         <ul>
           <li
             v-for="m in filteredModels"
@@ -962,7 +1124,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           />
           <LayoutCanvas
             v-if="viewMode === '2d'"
-            :models="models"
+            :models="previewModels"
             :view-objects="viewObjects"
             :selected-ids="selectedIds"
             @select="selectedIds = $event"
@@ -972,7 +1134,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           />
           <LayoutCanvas3D
             v-else
-            :models="models"
+            :models="previewModels"
             :view-objects="viewObjects"
             :selected-model-id="selectedModelId"
             @select="selectedIds = $event === null ? [] : [$event]"
@@ -1020,6 +1182,9 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 }
 .clone-count {
   width: 3rem;
+}
+.preview-name {
+  width: 7rem;
 }
 .controller-view {
   border: 1px solid #ddd;

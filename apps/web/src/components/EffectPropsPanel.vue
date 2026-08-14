@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import {
   DEFAULT_PALETTE_HEX,
   EFFECT_SCHEMAS,
@@ -13,6 +13,7 @@ import {
   isValueCurve,
   type BlendMode,
   type ColorCurve,
+  type PictureImage,
   type StoredSwatch,
   type EffectParamSpec,
   type LayerSettings,
@@ -25,6 +26,8 @@ import {
 } from "@webxlights/engine";
 import type { EffectParamValue, SequenceEffect } from "../lib/api";
 import ColorCurveEditor from "./ColorCurveEditor.vue";
+import PixelEditor from "./PixelEditor.vue";
+import { decodeImageForEffect } from "../lib/pictureImport";
 import SketchEditor from "./SketchEditor.vue";
 import ValueCurveEditor from "./ValueCurveEditor.vue";
 
@@ -42,6 +45,27 @@ const emit = defineEmits<{
 
 const schema = computed(() => (props.effect ? EFFECT_SCHEMAS[props.effect.name] : undefined));
 const palette = computed(() => props.effect?.palette ?? DEFAULT_PALETTE_HEX);
+
+// Whether the pixel editor is showing. Off by default: it is a big control, and most visits to a
+// Pictures effect are to change how the picture moves rather than to redraw it.
+const drawing = ref(false);
+
+function imageParam(key: string): PictureImage | undefined {
+  const value = props.effect?.params[key];
+  return value && typeof value === "object" && "data" in value ? (value as PictureImage) : undefined;
+}
+
+async function pickImage(key: string, e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  try {
+    setParam(key, await decodeImageForEffect(file));
+  } catch {
+    // A file picker is where the wrong file gets chosen; a throw here reaches the error overlay.
+  }
+}
 
 function setParam(key: string, value: EffectParamValue): void {
   if (!props.effect) return;
@@ -493,6 +517,23 @@ function curveable(p: EffectParamSpec): boolean {
           trace on instead of a box to type coordinates into, which is what xLights' Effect
           Assist panel is for.
         -->
+        <!--
+          The Pictures effect's image. Two ways at it: load a file, or draw one straight onto the
+          model's own grid with the pixel editor. `decodeImageForEffect` existed but had no
+          control anywhere, so until now a Pictures effect could hold an image only if one had
+          been imported with the sequence.
+        -->
+        <template v-else-if="p.type === 'image'">
+          <input type="file" accept="image/*" @change="pickImage(p.key, $event)" />
+          <button class="draw-toggle" @click="drawing = !drawing">{{ drawing ? "Hide" : "Draw" }}</button>
+          <PixelEditor
+            v-if="drawing"
+            :image="imageParam(p.key)"
+            :width="imageParam(p.key)?.width ?? 32"
+            :height="imageParam(p.key)?.height ?? 16"
+            @update="setParam(p.key, $event)"
+          />
+        </template>
         <SketchEditor
           v-else-if="p.key === 'sketch'"
           :sketch="String(effect.params[p.key] ?? p.default)"
@@ -546,6 +587,12 @@ function curveable(p: EffectParamSpec): boolean {
   margin-top: 0.3rem;
   font-size: 0.7rem;
   padding: 0.15rem 0.4rem;
+}
+.draw-toggle {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.4rem;
+  cursor: pointer;
+  margin-left: 0.3rem;
 }
 .hint {
   margin: 0.2rem 0 0;
