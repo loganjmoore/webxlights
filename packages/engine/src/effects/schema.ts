@@ -1,5 +1,7 @@
 import { ADJUST_MODES } from "./adjust";
 import { KALEIDOSCOPE_TYPES } from "./kaleidoscope";
+import { PIANO_SOURCES, PIANO_TYPES } from "./piano";
+import { STATE_COLOR_MODES, STATE_MODES } from "./state";
 import { TENDRIL_MOVEMENTS } from "./tendrils";
 import { WARP_TREATMENTS, WARP_TYPES } from "./warp";
 
@@ -13,6 +15,13 @@ export interface EffectParamSpec {
   max?: number;
   step?: number;
   options?: string[]; // choice type only
+  /**
+   * A choice whose options aren't known until there is a sequence and a model to look at - the
+   * timing tracks this sequence has, the state definitions this model carries. The schema names
+   * the source and the props panel fills it in; an empty list is a real answer ("no timing tracks
+   * yet"), which is why it isn't just `options`.
+   */
+  optionsFrom?: "timingTracks" | "stateDefinitions";
   default: number | boolean | string;
   valueCurve?: boolean; // param accepts a ValueCurve as well as a flat number (valueCurve.ts)
 }
@@ -554,6 +563,37 @@ export const SKETCH_EFFECT_SCHEMA: EffectSchema = {
   ],
 };
 
+// The State effect (state.ts). Its two most important settings aren't sliders: which of the
+// model's state definitions drives it, and which timing track supplies the words.
+export const STATE_EFFECT_SCHEMA: EffectSchema = {
+  name: "State",
+  params: [
+    { key: "stateDefinition", label: "State Definition", type: "choice", optionsFrom: "stateDefinitions", default: "" },
+    { key: "mode", label: "Mode", type: "choice", options: [...STATE_MODES], default: "Default" },
+    { key: "useTimingTrack", label: "Use Timing Track", type: "checkbox", default: true },
+    { key: "timingTrack", label: "Timing Track", type: "choice", optionsFrom: "timingTracks", default: "" },
+    // Doubles as the countdown's starting value ("specify the starting number in the label").
+    { key: "state", label: "State / Countdown From", type: "text", default: "" },
+    { key: "colorMode", label: "Color", type: "choice", options: [...STATE_COLOR_MODES], default: "Default" },
+  ],
+};
+
+// The Piano effect (piano.ts).
+export const PIANO_EFFECT_SCHEMA: EffectSchema = {
+  name: "Piano",
+  params: [
+    { key: "notesSource", label: "Notes Source", type: "choice", options: [...PIANO_SOURCES], default: "Timing Track" },
+    { key: "timingTrack", label: "Timing Track", type: "choice", optionsFrom: "timingTracks", default: "" },
+    { key: "type", label: "Type", type: "choice", options: [...PIANO_TYPES], default: "True Piano" },
+    // 60 is C4 and 84 is C7 - two octaves, which is as much as most props have the width for.
+    { key: "startMidi", label: "Start MIDI Key", type: "intSlider", min: 1, max: 127, default: 60 },
+    { key: "endMidi", label: "End MIDI Key", type: "intSlider", min: 1, max: 127, default: 84 },
+    { key: "showSharps", label: "Show Sharps and Flats", type: "checkbox", default: true },
+    { key: "verticalScalePct", label: "Vertical Scale", type: "intSlider", min: 1, max: 100, default: 100, valueCurve: true },
+    { key: "horizontalOffsetPct", label: "Horizontal Offset", type: "intSlider", min: -100, max: 100, default: 0, valueCurve: true },
+  ],
+};
+
 export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   On: ON_EFFECT_SCHEMA,
   Bars: BARS_EFFECT_SCHEMA,
@@ -599,11 +639,18 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Warp: WARP_EFFECT_SCHEMA,
   Adjust: ADJUST_EFFECT_SCHEMA,
   Sketch: SKETCH_EFFECT_SCHEMA,
+  State: STATE_EFFECT_SCHEMA,
+  Piano: PIANO_EFFECT_SCHEMA,
 };
+
+// Effects driven by the words on a timing track rather than by their own parameters. The props
+// panel warns when one of these names a track the sequence hasn't got, because the symptom
+// otherwise is an effect that renders nothing for no visible reason.
+export const TIMING_TRACK_EFFECTS = new Set<string>(["State", "Piano"]);
 
 // Effects that read the analysed audio track rather than only their own params - the UI warns
 // when one of these is placed in a sequence with no audio loaded.
-export const AUDIO_REACTIVE_EFFECTS = new Set<string>(["VU Meter", "Music", "Fireworks", "Tendrils"]);
+export const AUDIO_REACTIVE_EFFECTS = new Set<string>(["VU Meter", "Music", "Fireworks", "Tendrils", "Piano"]);
 
 // Effects that modify the layer below rather than drawing their own. On any other blend mode
 // they are handed a blank buffer and have nothing to work on, so the props panel warns rather

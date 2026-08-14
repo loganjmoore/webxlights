@@ -7,7 +7,6 @@ import {
   computeSubModel,
   DEFAULT_PALETTE,
   geometryCenter,
-  toRenderPalette,
   nodeWorldOffset,
   planGroupRendering,
   scatterGroupColors,
@@ -18,6 +17,7 @@ import {
 } from "@webxlights/engine";
 import type { ModelGroupRecord, ModelRecord, SequenceBody } from "../lib/api";
 import { groupRenderSpecs } from "../lib/groupRendering";
+import { toRenderableEffects } from "../lib/renderableEffects";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 
 const props = defineProps<{
@@ -117,10 +117,12 @@ function updateColors(): void {
   }
 
   for (const entry of rowEntries) {
-    const rowEffects = props.body.rows
-      .filter((r) => r.elementType === "model" && r.elementId === entry.model.id)
-      .flatMap((r) => r.effects)
-      .map((e) => ({ ...e, palette: toRenderPalette(e.palette) }));
+    const rowEffects = toRenderableEffects(
+      props.body.rows
+        .filter((r) => r.elementType === "model" && r.elementId === entry.model.id)
+        .flatMap((r) => r.effects),
+      { timingTracks: props.body.timingTracks, model: entry.model },
+    );
     const nodeColors = renderRowAtMs(
       { geometry: entry.geometry, effects: rowEffects },
       props.playheadMs,
@@ -138,10 +140,15 @@ function updateColors(): void {
     for (const spec of entry.model.sub_models ?? []) {
       const sub = computeSubModel(entry.geometry, spec);
       if (!sub) continue;
-      const subEffects = props.body.rows
-        .filter((r) => r.elementType === "submodel" && r.elementId === entry.model.id && r.subName === spec.name)
-        .flatMap((r) => r.effects)
-        .map((e) => ({ ...e, palette: toRenderPalette(e.palette) }));
+      // A sub-model row gets the timing tracks but not the parent's state definitions: a state's
+      // node ranges are numbered against the model they were defined on, so applying them to a
+      // sub-model's own numbering would light the wrong nodes.
+      const subEffects = toRenderableEffects(
+        props.body.rows
+          .filter((r) => r.elementType === "submodel" && r.elementId === entry.model.id && r.subName === spec.name)
+          .flatMap((r) => r.effects),
+        { timingTracks: props.body.timingTracks },
+      );
       if (subEffects.length === 0) continue;
       const subColors = renderRowAtMs(
         { geometry: sub.geometry, effects: subEffects },

@@ -124,3 +124,37 @@ describe("SubModels", () => {
     expect(arch.subModels).toEqual([]);
   });
 });
+
+// States live inside <model> the same way, and are what the State effect turns on by name.
+describe("States", () => {
+  const xml = `<?xml version="1.0"?>
+<xrgb>
+  <models>
+    <model name="Bruno" DisplayAs="Custom" parm1="10" parm2="4" CustomModel="1,2,3,4;5,6,7,8;9,10,11,12;13,14,15,16">
+      <stateInfo Name="State1" Type="NodeRange" s2-Name="blink" s2="1,2,5,8" s1-Name="wink" s1="1,5,8" s1-Color="#FF0000" />
+      <stateInfo Name="Empty" Type="NodeRange" s1-Name="nothing" />
+    </model>
+    <model name="Arch" DisplayAs="Arches" parm1="1" parm2="20" />
+  </models>
+</xrgb>`;
+
+  it("reads a definition's states, in the order xLights numbered them", () => {
+    const bruno = parseRgbEffectsXml(xml).models.find((m) => m.name === "Bruno")!;
+    const state1 = bruno.states.find((s) => s.name === "State1")!;
+    // s1 before s2, whatever order the attributes were written in - "Allocate" hands out colours
+    // by this order, so it can't come from the file's attribute layout.
+    expect(state1.entries.map((e) => e.name)).toEqual(["wink", "blink"]);
+    expect(state1.entries[0]).toEqual({ name: "wink", nodes: "1,5,8", color: "#FF0000" });
+    expect(state1.entries[1]!.color).toBeUndefined();
+  });
+
+  it("skips a definition whose states name no nodes", () => {
+    const bruno = parseRgbEffectsXml(xml).models.find((m) => m.name === "Bruno")!;
+    expect(bruno.states.map((s) => s.name)).not.toContain("Empty");
+  });
+
+  it("gives a model with no states an empty list, not undefined", () => {
+    const arch = parseRgbEffectsXml(xml).models.find((m) => m.name === "Arch")!;
+    expect(arch.states).toEqual([]);
+  });
+});

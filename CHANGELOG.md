@@ -1,5 +1,53 @@
 # Changelog
 
+## Two effects that weren't actually blocked: State and Piano
+
+Both were recorded in the coverage doc as needing "definition files" we didn't have. Re-reading their manual pages showed that neither does.
+
+**State's** definitions are node ranges — "From the drop down box, select either Single Range or Node ranges" — which is the same notation sub-models already use, and the same parser. So a state is now a property of the model, edited on the Layout page and read from `<stateInfo>` on import. **Piano's** notes come from "a timing track source... this is the preferred option", whose labels are key letters or MIDI values. Neither needed a file format we don't have; both needed the machinery already here to be pointed at them.
+
+That is the useful part of this change: a row marked blocked is worth re-reading rather than inheriting.
+
+### What a label-driven effect needed
+
+Nothing in the engine had this shape before. Every other effect renders from its own parameters and the playhead; these two render from *words someone typed on a timing track*. Three things had to reach an effect that never had them:
+
+- **The cells of the track it names.** A timing track is marks plus a label per mark; a cell is the span between one mark and the next. Labels are paired with their marks *before* sorting, because a label belongs to the mark it was authored against — pairing after sorting silently relabels the whole track, which is a bug the song-region code had and this one has a test against.
+- **Real time.** A countdown counts real seconds, and a cell sits at an absolute millisecond; the 0..1 position an effect already gets can't stand in for either.
+- **The model's own nodes.** State lights *particular nodes by number* rather than filling a shape — it is the only effect family that addresses the model that way — so it needs to find each node's pixel in the buffer.
+
+All three arrive on the frame context, and only the effects that ask for them pay anything.
+
+### One place that resolves what a row renders
+
+Six render paths each did the same inline "copy the effect, resolve its palette" — fine while the palette was all there was to resolve. It isn't now: these effects are rendered from the sequence's timing tracks and the model's state definitions, and a preview that resolved them differently from the export would put a different show in the yard than on the screen. All six now go through one function.
+
+A sub-model row gets the timing tracks but *not* its parent's states: a state's node numbers are counted against the model they were defined on, so applying them to a sub-model's own numbering would light the wrong nodes.
+
+### State
+
+All four modes. **Default** follows the track — the label at the playhead is the state, which is how a lyric or phoneme track drives a prop. **Iterate** ignores where the cells fall and loops the labels evenly across the effect, per the manual's "loop around equally for the timespan duration selected". **Countdown** counts down to zero across the effect and **Time Countdown** counts real seconds from a written time, both spelling the number out in seven-segment digit states — 123 becomes `100,20,3`, exactly as the manual tells you to type it by hand.
+
+Zeros are lit: counting down through 100 has to light both right-hand zeros or the sign reads as a bare "1".
+
+All four colour modes (Graduate, Cycle, Allocate, Number), and Force Custom Colors per state, which beats every mode.
+
+### Piano
+
+Both types. **True Piano** draws a keyboard — whites carrying the layout, blacks narrower and sitting on the seams — so it's a key you can point at rather than a bar chart; it draws the keyboard even when nothing is playing, which is what makes it one. **Bars** draws only what's playing, which is what reads from across a yard.
+
+Labels parse in the manual's three forms: MIDI codes, `C4`/`c#4`, and a bare `C` "assumed to be 4th octave", separated by space, comma or colon. The note-and-octave form fixes the numbering at C4 = 60, so `C4` and `60` name the same key — the manual's table says 64 is Middle C, which would put its own two forms a third apart and disagree with every MIDI file a sequence might be built from.
+
+With no track, the analysed spectrum drives the keys, which is the manual's own "modulate based on the beat and frequency of the sequence audio" — and keeps the effect useful on a song nobody has transcribed. MIDI *file* import is the thing still missing here, not the effect.
+
+### The state editor
+
+On the Layout page, beside the sub-model editor. Up to the manual's 40 states per definition, each showing live how many nodes it resolves to and how many are past the end of the model — the two ways a range list fails silently.
+
+One button adds a whole seven-segment set: the 42 predefined names (`1`–`0`, `00`–`90`, `100`–`900`, `1000`–`9000`, `Colon`, `Dot`). The names are fixed by the manual and only the node ranges are yours, so typing them out by hand was 42 rows of chore standing between someone and a countdown sign.
+
+The props panel warns when a State or Piano effect isn't pointed at a track this sequence has — the same silence the canvas-mode warning covers, and worth the same line of UI.
+
 ## Re-read all 176 manual pages, and found a tab we'd never named
 
 The coverage doc was built by reading the whole manual once. I re-fetched every one of the 176 indexed pages — **88,710 words** — and audited the doc against them rather than against my memory of them.

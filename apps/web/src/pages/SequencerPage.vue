@@ -180,6 +180,19 @@ const pxPerMs = computed(() => {
 
 const selectedEffect = computed(() => (store.selectedEffectId ? store.findEffect(store.selectedEffectId) : null));
 
+// What the label-driven effects (State, Piano) can be pointed at. The timing tracks belong to the
+// sequence; the state definitions belong to the model under the row the selected effect is on, so
+// a State effect on one prop never offers another prop's states.
+const timingTrackNames = computed(() => store.body.timingTracks.map((t) => t.name));
+const selectedEffectModel = computed(() => {
+  const id = store.selectedEffectId;
+  if (!id) return null;
+  const row = store.body.rows.find((r) => r.effects.some((e) => e.id === id));
+  if (!row || row.elementType === "group") return null;
+  return modelRecords.value.find((m) => m.id === row.elementId) ?? null;
+});
+const stateDefinitionNames = computed(() => (selectedEffectModel.value?.states ?? []).map((s) => s.name));
+
 function rowKey(row: GridRow): string {
   return `${row.elementType}:${row.elementId}:${row.subName ?? ""}`;
 }
@@ -1484,6 +1497,8 @@ watch(sequenceId, async (id) => {
       <aside class="props">
         <EffectPropsPanel
           :effect="selectedEffect"
+          :timing-track-names="timingTrackNames"
+          :state-definition-names="stateDefinitionNames"
           @update="handleParamsUpdate"
           @update-palette="handlePaletteUpdate"
           @update-blend="handleBlendUpdate"

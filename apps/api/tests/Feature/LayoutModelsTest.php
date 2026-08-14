@@ -166,6 +166,72 @@ class LayoutModelsTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_states_can_be_edited_on_a_model(): void
+    {
+        // The in-app state editor. A state is a named set of the model's nodes that the State
+        // effect turns on by name, and the whole feature is unusable without somewhere to define
+        // them - importing is the only other route in.
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_id' => $user->id]);
+        $layout = $project->layouts()->create(['name' => 'Layout']);
+        $model = $layout->models()->create(['name' => 'Bruno', 'type' => 'Custom', 'supported' => true]);
+
+        $this->actingAs($user)->patchJson("/api/v1/layouts/{$layout->id}/models/{$model->id}", [
+            'states' => [
+                [
+                    'name' => 'State1',
+                    'entries' => [
+                        ['name' => 'wink', 'nodes' => '1,5,8', 'color' => '#ff0000'],
+                        ['name' => 'blink', 'nodes' => '1-2,5,8'],
+                    ],
+                ],
+            ],
+        ])->assertOk();
+
+        $fresh = $model->fresh();
+        $this->assertCount(1, $fresh->states);
+        // The whole definition survives the round trip - the earlier preset bug was exactly this:
+        // rules on the nested keys only, and Laravel returning nothing for the parent.
+        $this->assertSame('wink', $fresh->states[0]['entries'][0]['name']);
+        $this->assertSame('1,5,8', $fresh->states[0]['entries'][0]['nodes']);
+        $this->assertSame('#ff0000', $fresh->states[0]['entries'][0]['color']);
+        $this->assertArrayNotHasKey('color', $fresh->states[0]['entries'][1]);
+    }
+
+    public function test_a_state_without_node_ranges_is_rejected(): void
+    {
+        // A state that names no nodes turns nothing on, so it would save and then look like the
+        // effect was broken rather than the definition.
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_id' => $user->id]);
+        $layout = $project->layouts()->create(['name' => 'Layout']);
+        $model = $layout->models()->create(['name' => 'Bruno', 'type' => 'Custom', 'supported' => true]);
+
+        $this->actingAs($user)
+            ->patchJson("/api/v1/layouts/{$layout->id}/models/{$model->id}", [
+                'states' => [['name' => 'State1', 'entries' => [['name' => 'wink']]]],
+            ])
+            ->assertStatus(422);
+    }
+
+    public function test_bulk_import_carries_state_definitions(): void
+    {
+        // States arrive from an xlights_rgbeffects.xml the same way sub-models do.
+        $user = User::factory()->create();
+        $layout = Layout::factory()->for($user->projects()->create(['name' => 'Show']))->create();
+
+        $this->actingAs($user)->postJson("/api/v1/layouts/{$layout->id}/models/bulk", [
+            'models' => [[
+                'name' => 'Bruno',
+                'type' => 'Custom',
+                'states' => [['name' => 'State1', 'entries' => [['name' => 'wink', 'nodes' => '1,5,8']]]],
+            ]],
+        ])->assertCreated();
+
+        $model = $layout->fresh()->models->firstWhere('name', 'Bruno');
+        $this->assertSame('wink', $model->states[0]['entries'][0]['name']);
+    }
+
     public function test_deleting_a_model_group_removes_it(): void
     {
         $user = User::factory()->create();

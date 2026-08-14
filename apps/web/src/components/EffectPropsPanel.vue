@@ -5,6 +5,7 @@ import {
   EFFECT_SCHEMAS,
   BLEND_MODES,
   CANVAS_ONLY_EFFECTS,
+  TIMING_TRACK_EFFECTS,
   LAYER_TRANSFORMS,
   RENDER_STYLES,
   PATTERNED_TRANSITION_TYPES,
@@ -34,7 +35,13 @@ import ValueCurveEditor from "./ValueCurveEditor.vue";
 const MAX_COLORS = 6; // matches real xLights' Color tab swatch count
 
 
-const props = defineProps<{ effect: SequenceEffect | null }>();
+const props = defineProps<{
+  effect: SequenceEffect | null;
+  // Choices the schema can't know: the timing tracks this sequence has, and the state definitions
+  // the model under this row carries. Both are named by the label-driven effects.
+  timingTrackNames?: string[];
+  stateDefinitionNames?: string[];
+}>();
 const emit = defineEmits<{
   update: [params: Record<string, EffectParamValue>];
   updatePalette: [palette: StoredSwatch[]];
@@ -133,6 +140,25 @@ function setTransitionMs(field: "inDurationMs" | "outDurationMs", ms: string): v
 const needsCanvas = computed(
   () => !!props.effect && CANVAS_ONLY_EFFECTS.has(props.effect.name) && props.effect.blendMode !== "Canvas",
 );
+
+// A choice whose options come from the sequence rather than the schema (schema.ts's optionsFrom).
+function optionsFor(p: EffectParamSpec): string[] {
+  if (p.optionsFrom === "timingTracks") return props.timingTrackNames ?? [];
+  if (p.optionsFrom === "stateDefinitions") return props.stateDefinitionNames ?? [];
+  return p.options ?? [];
+}
+
+// State and Piano render nothing at all until they are pointed at a track that exists - the same
+// silence the canvas warning covers, and worth the same line of UI.
+const missingTimingTrack = computed(() => {
+  const effect = props.effect;
+  if (!effect || !TIMING_TRACK_EFFECTS.has(effect.name)) return false;
+  // A State effect told not to use a track is driven by its own State field instead.
+  if (effect.name === "State" && effect.params.useTimingTrack === false) return false;
+  if (effect.name === "Piano" && effect.params.notesSource === "Audio") return false;
+  const chosen = effect.params.timingTrack;
+  return typeof chosen !== "string" || !chosen || !(props.timingTrackNames ?? []).includes(chosen);
+});
 
 const transition = computed<TransitionSpec>(() => props.effect?.transition ?? {});
 // Blinds/Slide Bars/Checkerboard are the types whose "adjust" knob means anything (it sets the
@@ -276,6 +302,10 @@ function curveable(p: EffectParamSpec): boolean {
           Suppress hides an effect's first frames while it keeps running underneath, which is how
           an effect with unwanted opening frames is warmed up. Freeze holds one frame for the rest
           of the effect; -1 is off.
+        </p>
+        <p v-if="missingTimingTrack" class="hint warn">
+          {{ effect.name }} is driven by the labels on a timing track, and this one isn't pointed
+          at a track this sequence has. Until it is, the effect renders nothing.
         </p>
         <p v-if="needsCanvas" class="hint warn">
           {{ effect.name }} modifies the layer below it rather than drawing its own, so it needs
@@ -510,7 +540,11 @@ function curveable(p: EffectParamSpec): boolean {
           :value="effect.params[p.key] ?? p.default"
           @change="setParam(p.key, ($event.target as HTMLSelectElement).value)"
         >
-          <option v-for="opt in p.options" :key="opt" :value="opt">{{ opt }}</option>
+          <!-- A dynamic list can legitimately be empty (no timing tracks yet), and the current
+               value can name something that has since been renamed away - both need to be
+               visible rather than silently reset to the first option. -->
+          <option v-if="p.optionsFrom" value="">—</option>
+          <option v-for="opt in optionsFor(p)" :key="opt" :value="opt">{{ opt }}</option>
         </select>
         <!--
           Sketch's path is text in the schema, but it is a *drawing* - so it gets a canvas to

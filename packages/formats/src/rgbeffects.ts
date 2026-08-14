@@ -49,11 +49,20 @@ export interface ParsedSubModel {
   vertical: boolean;
 }
 
+// A named set of a model's nodes that the State effect turns on by name - "wink", "eyesleft",
+// the digits of a seven segment sign. Stored as <stateInfo> elements inside <model>, so the
+// attribute bag never carried them either.
+export interface ParsedStateDefinition {
+  name: string;
+  entries: { name: string; nodes: string; color?: string }[];
+}
+
 export interface ParsedModel {
   name: string;
   displayAs: string;
   supported: boolean;
   subModels: ParsedSubModel[];
+  states: ParsedStateDefinition[];
   // Every XML attribute verbatim (typed-prefix attribute bag, matches xLights' own
   // SettingsMap approach and the jsonb `params` column it maps to).
   attrs: Record<string, string>;
@@ -121,6 +130,38 @@ function parseSubModels(model: Record<string, unknown>): ParsedSubModel[] {
   return out;
 }
 
+// xLights numbers a state definition's entries: sN-Name is the word the timing track says, sN
+// is that state's node ranges, and sN-Color is the forced colour if "Force Custom Colors" was on.
+//
+// Anything shaped differently yields no entries rather than a guess - a wrongly-read state lights
+// the wrong nodes on the night, which is worse than a definition the editor shows as empty.
+function parseStates(model: Record<string, unknown>): ParsedStateDefinition[] {
+  const raw = asArray<Record<string, string>>(model.stateInfo as never);
+  const out: ParsedStateDefinition[] = [];
+  for (const info of raw) {
+    if (!info || typeof info !== "object") continue;
+    const numbered: { index: number; entry: ParsedStateDefinition["entries"][number] }[] = [];
+    for (const [key, value] of Object.entries(info)) {
+      const match = /^s(\d+)-Name$/.exec(key);
+      if (!match || value === undefined || value === null || `${value}` === "") continue;
+      const nodes = info[`s${match[1]}`];
+      if (nodes === undefined || `${nodes}` === "") continue; // a named state with no nodes turns nothing on
+      const color = info[`s${match[1]}-Color`];
+      numbered.push({
+        index: Number(match[1]),
+        entry: { name: `${value}`, nodes: `${nodes}`, ...(color ? { color: `${color}` } : {}) },
+      });
+    }
+    // Ordered by the number xLights gave each state, not by the order the attributes happen to
+    // be written in: the State effect's "Allocate" colour mode hands out colours by that order.
+    numbered.sort((a, b) => a.index - b.index);
+    const entries = numbered.map((n) => n.entry);
+    if (entries.length === 0) continue;
+    out.push({ name: info.Name ?? info.name ?? "", entries });
+  }
+  return out;
+}
+
 export function parseRgbEffectsXml(xml: string): ParsedRgbEffects {
   const doc = parser.parse(xml);
   const root = doc.xrgb;
@@ -135,7 +176,14 @@ export function parseRgbEffectsXml(xml: string): ParsedRgbEffects {
     const displayAs = LEGACY_DISPLAY_AS[rawDisplayAs] ?? rawDisplayAs;
     const supported = (SUPPORTED_DISPLAY_AS as readonly string[]).includes(displayAs);
     if (!supported) unsupported.add(displayAs);
-    models.push({ name: m.name ?? "", displayAs, supported, subModels: parseSubModels(m), attrs: m });
+    models.push({
+      name: m.name ?? "",
+      displayAs,
+      supported,
+      subModels: parseSubModels(m),
+      states: parseStates(m),
+      attrs: m,
+    });
   }
 
   const rawGroups = asArray<Record<string, string>>(root.modelGroups?.modelGroup);

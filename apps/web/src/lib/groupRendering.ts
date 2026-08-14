@@ -1,5 +1,6 @@
-import { toRenderPalette, type GroupRenderSpec, type ModelGeometry } from "@webxlights/engine";
+import type { GroupRenderSpec, ModelGeometry } from "@webxlights/engine";
 import type { ModelGroupRecord, SequenceBody } from "./api";
+import { toRenderableEffects } from "./renderableEffects";
 
 // Turns this app's stored records into what the engine needs to render a group row.
 //
@@ -22,9 +23,11 @@ export function groupRenderSpecs(
     members: group.members
       .map((m) => ({ modelId: m.id, geometry: geometryByModelId.get(m.id) }))
       .filter((m): m is { modelId: number; geometry: ModelGeometry } => !!m.geometry),
-    effects: body.rows
-      .filter((r) => r.elementType === "group" && r.elementId === group.id)
-      .flatMap((r) => r.effects)
-      .map((e) => ({ ...e, palette: toRenderPalette(e.palette) })),
+    // A group has no state definitions of its own - states are defined on a model - so a group
+    // row gets the timing tracks and nothing else.
+    effects: toRenderableEffects(
+      body.rows.filter((r) => r.elementType === "group" && r.elementId === group.id).flatMap((r) => r.effects),
+      { timingTracks: body.timingTracks },
+    ),
   }));
 }

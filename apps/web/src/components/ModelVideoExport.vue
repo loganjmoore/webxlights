@@ -4,11 +4,11 @@ import {
   DEFAULT_PALETTE,
   computeGeometryFromAttrs,
   createRowSequencer,
-  toRenderPalette,
   type AudioSeries,
 } from "@webxlights/engine";
 import type { ModelRecord, SequenceBody, SequenceRecord } from "../lib/api";
 import { canExportVideo, downloadVideo, pickMimeType, recordCanvas } from "../lib/videoExport";
+import { toRenderableEffects } from "../lib/renderableEffects";
 
 // xLights' Export Model as Video. It answers the question the house preview can't: "what will
 // this prop actually look like?", as something you can send to someone who isn't at the app.
@@ -61,10 +61,10 @@ async function exportVideo(): Promise<void> {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const effects = props.body.rows
-    .filter((r) => r.elementType === "model" && r.elementId === model.id)
-    .flatMap((r) => r.effects)
-    .map((e) => ({ ...e, palette: toRenderPalette(e.palette) }));
+  const effects = toRenderableEffects(
+    props.body.rows.filter((r) => r.elementType === "model" && r.elementId === model.id).flatMap((r) => r.effects),
+    { timingTracks: props.body.timingTracks, model },
+  );
 
   // One sequencer for the whole export, called in order - the same reason the .fseq export uses
   // one: a fresh renderRowAtMs per frame replays every stateful effect from its start each time,

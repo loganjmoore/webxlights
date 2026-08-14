@@ -52,7 +52,10 @@ import { renderWarp, type WarpParams } from "./effects/warp";
 import { renderAdjust, type AdjustParams } from "./effects/adjust";
 import { renderSketch, type SketchParams } from "./effects/sketch";
 import { createTendrilsState, renderTendrils, type TendrilsParams, type TendrilsState } from "./effects/tendrils";
-import type { FrameContext } from "./effects/types";
+import { renderState, type StateParams } from "./effects/state";
+import { renderPiano, type PianoParams } from "./effects/piano";
+import type { EffectData, FrameContext } from "./effects/types";
+import type { ModelNode } from "./models/types";
 import { resolveParamsAtPosition } from "./valueCurve";
 import {
   acrossAt,
@@ -84,6 +87,10 @@ export interface RenderableEffect {
   // the effect and the model, so they apply to every effect without any effect knowing
   // (layerSettings.ts).
   layer?: LayerSettings;
+  // What the label-driven effects (State, Piano) need and their parameters can't carry: the cells
+  // of the timing track this effect names, and the model's own state definitions. Resolved by the
+  // caller, because a row renders in isolation and knows nothing of the sequence around it.
+  data?: EffectData;
 }
 
 export interface RenderableRow {
@@ -137,6 +144,7 @@ function renderStateless(
   atMs: number,
   seed: number,
   audio: AudioSeries | undefined,
+  nodes?: readonly ModelNode[],
 ): void {
   const palette = rowPalette; // already resolved for this frame and position (colorCurve.ts)
   const positionInEffect01 = positionOf(effect, atMs);
@@ -148,10 +156,20 @@ function renderStateless(
     positionInEffect01,
     seed,
     audio: audio ? audioFrameAt(audio, atMs) : undefined,
+    // The label-driven effects need real time and real nodes; everything else ignores both.
+    clock: { atMs, startMs: effect.startMs, endMs: effect.endMs },
+    data: effect.data,
+    nodes,
   };
   const params = paramsAt(effect, positionInEffect01);
 
   switch (effect.name) {
+    case "State":
+      renderState(buffer, palette, params as unknown as StateParams, ctx);
+      break;
+    case "Piano":
+      renderPiano(buffer, palette, params as unknown as PianoParams, ctx);
+      break;
     case "Off":
       renderOff(buffer, params as unknown as OffParams);
       break;
@@ -351,11 +369,12 @@ function renderPersistent(
   frameMs: number,
   seed: number,
   audio: AudioSeries | undefined,
+  nodes?: readonly ModelNode[],
 ): void {
   const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
   const cap = Math.min(framesElapsed, MAX_PERSISTENT_FRAMES);
   for (let f = framesElapsed - cap; f <= framesElapsed; f++) {
-    renderStateless(buffer, palette, effect, effect.startMs + f * frameMs, seed, audio);
+    renderStateless(buffer, palette, effect, effect.startMs + f * frameMs, seed, audio, nodes);
   }
 }
 
@@ -439,28 +458,31 @@ export function renderRowAtMs(
     return row.geometry.nodes.map(() => rgba(0, 0, 0, 0));
   }
 
-  const layers: NodeLayerSpec[] = active.map((effect) => ({
+  const layers: NodeLayerSpec[] = active.map((effect) => {
     // The render style reshapes the buffer this effect draws into, and re-points the nodes at
     // it (renderStyle.ts). Nothing in the effect changes.
-    geometry: applyRenderStyle(row.geometry, effect.layer?.renderStyle),
-    render: (buffer: RenderBuffer) => {
-      // Layer settings wrap the effect rather than post-processing the model: a sub-buffer hands
-      // the effect a smaller canvas to compose itself into, instead of cropping a full-size
-      // render down to it (layerSettings.ts).
-      const shownAt = frameControlledMs(effect, atMs, frameMs);
-      if (shownAt === null) return; // suppressed for now: the layer renders as nothing
-      renderWithLayerSettings(buffer, effect.layer, (target) => {
-        renderWithColorCurves(target, effect.palette ?? palette, positionOf(effect, shownAt), (paint, colors) => {
-          if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(paint, colors, effect, shownAt, frameMs, seed, audio);
-          else if (effect.layer?.persistent) renderPersistent(paint, colors, effect, shownAt, frameMs, seed, audio);
-          else renderStateless(paint, colors, effect, shownAt, seed, audio);
+    const geometry = applyRenderStyle(row.geometry, effect.layer?.renderStyle);
+    return {
+      geometry,
+      render: (buffer: RenderBuffer) => {
+        // Layer settings wrap the effect rather than post-processing the model: a sub-buffer hands
+        // the effect a smaller canvas to compose itself into, instead of cropping a full-size
+        // render down to it (layerSettings.ts).
+        const shownAt = frameControlledMs(effect, atMs, frameMs);
+        if (shownAt === null) return; // suppressed for now: the layer renders as nothing
+        renderWithLayerSettings(buffer, effect.layer, (target) => {
+          renderWithColorCurves(target, effect.palette ?? palette, positionOf(effect, shownAt), (paint, colors) => {
+            if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(paint, colors, effect, shownAt, frameMs, seed, audio);
+            else if (effect.layer?.persistent) renderPersistent(paint, colors, effect, shownAt, frameMs, seed, audio, geometry.nodes);
+            else renderStateless(paint, colors, effect, shownAt, seed, audio, geometry.nodes);
+          });
+          if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
         });
-        if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
-      });
-    },
-    blendMode: effect.blendMode ?? "Normal",
-    effectMixThreshold: mixFor(effect, atMs),
-  }));
+      },
+      blendMode: effect.blendMode ?? "Normal",
+      effectMixThreshold: mixFor(effect, atMs),
+    };
+  });
 
   return renderLayerStackToNodes(row.geometry.nodes.length, layers);
 }
@@ -502,38 +524,41 @@ export function createRowSequencer(
       return row.geometry.nodes.map(() => rgba(0, 0, 0, 0));
     }
 
-    const layers: NodeLayerSpec[] = activeWithIndex.map(({ effect, index }) => ({
-      geometry: applyRenderStyle(row.geometry, effect.layer?.renderStyle),
-      render: (buffer: RenderBuffer) => {
-        const shownAt = frameControlledMs(effect, atMs, frameMs);
-        if (shownAt === null) return; // suppressed for now: the layer renders as nothing
-        renderWithLayerSettings(buffer, effect.layer, (target) => {
-          renderWithColorCurves(target, effect.palette ?? palette, positionOf(effect, shownAt), (paint, colors) => {
-            if (STATEFUL_EFFECTS.has(effect.name)) {
-              renderStatefulIncremental(paint, colors, effect, shownAt, frameMs, seed, index, statefulStates, audio);
-            } else if (effect.layer?.persistent) {
-              // Sequential export walks the frames in order anyway, so persistence here is just a
-              // matter of keeping the buffer around instead of replaying into a fresh one.
-              const key = `persist:${index}`;
-              let kept = statefulStates.get(key) as RenderBuffer | undefined;
-              if (!kept || kept.width !== paint.width || kept.height !== paint.height) {
-                kept = new RenderBuffer(paint.width, paint.height);
-                statefulStates.set(key, kept);
+    const layers: NodeLayerSpec[] = activeWithIndex.map(({ effect, index }) => {
+      const geometry = applyRenderStyle(row.geometry, effect.layer?.renderStyle);
+      return {
+        geometry,
+        render: (buffer: RenderBuffer) => {
+          const shownAt = frameControlledMs(effect, atMs, frameMs);
+          if (shownAt === null) return; // suppressed for now: the layer renders as nothing
+          renderWithLayerSettings(buffer, effect.layer, (target) => {
+            renderWithColorCurves(target, effect.palette ?? palette, positionOf(effect, shownAt), (paint, colors) => {
+              if (STATEFUL_EFFECTS.has(effect.name)) {
+                renderStatefulIncremental(paint, colors, effect, shownAt, frameMs, seed, index, statefulStates, audio);
+              } else if (effect.layer?.persistent) {
+                // Sequential export walks the frames in order anyway, so persistence here is just a
+                // matter of keeping the buffer around instead of replaying into a fresh one.
+                const key = `persist:${index}`;
+                let kept = statefulStates.get(key) as RenderBuffer | undefined;
+                if (!kept || kept.width !== paint.width || kept.height !== paint.height) {
+                  kept = new RenderBuffer(paint.width, paint.height);
+                  statefulStates.set(key, kept);
+                }
+                renderStateless(kept, colors, effect, shownAt, seed, audio, geometry.nodes);
+                for (let y = 0; y < paint.height; y++) {
+                  for (let x = 0; x < paint.width; x++) paint.setPixel(x, y, kept.getPixel(x, y));
+                }
+              } else {
+                renderStateless(paint, colors, effect, shownAt, seed, audio, geometry.nodes);
               }
-              renderStateless(kept, colors, effect, shownAt, seed, audio);
-              for (let y = 0; y < paint.height; y++) {
-                for (let x = 0; x < paint.width; x++) paint.setPixel(x, y, kept.getPixel(x, y));
-              }
-            } else {
-              renderStateless(paint, colors, effect, shownAt, seed, audio);
-            }
+            });
+            if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
           });
-          if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
-        });
-      },
-      blendMode: effect.blendMode ?? "Normal",
-      effectMixThreshold: mixFor(effect, atMs),
-    }));
+        },
+        blendMode: effect.blendMode ?? "Normal",
+        effectMixThreshold: mixFor(effect, atMs),
+      };
+    });
 
     return renderLayerStackToNodes(row.geometry.nodes.length, layers);
   }
