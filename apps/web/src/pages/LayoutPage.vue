@@ -14,7 +14,7 @@ import {
   type SubModelSpec,
 } from "@webxlights/engine";
 import SubModelEditor from "../components/SubModelEditor.vue";
-import { controllerLayouts, slotBarStyle, unassignedModels } from "../lib/controllerLayout";
+import { allocateStartChannels, controllerLayouts, slotBarStyle, unassignedModels } from "../lib/controllerLayout";
 import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { confirm } from "../lib/confirm";
@@ -119,6 +119,18 @@ const renameValue = ref("");
 // M15.5: Model Groups editor - previously import-only (bulkUpsertModelGroups, resolves
 // membership by name), no path to create/rename/re-member/delete a group from the app itself.
 const activeTab = ref<"models" | "groups" | "controllers">("models");
+
+// xLights filters its model list by name, type and controller. A show has a hundred-odd models,
+// so scrolling for one is the single most repeated action on this page.
+const modelFilter = ref("");
+const filteredModels = computed(() => {
+  const needle = modelFilter.value.trim().toLowerCase();
+  if (!needle) return models.value;
+  return models.value.filter((m) => {
+    const controllerName = controllers.value.find((c) => c.id === m.controller_id)?.name ?? "";
+    return [m.name, m.type, controllerName].some((field) => field.toLowerCase().includes(needle));
+  });
+});
 
 // xLights' controller visualiser: what is plugged in where. The reason to have it isn't the
 // picture - it is that two models on overlapping channels is a show-day bug nothing else in this
@@ -351,6 +363,68 @@ async function handleCreate(type: string, x: number, y: number): Promise<void> {
   if (!created) return;
   models.value = [...models.value, created];
   selectedIds.value = [created.id];
+}
+
+// xLights can clone a model, and create N instances in one action. Both matter for the same
+// reason: a run of identical props - twelve mini-trees, eight arches - is set up once and then
+// repeated, and doing that by hand means twelve trips through the property grid.
+//
+// Copies are offset from the original rather than placed on top of it, or the whole run would be
+// one indistinguishable pile that has to be dragged apart before it can be told apart.
+const cloneCount = ref(1);
+
+async function cloneSelectedModel(): Promise<void> {
+  const source = selectedModel.value;
+  if (!layout.value || !source) return;
+  const copies = Math.max(1, Math.min(50, Math.trunc(cloneCount.value)));
+  const spacing = 8; // local units, roughly a prop's width apart
+
+  const payloads = Array.from({ length: copies }, (_, i) => ({
+    name: nextNameForType(source.type),
+    type: source.type,
+    supported: source.supported,
+    params: { ...source.params },
+    raw_attrs: { ...source.raw_attrs },
+    screen: { ...source.screen, x: (source.screen.x ?? 0) + spacing * (i + 1) },
+    sub_models: source.sub_models ?? [],
+    string_type: source.string_type,
+    // Deliberately not copied: the controller assignment. Two models on the same channels is a
+    // show-day bug that nothing errors on, and a clone is exactly how you would create one by
+    // accident. The new copies come out unassigned, ready for auto-allocation.
+    order: models.value.length + i,
+  }));
+
+  // Names are generated one at a time from what already exists, so a batch would otherwise give
+  // every copy the same name.
+  const created: ModelRecord[] = [];
+  for (const payload of payloads) {
+    const [model] = await api.bulkUpsertModels(layout.value.id, [{ ...payload, name: nextNameForType(source.type) }]);
+    if (model) {
+      created.push(model);
+      models.value = [...models.value, model];
+    }
+  }
+  if (created.length) selectedIds.value = created.map((m) => m.id);
+}
+
+// xLights' auto start-channel allocation. Pairs with the collision view above: run it and the
+// visualiser should have nothing left to complain about.
+const allocationNote = ref("");
+async function autoAllocateChannels(): Promise<void> {
+  if (!layout.value) return;
+  const { allocations, unplaced } = allocateStartChannels(controllers.value, models.value, channelCountForModel);
+  for (const a of allocations) {
+    const updated = await api.updateModel(layout.value.id, a.modelId, {
+      controller_id: a.controllerId,
+      controller_offset: a.controllerOffset,
+      channel_count: a.channelCount,
+    });
+    const idx = models.value.findIndex((m) => m.id === a.modelId);
+    if (idx !== -1) models.value[idx] = updated;
+  }
+  allocationNote.value = unplaced.length
+    ? `Assigned ${allocations.length}. No room for: ${unplaced.map((u) => `${u.model.name} (${u.reason})`).join(", ")}`
+    : `Assigned ${allocations.length} model${allocations.length === 1 ? "" : "s"}.`;
 }
 
 // The necessary complement to create (see GOAL-M13.md) - a mis-dropped or duplicate model has
@@ -615,6 +689,12 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
               <li v-if="view.slots.length === 0" class="empty">Nothing assigned to this controller.</li>
             </ul>
           </div>
+          <div class="controller-head">
+            <button :disabled="controllers.length === 0 || looseModels.length === 0" @click="autoAllocateChannels">
+              Auto-assign start channels
+            </button>
+            <span v-if="allocationNote" class="controller-meta">{{ allocationNote }}</span>
+          </div>
           <p v-if="controllers.length === 0" class="empty">No controllers in this project yet.</p>
           <div v-if="looseModels.length" class="controller-view">
             <div class="controller-head"><strong>Not assigned to a controller</strong></div>
@@ -674,9 +754,17 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
         </template>
 
         <template v-else>
+        <div class="model-filter">
+          <button :disabled="!selectedModel" title="Copy the selected model" @click="cloneSelectedModel">
+            Clone
+          </button>
+          <input v-model.number="cloneCount" type="number" min="1" max="50" class="clone-count" title="How many copies" />
+          <input v-model="modelFilter" type="search" placeholder="Filter by name, type or controller" />
+          <span v-if="modelFilter" class="controller-meta">{{ filteredModels.length }}/{{ models.length }}</span>
+        </div>
         <ul>
           <li
-            v-for="m in models"
+            v-for="m in filteredModels"
             :key="m.id"
             :class="{ unsupported: !m.supported, selected: selectedIds.includes(m.id) }"
             @click="selectFromList(m, $event)"
@@ -833,6 +921,19 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 </template>
 
 <style scoped>
+.model-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.3rem;
+}
+.model-filter input[type="search"] {
+  flex: 1;
+  min-width: 0;
+}
+.clone-count {
+  width: 3rem;
+}
 .controller-view {
   border: 1px solid #ddd;
   border-radius: 4px;

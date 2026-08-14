@@ -20,10 +20,10 @@ written down. Status here means:
 | Feature | Status | Notes |
 |---|---|---|
 | Model list, rename, delete, undo | ⚠️ | Rename and delete yes; no undo stack on the Layout tab |
-| Filter the model list | ❌ | xLights filters by name/type/controller; ours is an unfiltered list |
+| Filter the model list | ✅ | By name, type or controller name — the three xLights offers |
 | Add models by drag-create | ✅ | 11-type palette |
-| Multiple model instances at once | ❌ | xLights can create N copies in one action |
-| Copy / clone a model | ❌ | |
+| Multiple model instances at once | ✅ | Clone the selected model N times in one action, each copy offset from the last so the run isn't one indistinguishable pile |
+| Copy / clone a model | ✅ | Copies geometry, sub-models and string type; deliberately **not** the controller assignment, since two models on the same channels is a show-day bug nothing errors on and a clone is exactly how you'd make one by accident |
 | Replace model | ❌ | |
 | Model settings (per-type geometry) | ⚠️ | Only the attributes our geometry reads — see PARITY |
 | Setting start channels (auto + manual) | ⚠️ | Manual per-model start channel; no auto-allocation pass |
@@ -138,7 +138,7 @@ Moving Head + Servo (DMX fixtures).
 | Controller list, add, delete | ✅ | |
 | USB / Ethernet / NULL controller types | ⚠️ | Generic controllers with a start channel and count |
 | Controller visualiser | ⚠️ | A channel-by-channel view of what's assigned where, per controller, with free space, overruns and — the reason to have it — **channel collisions between models on the same controller**. Nothing else in the app surfaces those: each assignment is checked against the controller's span when it's made, never against the other models already on it. Missing: xLights' physical port/string breakdown, which needs per-port controller definitions this app doesn't model |
-| Auto start-channel allocation | ❌ | |
+| Auto start-channel allocation | ✅ | First-fit packing of every unassigned model into the first active controller with room, starting after everything already there. Existing assignments are never moved — a hand-placed model is usually where it is because a physical port starts there. Reports what it couldn't place and why |
 
 ---
 

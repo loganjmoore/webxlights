@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { controllerLayouts, slotBarStyle, unassignedModels } from "../src/lib/controllerLayout";
+import { allocateStartChannels, controllerLayouts, slotBarStyle, unassignedModels } from "../src/lib/controllerLayout";
 import type { ControllerRecord, ModelRecord } from "../src/lib/api";
 
 const controller: ControllerRecord = {
@@ -169,5 +169,91 @@ describe("the bar each model gets", () => {
     const layout = controllerLayouts([controller], [model({ name: "Over", controller_offset: 500, channel_count: 200 })], countFor)[0]!;
     const style = slotBarStyle(layout, layout.slots[0]!);
     expect(parseFloat(style.left) + parseFloat(style.width)).toBeLessThanOrEqual(100);
+  });
+});
+
+describe("auto start-channel allocation", () => {
+  const small: ControllerRecord = { ...controller, id: 2, name: "Small", channel_count: 100, start_channel: 1000 };
+
+  it("packs unassigned models into the first controller with room", () => {
+    const result = allocateStartChannels(
+      [controller],
+      [model({ name: "A", controller_id: null, channel_count: 30 }), model({ name: "B", controller_id: null, channel_count: 30 })],
+      countFor,
+    );
+    expect(result.allocations.map((a) => a.controllerOffset)).toEqual([0, 30]);
+    expect(result.unplaced).toEqual([]);
+  });
+
+  it("never moves a model someone assigned by hand", () => {
+    // A hand-placed model is usually where it is because a physical port starts there. Silently
+    // repositioning it would break the wiring rather than the spreadsheet.
+    const fixed = model({ name: "Hand placed", controller_offset: 200, channel_count: 30 });
+    const result = allocateStartChannels([controller], [fixed, model({ name: "New", controller_id: null, channel_count: 30 })], countFor);
+    expect(result.allocations).toHaveLength(1);
+    expect(result.allocations[0]!.modelId).not.toBe(fixed.id);
+  });
+
+  it("starts after everything already on the controller, so it can't collide with it", () => {
+    const result = allocateStartChannels(
+      [controller],
+      [model({ name: "Existing", controller_offset: 0, channel_count: 90 }), model({ name: "New", controller_id: null, channel_count: 30 })],
+      countFor,
+    );
+    expect(result.allocations[0]!.controllerOffset).toBe(90);
+  });
+
+  it("leaves a hand-made gap alone rather than filling it", () => {
+    // A gap is usually there to match a port boundary, so packing into it would undo a deliberate
+    // choice - and the model that got tucked in there would be the one that broke.
+    const result = allocateStartChannels(
+      [controller],
+      [model({ name: "High", controller_offset: 300, channel_count: 30 }), model({ name: "New", controller_id: null, channel_count: 30 })],
+      countFor,
+    );
+    expect(result.allocations[0]!.controllerOffset).toBe(330);
+  });
+
+  it("moves on to the next controller when the first is full", () => {
+    const result = allocateStartChannels(
+      [{ ...controller, channel_count: 50 }, small],
+      [model({ name: "Big", controller_id: null, channel_count: 80 })],
+      countFor,
+    );
+    expect(result.allocations[0]!.controllerId).toBe(small.id);
+  });
+
+  it("skips inactive controllers", () => {
+    const result = allocateStartChannels(
+      [{ ...controller, active: false }],
+      [model({ name: "A", controller_id: null, channel_count: 30 })],
+      countFor,
+    );
+    expect(result.allocations).toEqual([]);
+    expect(result.unplaced[0]!.reason).toBe("no active controller");
+  });
+
+  it("says which models it couldn't place, and why", () => {
+    const result = allocateStartChannels(
+      [{ ...controller, channel_count: 50 }],
+      [model({ name: "Too big", controller_id: null, channel_count: 500 })],
+      countFor,
+    );
+    expect(result.allocations).toEqual([]);
+    expect(result.unplaced[0]!.model.name).toBe("Too big");
+    expect(result.unplaced[0]!.reason).toContain("500 channels");
+  });
+
+  it("produces an allocation that has no collisions", () => {
+    // The whole point: run it, apply it, and the visualiser should have nothing to complain about.
+    const models = Array.from({ length: 8 }, (_, i) => model({ name: `M${i}`, controller_id: null, channel_count: 30 + i }));
+    const result = allocateStartChannels([controller], models, countFor);
+    const applied = models.map((m) => {
+      const a = result.allocations.find((x) => x.modelId === m.id)!;
+      return { ...m, controller_id: a.controllerId, controller_offset: a.controllerOffset };
+    });
+    const layout = controllerLayouts([controller], applied, countFor)[0]!;
+    expect(layout.slots.every((s) => s.collidesWith.length === 0)).toBe(true);
+    expect(layout.overrunChannels).toBe(0);
   });
 });

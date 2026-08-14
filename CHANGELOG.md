@@ -1,5 +1,19 @@
 # Changelog
 
+## Model-list conveniences, and auto start-channel allocation
+
+Four items off the Layout tab, all of them things you do constantly on a real show.
+
+- **Filter the model list** by name, type or controller — the three xLights offers. A show has a hundred-odd models, so scrolling for one is the single most repeated action on the page.
+- **Clone a model**, N copies in one action. Geometry, sub-models and string type come across; each copy is offset from the last, because a run placed on top of itself is one indistinguishable pile that has to be dragged apart before it can be told apart.
+- **The controller assignment is deliberately not cloned.** Two models on the same channels is a show-day bug nothing errors on — and a clone is exactly how you'd create one by accident. Copies come out unassigned, ready for:
+- **Auto-assign start channels.** First-fit packing of every unassigned model into the first active controller with room, starting after everything already on it.
+
+The allocator's rules are the interesting part. **Existing assignments are never moved**: someone who hand-placed a model has done so for a reason, usually because a physical port starts there, and repositioning it would break the wiring rather than the spreadsheet. **A hand-made gap stays a gap**, for the same reason — it's usually a port boundary, and the model tucked into it would be the one that broke. It's first-fit rather than best-fit on purpose: best-fit packs tighter but scatters related props across controllers, and a run created together almost always wants to be contiguous.
+
+It reports what it couldn't place and why, rather than silently leaving models loose. And a test asserts the thing that actually matters: **run the allocator, apply it, and the collision visualiser has nothing to complain about.**
+
+
 ## A controller visualiser, and the bug it exists to find
 
 A Controllers tab on the Layout page: each controller's channel span drawn to scale, with every model assigned to it, plus how many channels are free and how many run past the end.

@@ -105,3 +105,66 @@ export function slotBarStyle(layout: ControllerLayout, slot: ControllerSlot): { 
   const width = Math.max(0.6, Math.min(100 - left, (slot.channelCount / span) * 100));
   return { left: `${left}%`, width: `${width}%` };
 }
+
+export interface Allocation {
+  modelId: number;
+  controllerId: number;
+  controllerOffset: number;
+  channelCount: number;
+}
+
+export interface AllocationResult {
+  allocations: Allocation[];
+  /** Models there was no room for, with why. */
+  unplaced: Array<{ model: ModelRecord; reason: string }>;
+}
+
+/**
+ * xLights' auto start-channel allocation: give every unassigned model a home.
+ *
+ * Packs models into the first controller with room, in the order given, starting after everything
+ * already assigned. Existing assignments are never moved - someone who has hand-placed a model
+ * has done so for a reason, usually because a physical port starts there, and silently
+ * repositioning it would break the wiring rather than the spreadsheet.
+ *
+ * First-fit rather than best-fit on purpose: best-fit packs tighter but scatters related props
+ * across controllers, and a run of models created together almost always wants to be contiguous.
+ */
+export function allocateStartChannels(
+  controllers: ControllerRecord[],
+  models: ModelRecord[],
+  channelCountFor: (model: ModelRecord) => number,
+): AllocationResult {
+  const active = controllers.filter((c) => c.active);
+  // Where each controller is already full up to. Taken from the highest end of anything on it, so
+  // a gap left by hand stays a gap - it is usually there to match a physical port boundary.
+  const nextFree = new Map<number, number>();
+  for (const controller of active) nextFree.set(controller.id, 0);
+  for (const model of models) {
+    if (model.controller_id == null || model.controller_offset == null) continue;
+    const used = model.controller_offset + Math.max(1, model.channel_count ?? channelCountFor(model));
+    nextFree.set(model.controller_id, Math.max(nextFree.get(model.controller_id) ?? 0, used));
+  }
+
+  const allocations: Allocation[] = [];
+  const unplaced: AllocationResult["unplaced"] = [];
+
+  for (const model of unassignedModels(models)) {
+    const channelCount = Math.max(1, model.channel_count ?? channelCountFor(model));
+    if (channelCount <= 0) continue;
+
+    const home = active.find((c) => (nextFree.get(c.id) ?? 0) + channelCount <= c.channel_count);
+    if (!home) {
+      unplaced.push({
+        model,
+        reason: active.length === 0 ? "no active controller" : `needs ${channelCount} channels; none has that many free`,
+      });
+      continue;
+    }
+    const offset = nextFree.get(home.id) ?? 0;
+    allocations.push({ modelId: model.id, controllerId: home.id, controllerOffset: offset, channelCount });
+    nextFree.set(home.id, offset + channelCount);
+  }
+
+  return { allocations, unplaced };
+}
