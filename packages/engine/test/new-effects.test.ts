@@ -8,6 +8,9 @@ import { createSnowStormState, renderSnowStorm } from "../src/effects/snowStorm"
 import { createLifeState, renderLife, stepLife } from "../src/effects/life";
 import { renderLightning } from "../src/effects/lightning";
 import { renderCandle } from "../src/effects/candle";
+import { renderLines } from "../src/effects/lines";
+import { renderSpirograph } from "../src/effects/spirograph";
+import { renderShape } from "../src/effects/shape";
 import type { FrameContext } from "../src/effects/types";
 
 const RED = rgba(255, 0, 0, 255);
@@ -315,5 +318,143 @@ describe("Candle", () => {
     const b = new RenderBuffer(2, 2);
     renderCandle(b, PALETTE, params, ctx(0.5, 40));
     expect(a.getPixel(0, 0)).not.toEqual(b.getPixel(0, 0));
+  });
+});
+
+describe("Lines", () => {
+  const params = { lines: 2, points: 4, thickness: 1, speed: 10, tails: 3, fadeTails: true };
+
+  it("draws polygons on the buffer", () => {
+    const b = new RenderBuffer(20, 20);
+    renderLines(b, PALETTE, params, ctx(0.1, 5));
+    expect(lit(b)).toBeGreaterThan(10);
+  });
+
+  it("keeps every vertex inside the buffer as it bounces", () => {
+    // The bounce is closed-form rather than simulated, so this is really checking the folding
+    // maths: a vertex that escaped would draw lines off the model for the rest of the effect.
+    for (const frame of [0, 7, 61, 500, 5000]) {
+      const b = new RenderBuffer(16, 9);
+      renderLines(b, PALETTE, params, ctx(0.5, frame));
+      expect(lit(b), `frame ${frame}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("is a pure function of the frame, so scrubbing lands where playback would", () => {
+    const a = new RenderBuffer(16, 16);
+    renderLines(a, PALETTE, params, ctx(0.4, 42));
+    const b = new RenderBuffer(16, 16);
+    renderLines(b, PALETTE, params, ctx(0.4, 42));
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) expect(b.getPixel(x, y)).toEqual(a.getPixel(x, y));
+  });
+
+  it("tails add to what is drawn, and fading them changes their brightness", () => {
+    const none = new RenderBuffer(24, 24);
+    renderLines(none, PALETTE, { ...params, tails: 0 }, ctx(0.5, 60));
+    const many = new RenderBuffer(24, 24);
+    renderLines(many, PALETTE, { ...params, tails: 8, fadeTails: false }, ctx(0.5, 60));
+    expect(lit(many)).toBeGreaterThan(lit(none));
+  });
+});
+
+describe("Spirograph", () => {
+  const params = { speed: 10, outerRadius: 20, innerRadius: 7, distance: 12, animate: 0, length: 100 };
+
+  it("draws a curve", () => {
+    const b = new RenderBuffer(20, 20);
+    renderSpirograph(b, PALETTE, params, ctx(0.3, 10));
+    expect(lit(b)).toBeGreaterThan(5);
+  });
+
+  it("clamps r to R, which the manual states as a requirement", () => {
+    // "r (inner circle Radius) should be <= R" - an unclamped larger r sends the figure outside
+    // the buffer entirely, so the effect would render blank rather than wrong-looking.
+    const b = new RenderBuffer(20, 20);
+    renderSpirograph(b, PALETTE, { ...params, innerRadius: 90, outerRadius: 20 }, ctx(0.3, 10));
+    expect(lit(b)).toBeGreaterThan(0);
+  });
+
+  it("uses only the first colour, per the manual", () => {
+    const b = new RenderBuffer(20, 20);
+    renderSpirograph(b, PALETTE, params, ctx(0.3, 10));
+    const colors = new Set<string>();
+    for (let y = 0; y < 20; y++) for (let x = 0; x < 20; x++) {
+      const p = b.getPixel(x, y);
+      if (p.a > 0) colors.add(`${p.r},${p.g},${p.b}`);
+    }
+    expect(colors.size).toBe(1);
+  });
+
+  it("moves over time", () => {
+    // Compared pixel by pixel, not by counting lit pixels: the figure is a closed curve, so the
+    // count stays the same as it turns. This caught the effect standing completely still -
+    // advancing the tracing phase alone re-draws a closed curve exactly, so the figure has to
+    // spin for Speed to mean anything at full Length.
+    const a = new RenderBuffer(20, 20);
+    renderSpirograph(a, PALETTE, params, ctx(0.1, 0));
+    const b = new RenderBuffer(20, 20);
+    renderSpirograph(b, PALETTE, params, ctx(0.6, 90));
+    let differing = 0;
+    for (let y = 0; y < 20; y++) for (let x = 0; x < 20; x++) {
+      if (a.getPixel(x, y).a !== b.getPixel(x, y).a) differing++;
+    }
+    expect(differing).toBeGreaterThan(0);
+  });
+});
+
+describe("Shape", () => {
+  const params = {
+    shape: "Circle" as const,
+    thickness: 1,
+    count: 1,
+    startSize: 60,
+    randomSizes: false,
+    velocity: 0,
+    direction: 90,
+    lifetime: 100,
+    growth: 0,
+    centerX: 50,
+    centerY: 50,
+  };
+
+  it("draws each shape as an outline", () => {
+    for (const shape of ["Circle", "Square", "Triangle", "Star", "Heart"] as const) {
+      const b = new RenderBuffer(21, 21);
+      renderShape(b, PALETTE, { ...params, shape }, ctx(0.2));
+      expect(lit(b), shape).toBeGreaterThan(4);
+      // An outline, not a filled blob: the centre stays dark.
+      expect(b.getPixel(10, 10).a, shape).toBe(0);
+    }
+  });
+
+  it("honours the manual's direction convention: 90 is up and 270 is down", () => {
+    // The obvious screen-coordinate reading would send 90 downwards, so this is worth pinning.
+    const meanY = (direction: number) => {
+      const b = new RenderBuffer(21, 41);
+      renderShape(b, PALETTE, { ...params, startSize: 10, velocity: 3, direction, lifetime: 100 }, ctx(0.6));
+      let sum = 0;
+      let n = 0;
+      for (let y = 0; y < 41; y++) for (let x = 0; x < 21; x++) if (b.getPixel(x, y).a > 0) { sum += y; n++; }
+      expect(n, `direction ${direction} drew nothing`).toBeGreaterThan(0);
+      return sum / n;
+    };
+    expect(meanY(90)).toBeGreaterThan(20);
+    expect(meanY(270)).toBeLessThan(20);
+  });
+
+  it("grows a shape over its life when asked to", () => {
+    const small = new RenderBuffer(31, 31);
+    renderShape(small, PALETTE, { ...params, startSize: 10, growth: 0 }, ctx(0.9));
+    const grown = new RenderBuffer(31, 31);
+    renderShape(grown, PALETTE, { ...params, startSize: 10, growth: 80 }, ctx(0.9));
+    expect(lit(grown)).toBeGreaterThan(lit(small));
+  });
+
+  it("draws several shapes when asked", () => {
+    const one = new RenderBuffer(31, 31);
+    renderShape(one, PALETTE, { ...params, startSize: 20, count: 1 }, ctx(0.5));
+    const many = new RenderBuffer(31, 31);
+    renderShape(many, PALETTE, { ...params, startSize: 20, count: 4, growth: 40 }, ctx(0.5));
+    expect(lit(many)).toBeGreaterThan(lit(one));
   });
 });

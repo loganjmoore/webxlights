@@ -371,6 +371,47 @@ export const CANDLE_EFFECT_SCHEMA: EffectSchema = {
   ],
 };
 
+export const LINES_EFFECT_SCHEMA: EffectSchema = {
+  name: "Lines",
+  params: [
+    { key: "lines", label: "Lines", type: "intSlider", min: 1, max: 10, default: 2 },
+    { key: "points", label: "Points", type: "intSlider", min: 2, max: 10, default: 4 },
+    { key: "thickness", label: "Thickness", type: "intSlider", min: 1, max: 10, default: 1 },
+    { key: "speed", label: "Speed", type: "intSlider", min: 1, max: 100, default: 10 },
+    { key: "tails", label: "Tails", type: "intSlider", min: 0, max: 20, default: 5 },
+    { key: "fadeTails", label: "Fade Tails", type: "checkbox", default: true },
+  ],
+};
+
+export const SPIROGRAPH_EFFECT_SCHEMA: EffectSchema = {
+  name: "Spirograph",
+  params: [
+    { key: "speed", label: "Speed", type: "intSlider", min: 1, max: 100, default: 10, valueCurve: true },
+    { key: "outerRadius", label: "R - Radius outer circle", type: "intSlider", min: 1, max: 100, default: 20, valueCurve: true },
+    { key: "innerRadius", label: "r - Radius of inner circle", type: "intSlider", min: 1, max: 100, default: 7, valueCurve: true },
+    { key: "distance", label: "d - Distance", type: "intSlider", min: 0, max: 100, default: 12, valueCurve: true },
+    { key: "animate", label: "d - Animation", type: "intSlider", min: 0, max: 100, default: 0, valueCurve: true },
+    { key: "length", label: "Length", type: "intSlider", min: 1, max: 100, default: 100, valueCurve: true },
+  ],
+};
+
+export const SHAPE_EFFECT_SCHEMA: EffectSchema = {
+  name: "Shape",
+  params: [
+    { key: "shape", label: "Object to Draw", type: "choice", options: ["Circle", "Square", "Triangle", "Star", "Heart"], default: "Circle" },
+    { key: "thickness", label: "Thickness", type: "intSlider", min: 1, max: 10, default: 1 },
+    { key: "count", label: "Count", type: "intSlider", min: 1, max: 20, default: 3 },
+    { key: "startSize", label: "Start Size", type: "intSlider", min: 1, max: 100, default: 30 },
+    { key: "randomSizes", label: "Random initial shape sizes", type: "checkbox", default: false },
+    { key: "velocity", label: "Velocity", type: "intSlider", min: 0, max: 100, default: 0 },
+    { key: "direction", label: "Direction", type: "intSlider", min: 0, max: 359, default: 90 },
+    { key: "lifetime", label: "Lifetime", type: "intSlider", min: 1, max: 100, default: 100 },
+    { key: "growth", label: "Growth", type: "intSlider", min: -100, max: 100, default: 0 },
+    { key: "centerX", label: "X Center", type: "intSlider", min: 0, max: 100, default: 50 },
+    { key: "centerY", label: "Y Center", type: "intSlider", min: 0, max: 100, default: 50 },
+  ],
+};
+
 export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   On: ON_EFFECT_SCHEMA,
   Bars: BARS_EFFECT_SCHEMA,
@@ -404,6 +445,9 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Life: LIFE_EFFECT_SCHEMA,
   Lightning: LIGHTNING_EFFECT_SCHEMA,
   Candle: CANDLE_EFFECT_SCHEMA,
+  Lines: LINES_EFFECT_SCHEMA,
+  Spirograph: SPIROGRAPH_EFFECT_SCHEMA,
+  Shape: SHAPE_EFFECT_SCHEMA,
 };
 
 // Effects that read the analysed audio track rather than only their own params - the UI warns
