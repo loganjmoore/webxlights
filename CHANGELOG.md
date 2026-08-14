@@ -1,5 +1,22 @@
 # Changelog
 
+## Render styles: an effect can be laid out along the string, across the prop, or as one pixel
+
+xLights' Render Style controls "how the buffer is laid out for a model when the effect is rendered". Six of them are now implemented — the ones that mean something for a single model:
+
+- **Default** — the model's own buffer, unchanged.
+- **Single Line** — every node end to end on one row, in wiring order. A chase runs along the physical string rather than across the model's grid.
+- **As Pixel** — the whole prop behaves as one light.
+- **Per Preview** — the buffer is laid out the way the model physically stands, so an effect sweeps across the prop rather than along the string. On a mega tree that's the difference between Bars chasing up the strands and Bars chasing up the tree.
+- **Horizontal / Vertical Per Strand** — each strand becomes a row or a column.
+
+The insight that made this cheap: a render style isn't a rendering mode, it's a **remap of which buffer cell each node reads from**. Effects already draw into a buffer and nodes already pull their colour out by `(bufX, bufY)`, so a style hands the effect a differently-shaped buffer and re-points the nodes at it. No effect needed changing. Screen coordinates are deliberately untouched — a style that shifted those would silently rearrange someone's yard.
+
+One structural change came with it: **layers now composite in node space rather than buffer space**. Buffer-space compositing assumes every layer shares one buffer, which stops being true the moment styles exist — one layer may draw into a 16×50 grid while the layer under it draws into a single pixel. For layers that all use Default the result is identical, since blending is per-pixel and the mapping is per-node.
+
+The remaining thirteen styles describe how several models in a *group* are arranged relative to each other, which needs group rendering this app doesn't have. Recorded in the coverage doc rather than faked.
+
+
 ## Three more effects: Life, Lightning and Candle
 
 29 of 55 becomes 32.

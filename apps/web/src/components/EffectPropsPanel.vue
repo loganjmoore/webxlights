@@ -4,6 +4,7 @@ import {
   DEFAULT_PALETTE_HEX,
   EFFECT_SCHEMAS,
   LAYER_TRANSFORMS,
+  RENDER_STYLES,
   PATTERNED_TRANSITION_TYPES,
   TRANSITION_TYPES,
   isValueCurve,
@@ -11,6 +12,7 @@ import {
   type EffectParamSpec,
   type LayerSettings,
   type LayerTransform,
+  type RenderStyle,
   type SubBuffer,
   type TransitionSpec,
   type TransitionType,
@@ -250,6 +252,15 @@ function curveable(p: EffectParamSpec): boolean {
 
       <div class="blend-panel">
         <h4>Layer Settings</h4>
+        <label class="blend-row">
+          Render Style
+          <select
+            :value="layer.renderStyle ?? 'Default'"
+            @change="patchLayer({ renderStyle: ($event.target as HTMLSelectElement).value as RenderStyle })"
+          >
+            <option v-for="r in RENDER_STYLES" :key="r" :value="r">{{ r }}</option>
+          </select>
+        </label>
         <label class="blend-row">
           Transformation
           <select

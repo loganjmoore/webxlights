@@ -61,6 +61,7 @@ export * from "./blend";
 export * from "./nodeMapping";
 export * from "./layerStack";
 export * from "./layerSettings";
+export * from "./renderStyle";
 export * from "./renderFrame";
 export * from "./valueCurve";
 export * from "./transition";

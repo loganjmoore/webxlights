@@ -62,7 +62,7 @@ written down. Status here means:
 | Layer blending — Morph, Suppress Until Frame, Freeze At Frame, Canvas | ❌ | |
 | Transitions | ✅ | All 16 types, in and out |
 | Mix slider | ✅ | |
-| **Layer settings — Render Style (buffer styles)** | ❌ | 19 styles; every effect currently renders into the model's default buffer |
+| **Layer settings — Render Style (buffer styles)** | ⚠️ | The six that mean something for a single model are implemented (Default, Per Preview, Single Line, As Pixel, Horizontal/Vertical Per Strand). The rest describe how several models in a *group* are arranged relative to each other, which needs group rendering this app doesn't have |
 | **Layer settings — Transformation (rotate/flip)** | ❌ | |
 | **Layer settings — Blur** | ❌ | |
 | **Layer settings — Sub-buffer** | ❌ | Restricts an effect to part of the model |
@@ -127,11 +127,13 @@ Moving Head + Servo (DMX fixtures).
 
 ## What this says about priorities
 
-The largest single lever is **layer settings**, because they apply to all 25 effects at once
-rather than adding a 26th: render style, transformation, blur, sub-buffer and persistent are
-five features that multiply across everything already built. Sub-models and buffer render styles
-are also what real sequences lean on hardest — an imported `.xsq` that uses them renders wrong
-today, not merely plainly.
+Layer settings were the largest single lever, because they apply to every effect at once rather
+than adding one more: render style, transformation, blur and sub-buffer are now in. What remains
+of that panel is Persistent (needs the buffer to survive between frames) and Roto-Zoom.
+
+Sub-models are now the biggest single gap, and what real sequences lean on hardest — an imported
+`.xsq` that uses them renders wrong today, not merely plainly. Group render styles need group
+rendering, which is its own piece of work.
 
 After that, the missing effects are worth taking in batches by how much machinery they share:
 the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Lines) before the

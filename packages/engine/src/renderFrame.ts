@@ -2,11 +2,12 @@ import type { RGBA } from "./color";
 import { rgba } from "./color";
 import { RenderBuffer } from "./renderBuffer";
 import type { ModelGeometry } from "./models/types";
-import { renderLayerStack, type LayerSpec } from "./layerStack";
-import { bufferToNodeColors } from "./nodeMapping";
+import { renderLayerStackToNodes, type NodeLayerSpec } from "./layerStack";
+
 import type { BlendMode } from "./blend";
 import { audioFrameAt, type AudioSeries } from "./audio";
 import { renderWithLayerSettings, type LayerSettings } from "./layerSettings";
+import { applyRenderStyle } from "./renderStyle";
 import { renderOn, type OnParams } from "./effects/on";
 import { renderBars, type BarsParams } from "./effects/bars";
 import { renderColorWash, type ColorWashParams } from "./effects/colorWash";
@@ -260,7 +261,10 @@ export function renderRowAtMs(
     return row.geometry.nodes.map(() => rgba(0, 0, 0, 0));
   }
 
-  const layers: LayerSpec[] = active.map((effect) => ({
+  const layers: NodeLayerSpec[] = active.map((effect) => ({
+    // The render style reshapes the buffer this effect draws into, and re-points the nodes at
+    // it (renderStyle.ts). Nothing in the effect changes.
+    geometry: applyRenderStyle(row.geometry, effect.layer?.renderStyle),
     render: (buffer: RenderBuffer) => {
       // Layer settings wrap the effect rather than post-processing the model: a sub-buffer hands
       // the effect a smaller canvas to compose itself into, instead of cropping a full-size
@@ -275,8 +279,7 @@ export function renderRowAtMs(
     effectMixThreshold: effect.mix ?? 0,
   }));
 
-  const composited = renderLayerStack(row.geometry.width, row.geometry.height, layers);
-  return bufferToNodeColors(composited, row.geometry);
+  return renderLayerStackToNodes(row.geometry.nodes.length, layers);
 }
 
 export interface RowSequencer {
@@ -313,7 +316,8 @@ export function createRowSequencer(
       return row.geometry.nodes.map(() => rgba(0, 0, 0, 0));
     }
 
-    const layers: LayerSpec[] = activeWithIndex.map(({ effect, index }) => ({
+    const layers: NodeLayerSpec[] = activeWithIndex.map(({ effect, index }) => ({
+      geometry: applyRenderStyle(row.geometry, effect.layer?.renderStyle),
       render: (buffer: RenderBuffer) => {
         renderWithLayerSettings(buffer, effect.layer, (target) => {
           if (STATEFUL_EFFECTS.has(effect.name)) {
@@ -328,8 +332,7 @@ export function createRowSequencer(
       effectMixThreshold: effect.mix ?? 0,
     }));
 
-    const composited = renderLayerStack(row.geometry.width, row.geometry.height, layers);
-    return bufferToNodeColors(composited, row.geometry);
+    return renderLayerStackToNodes(row.geometry.nodes.length, layers);
   }
 
   return { renderFrameAt };

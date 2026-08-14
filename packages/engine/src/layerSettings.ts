@@ -41,6 +41,8 @@ export interface SubBuffer {
 }
 
 export interface LayerSettings {
+  /** Which buffer layout the effect renders into (renderStyle.ts). */
+  renderStyle?: import("./renderStyle").RenderStyle;
   transform?: LayerTransform;
   /** 1 = untouched. Higher averages each pixel with more of its neighbours. */
   blur?: number;

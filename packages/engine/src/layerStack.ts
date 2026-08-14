@@ -1,5 +1,8 @@
 import { RenderBuffer } from "./renderBuffer";
 import { blendPixel, type BlendMode } from "./blend";
+import { bufferToNodeColors } from "./nodeMapping";
+import { rgba, type RGBA } from "./color";
+import type { ModelGeometry } from "./models/types";
 
 export interface LayerSpec {
   render: (buffer: RenderBuffer) => void; // caller-supplied closure invoking the effect fn
@@ -24,6 +27,39 @@ export function renderLayerStack(width: number, height: number, layers: LayerSpe
         const bg = result.getPixel(x, y);
         result.setPixel(x, y, blendPixel(fg, bg, layer.blendMode, layer.effectMixThreshold));
       }
+    }
+  }
+  return result;
+}
+
+
+export interface NodeLayerSpec extends LayerSpec {
+  /** The buffer this layer renders into, which its render style may have reshaped. */
+  geometry: ModelGeometry;
+}
+
+// Composites layers in *node* space rather than buffer space.
+//
+// Buffer-space compositing assumes every layer shares one buffer, which stops being true the
+// moment render styles exist: one layer may be drawing into a 16x50 grid while the layer under
+// it draws into a single-pixel buffer or a one-row line. Each layer is therefore rendered into
+// its own buffer, resolved to a colour per node, and blended there.
+//
+// For layers that all use the Default style this is identical to the old path - blending is
+// per-pixel and the mapping is per-node, so blending before or after the mapping gives the same
+// answer when the mapping is shared.
+export function renderLayerStackToNodes(nodeCount: number, layers: NodeLayerSpec[]): RGBA[] {
+  if (layers.length > MAX_LAYERS) throw new Error(`renderLayerStackToNodes: ${layers.length} layers exceeds the M3 cap of ${MAX_LAYERS}`);
+
+  const result: RGBA[] = new Array(nodeCount).fill(null).map(() => rgba(0, 0, 0, 0));
+  for (const layer of layers) {
+    const buffer = new RenderBuffer(layer.geometry.width, layer.geometry.height);
+    layer.render(buffer);
+    const colors = bufferToNodeColors(buffer, layer.geometry);
+    for (let i = 0; i < nodeCount; i++) {
+      const fg = colors[i];
+      if (!fg) continue;
+      result[i] = blendPixel(fg, result[i]!, layer.blendMode, layer.effectMixThreshold);
     }
   }
   return result;
