@@ -112,6 +112,13 @@ failing. Mouth positions, eyes (open/closed/automatic/off with blink frequency a
 outline, "suppress when not singing" with lead-in/lead-out frames and fading, and the manual's
 six-swatch palette mapping are all in.
 
+Two of the effect's settings are deliberately absent, both for the same reason: they act on a
+*picture*, and a node-range face doesn't draw one. **Transparent Black** ("sets the black pixels
+transparent to show effects on lower layers") has nothing to act on when the effect only lights the
+nodes it names and leaves every other pixel untouched, and **Suppress Shimmer** skips a `-shimmer`
+tag whose shimmer this engine doesn't render, so the face already behaves as though it were always
+checked. Offering either would be a control that changes nothing.
+
 The phoneme names are **data, not a fixed list**: the manual only shows them in screenshots, so a
 hardcoded set would be a guess that silently mismatched an imported definition. A new face is
 seeded with the standard set and every name is editable.

@@ -18,6 +18,11 @@ import type { FrameContext } from "./types";
 // has been broken down twice - phrases into words, words into phonemes - and each phoneme cell's
 // label is a mouth position.
 
+// Two settings from the manual's table are absent, both because they act on a picture and a
+// node-range face doesn't draw one. "Transparent Black" makes an image's black pixels transparent,
+// and this effect never writes a pixel it wasn't asked to. "Suppress Shimmer" skips a `-shimmer`
+// tag whose shimmer isn't rendered here, so the face already behaves as if it were always on.
+
 export const FACE_EYE_MODES = ["Open", "Close", "Automatic", "(off)"] as const;
 export type FaceEyeMode = (typeof FACE_EYE_MODES)[number];
 
