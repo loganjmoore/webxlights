@@ -1,6 +1,7 @@
 import type { RGBA } from "../color";
 import { multiColorBlend, rgba } from "../color";
 import type { RenderBuffer } from "../renderBuffer";
+import { bandsForNoteRange } from "../audio";
 import { labelAt, type TimingLabel } from "../timing";
 import { audioOf, type FrameContext } from "./types";
 
@@ -51,7 +52,18 @@ export type VuMeterType =
   | "Timing Event Pulse"
   | "Timing Event Pulse Color"
   | "Timing Event Jump"
-  | "Timing Event Jump 100";
+  | "Timing Event Jump 100"
+  // Note range
+  | "Note On"
+  | "Note Level Pulse"
+  | "Note Level Bar"
+  // The manual spells these two "Node", not "Note"; kept as written so a search of the manual
+  // finds them, and they behave as the note types their descriptions describe.
+  | "Node Level Jump"
+  | "Node Level Jump 100"
+  | "Frame Waveform"
+  | "Dominant Frequency Colour"
+  | "Dominant Frequency Colour Gradient";
 
 export const VU_METER_TYPES: VuMeterType[] = [
   "Spectrogram",
@@ -83,7 +95,26 @@ export const VU_METER_TYPES: VuMeterType[] = [
   "Timing Event Pulse Color",
   "Timing Event Jump",
   "Timing Event Jump 100",
+  "Note On",
+  "Note Level Pulse",
+  "Note Level Bar",
+  "Node Level Jump",
+  "Node Level Jump 100",
+  "Frame Waveform",
+  "Dominant Frequency Colour",
+  "Dominant Frequency Colour Gradient",
 ];
+
+/** Types that read a note range rather than the whole spectrum. */
+export const NOTE_RANGE_VU_METER_TYPES = new Set<string>([
+  "Note On",
+  "Note Level Pulse",
+  "Note Level Bar",
+  "Node Level Jump",
+  "Node Level Jump 100",
+  "Dominant Frequency Colour",
+  "Dominant Frequency Colour Gradient",
+]);
 
 /** Types driven by a timing track rather than by the audio - the props panel warns without one. */
 export const TIMING_DRIVEN_VU_METER_TYPES = new Set<string>(
@@ -97,6 +128,12 @@ export interface VuMeterParams {
   sensitivityPct: number; // 0-100, trigger threshold for the pulse and jump types
   /** "Defines the timing track from the sequence against which the effect will be generated." */
   timingTrack: string;
+  /**
+   * "Start and End Notes are used to set the frequency range" - MIDI note numbers, so 60 is C4.
+   * Only the note types and the dominant-frequency types read them.
+   */
+  startNote: number;
+  endNote: number;
 }
 
 /** How long a jump or pulse takes to fade back to nothing. */
@@ -233,10 +270,123 @@ export function renderVuMeter(buffer: RenderBuffer, palette: RGBA[], params: VuM
       break;
     }
 
+    case "Frame Waveform": {
+      // "Displays the audio waveform only using the current frame of audio." The analysis keeps a
+      // level and a spectrum per frame, not the samples, so this is that frame's level drawn as a
+      // centred band - a true sample-accurate waveform would need audio this app doesn't retain.
+      const mid = (H - 1) / 2;
+      const half = level * mid;
+      const color = multiColorBlend(palette, level, false);
+      for (let x = 0; x < W; x++) {
+        for (let y = Math.round(mid - half); y <= Math.round(mid + half); y++) buffer.setPixel(x, y, color);
+      }
+      break;
+    }
+
+    case "Note On":
+    case "Note Level Pulse":
+    case "Note Level Bar":
+    case "Node Level Jump":
+    case "Node Level Jump 100":
+    case "Dominant Frequency Colour":
+    case "Dominant Frequency Colour Gradient": {
+      renderNoteRange(buffer, palette, params, ctx, gain, threshold);
+      break;
+    }
+
     // "Spectrogram", and the "Spectrum" this app called it before the manual's name was adopted:
     // sequences already say that, so it still renders rather than becoming an unknown type.
     default:
       drawBars(buffer, palette, bars, (b) => Math.min(1, bandValue(audio.bands, b, bars) * gain));
+      break;
+  }
+}
+
+/**
+ * The types given a *note range* rather than the whole spectrum.
+ *
+ * A note is a frequency and a band is a range of frequencies, so the range has to be resolved
+ * against the layout the analysis chose (audio.ts). Where that layout isn't recorded - a series
+ * built before it was, or a test fixture - these render nothing rather than quietly widening to
+ * the whole spectrum, which would look like they were working.
+ */
+function renderNoteRange(
+  buffer: RenderBuffer,
+  palette: RGBA[],
+  params: VuMeterParams,
+  ctx: FrameContext,
+  gain: number,
+  threshold: number,
+): void {
+  const { width: W, height: H } = buffer;
+  const series = ctx.audioBandEdgesHz ? { frameMs: 0, bandCount: 0, frames: [], bandEdgesHz: [...ctx.audioBandEdgesHz] } : undefined;
+  const range = bandsForNoteRange(series, params.startNote, params.endNote);
+  if (!range) return;
+
+  const [from, to] = range;
+  const bands = audioOf(ctx).bands;
+  const inRange = bands.slice(from, to);
+  if (inRange.length === 0) return;
+
+  const noteLevel = Math.min(1, (inRange.reduce((a, b) => a + b, 0) / inRange.length) * gain);
+  const swatch = (i: number): RGBA => palette[i % Math.max(1, palette.length)] ?? rgba(255, 255, 255);
+
+  switch (params.type) {
+    case "Note On":
+      // "will show brightness based on the note range intensity"
+      buffer.fill({ ...swatch(0), a: Math.round(255 * noteLevel) });
+      break;
+
+    case "Note Level Pulse": {
+      // "will turn on a color when the note range crosses the sensitivity level and then quickly
+      // fade out"
+      if (noteLevel < threshold) return;
+      buffer.fill({ ...swatch(0), a: Math.round(255 * noteLevel) });
+      break;
+    }
+
+    case "Note Level Bar": {
+      // "Sweeps a vertical bar across when the note range crosses the sensitivity." The sweep is
+      // driven by how far past the threshold the range is, so a louder passage sweeps further.
+      if (noteLevel < threshold) return;
+      const span = Math.max(0.0001, 1 - threshold);
+      const x = Math.min(W - 1, Math.round(((noteLevel - threshold) / span) * (W - 1)));
+      for (let y = 0; y < H; y++) buffer.setPixel(x, y, swatch(0));
+      break;
+    }
+
+    case "Node Level Jump":
+    case "Node Level Jump 100": {
+      if (noteLevel < threshold) return;
+      drawBars(buffer, palette, Math.max(1, Math.round(params.bars)), () =>
+        params.type === "Node Level Jump 100" ? 1 : noteLevel,
+      );
+      break;
+    }
+
+    case "Dominant Frequency Colour":
+    case "Dominant Frequency Colour Gradient": {
+      // "chooses the colour based on the dominant frequency" - the loudest band inside the range,
+      // placed across the palette by where it sits in that range.
+      let best = 0;
+      let bestValue = -1;
+      inRange.forEach((v, i) => {
+        if (v > bestValue) {
+          bestValue = v;
+          best = i;
+        }
+      });
+      if (bestValue <= 0) return;
+      const position = inRange.length > 1 ? best / (inRange.length - 1) : 0;
+      const color =
+        params.type === "Dominant Frequency Colour Gradient"
+          ? multiColorBlend(palette, position, false)
+          : swatch(Math.round(position * Math.max(0, palette.length - 1)));
+      buffer.fill(color);
+      break;
+    }
+
+    default:
       break;
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeAudio, audioFrameAt, fftInPlace, fftMagnitudes, SILENT_AUDIO_FRAME } from "../src/audio";
+import { analyzeAudio, audioFrameAt, bandsForNoteRange, fftInPlace, fftMagnitudes, noteFrequency, SILENT_AUDIO_FRAME } from "../src/audio";
 
 function sine(freqHz: number, sampleRate: number, sampleCount: number, amplitude = 1): Float32Array {
   const out = new Float32Array(sampleCount);
@@ -76,5 +76,36 @@ describe("Audio analysis (feeds the VU Meter family, SPEC ch8)", () => {
 
   it("audioFrameAt with no series reads as silence rather than throwing", () => {
     expect(audioFrameAt(undefined, 500)).toBe(SILENT_AUDIO_FRAME);
+  });
+});
+
+describe("notes against the analysed bands", () => {
+  it("gives a note its frequency", () => {
+    expect(noteFrequency(69)).toBeCloseTo(440, 5); // A4
+    expect(noteFrequency(60)).toBeCloseTo(261.63, 1); // C4
+    expect(noteFrequency(81)).toBeCloseTo(880, 5); // an octave above A4
+  });
+
+  it("finds the bands a note range covers", () => {
+    const series = { frameMs: 50, bandCount: 4, frames: [], bandEdgesHz: [100, 200, 400, 800, 1600] };
+    // C5 is 523Hz, which is inside the 400-800Hz band and nothing else.
+    expect(bandsForNoteRange(series, 72, 72)).toEqual([2, 3]);
+    // A range spanning C4 (262Hz) to C6 (1047Hz) reaches across three of them.
+    expect(bandsForNoteRange(series, 60, 84)).toEqual([1, 4]);
+  });
+
+  it("says nothing when the series doesn't record where its bands sit", () => {
+    // A series analysed before this was recorded, or a hand-built one. Widening to the whole
+    // spectrum instead would make a note-range effect look like it was working.
+    expect(bandsForNoteRange({ frameMs: 50, bandCount: 4, frames: [] }, 60, 72)).toBeNull();
+  });
+
+  it("records the band edges in hertz when it analyses a track", () => {
+    const samples = new Float32Array(4096).map((_, i) => Math.sin((2 * Math.PI * 440 * i) / 44100));
+    const series = analyzeAudio(samples, 44100, 50, 8);
+    expect(series.bandEdgesHz).toHaveLength(9);
+    expect(series.bandEdgesHz![0]).toBeGreaterThan(0);
+    // Rising, and stopping at the Nyquist frequency.
+    expect(series.bandEdgesHz![8]).toBeLessThanOrEqual(44100 / 2);
   });
 });

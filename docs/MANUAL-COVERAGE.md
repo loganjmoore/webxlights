@@ -122,16 +122,21 @@ The phoneme names are **data, not a fixed list**: the manual only shows them in 
 hardcoded set would be a guess that silently mismatched an imported definition. A new face is
 seeded with the standard set and every name is editable.
 
-**VU Meter** now renders 28 of the manual's ~39 types, up from 7. The addition that mattered was
+**VU Meter** now renders 37 of the manual's ~39 types, up from 7. The addition that mattered was
 structural rather than arithmetic: fourteen of its types are driven by a *timing track*, and
 effects could not read one until the State and Piano work added that plumbing — so they became
 routine without anything in the VU Meter itself changing. Also added: On, Color On, Pulse, Level
 Jump, Level Jump 100, Level Pulse Color, Spectrogram Peak and Spectrogram Line. The jump types
 decay from the moment the level crossed the threshold, looked up from the analysed audio rather
-than kept as state, so a scrub and an export agree. Still missing: the Note/Node family (needs a
-note range mapped from the spectrum), Level Shape (needs the shape renderer's shape set), Frame
-Waveform, and the two Dominant Frequency Colour types. The type this app called "Spectrum" is now
-the manual's "Spectrogram"; sequences that say the old name still render.
+than kept as state, so a scrub and an export agree. The Note/Node family and the two Dominant
+Frequency Colour types are in too: they are given a *note range* rather than band indices, which
+means resolving notes to the frequencies the analysis actually banded — so the analyser now records
+where its bands sit in hertz, and a series that doesn't say renders nothing rather than quietly
+widening to the whole spectrum. Still missing: **Level Shape** (needs the Shape effect's shape set
+wired in) and a sample-accurate **Frame Waveform** — that one draws the frame's own level as a
+centred band, because the analysis keeps a level and a spectrum per frame rather than the samples.
+The type this app called "Spectrum" is now the manual's "Spectrogram"; sequences that say the old
+name still render.
 
 **State and Piano** are driven by the words on a timing track rather than by their own parameters,
 which is a shape nothing else in the engine had. Both were previously listed here as blocked on

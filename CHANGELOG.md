@@ -1,5 +1,25 @@
 # Changelog
 
+## VU Meter: the note-range types
+
+The last substantial group of VU Meter types, and the one that needed something the analysis wasn't recording. 28 types to 37.
+
+**Note On, Note Level Pulse, Note Level Bar, Node Level Jump, Node Level Jump 100** — plus the two **Dominant Frequency Colour** types, which read the same range — are given a *note* range rather than a band index. The manual: "Start and End Notes are used to set the frequency range."
+
+A note is a frequency; a band is a range of frequencies. Turning one into the other needs to know where the analyser put its band edges, which is a function of the window size and the sample rate — and that was thrown away after analysis. The analysed series now records its band edges in hertz.
+
+**A series that doesn't record them renders nothing** rather than falling back to the whole spectrum. The fallback would look like the effect working: a Note On pointed at a two-octave range would light up on a bass drum, and nothing about it would say why.
+
+(The manual spells two of these "Node Level Jump" rather than "Note". Kept as written, so searching the manual for what you see in the picker finds it.)
+
+### Frame Waveform, honestly
+
+"Displays the audio waveform only using the current frame of audio." The analysis keeps a *level and a spectrum* per frame, not the samples, so this draws the frame's own level as a centred band. It is a real and distinct effect — it doesn't vary across the buffer the way the spectrum-driven Waveform does — but it isn't a sample-accurate waveform, and the coverage doc says so rather than counting it as done.
+
+### What's left
+
+**Level Shape**, which needs the Shape effect's shape set wired in, and the sample-accurate Frame Waveform above.
+
 ## VU Meter: 7 types to 28
 
 The manual's VU Meter page lists about thirty-nine types. This app had seven.
