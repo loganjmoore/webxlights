@@ -2,10 +2,10 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { parseXsq } from "@webxlights/formats";
-import { defaultParamsFor } from "@webxlights/engine";
+import { describeMapping, mapXsqToBody } from "../lib/xsqConvert";
+import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { api, type SequenceSummary } from "../lib/api";
 import { decodeAudioFile } from "../lib/audio";
-import { newEffectId } from "../stores/sequencer";
 
 const route = useRoute();
 const router = useRouter();
@@ -59,6 +59,58 @@ async function createSequence(): Promise<void> {
 // SPEC ch11 §4: import a .xsq. Model rows are matched to the layout's models by exact name
 // only (xLights' full mapping dialog with fuzzy/manual matching is a documented ceiling);
 // unmatched rows and effects with no param translation are reported, not silently dropped.
+// xLights' Tools > Convert: turn a sequence file into another format without opening it.
+//
+// The mapping is the importer's own (lib/xsqConvert.ts), on purpose: a converter that mapped
+// differently would produce an .fseq that didn't match what importing the same file would show,
+// and the whole reason to convert rather than import is that you trust the two to agree.
+//
+// Nothing is written to the project - no sequence is created, nothing is saved. It reads a file
+// and hands back a file.
+const converting = ref(false);
+const convertMessage = ref("");
+
+async function convertXsqToFseq(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+
+  converting.value = true;
+  convertMessage.value = "";
+  try {
+    const parsed = parseXsq(await file.text());
+    const layouts = await api.listLayouts(projectId.value);
+    const layout = layouts[0];
+    const [models, groups, controllers] = await Promise.all([
+      layout ? api.listModels(layout.id) : Promise.resolve([]),
+      layout ? api.listModelGroups(layout.id) : Promise.resolve([]),
+      api.listControllers(projectId.value),
+    ]);
+
+    const mapped = mapXsqToBody(parsed, models, groups);
+    const name = file.name.replace(/\.xsq$/i, "");
+    const bytes = exportSequenceToFseq(
+      models,
+      mapped.body,
+      // The .fseq's frame rate and length come from the file being converted, not from anything
+      // in this project - converting must not quietly re-time someone's sequence.
+      { id: 0, name, frame_ms: parsed.frameMs, duration_ms: parsed.durationMs } as never,
+      controllers,
+      undefined,
+      groups,
+    );
+    downloadFseq(bytes, name);
+    convertMessage.value = `Converted ${describeMapping(mapped, parsed)}`;
+  } catch (err) {
+    // A file picker is where the wrong file gets chosen, and an .xsq from a much larger show can
+    // legitimately fail to map. Neither is worth taking the page down for.
+    convertMessage.value = err instanceof Error ? err.message : "Couldn't convert that file.";
+  } finally {
+    converting.value = false;
+  }
+}
+
 async function importXsq(e: Event): Promise<void> {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -74,12 +126,6 @@ async function importXsq(e: Event): Promise<void> {
     const layout = layouts[0];
     const models = layout ? await api.listModels(layout.id) : [];
     const groups = layout ? await api.listModelGroups(layout.id) : [];
-    const modelIdByName = new Map(models.map((m) => [m.name, m.id]));
-    // A sequence Element targeting a Model Group has no distinct "group" type in the .xsq
-    // (xLights writes type="model" for both) - so a name miss against models falls back to
-    // groups before being reported unmatched. Real xLights shows target group rows this way.
-    const groupIdByName = new Map(groups.map((g) => [g.name, g.id]));
-
     const record = await api.createSequence(projectId.value, {
       name: file.name.replace(/\.xsq$/i, ""),
       frame_ms: parsed.frameMs,
@@ -87,47 +133,12 @@ async function importXsq(e: Event): Promise<void> {
       audio_filename: parsed.mediaFilename || undefined,
     });
 
-    const unmatchedModels: string[] = [];
-    const rows = parsed.rows
-      .filter((r) => r.elementType === "model")
-      .map((r) => {
-        const modelId = modelIdByName.get(r.name);
-        const elementType = modelId !== undefined ? "model" : "group";
-        const elementId = modelId ?? groupIdByName.get(r.name);
-        if (elementId === undefined) {
-          unmatchedModels.push(r.name);
-          return null;
-        }
-        return {
-          elementType: elementType as "model" | "group",
-          elementId,
-          effects: r.effects.map((eff) => ({
-            id: newEffectId(),
-            name: eff.name,
-            startMs: eff.startMs,
-            endMs: eff.endMs,
-            // A name without a PARAM_MAPPER (translated: false) comes back from parseXsq with
-            // literally empty params - the renderers for the 10 implemented-but-unmapped effects
-            // (Shockwave, SingleStrand, Pinwheel, ...) don't all null-guard every field, so an
-            // untranslated real effect could render/export as NaN geometry and throw. The
-            // engine's own schema defaults (same ones a manually-added effect gets) are always a
-            // valid render input; real params (when translated) still win.
-            params: (eff.translated ? eff.params : defaultParamsFor(eff.name)) as Record<string, number | boolean | string>,
-          })),
-        };
-      })
-      .filter((r): r is NonNullable<typeof r> => r !== null);
-
-    const timingTracks = parsed.rows
-      .filter((r) => r.elementType === "timing")
-      .map((r) => ({ name: r.name, marks: r.effects.map((e) => e.startMs) }));
+    const mapped = mapXsqToBody(parsed, models, groups);
+    const { rows, timingTracks } = mapped.body;
 
     await api.saveSequenceBody(record.id, { rows, timingTracks });
 
-    const parts = [`Imported ${rows.length} rows`];
-    if (unmatchedModels.length) parts.push(`${unmatchedModels.length} names had no match in this layout: ${unmatchedModels.join(", ")}`);
-    if (parsed.unsupportedEffectNames.length) parts.push(`effects imported without full param translation: ${parsed.unsupportedEffectNames.join(", ")}`);
-    importMessage.value = parts.join(" — ");
+    importMessage.value = `Imported ${describeMapping(mapped, parsed)}`;
 
     // The sequencer route is where the user actually looks - a message set here would be
     // thrown away by this navigation (this page's importMessage never renders again), so it
@@ -157,8 +168,13 @@ onMounted(load);
         {{ importing ? "Importing..." : "Import .xsq" }}
         <input type="file" accept=".xsq" @change="importXsq" :disabled="importing" hidden />
       </label>
+      <label class="import-btn" title="Turn an .xsq into an .fseq without creating a sequence">
+        {{ converting ? "Converting..." : "Convert .xsq → .fseq" }}
+        <input type="file" accept=".xsq" @change="convertXsqToFseq" :disabled="converting" hidden />
+      </label>
     </header>
     <p v-if="importMessage" class="import-message">{{ importMessage }}</p>
+    <p v-if="convertMessage" class="import-message">{{ convertMessage }}</p>
 
     <section class="new-sequence">
       <h2>New sequence</h2>

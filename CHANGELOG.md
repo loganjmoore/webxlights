@@ -1,5 +1,58 @@
 # Changelog
 
+## Re-read all 176 manual pages, and found a tab we'd never named
+
+The coverage doc was built by reading the whole manual once. I re-fetched every one of the 176 indexed pages — **88,710 words** — and audited the doc against them rather than against my memory of them.
+
+Two things came out of it.
+
+**A whole settings tab was missing from the inventory.** File > Settings > **Colors** — the app's own chrome colours — had never been named in `docs/MANUAL-COVERAGE.md` at all. Not marked ❌, not marked as a non-goal: simply absent, which is the one failure mode an inventory is supposed to make impossible. It's implemented now, and the row says how it was found.
+
+**The manual's own `llms-full.txt` bundle is incomplete.** 25 of the 176 indexed pages are absent from it, including Sketch, Tendrils, Spirograph, Candle, Fireworks, Galaxy, Garlands, Guitar, Life, Lightning, Liquid, Marquee, Meteors, Plasma, Shimmer, Snow Storm and Generate Custom Model. Anything auditing this manual from that bundle alone would silently miss them — which is exactly the kind of gap that looks like completeness. The coverage doc now says so.
+
+### Settings > Colors
+
+Timing-track headers and marks, effects and selected effects, row headings and their text, gridlines, the waveform and its background, and the layout's model / selected / overlap colours. Reset, export and import, as the dialog offers.
+
+It matters more than a theme usually would: a sequencer grid is dense, people work in one for hours, and someone colour-blind may need the selected/unselected pair to differ by more than hue.
+
+Values are **validated as hex on read**. They go straight into a canvas `fillStyle`, where a bad value paints *nothing* rather than erroring — which on a sequencer grid reads as effects that have vanished. And an import needs at least one real colour in the file, or any JSON at all would "import" as the defaults and look like it worked.
+
+## The last three that weren't blocked
+
+`docs/MANUAL-COVERAGE.md` had four rows reading ❌ and a note saying which were blocked and which were simply not built. Three were not blocked. They are built.
+
+### Tools > Convert
+
+`.xsq` → `.fseq` without creating a sequence. Pick a file, get a file.
+
+It uses **the importer's own mapping**, and that's the point rather than a convenience: a converter that mapped differently would produce an `.fseq` that didn't match what importing the same sequence would show — and trusting those two to agree is the entire reason to convert rather than import. So the mapping came out of the import page into a tested module that both now call.
+
+Frame rate and length come from **the file being converted**, never from this project. Converting must not quietly re-time someone's sequence.
+
+### Export model as video
+
+One model's frames recorded to a video file. It answers the question the house preview can't — *"what will this prop actually look like?"* — as something you can send to someone who isn't sitting at the app.
+
+Two things it has to get right:
+
+- **Frames are drawn on a timer, not as fast as possible.** `captureStream` samples the canvas in real time, so racing through them would produce a three-second video of a three-minute sequence.
+- **One sequencer for the whole export**, exactly as the `.fseq` path does it. A fresh `renderRowAtMs` per frame replays every stateful effect from its start each time, which turns a minute of video into minutes of waiting.
+
+Whether the browser can encode at all is checked **up front**, so the button says so rather than failing on click after someone has waited for a long sequence to set up. And the file extension follows the container the browser actually chose — a `.webm` named `.mp4` won't open in the player someone hands it to.
+
+### Detachable panel windows
+
+Panels can be torn off into their own window, synced over `BroadcastChannel` like the popped-out preview and on a **real route** for the same reason: it survives a reload and can be bookmarked onto the screen it belongs on.
+
+The sequencer stays the single source of truth. A torn-off panel asks for a snapshot when it opens and re-renders from what it's sent; it has no save path of its own, because a panel that could write would be a second writer racing the tab that owns the autosave.
+
+### What's left
+
+**One row.** The vendor model library needs xLights' own web service — a third-party dependency, not a piece of app work.
+
+**Tools > Test** stays 🚫 for a harder reason: it sends E1.31/DDP live, and a browser cannot open a UDP socket at all. No amount of work here changes that, and it's precisely why FPP Connect uploads a `.fseq` to a player instead of streaming to controllers.
+
 ## Perspectives
 
 A saved arrangement of which panels are showing. This page has a lot of them now — Views, Presets, Regions, Preferences, Models, Timing, FPP — and getting back to a working arrangement after opening three of them is otherwise a matter of remembering which ones you had.

@@ -7,6 +7,7 @@ import SequencesListPage from "../pages/SequencesListPage.vue";
 import SequencerPage from "../pages/SequencerPage.vue";
 import DocsPage from "../pages/DocsPage.vue";
 import PreviewPage from "../pages/PreviewPage.vue";
+import PanelWindowPage from "../pages/PanelWindowPage.vue";
 import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({
@@ -31,6 +32,15 @@ const router = createRouter({
       path: "/projects/:projectId/sequences/:sequenceId/preview",
       name: "sequence-preview",
       component: PreviewPage,
+      meta: { requiresAuth: true },
+    },
+    {
+      // A panel torn off into its own window (lib/previewChannel.ts' openPanelWindow). Same
+      // reasoning as the preview route: a real route survives a reload and can be bookmarked
+      // onto the screen it belongs on.
+      path: "/projects/:projectId/sequences/:sequenceId/panel/:panel",
+      name: "sequence-panel",
+      component: PanelWindowPage,
       meta: { requiresAuth: true },
     },
   ],
