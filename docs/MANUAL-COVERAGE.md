@@ -84,13 +84,13 @@ written down. Status here means:
 
 ## Chapter 4 — Built-in effects
 
-xLights ships 55 effects. We render 43.
+xLights ships 55 effects. We render 44.
 
-**Implemented (43):** Adjust, Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill,
+**Implemented (44):** Adjust, Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill,
 Fire, Galaxy, Garlands, Kaleidoscope, Life, Lightning, Lines, Marquee, Meteors, Morph, Off, On,
 Pictures, Pinwheel, Fireworks, Music, Plasma, Ripple, Shape, Shimmer, Shockwave, Single Strand,
-Snow Storm, Snowflakes, Spirals, Spirograph, Strobe, Tendrils, Text, Tree, Twinkle, VU Meter,
-Warp, Wave.
+Sketch, Snow Storm, Snowflakes, Spirals, Spirograph, Strobe, Tendrils, Text, Tree, Twinkle,
+VU Meter, Warp, Wave.
 
 Kaleidoscope, Warp and Adjust are **canvas-mode** effects: they modify the layer below them
 rather than drawing their own, and render nothing on any other blend mode — which is what the
@@ -98,9 +98,11 @@ manual means by Kaleidoscope "by itself it does nothing". The layer stack now se
 layer's buffer with what the layers underneath produced, which is what makes them possible; the
 props panel says so when one is placed on a layer that isn't in Canvas mode.
 
-**Missing, and renderable with what the engine already has (1):** Sketch — the path itself is
-easy to draw; what it needs is the Effect Assist editor to *trace* one, since the manual's whole
-workflow is drawing the sketch over a background image.
+**Every effect renderable with what the engine has is now implemented.** Sketch came with a
+tracing canvas in the props panel, which is what xLights' Effect Assist panel is for. Its
+background-image tracing aid is deliberately absent: the manual is explicit that "the image is not
+rendered into the effect output — it is only there to help you trace", so its absence changes
+nothing about what a sketch renders.
 
 **Missing, needs a definition file (2):** Guitar (a tab/track) and State (state definitions).
 
@@ -157,9 +159,11 @@ so effects placed on a group reached nothing at all. Real sequences target group
 37% of one real show's sequenced elements — so this was whole passages of a show going dark
 without an error anywhere.
 
-What is left is smaller and more scattered than it was: a sub-model editor, the Effect Assist
-path editor Sketch needs, preferences, and the controller visualiser. No single one of them is
-load-bearing the way group rendering was.
+What is left is smaller and more scattered than it was: a sub-model editor, preferences, the
+controller visualiser, and a long tail of Layout-tab conveniences (filter, clone, replace, align).
+No single one of them is load-bearing the way group rendering was, and the eleven remaining
+effects all need infrastructure that is a deliberate non-goal — face and state definitions, DMX
+fixtures, shaders and video.
 
 After that, the missing effects are worth taking in batches by how much machinery they share:
 the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Lines) before the

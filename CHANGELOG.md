@@ -1,5 +1,18 @@
 # Changelog
 
+## Sketch — the last effect this engine could render
+
+**44 of 55.** More to the point: every effect renderable with what the engine already has is now implemented. The remaining eleven all need infrastructure that's a deliberate non-goal — face and state definitions, DMX fixtures, shaders, video.
+
+Sketch is *"a path (a 'sketch') progressively drawn onto your model over the duration of the effect."* The path is stored as text so it round-trips through the sequence body like any other param, in the smallest notation that expresses what the effect needs — `M` starts a stroke, `L` continues it, coordinates are 0..1 so **a sketch traced once renders on any prop**, whatever shape it is.
+
+Progress is measured along the whole sketch's length rather than per stroke, so a long stroke takes proportionally longer to appear than a short one. That's the difference between something that looks like *drawing* and something that looks like each stroke taking its turn. A segment straddling the visible edge is drawn only as far as that edge reaches, so the line grows smoothly instead of jumping a whole segment at a time.
+
+**Draw Percentage** decides how much of the effect the drawing takes, with the finished sketch staying visible afterwards. **Motion** replaces it with a moving window — *"only a percentage of it is rendered at any given moment"* — and the two are mutually exclusive, as the manual says. Each separate stroke takes the next palette colour.
+
+It comes with a **tracing canvas** in the props panel, which is what xLights' Effect Assist panel is for: click to drop points, "Finish stroke" to start the next colour. The background-image tracing aid is deliberately absent — the manual is explicit that *"the image is not rendered into the effect output; it is only there to help you trace"*, so leaving it out changes nothing about what a sketch renders.
+
+
 ## Effect presets
 
 Save an effect's whole configuration under a name, and drop it somewhere else later "without recreating them from scratch". Params, palette (colour curves included), blend mode, mix, transitions and layer settings — everything about an effect **except where it is**.

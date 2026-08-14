@@ -50,6 +50,7 @@ import { renderMorph, type MorphParams } from "./effects/morph";
 import { renderKaleidoscope, type KaleidoscopeParams } from "./effects/kaleidoscope";
 import { renderWarp, type WarpParams } from "./effects/warp";
 import { renderAdjust, type AdjustParams } from "./effects/adjust";
+import { renderSketch, type SketchParams } from "./effects/sketch";
 import { createTendrilsState, renderTendrils, type TendrilsParams, type TendrilsState } from "./effects/tendrils";
 import type { FrameContext } from "./effects/types";
 import { resolveParamsAtPosition } from "./valueCurve";
@@ -176,6 +177,9 @@ function renderStateless(
       break;
     case "Adjust":
       renderAdjust(buffer, params as unknown as AdjustParams);
+      break;
+    case "Sketch":
+      renderSketch(buffer, palette, params as unknown as SketchParams, ctx);
       break;
     case "Lines":
       renderLines(buffer, palette, params as unknown as LinesParams, ctx);

@@ -25,6 +25,7 @@ import {
 } from "@webxlights/engine";
 import type { EffectParamValue, SequenceEffect } from "../lib/api";
 import ColorCurveEditor from "./ColorCurveEditor.vue";
+import SketchEditor from "./SketchEditor.vue";
 import ValueCurveEditor from "./ValueCurveEditor.vue";
 
 const MAX_COLORS = 6; // matches real xLights' Color tab swatch count
@@ -487,7 +488,23 @@ function curveable(p: EffectParamSpec): boolean {
         >
           <option v-for="opt in p.options" :key="opt" :value="opt">{{ opt }}</option>
         </select>
-        <span v-if="!hasCurve(p.key)" class="value">{{ effect.params[p.key] ?? p.default }}</span>
+        <!--
+          Sketch's path is text in the schema, but it is a *drawing* - so it gets a canvas to
+          trace on instead of a box to type coordinates into, which is what xLights' Effect
+          Assist panel is for.
+        -->
+        <SketchEditor
+          v-else-if="p.key === 'sketch'"
+          :sketch="String(effect.params[p.key] ?? p.default)"
+          @update="setParam(p.key, $event)"
+        />
+        <input
+          v-else-if="p.type === 'text'"
+          type="text"
+          :value="effect.params[p.key] ?? p.default"
+          @input="setParam(p.key, ($event.target as HTMLInputElement).value)"
+        />
+        <span v-if="!hasCurve(p.key) && p.key !== 'sketch' && p.type !== 'text'" class="value">{{ effect.params[p.key] ?? p.default }}</span>
         <ValueCurveEditor
           v-if="curveable(p)"
           :model-value="effect.params[p.key] ?? p.default"
