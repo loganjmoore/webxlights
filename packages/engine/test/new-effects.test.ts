@@ -11,6 +11,9 @@ import { renderCandle } from "../src/effects/candle";
 import { renderLines } from "../src/effects/lines";
 import { renderSpirograph } from "../src/effects/spirograph";
 import { renderShape } from "../src/effects/shape";
+import { renderMusic } from "../src/effects/music";
+import { renderFireworks } from "../src/effects/fireworks";
+import { renderTreeEffect } from "../src/effects/treeEffect";
 import type { FrameContext } from "../src/effects/types";
 
 const RED = rgba(255, 0, 0, 255);
@@ -456,5 +459,146 @@ describe("Shape", () => {
     const many = new RenderBuffer(31, 31);
     renderShape(many, PALETTE, { ...params, startSize: 20, count: 4, growth: 40 }, ctx(0.5));
     expect(lit(many)).toBeGreaterThan(lit(one));
+  });
+});
+
+describe("Music", () => {
+  const params = {
+    bars: 8,
+    type: "Morph" as const,
+    sensitivity: 10,
+    offset: 0,
+    scaleBars: true,
+    color: "Blend" as const,
+    fade: false,
+    logarithmicX: false,
+  };
+  const loud = { level: 0.9, bands: [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2] };
+  const audioCtx = (audio: { level: number; bands: number[] }): FrameContext => ({
+    frameIndexInEffect: 5,
+    positionInEffect01: 0.3,
+    seed: 4,
+    audio,
+  });
+
+  it("draws bars from the analysed spectrum", () => {
+    const b = new RenderBuffer(16, 10);
+    renderMusic(b, PALETTE, params, audioCtx(loud));
+    expect(lit(b)).toBeGreaterThan(0);
+  });
+
+  it("renders nothing with no audio, rather than inventing a spectrum", () => {
+    const b = new RenderBuffer(16, 10);
+    renderMusic(b, PALETTE, params, ctx(0.3, 5));
+    expect(lit(b)).toBe(0);
+  });
+
+  it("raising sensitivity both hides quiet bars and shortens loud ones", () => {
+    // The manual says increasing it "reduces the effects" - not merely gates them.
+    const low = new RenderBuffer(16, 10);
+    renderMusic(low, PALETTE, params, audioCtx(loud));
+    const high = new RenderBuffer(16, 10);
+    renderMusic(high, PALETTE, { ...params, sensitivity: 60 }, audioCtx(loud));
+    expect(lit(high)).toBeLessThan(lit(low));
+  });
+
+  it("Separate grows from the middle out, Morph from the bottom up", () => {
+    const quiet = { level: 0.3, bands: [0.35, 0, 0, 0, 0, 0, 0, 0] };
+    const separate = new RenderBuffer(8, 11);
+    renderMusic(separate, PALETTE, { ...params, type: "Separate", scaleBars: false }, audioCtx(quiet));
+    const morph = new RenderBuffer(8, 11);
+    renderMusic(morph, PALETTE, { ...params, type: "Morph", scaleBars: false }, audioCtx(quiet));
+    expect(morph.getPixel(0, 0).a).toBeGreaterThan(0); // bottom row lit
+    expect(separate.getPixel(0, 0).a).toBe(0); // ...but not for Separate
+    expect(separate.getPixel(0, 5).a).toBeGreaterThan(0); // middle row instead
+  });
+});
+
+describe("Fireworks", () => {
+  const params = {
+    explosions: 4,
+    particles: 20,
+    velocity: 20,
+    gravity: 20,
+    particleFade: 30,
+    holdColor: true,
+    fireWithMusic: false,
+    triggerLevel: 30,
+  };
+
+  it("puts particles in the sky", () => {
+    const b = new RenderBuffer(24, 24);
+    renderFireworks(b, PALETTE, params, ctx(0.1, 3));
+    expect(lit(b)).toBeGreaterThan(0);
+  });
+
+  it("gravity arcs the particles rather than leaving an expanding ring", () => {
+    const floaty = new RenderBuffer(30, 30);
+    renderFireworks(floaty, PALETTE, { ...params, gravity: 0 }, ctx(0.12, 4));
+    const heavy = new RenderBuffer(30, 30);
+    renderFireworks(heavy, PALETTE, { ...params, gravity: 90 }, ctx(0.12, 4));
+    const meanY = (b: RenderBuffer) => {
+      let sum = 0;
+      let n = 0;
+      for (let y = 0; y < 30; y++) for (let x = 0; x < 30; x++) if (b.getPixel(x, y).a > 0) { sum += y; n++; }
+      return n ? sum / n : 0;
+    };
+    expect(meanY(heavy)).toBeLessThan(meanY(floaty));
+  });
+
+  it("stays silent below the trigger level when fired by music", () => {
+    const quiet: FrameContext = { frameIndexInEffect: 3, positionInEffect01: 0.1, seed: 4, audio: { level: 0.05, bands: [0.05] } };
+    const b = new RenderBuffer(24, 24);
+    renderFireworks(b, PALETTE, { ...params, fireWithMusic: true }, quiet);
+    expect(lit(b)).toBe(0);
+
+    const bang: FrameContext = { ...quiet, audio: { level: 0.9, bands: [0.9] } };
+    const b2 = new RenderBuffer(24, 24);
+    renderFireworks(b2, PALETTE, { ...params, fireWithMusic: true }, bang);
+    expect(lit(b2)).toBeGreaterThan(0);
+  });
+
+  it("is a pure function of the frame, so scrubbing matches playback", () => {
+    const a = new RenderBuffer(20, 20);
+    renderFireworks(a, PALETTE, params, ctx(0.42, 17));
+    const b = new RenderBuffer(20, 20);
+    renderFireworks(b, PALETTE, params, ctx(0.42, 17));
+    for (let y = 0; y < 20; y++) for (let x = 0; x < 20; x++) expect(b.getPixel(x, y)).toEqual(a.getPixel(x, y));
+  });
+});
+
+describe("Tree effect", () => {
+  const params = { branches: 4, speed: 10, showTreeLights: true };
+
+  it("uses the first colour as the background and the rest for branches", () => {
+    // The manual's colour rule for this effect is the opposite of the usual one, so it is worth
+    // asserting: palette[0] is the ground the branches are drawn on, not a branch colour.
+    const b = new RenderBuffer(12, 12);
+    renderTreeEffect(b, PALETTE, params, ctx(0.2, 2));
+    let background = 0;
+    let branch = 0;
+    for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
+      const p = b.getPixel(x, y);
+      if (p.r === 255 && p.g === 0) background++;
+      if (p.g === 255 && p.r === 0) branch++;
+    }
+    expect(background).toBeGreaterThan(branch);
+    expect(branch).toBeGreaterThan(0);
+  });
+
+  it("leaves the background off when Show Tree Lights is unchecked", () => {
+    const b = new RenderBuffer(12, 12);
+    renderTreeEffect(b, PALETTE, { ...params, showTreeLights: false }, ctx(0.2, 2));
+    expect(lit(b)).toBeLessThan(12 * 12);
+  });
+
+  it("moves the branches over time", () => {
+    const a = new RenderBuffer(16, 16);
+    renderTreeEffect(a, PALETTE, { ...params, showTreeLights: false }, ctx(0.1, 0));
+    const b = new RenderBuffer(16, 16);
+    renderTreeEffect(b, PALETTE, { ...params, showTreeLights: false }, ctx(0.5, 30));
+    let differing = 0;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (a.getPixel(x, y).a !== b.getPixel(x, y).a) differing++;
+    expect(differing).toBeGreaterThan(0);
   });
 });

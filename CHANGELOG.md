@@ -1,5 +1,16 @@
 # Changelog
 
+## Three more effects: Music, Fireworks and Tree
+
+35 of 55 becomes 38.
+
+- **Music** — a frequency breakdown of the song, reading the same offline FFT the VU Meter does, so it renders identically in the preview, the popped-out preview and the exported `.fseq`. A live analyser would give a different answer every run and break the determinism the export depends on. All five bar types are implemented from the manual's descriptions (Separate grows from the middle, Collide from the outside in, and so on), plus the logarithmic frequency axis — the manual's own fix for a linear split giving most of the buffer to frequencies music barely uses. Sensitivity both hides quiet bars and *shortens* loud ones, which is what "reduces the effects" means.
+- **Fireworks** — explosions of particles, arced over by gravity and fading as they go, optionally fired by the music. Stateless: a particle's whole flight is a closed form of the time since its explosion, so any frame can be computed directly instead of replaying every explosion since the effect started.
+- **Tree** — zigzag branches against a coloured background. The colour rule here is the **opposite of every other effect**: "the first color selected will be used as the background color for the model... subsequent color(s) will be used for each branch". So a two-colour palette gives one background and one branch colour, not two branch colours.
+
+Two of the remaining effects turn out to need something the pipeline doesn't have: Kaleidoscope and Warp both modify *the layer below them* rather than drawing their own, and the manual is explicit that Kaleidoscope "is a canvas mode effect. By itself it does nothing." The coverage doc now separates those from the ones that are merely unwritten.
+
+
 ## Render styles: an effect can be laid out along the string, across the prop, or as one pixel
 
 xLights' Render Style controls "how the buffer is laid out for a model when the effect is rendered". Six of them are now implemented — the ones that mean something for a single model:

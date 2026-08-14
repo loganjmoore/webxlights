@@ -412,6 +412,43 @@ export const SHAPE_EFFECT_SCHEMA: EffectSchema = {
   ],
 };
 
+export const MUSIC_EFFECT_SCHEMA: EffectSchema = {
+  name: "Music",
+  params: [
+    { key: "bars", label: "Bars", type: "intSlider", min: 1, max: 64, default: 12 },
+    { key: "type", label: "Type", type: "choice", options: ["Separate", "Morph", "Bounce", "Collide", "On"], default: "Morph" },
+    { key: "sensitivity", label: "Sensitivity", type: "intSlider", min: 0, max: 100, default: 20 },
+    { key: "offset", label: "Offset", type: "intSlider", min: -32, max: 32, default: 0, valueCurve: true },
+    { key: "scaleBars", label: "Scale Bars", type: "checkbox", default: true },
+    { key: "color", label: "Color", type: "choice", options: ["Distinct", "Blend", "Cycle"], default: "Blend" },
+    { key: "fade", label: "Fade", type: "checkbox", default: false },
+    { key: "logarithmicX", label: "Logarithmic X Axis", type: "checkbox", default: false },
+  ],
+};
+
+export const FIREWORKS_EFFECT_SCHEMA: EffectSchema = {
+  name: "Fireworks",
+  params: [
+    { key: "explosions", label: "Number of Explosions", type: "intSlider", min: 1, max: 40, default: 8 },
+    { key: "particles", label: "Particles in Explosion", type: "intSlider", min: 1, max: 100, default: 30 },
+    { key: "velocity", label: "Velocity of Particles", type: "intSlider", min: 1, max: 100, default: 20 },
+    { key: "gravity", label: "Gravity", type: "intSlider", min: 0, max: 100, default: 20 },
+    { key: "particleFade", label: "Particle Fade", type: "intSlider", min: 1, max: 100, default: 30 },
+    { key: "holdColor", label: "Hold Color", type: "checkbox", default: true },
+    { key: "fireWithMusic", label: "Fire with Music", type: "checkbox", default: false },
+    { key: "triggerLevel", label: "Trigger level", type: "intSlider", min: 0, max: 100, default: 30 },
+  ],
+};
+
+export const TREE_EFFECT_SCHEMA: EffectSchema = {
+  name: "Tree",
+  params: [
+    { key: "branches", label: "Number Branches", type: "intSlider", min: 1, max: 20, default: 5 },
+    { key: "speed", label: "Speed", type: "intSlider", min: 1, max: 100, default: 10 },
+    { key: "showTreeLights", label: "Show Tree Lights", type: "checkbox", default: true },
+  ],
+};
+
 export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   On: ON_EFFECT_SCHEMA,
   Bars: BARS_EFFECT_SCHEMA,
@@ -448,11 +485,14 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Lines: LINES_EFFECT_SCHEMA,
   Spirograph: SPIROGRAPH_EFFECT_SCHEMA,
   Shape: SHAPE_EFFECT_SCHEMA,
+  Music: MUSIC_EFFECT_SCHEMA,
+  Fireworks: FIREWORKS_EFFECT_SCHEMA,
+  Tree: TREE_EFFECT_SCHEMA,
 };
 
 // Effects that read the analysed audio track rather than only their own params - the UI warns
 // when one of these is placed in a sequence with no audio loaded.
-export const AUDIO_REACTIVE_EFFECTS = new Set<string>(["VU Meter"]);
+export const AUDIO_REACTIVE_EFFECTS = new Set<string>(["VU Meter", "Music", "Fireworks"]);
 
 export function defaultParamsFor(effectName: string): Record<string, number | boolean | string> {
   const schema = EFFECT_SCHEMAS[effectName];

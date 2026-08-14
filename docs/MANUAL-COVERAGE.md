@@ -81,15 +81,22 @@ written down. Status here means:
 
 ## Chapter 4 — Built-in effects
 
-xLights ships 55 effects. We render 35.
+xLights ships 55 effects. We render 38.
 
-**Implemented (35):** Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill, Fire,
+**Implemented (38):** Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill, Fire,
 Galaxy, Garlands, Life, Lightning, Lines, Marquee, Meteors, Off, On, Pictures, Pinwheel,
-Plasma, Ripple, Shape, Shimmer, Shockwave, Single Strand, Snow Storm, Snowflakes, Spirals,
-Spirograph, Strobe, Text, Twinkle, VU Meter, Wave.
+Fireworks, Music, Plasma, Ripple, Shape, Shimmer, Shockwave, Single Strand, Snow Storm,
+Snowflakes, Spirals, Spirograph, Strobe, Text, Tree, Twinkle, VU Meter, Wave.
 
-**Missing, and renderable with what the engine already has (11):**
-Adjust, Fireworks, Guitar, Kaleidoscope, Morph, Music, Sketch, State, Tendrils, Tree, Warp.
+**Missing, and renderable with what the engine already has (5):**
+Adjust, Morph, Sketch, Tendrils, Warp.
+
+**Missing, needs a canvas the render pipeline doesn't have (2):** Kaleidoscope and Warp both
+modify *the layer below them* rather than drawing their own; the manual is explicit that
+Kaleidoscope "is a canvas mode effect. By itself it does nothing." That needs the layer stack to
+expose what is underneath, which it doesn't.
+
+**Missing, needs a definition file (2):** Guitar (a tab/track) and State (state definitions).
 
 (Shape's Emoji and system-font glyphs are not drawn - this engine has no font beyond its own
 5x7 bitmap - so its Character setting is absent while the five geometric shapes are in.)
