@@ -9,7 +9,7 @@ const props = defineProps<{
   playheadMs: number;
 }>();
 
-const emit = defineEmits<{ seek: [ms: number] }>();
+const emit = defineEmits<{ seek: [ms: number]; scrub: [ms: number]; scrubEnd: [] }>();
 
 const ROW_LABEL_WIDTH = 140; // stays aligned with SequencerGrid's row-label gutter
 const canvasRef = ref<HTMLCanvasElement | null>(null);
@@ -51,13 +51,43 @@ function draw(): void {
   ctx.stroke();
 }
 
-function onClick(e: MouseEvent): void {
+function msAt(e: PointerEvent | MouseEvent): number | null {
   const canvas = canvasRef.value;
-  if (!canvas) return;
+  if (!canvas) return null;
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left - ROW_LABEL_WIDTH;
-  if (x < 0) return;
-  emit("seek", Math.round(x / props.pxPerMs));
+  if (x < 0) return null;
+  return Math.max(0, Math.round(x / props.pxPerMs));
+}
+
+function onClick(e: MouseEvent): void {
+  const ms = msAt(e);
+  if (ms !== null) emit("seek", ms);
+}
+
+// Audio scrubbing: xLights plays the track under the pointer as you drag across the waveform,
+// which is how you find a beat by ear rather than by counting. The drag emits `scrub` rather than
+// `seek` so the page can play a short burst - a plain seek moves the playhead silently, which is
+// the thing that makes finding a downbeat so slow without this.
+let scrubbing = false;
+
+function onPointerDown(e: PointerEvent): void {
+  const ms = msAt(e);
+  if (ms === null) return;
+  scrubbing = true;
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  emit("scrub", ms);
+}
+function onPointerMove(e: PointerEvent): void {
+  if (!scrubbing) return;
+  const ms = msAt(e);
+  if (ms !== null) emit("scrub", ms);
+}
+function onPointerUp(e: PointerEvent): void {
+  if (!scrubbing) return;
+  scrubbing = false;
+  (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+  emit("scrubEnd");
 }
 
 onMounted(() => {
@@ -68,7 +98,12 @@ watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs], dr
 </script>
 
 <template>
-  <canvas ref="canvasRef" class="waveform" :style="{ width: `${totalWidth}px` }" @click="onClick"></canvas>
+  <canvas ref="canvasRef" class="waveform" :style="{ width: `${totalWidth}px` }" @click="onClick"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerUp"
+  ></canvas>
 </template>
 
 <style scoped>

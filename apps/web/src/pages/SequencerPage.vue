@@ -421,6 +421,34 @@ function seekTo(ms: number): void {
   if (el) el.currentTime = ms / 1000;
 }
 
+// Audio scrubbing (manual: "play-on-drag over the waveform"). Dragging the waveform plays the
+// track under the pointer, which is how a downbeat gets found by ear instead of by counting.
+//
+// The burst is stopped on a timer rather than left running: a scrub that kept playing would drift
+// away from the pointer within a second, and dragging back would then be seeking against audio
+// that had moved on. It is also only started when the transport is stopped - scrubbing during
+// playback would fight the thing already playing.
+let scrubStopTimer: ReturnType<typeof setTimeout> | null = null;
+const SCRUB_BURST_MS = 120;
+
+function scrubTo(ms: number): void {
+  seekTo(ms);
+  const el = audioEl.value;
+  if (!el || playing.value) return;
+  if (scrubStopTimer) clearTimeout(scrubStopTimer);
+  void el.play().catch(() => {
+    // Autoplay policy, or no track loaded. The playhead still moved, which is the part that
+    // matters; the burst is a bonus.
+  });
+  scrubStopTimer = setTimeout(() => el.pause(), SCRUB_BURST_MS);
+}
+
+function endScrub(): void {
+  if (scrubStopTimer) clearTimeout(scrubStopTimer);
+  scrubStopTimer = null;
+  if (!playing.value) audioEl.value?.pause();
+}
+
 function onTimeUpdate(): void {
   if (audioEl.value) playheadMs.value = Math.round(audioEl.value.currentTime * 1000);
 }
@@ -1258,7 +1286,15 @@ watch(sequenceId, async (id) => {
           />
         </div>
         <div class="h-scroll">
-          <Waveform :peaks="peaks" :duration-ms="store.sequence?.duration_ms ?? 0" :px-per-ms="pxPerMs" :playhead-ms="playheadMs" @seek="seekTo" />
+          <Waveform
+            :peaks="peaks"
+            :duration-ms="store.sequence?.duration_ms ?? 0"
+            :px-per-ms="pxPerMs"
+            :playhead-ms="playheadMs"
+            @seek="seekTo"
+            @scrub="scrubTo"
+            @scrub-end="endScrub"
+          />
           <SequencerGrid
             :rows="visibleRows"
             :body="store.body"

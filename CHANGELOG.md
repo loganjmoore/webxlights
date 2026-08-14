@@ -1,5 +1,14 @@
 # Changelog
 
+## Audio scrubbing
+
+Drag across the waveform and the track plays under the pointer. It's how a downbeat gets found by ear rather than by counting — a plain seek moves the playhead in silence, which is what makes lining effects up to music slow without this.
+
+The burst is **stopped on a timer** rather than left running. A scrub that kept playing would drift away from the pointer within about a second, and dragging back would then be seeking against audio that had already moved on — which feels worse than no scrubbing at all.
+
+It only starts a burst when the transport is stopped: scrubbing during playback would fight the thing already playing. And a blocked autoplay is swallowed rather than surfaced — the playhead still moves, which is the part that matters; the sound is the bonus.
+
+
 ## Song structure regions
 
 *"Let you divide the sequence timeline into named, colored sections — for example Intro, Verse, Chorus, Bridge and Outro."*

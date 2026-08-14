@@ -48,7 +48,7 @@ written down. Status here means:
 | Feature | Status | Notes |
 |---|---|---|
 | Timeline + waveform, zoom, scroll | ✅ | 3 zoom levels |
-| Audio scrubbing | ❌ | Play-on-drag over the waveform |
+| Audio scrubbing | ✅ | Drag the waveform and the track plays under the pointer, in short bursts. The burst is stopped on a timer rather than left running: a scrub that kept playing would drift away from the pointer within a second, and dragging back would then be seeking against audio that had moved on |
 | Time display format | ✅ | Minutes:seconds, plain seconds, or frames — frames counted against the sequence's own frame rate, since a 20ms sequence and a 50ms one number the same second very differently |
 | Timeline tags | ⚠️ | A region boundary is a named point on the timeline, which is what a tag is; xLights' separate tag list, with its own colours and independent of the section structure, isn't offered |
 | Timing tracks | ✅ | Fixed interval + metronome generation |
