@@ -46,6 +46,8 @@ import { renderShape, type ShapeParams } from "./effects/shape";
 import { renderMusic, type MusicParams } from "./effects/music";
 import { renderFireworks, type FireworksParams } from "./effects/fireworks";
 import { renderTreeEffect, type TreeEffectParams } from "./effects/treeEffect";
+import { renderMorph, type MorphParams } from "./effects/morph";
+import { createTendrilsState, renderTendrils, type TendrilsParams, type TendrilsState } from "./effects/tendrils";
 import type { FrameContext } from "./effects/types";
 import { resolveParamsAtPosition } from "./valueCurve";
 import { applyTransitions, type TransitionSpec } from "./transition";
@@ -80,7 +82,7 @@ const MAX_LAYERS = 5;
 // Effects with per-frame state (heat map / particle list) that must be simulated forward
 // frame-by-frame from the effect's start to reach `atMs` - correct for a scrubbing preview
 // (not a real-time constraint), cheap at typical effect lengths (a few hundred frames).
-const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe", "Snow Storm", "Life"]);
+const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe", "Snow Storm", "Life", "Tendrils"]);
 
 function positionOf(effect: RenderableEffect, atMs: number): number {
   const duration = effect.endMs - effect.startMs || 1;
@@ -126,6 +128,9 @@ function renderStateless(
       break;
     case "Tree":
       renderTreeEffect(buffer, palette, params as unknown as TreeEffectParams, ctx);
+      break;
+    case "Morph":
+      renderMorph(buffer, palette, params as unknown as MorphParams, ctx);
       break;
     case "Lines":
       renderLines(buffer, palette, params as unknown as LinesParams, ctx);
@@ -223,6 +228,7 @@ function renderStateful(
   atMs: number,
   frameMs: number,
   seed: number,
+  audio: AudioSeries | undefined,
 ): void {
   const palette = effect.palette ?? rowPalette; // real xLights' per-effect Color tab
   const duration = effect.endMs - effect.startMs || 1;
@@ -264,6 +270,16 @@ function renderStateful(
     for (let f = 0; f <= framesElapsed; f++) {
       const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as LifeParams;
       renderLife(buffer, palette, params, state);
+    }
+  } else if (effect.name === "Tendrils") {
+    const state = createTendrilsState(buffer.width, buffer.height, paramsAt(effect, 0) as unknown as TendrilsParams, seed);
+    for (let f = 0; f <= framesElapsed; f++) {
+      const at = effect.startMs + f * frameMs;
+      const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as TendrilsParams;
+      // The music movements read the same offline analysis every other audio-reactive effect
+      // does, at the frame being replayed rather than at the playhead - otherwise the whole
+      // replayed history would be driven by one instant of the song.
+      renderTendrils(buffer, palette, params, state, audio ? audioFrameAt(audio, at) : undefined);
     }
   }
 }
@@ -325,7 +341,7 @@ export function renderRowAtMs(
       // the effect a smaller canvas to compose itself into, instead of cropping a full-size
       // render down to it (layerSettings.ts).
       renderWithLayerSettings(buffer, effect.layer, (target) => {
-        if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(target, palette, effect, atMs, frameMs, seed);
+        if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(target, palette, effect, atMs, frameMs, seed, audio);
         else if (effect.layer?.persistent) renderPersistent(target, palette, effect, atMs, frameMs, seed, audio);
         else renderStateless(target, palette, effect, atMs, seed, audio);
         if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
@@ -380,7 +396,7 @@ export function createRowSequencer(
       render: (buffer: RenderBuffer) => {
         renderWithLayerSettings(buffer, effect.layer, (target) => {
           if (STATEFUL_EFFECTS.has(effect.name)) {
-            renderStatefulIncremental(target, palette, effect, atMs, frameMs, seed, index, statefulStates);
+            renderStatefulIncremental(target, palette, effect, atMs, frameMs, seed, index, statefulStates, audio);
           } else if (effect.layer?.persistent) {
             // Sequential export walks the frames in order anyway, so persistence here is just a
             // matter of keeping the buffer around instead of replaying into a fresh one.
@@ -419,6 +435,7 @@ function renderStatefulIncremental(
   seed: number,
   key: number,
   states: Map<number | string, unknown>,
+  audio: AudioSeries | undefined,
 ): void {
   const palette = effect.palette ?? rowPalette;
   const duration = effect.endMs - effect.startMs || 1;
@@ -470,5 +487,13 @@ function renderStatefulIncremental(
       states.set(key, state);
     }
     renderLife(buffer, palette, lifeParams, state);
+  } else if (effect.name === "Tendrils") {
+    const tendrilParams = params as unknown as TendrilsParams;
+    let state = states.get(key) as TendrilsState | undefined;
+    if (!state) {
+      state = createTendrilsState(buffer.width, buffer.height, tendrilParams, seed);
+      states.set(key, state);
+    }
+    renderTendrils(buffer, palette, tendrilParams, state, audio ? audioFrameAt(audio, atMs) : undefined);
   }
 }

@@ -1,3 +1,5 @@
+import { TENDRIL_MOVEMENTS } from "./tendrils";
+
 // SPEC ch7-9 parameter tables -> UI control descriptors. Keys match each effect's *Params
 // interface exactly (e.g. OnParams) so the props panel can bind straight to them.
 export interface EffectParamSpec {
@@ -449,6 +451,55 @@ export const TREE_EFFECT_SCHEMA: EffectSchema = {
   ],
 };
 
+export const MORPH_EFFECT_SCHEMA: EffectSchema = {
+  name: "Morph",
+  params: [
+    // The two lines the morph travels between. The defaults sweep the model bottom to top, which
+    // is the arch and mega-tree movement Morph is most often reached for.
+    { key: "x1a", label: "Start X1", type: "intSlider", min: 0, max: 100, default: 0, valueCurve: true },
+    { key: "y1a", label: "Start Y1", type: "intSlider", min: 0, max: 100, default: 0, valueCurve: true },
+    { key: "x1b", label: "Start X2", type: "intSlider", min: 0, max: 100, default: 100, valueCurve: true },
+    { key: "y1b", label: "Start Y2", type: "intSlider", min: 0, max: 100, default: 0, valueCurve: true },
+    { key: "x2a", label: "End X1", type: "intSlider", min: 0, max: 100, default: 0, valueCurve: true },
+    { key: "y2a", label: "End Y1", type: "intSlider", min: 0, max: 100, default: 100, valueCurve: true },
+    { key: "x2b", label: "End X2", type: "intSlider", min: 0, max: 100, default: 100, valueCurve: true },
+    { key: "y2b", label: "End Y2", type: "intSlider", min: 0, max: 100, default: 100, valueCurve: true },
+    { key: "headLength", label: "Head Length", type: "intSlider", min: 0, max: 100, default: 20, valueCurve: true },
+    { key: "headDuration", label: "Head Duration", type: "intSlider", min: 0, max: 100, default: 100, valueCurve: true },
+    { key: "acceleration", label: "Acceleration", type: "intSlider", min: -10, max: 10, default: 0, valueCurve: true },
+    { key: "repeatCount", label: "Repeat Count", type: "intSlider", min: 1, max: 20, default: 1 },
+    { key: "repeatSkip", label: "Repeat Skip", type: "intSlider", min: 0, max: 20, default: 0 },
+    { key: "stagger", label: "Stagger", type: "intSlider", min: 0, max: 10, default: 0 },
+    { key: "showHeadAtStart", label: "Show Head at Start", type: "checkbox", default: false },
+    { key: "swapStartEnd", label: "Swap Start and End", type: "checkbox", default: false },
+  ],
+};
+
+export const TENDRILS_EFFECT_SCHEMA: EffectSchema = {
+  name: "Tendrils",
+  params: [
+    {
+      key: "movement",
+      label: "Movement",
+      type: "choice",
+      // Taken from the effect rather than restated here, so a movement can't be implemented and
+      // left unofferable - which is exactly what had happened to the blend modes.
+      options: TENDRIL_MOVEMENTS,
+      default: "Random",
+    },
+    { key: "tuneMovement", label: "Tune Movement", type: "intSlider", min: 1, max: 20, default: 10, valueCurve: true },
+    { key: "thickness", label: "Thickness", type: "intSlider", min: 1, max: 10, default: 1, valueCurve: true },
+    { key: "friction", label: "Friction", type: "intSlider", min: 0, max: 20, default: 10 },
+    { key: "dampening", label: "Dampening", type: "intSlider", min: 0, max: 20, default: 10 },
+    { key: "tension", label: "Tension", type: "intSlider", min: 0, max: 20, default: 10 },
+    { key: "trails", label: "Trails", type: "intSlider", min: 0, max: 10, default: 0 },
+    { key: "length", label: "Length", type: "intSlider", min: 2, max: 120, default: 60 },
+    { key: "speed", label: "Speed", type: "intSlider", min: 1, max: 10, default: 10 },
+    { key: "horizontalOffset", label: "Horizontal Offset", type: "intSlider", min: -100, max: 100, default: 0, valueCurve: true },
+    { key: "verticalOffset", label: "Vertical Offset", type: "intSlider", min: -100, max: 100, default: 0, valueCurve: true },
+  ],
+};
+
 export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   On: ON_EFFECT_SCHEMA,
   Bars: BARS_EFFECT_SCHEMA,
@@ -488,11 +539,13 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Music: MUSIC_EFFECT_SCHEMA,
   Fireworks: FIREWORKS_EFFECT_SCHEMA,
   Tree: TREE_EFFECT_SCHEMA,
+  Morph: MORPH_EFFECT_SCHEMA,
+  Tendrils: TENDRILS_EFFECT_SCHEMA,
 };
 
 // Effects that read the analysed audio track rather than only their own params - the UI warns
 // when one of these is placed in a sequence with no audio loaded.
-export const AUDIO_REACTIVE_EFFECTS = new Set<string>(["VU Meter", "Music", "Fireworks"]);
+export const AUDIO_REACTIVE_EFFECTS = new Set<string>(["VU Meter", "Music", "Fireworks", "Tendrils"]);
 
 export function defaultParamsFor(effectName: string): Record<string, number | boolean | string> {
   const schema = EFFECT_SCHEMAS[effectName];

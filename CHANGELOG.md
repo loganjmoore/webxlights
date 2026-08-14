@@ -1,5 +1,19 @@
 # Changelog
 
+## Morph and Tendrils
+
+Two more effects off `docs/MANUAL-COVERAGE.md`, both of them ones real sequences reach for.
+
+**Morph** is the manual's "movement across a model of one or many strands of lights with a head and a tail" — the sweep people put on arches and mega trees. It interpolates a line from a start line to an end line and fills in the ground it has covered, which is not a liberty: the manual's colour rule, *"three or more colors create progressive morphing sequences across head and tail sections"*, only means anything if there is a swept region for the palette to be spread across. The head is `palette[0]`; the body is the palette *after* it, so a head whose Head Duration has run out actually stops looking like a head instead of staying the same colour. Acceleration, Repeat Count, Repeat Skip, Stagger, Show Head at Start and Swap Start/End are all in, and it is stateless — the swept region is a closed form of the position in the effect, so a scrub costs the same as an export frame.
+
+**Tendrils** is "a twisting threadlike structure": a string dragged across a surface, every segment following the one ahead of it, held back by Friction and pulled straight by Dampening and Tension. It has to be stateful — the whole effect *is* the string's history, and a frame computed from the frame index alone would have no memory of where the string had been, which is the only thing separating a tendril from a moving dot. All seven of the manual's movements are simulated, including the two that follow the music, and the props panel takes its movement list from the effect itself so one can't be implemented and left unofferable. The string is pinned to the model, so the highest Friction setting — the manual's "wild flapping about" — comes back rather than flying off and leaving the effect dark.
+
+Both are tested against the sequential export path as well as the scrubbing one. Tendrils' music test was checked by breaking the audio wiring on purpose and confirming the test failed.
+
+**One correction.** Adjust was listed in the coverage doc as renderable with what the engine already has. Reading its own page shows it isn't: *"used Canvas mode to offset channel values"* — it modifies the layer below it rather than drawing its own, so it belongs with Kaleidoscope and Warp, waiting on a canvas the layer stack doesn't expose. The doc says so now.
+
+That leaves **Sketch** as the only remaining effect renderable with what exists today, and what it actually needs is the Effect Assist path editor to trace one with.
+
 ## The Layer Settings panel, finished
 
 **Roto-Zoom** and **Persistent** were the two controls still missing, and the panel is now 6 of 6.
