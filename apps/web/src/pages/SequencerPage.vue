@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { EFFECT_SCHEMAS, defaultParamsFor, mouthNames, type AudioSeries, type BlendMode, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
+import { EFFECT_SCHEMAS, defaultParamsFor, detectOnsets, estimateTempo, mouthNames, type AudioSeries, type OnsetBand, type BlendMode, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
 import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequencerView, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
@@ -186,6 +186,44 @@ function addMidiTimingTrack(): void {
   }
   store.addTimingTrack(track);
   midiMessage.value = describeMidiImport(track, parsed);
+}
+
+// xLights' audio-generated timing tracks. The interval and metronome generators put marks at a
+// rate you choose; this puts them where something actually happens in the track, which is what
+// makes a timing track usable for sequencing to a song rather than to a click.
+//
+// The detection itself lives in the engine (onsets.ts) - it is arithmetic over the analysed audio
+// and belongs where it can be tested against a synthesised track rather than a real one.
+const onsetSensitivity = ref(50);
+const onsetMinGapMs = ref(120);
+const onsetBand = ref<OnsetBand>("all");
+const onsetEveryNth = ref(1);
+const onsetMessage = ref("");
+
+function detectTimingFromAudio(): void {
+  const series = audioSeries.value;
+  if (!series) {
+    onsetMessage.value = "Load an audio track first — there's nothing to detect against.";
+    return;
+  }
+  const marks = detectOnsets(series, {
+    sensitivity: onsetSensitivity.value,
+    minGapMs: onsetMinGapMs.value,
+    band: onsetBand.value,
+    everyNth: onsetEveryNth.value,
+  });
+  if (marks.length === 0) {
+    onsetMessage.value = "Nothing stood out in that track. Try a higher sensitivity.";
+    return;
+  }
+  const bpm = estimateTempo(marks);
+  const label = onsetEveryNth.value > 1 ? `Every ${onsetEveryNth.value} beats` : "Beats";
+  store.addTimingTrack({ name: `${label} (${onsetBand.value})`, marks });
+  // The tempo is reported rather than used: it answers "did this find the beat or find noise?",
+  // which is the question you have when looking at a track full of new marks.
+  onsetMessage.value = bpm
+    ? `${marks.length} marks — the gaps between them look like about ${bpm} BPM`
+    : `${marks.length} marks — no steady tempo in them, so check them against the waveform`;
 }
 
 const showFppPanel = ref(false);
@@ -1157,6 +1195,28 @@ watch(sequenceId, async (id) => {
         </template>
         <button @click="generateTimingTrack">Generate</button>
       </div>
+
+      <p class="timing-note">
+        Or find the beats in the loaded track. Marks go where the sound actually rises, so they
+        follow the song rather than a fixed rate. Sensitivity trades marks you wanted against
+        marks you didn't; the minimum gap keeps one drum hit from becoming a cluster.
+      </p>
+      <div class="timing-row">
+        <select v-model="onsetBand">
+          <option value="all">Whole spectrum</option>
+          <option value="low">Low (kick)</option>
+          <option value="mid">Mid</option>
+          <option value="high">High (hats)</option>
+        </select>
+        <label class="midi-field">
+          Sensitivity <input v-model.number="onsetSensitivity" type="range" min="0" max="100" />
+          <span class="value">{{ onsetSensitivity }}</span>
+        </label>
+        <label class="midi-field">Min gap <input v-model.number="onsetMinGapMs" type="number" min="0" step="10" /> ms</label>
+        <label class="midi-field">Keep every <input v-model.number="onsetEveryNth" type="number" min="1" max="16" /></label>
+        <button :disabled="!audioSeries" @click="detectTimingFromAudio">Detect</button>
+      </div>
+      <p v-if="onsetMessage" class="timing-note">{{ onsetMessage }}</p>
 
       <p class="timing-note">
         Or import a MIDI file's notes as a track. Each cell is labelled with the keys sounding in
