@@ -20,8 +20,11 @@ describe("computeGeometryFromAttrs (import pipeline)", () => {
     expect(geo!.nodes.length).toBe(120);
   });
 
-  it("returns null for an unsupported DisplayAs (e.g. Spinner)", () => {
-    expect(computeGeometryFromAttrs("Spinner", { NumStrings: "4" })).toBeNull();
+  it("returns null for an unsupported DisplayAs", () => {
+    // Label is a non-rendering annotation - "it does not control any lights or channels" - so
+    // there is genuinely no geometry to build, and DmxServo is a fixture rather than pixels.
+    expect(computeGeometryFromAttrs("Label", { Text: "Garage" })).toBeNull();
+    expect(computeGeometryFromAttrs("DmxServo", {})).toBeNull();
   });
 
   it("falls back to sane defaults on missing attributes", () => {

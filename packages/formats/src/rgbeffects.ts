@@ -1,8 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 
-// SPEC ch11 §2: xlights_rgbeffects.xml. Model DisplayAs values webXLights can render (M1
-// scope, per the goal prompt's 12-type list). Everything else imports as `unsupported`
-// so nothing is silently lost.
+// SPEC ch11 §2: xlights_rgbeffects.xml. Model DisplayAs values webXLights can render.
+// Everything else imports as `unsupported` so nothing is silently lost.
 export const SUPPORTED_DISPLAY_AS = [
   "Matrix",
   "Single Line",
@@ -16,6 +15,11 @@ export const SUPPORTED_DISPLAY_AS = [
   "Window Frame",
   "Wreath",
   "Custom",
+  "Spinner",
+  "Cube",
+  "Sphere",
+  "Channel Block",
+  "Image",
 ] as const;
 
 // xLights writes these legacy DisplayAs strings for style variants of Matrix/Tree and

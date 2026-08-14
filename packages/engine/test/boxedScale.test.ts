@@ -100,7 +100,9 @@ describe("choosing the reading from evidence in the file", () => {
   });
 
   it("ignores models it can't build geometry for", () => {
-    const unsupported: PlaceableModel = { displayAs: "Sphere", attrs: { ScaleX: "5" } };
+    // Label is a text annotation - "it does not control any lights or channels" - so there is
+    // genuinely no geometry to measure it by. (Sphere stood here until it became a real type.)
+    const unsupported: PlaceableModel = { displayAs: "Label", attrs: { ScaleX: "5" } };
     const choice = chooseBoxedScaleReading([ROOFLINE, ARCHES, MATRIX_WORLD_SIZE, unsupported], SPACING);
     expect(choice.reading).toBe("worldSize");
     expect(choice.boxedCount).toBe(1);
