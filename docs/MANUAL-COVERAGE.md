@@ -81,15 +81,16 @@ written down. Status here means:
 
 ## Chapter 4 — Built-in effects
 
-xLights ships 55 effects. We render 29.
+xLights ships 55 effects. We render 32.
 
-**Implemented (29):** Bars, Butterfly, Circles, Color Wash, Curtain, Fan, Fill, Fire, Galaxy,
-Garlands, Marquee, Meteors, Off, On, Pictures, Pinwheel, Plasma, Ripple, Shimmer, Shockwave,
-Single Strand, Snow Storm, Snowflakes, Spirals, Strobe, Text, Twinkle, VU Meter, Wave.
+**Implemented (32):** Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill, Fire,
+Galaxy, Garlands, Life, Lightning, Marquee, Meteors, Off, On, Pictures, Pinwheel, Plasma,
+Ripple, Shimmer, Shockwave, Single Strand, Snow Storm, Snowflakes, Spirals, Strobe, Text,
+Twinkle, VU Meter, Wave.
 
-**Missing, and renderable with what the engine already has (17):**
-Adjust, Candle, Fireworks, Guitar, Kaleidoscope, Life, Lightning, Lines, Morph, Music, Shape,
-Sketch, Spirograph, State, Tendrils, Tree, Warp.
+**Missing, and renderable with what the engine already has (14):**
+Adjust, Fireworks, Guitar, Kaleidoscope, Lines, Morph, Music, Shape, Sketch, Spirograph, State,
+Tendrils, Tree, Warp.
 
 **Missing, needs infrastructure we don't have (5):**
 Duplicate (renders another model's layer), Faces + Piano (face/state definitions),

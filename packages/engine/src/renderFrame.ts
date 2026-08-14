@@ -36,6 +36,9 @@ import { renderOff, type OffParams } from "./effects/off";
 import { renderShimmer, type ShimmerParams } from "./effects/shimmer";
 import { renderFill, type FillParams } from "./effects/fill";
 import { createSnowStormState, renderSnowStorm, type SnowStormParams, type SnowStormState } from "./effects/snowStorm";
+import { createLifeState, renderLife, type LifeParams, type LifeState } from "./effects/life";
+import { renderLightning, type LightningParams } from "./effects/lightning";
+import { renderCandle, type CandleParams } from "./effects/candle";
 import type { FrameContext } from "./effects/types";
 import { resolveParamsAtPosition } from "./valueCurve";
 import { applyTransitions, type TransitionSpec } from "./transition";
@@ -70,7 +73,7 @@ const MAX_LAYERS = 5;
 // Effects with per-frame state (heat map / particle list) that must be simulated forward
 // frame-by-frame from the effect's start to reach `atMs` - correct for a scrubbing preview
 // (not a real-time constraint), cheap at typical effect lengths (a few hundred frames).
-const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe", "Snow Storm"]);
+const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe", "Snow Storm", "Life"]);
 
 function positionOf(effect: RenderableEffect, atMs: number): number {
   const duration = effect.endMs - effect.startMs || 1;
@@ -107,6 +110,12 @@ function renderStateless(
   switch (effect.name) {
     case "Off":
       renderOff(buffer, params as unknown as OffParams);
+      break;
+    case "Lightning":
+      renderLightning(buffer, palette, params as unknown as LightningParams, ctx);
+      break;
+    case "Candle":
+      renderCandle(buffer, palette, params as unknown as CandleParams, ctx);
       break;
     case "Shimmer":
       renderShimmer(buffer, palette, params as unknown as ShimmerParams, ctx);
@@ -224,6 +233,12 @@ function renderStateful(
     for (let f = 0; f <= framesElapsed; f++) {
       const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as SnowStormParams;
       renderSnowStorm(buffer, palette, params, state);
+    }
+  } else if (effect.name === "Life") {
+    const state = createLifeState(buffer.width, buffer.height, paramsAt(effect, 0) as unknown as LifeParams, seed);
+    for (let f = 0; f <= framesElapsed; f++) {
+      const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as LifeParams;
+      renderLife(buffer, palette, params, state);
     }
   }
 }
@@ -372,5 +387,13 @@ function renderStatefulIncremental(
       states.set(key, state);
     }
     renderSnowStorm(buffer, palette, snowParams, state);
+  } else if (effect.name === "Life") {
+    const lifeParams = params as unknown as LifeParams;
+    let state = states.get(key) as LifeState | undefined;
+    if (!state) {
+      state = createLifeState(buffer.width, buffer.height, lifeParams, seed);
+      states.set(key, state);
+    }
+    renderLife(buffer, palette, lifeParams, state);
   }
 }

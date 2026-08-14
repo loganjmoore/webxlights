@@ -1,5 +1,16 @@
 # Changelog
 
+## Three more effects: Life, Lightning and Candle
+
+29 of 55 becomes 32.
+
+- **Life** — Conway's Game of Life, whose four rules the manual quotes verbatim, plus three rule variants for its Type setting. The grid **wraps at the edges**: a model-sized buffer is nearly all edge — a 16×50 mega tree has more boundary cells than interior ones — so on a bounded grid every glider would die at a wall within a second and the effect would settle into nothing. Speed is generations per frame, so a slow setting holds a generation on screen rather than skipping the simulation forward.
+- **Lightning** — a zigzag bolt with an optional fork. The palette colours the core and *white always edges it*, which the manual states as a fact about the effect rather than an option, and is what makes a bolt read as lightning instead of a coloured line. Width 1 gives a straight vertical line, as documented.
+- **Candle** — a flickering flame. The palette is **opt-in** here, the opposite way round from every other effect: "by default the Color Palette is not used and the flame is always an orange to reddish color". Per Node gives every pixel its own flicker; without it the whole model flickers together, which is what you want when the model *is* one candle.
+
+Tested against the canonical patterns rather than against our own output: a blinker oscillating with period two, a block staying still, and a blinker straddling the boundary surviving — which it only does if the grid wraps.
+
+
 ## Four more effects from the manual: Off, Shimmer, Fill and Snow Storm
 
 Taking the coverage inventory in order, these four are the ones that need nothing the engine doesn't already have. 25 of 55 becomes 29.
