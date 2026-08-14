@@ -3,6 +3,7 @@ import { KALEIDOSCOPE_TYPES } from "./kaleidoscope";
 import { FACE_EYE_MODES } from "./faces";
 import { PIANO_SOURCES, PIANO_TYPES } from "./piano";
 import { STATE_COLOR_MODES, STATE_MODES } from "./state";
+import { VU_METER_TYPES } from "./vuMeter";
 import { TENDRIL_MOVEMENTS } from "./tendrils";
 import { WARP_TREATMENTS, WARP_TYPES } from "./warp";
 
@@ -309,9 +310,12 @@ export const VU_METER_EFFECT_SCHEMA: EffectSchema = {
       key: "type",
       label: "Type",
       type: "choice",
-      options: ["Spectrum", "Volume Bars", "Level Bar", "Level Pulse", "Level Color", "Intensity Wave", "Waveform"],
-      default: "Spectrum",
+      options: [...VU_METER_TYPES],
+      default: "Spectrogram",
     },
+    // Only the timing-event types read this; the rest are driven by the audio. Listed once here
+    // rather than as a second schema, because it is one effect with one Type list in xLights too.
+    { key: "timingTrack", label: "Timing Track", type: "choice", optionsFrom: "timingTracks", default: "" },
     { key: "bars", label: "Bars", type: "intSlider", min: 1, max: 32, default: 12, valueCurve: true },
     { key: "gainPct", label: "Gain", type: "intSlider", min: 0, max: 300, default: 100, valueCurve: true },
     { key: "sensitivityPct", label: "Sensitivity", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },

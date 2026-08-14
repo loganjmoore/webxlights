@@ -14,6 +14,14 @@ export interface FrameContext {
   // Analysed audio for the frame being rendered (audio.ts). Absent when the sequence has no
   // audio loaded; audio-reactive effects fall back to silence rather than failing to render.
   audio?: AudioFrame;
+  /**
+   * The analysed audio at any moment, not just this frame.
+   *
+   * A few of the VU Meter types decay from the last time the level crossed a threshold, which
+   * cannot be worked out from one frame. Handing over a lookup keeps that deterministic - a scrub
+   * and a sequential render see the same history - where keeping state in the effect would not.
+   */
+  audioAt?: (atMs: number) => AudioFrame;
   // Wall-clock position, for the effects whose source is the sequence's own timeline rather than
   // their own parameters. `positionInEffect01` can't stand in: a countdown counts real seconds,
   // and a timing cell is at an absolute millisecond.
