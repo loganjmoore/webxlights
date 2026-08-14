@@ -1,14 +1,16 @@
-import { defaultParamsFor } from "@webxlights/engine";
 import type { ParsedXsq } from "@webxlights/formats";
-import { newEffectId } from "../stores/sequencer";
 import type { ModelGroupRecord, ModelRecord, SequenceBody } from "./api";
+import { applyMapping, autoMapping, donorRows, donorTimingTrackNames, mappingTargets } from "./importMapping";
 
-// Mapping a parsed `.xsq` onto this project's layout.
+// Mapping a parsed `.xsq` onto this project's layout *without asking anybody*.
 //
-// Pulled out of the import page because Tools > Convert needs exactly the same mapping without
-// creating a sequence: converting an `.xsq` to an `.fseq` is "map it onto the layout, render it,
-// write the file", and a converter that mapped differently from the importer would produce a file
-// that didn't match what importing the same sequence would show.
+// Tools > Convert turns an `.xsq` into an `.fseq` and hands it back; there is no sequence, no
+// sequencer, and nowhere to put a mapping dialog. So it maps by name, which is what the import
+// dialog starts from before anyone touches it.
+//
+// That shared starting point is the point: a converter that matched names differently from the
+// importer would produce a file that didn't match what importing the same sequence would show,
+// and the whole reason to convert rather than import is that you trust the two to agree.
 
 export interface MappedXsq {
   body: SequenceBody;
@@ -17,44 +19,18 @@ export interface MappedXsq {
 }
 
 export function mapXsqToBody(parsed: ParsedXsq, models: ModelRecord[], groups: ModelGroupRecord[]): MappedXsq {
-  const modelIdByName = new Map(models.map((m) => [m.name, m.id]));
-  // A sequence Element targeting a Model Group has no distinct "group" type in the `.xsq` -
-  // xLights writes type="model" for both - so a name miss against models falls back to groups
-  // before being reported unmatched. Real sequences target groups constantly.
-  const groupIdByName = new Map(groups.map((g) => [g.name, g.id]));
+  const targets = mappingTargets(models, groups);
+  const donors = donorRows(parsed);
+  const mapping = autoMapping(targets, donors);
+  // Convert takes every timing track: there is nobody to ask which ones, and a timing track costs
+  // nothing in an `.fseq` - it isn't written to one at all.
+  const applied = applyMapping(parsed, targets, mapping, donorTimingTrackNames(parsed));
 
-  const unmatchedNames: string[] = [];
-  const rows = parsed.rows
-    .filter((r) => r.elementType === "model")
-    .map((r) => {
-      const modelId = modelIdByName.get(r.name);
-      const elementId = modelId ?? groupIdByName.get(r.name);
-      if (elementId === undefined) {
-        unmatchedNames.push(r.name);
-        return null;
-      }
-      return {
-        elementType: (modelId !== undefined ? "model" : "group") as "model" | "group",
-        elementId,
-        effects: r.effects.map((eff) => ({
-          id: newEffectId(),
-          name: eff.name,
-          startMs: eff.startMs,
-          endMs: eff.endMs,
-          // An effect whose params weren't translated gets the engine's own schema defaults
-          // rather than an empty bag: the renderers don't all null-guard every field, so an
-          // untranslated effect with `{}` could render as NaN geometry and throw on export.
-          params: (eff.translated ? eff.params : defaultParamsFor(eff.name)) as Record<string, number | boolean | string>,
-        })),
-      };
-    })
-    .filter((r): r is NonNullable<typeof r> => r !== null);
-
-  const timingTracks = parsed.rows
-    .filter((r) => r.elementType === "timing")
-    .map((r) => ({ name: r.name, marks: r.effects.map((e) => e.startMs) }));
-
-  return { body: { rows, timingTracks }, unmatchedNames };
+  const matched = new Set(Object.values(mapping));
+  return {
+    body: applied.body,
+    unmatchedNames: donors.filter((d) => d.effectCount > 0 && !matched.has(d.name)).map((d) => d.name),
+  };
 }
 
 /** A one-line account of what a mapping did, for the import and convert flows alike. */

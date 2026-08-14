@@ -33,7 +33,7 @@ describe("mapping an .xsq onto a layout", () => {
     // The .xsq writes type="model" for groups too, so a name miss has to try groups before being
     // reported unmatched - real sequences target groups constantly.
     const mapped = mapXsqToBody(
-      parsed({ rows: [{ name: "ALL", elementType: "model", effects: [] }] as never }),
+      parsed({ rows: [{ name: "ALL", elementType: "model", effects: [{ name: "On", startMs: 0, endMs: 500, params: {}, translated: true }] }] as never }),
       models,
       groups,
     );
@@ -44,12 +44,28 @@ describe("mapping an .xsq onto a layout", () => {
 
   it("reports a name nothing in the layout has, rather than dropping it silently", () => {
     const mapped = mapXsqToBody(
-      parsed({ rows: [{ name: "Nonexistent", elementType: "model", effects: [] }] as never }),
+      parsed({
+        rows: [
+          { name: "Nonexistent", elementType: "model", effects: [{ name: "On", startMs: 0, endMs: 500, params: {}, translated: true }] },
+        ] as never,
+      }),
       models,
       groups,
     );
     expect(mapped.body.rows).toEqual([]);
     expect(mapped.unmatchedNames).toEqual(["Nonexistent"]);
+  });
+
+  it("says nothing about an unmatched row that had no effects on it", () => {
+    // Nothing was lost, so there is nothing to report. A vendor sequence carries plenty of empty
+    // rows, and listing them as unmatched buries the ones that actually had sequencing on them.
+    const mapped = mapXsqToBody(
+      parsed({ rows: [{ name: "Nonexistent", elementType: "model", effects: [] }] as never }),
+      models,
+      groups,
+    );
+    expect(mapped.body.rows).toEqual([]);
+    expect(mapped.unmatchedNames).toEqual([]);
   });
 
   it("gives an untranslated effect the engine's schema defaults, not an empty bag", () => {
