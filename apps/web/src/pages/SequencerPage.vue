@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { EFFECT_SCHEMAS, defaultParamsFor, type AudioSeries, type BlendMode, type LayerSettings, type TransitionSpec } from "@webxlights/engine";
+import { EFFECT_SCHEMAS, defaultParamsFor, type AudioSeries, type BlendMode, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
 import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
@@ -339,7 +339,7 @@ function handleContextAction(action: string): void {
 function handleParamsUpdate(params: Record<string, EffectParamValue>): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { params });
 }
-function handlePaletteUpdate(palette: string[]): void {
+function handlePaletteUpdate(palette: StoredSwatch[]): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { palette });
 }
 function handleBlendUpdate(patch: { blendMode?: BlendMode; mix?: number }): void {

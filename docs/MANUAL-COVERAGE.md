@@ -58,11 +58,11 @@ written down. Status here means:
 | Changing effects, moving/stretching, aligning | ⚠️ | Move and resize; no align commands |
 | Copy / paste / delete effects | ✅ | Including one row and across rows |
 | Colour settings — palette | ✅ | Up to 6 swatches |
-| Colour settings — **colour curves** | ❌ | A colour that varies across the effect, like a value curve |
+| Colour settings — colour curves | ✅ | Both kinds. **Time**-based curves resolve once a frame, so all 43 effects gain them for free. **Spatial** ones can't be — within one frame the swatch is a different colour in different places — so the layer is rendered at a few points along the curve's axis and each pixel taken from, or blended between, the renders nearest its own position; exact for any effect whose output is linear in its palette, which is nearly all of them. Gradient and None blending, all four directions, up to the manual's 40 markers |
 | Layers | ⚠️ | Up to 5, bottom-to-top |
-| Layer blending — 24 modes | ⚠️ | 19 implemented, including Canvas. The manual documents these with screenshots and the advice "experience is much better than reading about it" rather than defining them in words, so the eight added beyond the original ten follow what their names unambiguously mean (a mask hides, an unmask reveals, a shadow darkens); whether each matches xLights pixel for pixel is unverified. Bottom-Top and Left-Right need the pixel's position, which the blend function isn't given |
+| Layer blending — 24 modes | ✅ | All of them, including Canvas, Bottom-Top, Left-Right and Morph. The manual documents these with screenshots and the advice "experience is much better than reading about it" rather than defining them in words, so the eight added beyond the original ten follow what their names unambiguously mean (a mask hides, an unmask reveals, a shadow darkens); whether each matches xLights pixel for pixel is unverified. Bottom-Top and Left-Right are given the pixel's position along the axis, measured in buffer space where the geometry is known; Morph's cross-fade is driven by the position in the effect rather than by the Mix slider, per the manual's "during the length of the timing cell that the effects are in" |
 | Layer blending — Canvas | ✅ | The layer is handed what the layers underneath it drew instead of a blank buffer, and its output replaces theirs — including where it cleared a pixel, which a Normal blend would have quietly kept |
-| Layer blending — Morph, Suppress Until Frame, Freeze At Frame | ❌ | |
+| Layer blending — Suppress Until Frame, Freeze At Frame | ✅ | Both move or withhold the moment the effect renders at, rather than changing how it combines. Suppress keeps the effect running underneath while hiding it, which is what "warms up" an effect with unwanted opening frames |
 | Transitions | ✅ | All 16 types, in and out |
 | Mix slider | ✅ | |
 | Layer settings — Render Style (buffer styles) | ✅ | All of them. Six for a single model (Default, Per Preview, Single Line, As Pixel, Horizontal/Vertical Per Strand) and the fourteen that arrange a *group's* members into one shared buffer (the four Stacked variants, Horizontal/Vertical Per Model, the two Per Model/Strand, both Overlays, Single Line as a Pixel, and the three Per Model ones that render on each prop separately). A group's Default is Per Preview, per the manual |
@@ -157,9 +157,9 @@ so effects placed on a group reached nothing at all. Real sequences target group
 37% of one real show's sequenced elements — so this was whole passages of a show going dark
 without an error anywhere.
 
-What is left is smaller and more scattered than it was: colour curves, effect presets, views, a
-sub-model editor, the Effect Assist path editor Sketch needs, preferences, and the controller
-visualiser. No single one of them is load-bearing the way group rendering was.
+What is left is smaller and more scattered than it was: effect presets, views, a sub-model
+editor, the Effect Assist path editor Sketch needs, preferences, and the controller visualiser.
+No single one of them is load-bearing the way group rendering was.
 
 After that, the missing effects are worth taking in batches by how much machinery they share:
 the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Lines) before the

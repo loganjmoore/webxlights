@@ -1,4 +1,4 @@
-import { hexToRgba, type GroupRenderSpec, type ModelGeometry } from "@webxlights/engine";
+import { toRenderPalette, type GroupRenderSpec, type ModelGeometry } from "@webxlights/engine";
 import type { ModelGroupRecord, SequenceBody } from "./api";
 
 // Turns this app's stored records into what the engine needs to render a group row.
@@ -25,6 +25,6 @@ export function groupRenderSpecs(
     effects: body.rows
       .filter((r) => r.elementType === "group" && r.elementId === group.id)
       .flatMap((r) => r.effects)
-      .map((e) => ({ ...e, palette: e.palette?.map(hexToRgba) })),
+      .map((e) => ({ ...e, palette: toRenderPalette(e.palette) })),
   }));
 }

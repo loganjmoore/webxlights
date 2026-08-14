@@ -9,8 +9,11 @@ import {
   RENDER_STYLES,
   PATTERNED_TRANSITION_TYPES,
   TRANSITION_TYPES,
+  isColorCurve,
   isValueCurve,
   type BlendMode,
+  type ColorCurve,
+  type StoredSwatch,
   type EffectParamSpec,
   type LayerSettings,
   type LayerTransform,
@@ -21,6 +24,7 @@ import {
   type TransitionType,
 } from "@webxlights/engine";
 import type { EffectParamValue, SequenceEffect } from "../lib/api";
+import ColorCurveEditor from "./ColorCurveEditor.vue";
 import ValueCurveEditor from "./ValueCurveEditor.vue";
 
 const MAX_COLORS = 6; // matches real xLights' Color tab swatch count
@@ -29,7 +33,7 @@ const MAX_COLORS = 6; // matches real xLights' Color tab swatch count
 const props = defineProps<{ effect: SequenceEffect | null }>();
 const emit = defineEmits<{
   update: [params: Record<string, EffectParamValue>];
-  updatePalette: [palette: string[]];
+  updatePalette: [palette: StoredSwatch[]];
   updateBlend: [patch: { blendMode?: BlendMode; mix?: number }];
   updateTransition: [transition: TransitionSpec];
   updateLayer: [layer: LayerSettings];
@@ -43,9 +47,9 @@ function setParam(key: string, value: EffectParamValue): void {
   emit("update", { ...props.effect.params, [key]: value });
 }
 
-function setColor(index: number, hex: string): void {
+function setSwatch(index: number, value: StoredSwatch): void {
   const next = [...palette.value];
-  next[index] = hex;
+  next[index] = value;
   emit("updatePalette", next);
 }
 function addColor(): void {
@@ -54,6 +58,30 @@ function addColor(): void {
 function removeColor(index: number): void {
   if (palette.value.length <= 1) return;
   emit("updatePalette", palette.value.filter((_, i) => i !== index));
+}
+
+// Turning a swatch into a curve starts it at the colour it already was, so the effect looks the
+// same the instant it is converted and the first drag is a change rather than a surprise.
+function makeCurve(index: number): void {
+  const current = palette.value[index];
+  const from = typeof current === "string" ? current : "#ffffff";
+  setSwatch(index, {
+    kind: "colorCurve",
+    mode: "Time",
+    blend: "Gradient",
+    points: [
+      { x: 0, color: from },
+      { x: 1, color: from },
+    ],
+  });
+}
+function unmakeCurve(index: number): void {
+  const current = palette.value[index];
+  // Keeps the curve's first marker, which is the colour the swatch reads as at the effect's start.
+  setSwatch(index, isColorCurve(current) ? (current.points[0]?.color ?? "#ffffff") : "#ffffff");
+}
+function swatchHex(entry: StoredSwatch): string {
+  return typeof entry === "string" ? entry : (entry.points[0]?.color ?? "#ffffff");
 }
 
 function setBlendMode(mode: string): void {
@@ -102,6 +130,14 @@ function resetSubBuffer(): void {
   patchLayer({ subBuffer: { x1: 0, y1: 0, x2: 100, y2: 100 } });
 }
 
+// -1 in the box means "no freeze". A frame number can't be negative, so the sentinel can't
+// collide with a real one, and it keeps the control a plain number input rather than a checkbox
+// plus a number that have to agree with each other.
+function freezeFrom(raw: string): number | undefined {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
 const rotoZoom = computed<RotoZoom>(() => layer.value.rotoZoom ?? {});
 function patchRotoZoom(changes: Partial<RotoZoom>): void {
   patchLayer({ rotoZoom: { ...rotoZoom.value, ...changes } });
@@ -144,12 +180,32 @@ function curveable(p: EffectParamSpec): boolean {
       <div class="color-panel">
         <h4>Color</h4>
         <div class="swatches">
-          <div v-for="(hex, i) in palette" :key="i" class="swatch">
-            <input type="color" :value="hex" @input="setColor(i, ($event.target as HTMLInputElement).value)" />
+          <div v-for="(entry, i) in palette" :key="i" class="swatch">
+            <input
+              type="color"
+              :value="swatchHex(entry)"
+              :disabled="isColorCurve(entry)"
+              :title="isColorCurve(entry) ? 'This swatch is a colour curve' : 'Color'"
+              @input="setSwatch(i, ($event.target as HTMLInputElement).value)"
+            />
+            <button
+              class="curve-swatch"
+              :class="{ on: isColorCurve(entry) }"
+              title="Make this colour change over the effect, or across the model"
+              @click="isColorCurve(entry) ? unmakeCurve(i) : makeCurve(i)"
+            >~</button>
             <button v-if="palette.length > 1" class="remove-swatch" title="Remove color" @click="removeColor(i)">×</button>
           </div>
           <button v-if="palette.length < MAX_COLORS" class="add-swatch" title="Add color" @click="addColor">+</button>
         </div>
+        <template v-for="(entry, i) in palette" :key="`curve-${i}`">
+          <ColorCurveEditor
+            v-if="isColorCurve(entry)"
+            :curve="entry as ColorCurve"
+            @update="setSwatch(i, $event)"
+            @remove="unmakeCurve(i)"
+          />
+        </template>
       </div>
 
       <div class="blend-panel">
@@ -173,6 +229,29 @@ function curveable(p: EffectParamSpec): boolean {
             <span class="value">{{ Math.round((effect.mix ?? 0) * 100) }}</span>
           </span>
         </label>
+        <label class="blend-row">
+          Suppress until frame
+          <input
+            type="number"
+            min="0"
+            :value="layer.suppressUntilFrame ?? 0"
+            @input="patchLayer({ suppressUntilFrame: Math.max(0, Number(($event.target as HTMLInputElement).value)) })"
+          />
+        </label>
+        <label class="blend-row">
+          Freeze at frame
+          <input
+            type="number"
+            min="-1"
+            :value="layer.freezeAtFrame ?? -1"
+            @input="patchLayer({ freezeAtFrame: freezeFrom(($event.target as HTMLInputElement).value) })"
+          />
+        </label>
+        <p class="hint">
+          Suppress hides an effect's first frames while it keeps running underneath, which is how
+          an effect with unwanted opening frames is warmed up. Freeze holds one frame for the rest
+          of the effect; -1 is off.
+        </p>
         <p v-if="needsCanvas" class="hint warn">
           {{ effect.name }} modifies the layer below it rather than drawing its own, so it needs
           the Canvas blend mode and a layer underneath. On any other mode it is handed a blank
@@ -497,6 +576,27 @@ function curveable(p: EffectParamSpec): boolean {
   border-radius: 4px;
   cursor: pointer;
   background: none;
+}
+.curve-swatch {
+  position: absolute;
+  bottom: -0.4rem;
+  right: -0.4rem;
+  width: 1rem;
+  height: 1rem;
+  line-height: 1;
+  font-size: 0.7rem;
+  color: #ddd;
+  background: #1e1e26;
+  border: 1px solid #444;
+  border-radius: 50%;
+  cursor: pointer;
+}
+/* Lit when the swatch is a curve, because the colour well above it then shows only the curve's
+   first marker - without this the swatch would look like an ordinary colour that ignores edits. */
+.curve-swatch.on {
+  color: #1e1e26;
+  background: #ffc878;
+  border-color: #ffc878;
 }
 .remove-swatch {
   position: absolute;

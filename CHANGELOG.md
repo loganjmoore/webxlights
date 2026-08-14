@@ -1,5 +1,26 @@
 # Changelog
 
+## Colour curves, and the last of the blend modes
+
+**Blend modes are now 24 of 24.** Colour curves are in, both kinds.
+
+### Colour curves
+
+A palette swatch normally holds one colour for the whole effect. A colour curve lets it change — *"where previously the same color value would have been displayed for a particular segment duration it can now be made to change within that segment duration."* The manual splits them in two, and they really are different mechanisms:
+
+- **Time based** — *"will change color over the duration of the effect."* Resolved once per frame, before any effect runs, so **all 43 effects gain it without knowing it exists** — the same trick value curves already use for numeric params.
+- **Spatial** — *"will change over the models X/Y location. A spatial color curve has direction."* This one can't be collapsed per frame: within a single frame the swatch is a different colour in different places. Making all 43 effects position-aware for one feature isn't a trade worth taking, so instead the layer is rendered a handful of times, each with the palette resolved at a different point along the curve's axis, and each pixel is taken from — or blended between — the renders nearest its own position. **That's exact for any effect whose output is linear in its palette** (an effect picks a swatch and scales it, which is nearly all of them) and close for the rest. The extra renders are only paid for by a layer that actually uses a spatial curve, capped at eight.
+
+Gradient and None blending, all four directions, up to the manual's 40 markers. The props panel gets a `~` button per swatch and an editor with a live gradient strip — a curve is very hard to reason about from four numbers and easy to see.
+
+One thing worth noting: all five places that converted a stored palette (`preview`, popped-out preview, group rows, sub-model rows, export) now go through one engine function. A swatch holding a curve that reached the old `parseInt`-based hex parse would have come out **white**, silently, in the yard.
+
+### The last five blend modes
+
+- **Bottom-Top** and **Left-Right** — the layer below shows at one edge of the model and this layer at the other, mixed across the span. These had been deferred because *"they need the pixel's position, and the blend function is given only two colours."* The answer turned out to be that the layer stack already composites in node space and knows the geometry, so it can hand the position down — and only three of the twenty-four modes read it, so it's an optional argument rather than noise threaded through the rest.
+- **Morph** — *"will magically make effect 1 'morph' into effect 2 during the length of the timing cell that the effects are in."* So its mix comes from how far through the effect the playhead is, not from the Mix slider.
+- **Suppress Until Frame** and **Freeze At Frame** — not really blend modes at all: both are about *when* a layer shows rather than how it combines, so they move or withhold the moment the effect renders at. Suppress keeps the effect running underneath while hiding it, which is exactly what "warming up" an effect with unwanted opening frames means; a version that simply started it late wouldn't do that.
+
 ## Five more model types
 
 **12 of xLights' 21 becomes 17.** Spinner, Cube, Sphere, Channel Block and Image now import, render and appear in the drag-create palette. Until now a show containing any of them imported them as labelled placeholders — kept, but inert.

@@ -1,4 +1,4 @@
-import type { BlendMode, LayerSettings, PictureImage, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
+import type { BlendMode, LayerSettings, PictureImage, StoredSwatch, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
 
 export class ApiError extends Error {
   status: number;
@@ -150,7 +150,9 @@ export interface SequenceEffect {
   params: Record<string, EffectParamValue>;
   // Per-effect color override (real xLights' Color tab), hex strings. Unset = inherit the
   // row's default palette.
-  palette?: string[];
+  // A swatch is a hex colour, or a colour curve that changes over the effect or across the
+  // model (engine/colorCurve.ts).
+  palette?: StoredSwatch[];
   // Real xLights' Layer Blending panel.
   blendMode?: BlendMode;
   mix?: number; // 0..1, the "Mix" slider

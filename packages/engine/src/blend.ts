@@ -19,6 +19,9 @@ export type BlendMode =
   | "Shadow 2 on 1"
   | "Layered"
   | "Brightness"
+  | "Bottom-Top"
+  | "Left-Right"
+  | "Morph"
   | "Canvas";
 
 // The set the props panel offers, in the manual's own order.
@@ -41,6 +44,9 @@ export const BLEND_MODES: BlendMode[] = [
   "Shadow 2 on 1",
   "Layered",
   "Brightness",
+  "Bottom-Top",
+  "Left-Right",
+  "Morph",
   "Canvas",
 ];
 
@@ -53,6 +59,18 @@ export function isCanvasMode(mode: BlendMode): boolean {
 }
 
 const clamp255 = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));
+const clamp01 = (v: number): number => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0);
+
+// Linear cross-fade from the background to the foreground. Alpha travels with the colour, so a
+// cross-fade into a transparent layer fades out rather than fading to black.
+function mixTowards(fg: RGBA, bg: RGBA, t: number): RGBA {
+  return rgba(
+    clamp255(bg.r + (fg.r - bg.r) * t),
+    clamp255(bg.g + (fg.g - bg.g) * t),
+    clamp255(bg.b + (fg.b - bg.b) * t),
+    clamp255(bg.a + (fg.a - bg.a) * t),
+  );
+}
 
 function value(c: RGBA): number {
   return rgbToHsv(c).v; // 0..1
@@ -84,7 +102,11 @@ function isBlack(c: RGBA): boolean {
 // pixel's position in the buffer, and this function is given only the two colours. Adding a
 // position parameter for two modes would put a coordinate through every blend call in the
 // engine, so they wait for a reason bigger than themselves.
-export function blendPixel(fg: RGBA, bg: RGBA, mode: BlendMode, effectMixThreshold: number): RGBA {
+// `position01` is where this pixel sits along the axis the positional modes read - 0 at the
+// bottom or left edge, 1 at the top or right. Every other mode ignores it, which is why it has a
+// default: only three of the twenty-four care where a pixel is, and threading a coordinate
+// through the rest would be noise.
+export function blendPixel(fg: RGBA, bg: RGBA, mode: BlendMode, effectMixThreshold: number, position01 = 0.5): RGBA {
   switch (mode) {
     case "Normal": {
       const alpha = fg.a * (1 - effectMixThreshold);
@@ -185,6 +207,21 @@ export function blendPixel(fg: RGBA, bg: RGBA, mode: BlendMode, effectMixThresho
     // including where it cleared a pixel, which a Normal blend would have quietly kept.
     case "Canvas":
       return fg;
+
+    // The two positional modes: the layer below shows at one edge of the model, this layer at the
+    // other, mixed across the span between them. Bottom-Top and Left-Right differ only in which
+    // axis the caller measured, so they share one implementation - the axis is chosen where the
+    // position is computed (layerStack.ts), which is the only place that knows the geometry.
+    case "Bottom-Top":
+    case "Left-Right":
+      return mixTowards(fg, bg, clamp01(position01));
+
+    // "The morph option of layer blending will magically make effect 1 'morph' into effect 2
+    // during the length of the timing cell that the effects are in." So it is a cross-fade driven
+    // by how far through the effect the playhead is, not by the Mix slider - renderFrame.ts puts
+    // that position here in place of the slider value.
+    case "Morph":
+      return mixTowards(fg, bg, clamp01(effectMixThreshold));
     default:
       return bg;
   }

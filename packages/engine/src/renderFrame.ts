@@ -53,6 +53,14 @@ import { renderAdjust, type AdjustParams } from "./effects/adjust";
 import { createTendrilsState, renderTendrils, type TendrilsParams, type TendrilsState } from "./effects/tendrils";
 import type { FrameContext } from "./effects/types";
 import { resolveParamsAtPosition } from "./valueCurve";
+import {
+  acrossAt,
+  hasSpatialCurve,
+  resolvePalette,
+  sampleCountFor,
+  spatialAxisFor,
+  type PaletteEntry,
+} from "./colorCurve";
 import { applyTransitions, type TransitionSpec } from "./transition";
 
 export interface RenderableEffect {
@@ -62,8 +70,10 @@ export interface RenderableEffect {
   params: Record<string, unknown>;
   transition?: TransitionSpec;
   // Per-effect color override (real xLights' Color tab) - falls back to the row's own palette
-  // (the app-wide default, until a model/group-level palette exists) when unset.
-  palette?: RGBA[];
+  // (the app-wide default, until a model/group-level palette exists) when unset. A swatch may be
+  // a plain colour or a *colour curve*, which changes over the effect or across the model
+  // (colorCurve.ts); it is collapsed to a plain colour before any effect sees it.
+  palette?: PaletteEntry[];
   // Real xLights' Layer Blending panel: how this effect's layer composites onto the layers
   // below it (default "Normal" = fully opaque overwrite) and the "Mix" slider some blend
   // modes read as their reveal/fade threshold (see blend.ts's blendPixel).
@@ -87,6 +97,27 @@ const MAX_LAYERS = 5;
 // (not a real-time constraint), cheap at typical effect lengths (a few hundred frames).
 const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe", "Snow Storm", "Life", "Tendrils"]);
 
+// Morph cross-fades one layer into the one below it "during the length of the timing cell that
+// the effects are in", so its mix is how far through the effect the playhead is rather than a
+// slider position. Every other mode keeps the slider.
+function mixFor(effect: RenderableEffect, atMs: number): number {
+  return effect.blendMode === "Morph" ? positionOf(effect, atMs) : (effect.mix ?? 0);
+}
+
+// The two frame controls from the Layer Blending panel (layerSettings.ts). Both are about *when*
+// a layer shows rather than how it combines, so they are applied by moving or withholding the
+// moment the effect is rendered at, before anything else happens.
+//
+// Returns null when the layer is suppressed at this moment, which the caller renders as nothing.
+function frameControlledMs(effect: RenderableEffect, atMs: number, frameMs: number): number | null {
+  const frame = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
+  const suppress = effect.layer?.suppressUntilFrame ?? 0;
+  if (suppress > 0 && frame < suppress) return null;
+  const freeze = effect.layer?.freezeAtFrame;
+  if (freeze !== undefined && freeze >= 0 && frame > freeze) return effect.startMs + freeze * frameMs;
+  return atMs;
+}
+
 function positionOf(effect: RenderableEffect, atMs: number): number {
   const duration = effect.endMs - effect.startMs || 1;
   return Math.max(0, Math.min(1, (atMs - effect.startMs) / duration));
@@ -106,7 +137,7 @@ function renderStateless(
   seed: number,
   audio: AudioSeries | undefined,
 ): void {
-  const palette = effect.palette ?? rowPalette; // real xLights' per-effect Color tab
+  const palette = rowPalette; // already resolved for this frame and position (colorCurve.ts)
   const positionInEffect01 = positionOf(effect, atMs);
   const frameIndexInEffect = 0; // shimmer/parity-only field; scrubbing doesn't track frame parity
   // Left undefined when the sequence has no analysed track, so audio-reactive effects can tell
@@ -244,7 +275,7 @@ function renderStateful(
   seed: number,
   audio: AudioSeries | undefined,
 ): void {
-  const palette = effect.palette ?? rowPalette; // real xLights' per-effect Color tab
+  const palette = rowPalette; // already resolved (colorCurve.ts)
   const duration = effect.endMs - effect.startMs || 1;
   const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
 
@@ -329,6 +360,64 @@ function renderPersistent(
 // same and the cost stops growing.
 const MAX_PERSISTENT_FRAMES = 600;
 
+// Collapses colour curves around one layer's render (colorCurve.ts).
+//
+// A *time* curve is resolved once for the frame, so every effect gains it for free - the same
+// trick value curves use for numeric params.
+//
+// A *spatial* curve can't be: within a single frame the swatch is a different colour in different
+// places, and making all 43 effects position-aware for one feature is not a trade worth taking.
+// Instead the effect is rendered a few times, each with the palette resolved at a different point
+// along the curve's axis, and each destination pixel is taken from - or blended between - the
+// renders nearest its own position. That is exact for any effect whose output is linear in its
+// palette (an effect picks a swatch and scales it, which is nearly all of them) and close for the
+// rest. The extra renders are only paid for by a layer that actually uses a spatial curve.
+function renderWithColorCurves(
+  target: RenderBuffer,
+  palette: PaletteEntry[],
+  position01: number,
+  draw: (buffer: RenderBuffer, resolved: RGBA[]) => void,
+): void {
+  if (!hasSpatialCurve(palette)) {
+    draw(target, resolvePalette(palette, position01));
+    return;
+  }
+
+  const samples = sampleCountFor(palette);
+  const { direction, blend } = spatialAxisFor(palette);
+  const renders: RenderBuffer[] = [];
+  for (let s = 0; s < samples; s++) {
+    const across = samples > 1 ? s / (samples - 1) : 0;
+    const buffer = new RenderBuffer(target.width, target.height);
+    draw(buffer, resolvePalette(palette, position01, across));
+    renders.push(buffer);
+  }
+
+  for (let y = 0; y < target.height; y++) {
+    for (let x = 0; x < target.width; x++) {
+      const across = acrossAt(direction, x, y, target.width, target.height);
+      const scaled = across * (samples - 1);
+      const lower = Math.min(samples - 1, Math.floor(scaled));
+      // "None" is the manual's sharp change, so it snaps to the nearer render rather than
+      // blending across the boundary the curve deliberately made hard.
+      if (blend === "None") {
+        target.setPixel(x, y, renders[Math.round(scaled)]!.getPixel(x, y));
+        continue;
+      }
+      const upper = Math.min(samples - 1, lower + 1);
+      const f = scaled - lower;
+      const a = renders[lower]!.getPixel(x, y);
+      const b = renders[upper]!.getPixel(x, y);
+      target.setPixel(x, y, rgba(
+        Math.round(a.r + (b.r - a.r) * f),
+        Math.round(a.g + (b.g - a.g) * f),
+        Math.round(a.b + (b.b - a.b) * f),
+        Math.round(a.a + (b.a - a.a) * f),
+      ));
+    }
+  }
+}
+
 // Renders one row (model or group) at a given playhead time: finds effects active at atMs
 // (row.effects array order = layer order, bottom-to-top, Normal blend - M2's data model has
 // no explicit layer index yet), composites via the M3 layer stack, and maps to node colors.
@@ -354,15 +443,19 @@ export function renderRowAtMs(
       // Layer settings wrap the effect rather than post-processing the model: a sub-buffer hands
       // the effect a smaller canvas to compose itself into, instead of cropping a full-size
       // render down to it (layerSettings.ts).
+      const shownAt = frameControlledMs(effect, atMs, frameMs);
+      if (shownAt === null) return; // suppressed for now: the layer renders as nothing
       renderWithLayerSettings(buffer, effect.layer, (target) => {
-        if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(target, palette, effect, atMs, frameMs, seed, audio);
-        else if (effect.layer?.persistent) renderPersistent(target, palette, effect, atMs, frameMs, seed, audio);
-        else renderStateless(target, palette, effect, atMs, seed, audio);
+        renderWithColorCurves(target, effect.palette ?? palette, positionOf(effect, shownAt), (paint, colors) => {
+          if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(paint, colors, effect, shownAt, frameMs, seed, audio);
+          else if (effect.layer?.persistent) renderPersistent(paint, colors, effect, shownAt, frameMs, seed, audio);
+          else renderStateless(paint, colors, effect, shownAt, seed, audio);
+        });
         if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
       });
     },
     blendMode: effect.blendMode ?? "Normal",
-    effectMixThreshold: effect.mix ?? 0,
+    effectMixThreshold: mixFor(effect, atMs),
   }));
 
   return renderLayerStackToNodes(row.geometry.nodes.length, layers);
@@ -408,30 +501,34 @@ export function createRowSequencer(
     const layers: NodeLayerSpec[] = activeWithIndex.map(({ effect, index }) => ({
       geometry: applyRenderStyle(row.geometry, effect.layer?.renderStyle),
       render: (buffer: RenderBuffer) => {
+        const shownAt = frameControlledMs(effect, atMs, frameMs);
+        if (shownAt === null) return; // suppressed for now: the layer renders as nothing
         renderWithLayerSettings(buffer, effect.layer, (target) => {
-          if (STATEFUL_EFFECTS.has(effect.name)) {
-            renderStatefulIncremental(target, palette, effect, atMs, frameMs, seed, index, statefulStates, audio);
-          } else if (effect.layer?.persistent) {
-            // Sequential export walks the frames in order anyway, so persistence here is just a
-            // matter of keeping the buffer around instead of replaying into a fresh one.
-            const key = `persist:${index}`;
-            let kept = statefulStates.get(key) as RenderBuffer | undefined;
-            if (!kept || kept.width !== target.width || kept.height !== target.height) {
-              kept = new RenderBuffer(target.width, target.height);
-              statefulStates.set(key, kept);
+          renderWithColorCurves(target, effect.palette ?? palette, positionOf(effect, shownAt), (paint, colors) => {
+            if (STATEFUL_EFFECTS.has(effect.name)) {
+              renderStatefulIncremental(paint, colors, effect, shownAt, frameMs, seed, index, statefulStates, audio);
+            } else if (effect.layer?.persistent) {
+              // Sequential export walks the frames in order anyway, so persistence here is just a
+              // matter of keeping the buffer around instead of replaying into a fresh one.
+              const key = `persist:${index}`;
+              let kept = statefulStates.get(key) as RenderBuffer | undefined;
+              if (!kept || kept.width !== paint.width || kept.height !== paint.height) {
+                kept = new RenderBuffer(paint.width, paint.height);
+                statefulStates.set(key, kept);
+              }
+              renderStateless(kept, colors, effect, shownAt, seed, audio);
+              for (let y = 0; y < paint.height; y++) {
+                for (let x = 0; x < paint.width; x++) paint.setPixel(x, y, kept.getPixel(x, y));
+              }
+            } else {
+              renderStateless(paint, colors, effect, shownAt, seed, audio);
             }
-            renderStateless(kept, palette, effect, atMs, seed, audio);
-            for (let y = 0; y < target.height; y++) {
-              for (let x = 0; x < target.width; x++) target.setPixel(x, y, kept.getPixel(x, y));
-            }
-          } else {
-            renderStateless(target, palette, effect, atMs, seed, audio);
-          }
+          });
           if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
         });
       },
       blendMode: effect.blendMode ?? "Normal",
-      effectMixThreshold: effect.mix ?? 0,
+      effectMixThreshold: mixFor(effect, atMs),
     }));
 
     return renderLayerStackToNodes(row.geometry.nodes.length, layers);
@@ -451,7 +548,7 @@ function renderStatefulIncremental(
   states: Map<number | string, unknown>,
   audio: AudioSeries | undefined,
 ): void {
-  const palette = effect.palette ?? rowPalette;
+  const palette = rowPalette; // already resolved (colorCurve.ts)
   const duration = effect.endMs - effect.startMs || 1;
   const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
   const position01 = Math.min(1, (framesElapsed * frameMs) / duration);
