@@ -137,7 +137,7 @@ Moving Head + Servo (DMX fixtures).
 |---|---|---|
 | Controller list, add, delete | ✅ | |
 | USB / Ethernet / NULL controller types | ⚠️ | Generic controllers with a start channel and count |
-| Controller visualiser | ❌ | Port-by-port layout of what's plugged in where |
+| Controller visualiser | ⚠️ | A channel-by-channel view of what's assigned where, per controller, with free space, overruns and — the reason to have it — **channel collisions between models on the same controller**. Nothing else in the app surfaces those: each assignment is checked against the controller's span when it's made, never against the other models already on it. Missing: xLights' physical port/string breakdown, which needs per-port controller definitions this app doesn't model |
 | Auto start-channel allocation | ❌ | |
 
 ---
@@ -159,8 +159,8 @@ so effects placed on a group reached nothing at all. Real sequences target group
 37% of one real show's sequenced elements — so this was whole passages of a show going dark
 without an error anywhere.
 
-What is left is smaller and more scattered than it was: preferences, the controller visualiser,
-and a long tail of Layout-tab conveniences (filter, clone, replace, align).
+What is left is smaller and more scattered than it was: preferences, and a long tail of
+Layout-tab conveniences (filter, clone, replace, align).
 No single one of them is load-bearing the way group rendering was, and the eleven remaining
 effects all need infrastructure that is a deliberate non-goal — face and state definitions, DMX
 fixtures, shaders and video.

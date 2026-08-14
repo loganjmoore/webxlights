@@ -1,5 +1,20 @@
 # Changelog
 
+## A controller visualiser, and the bug it exists to find
+
+A Controllers tab on the Layout page: each controller's channel span drawn to scale, with every model assigned to it, plus how many channels are free and how many run past the end.
+
+**The reason to build it isn't the picture.** Two models assigned to overlapping channels is a show-day bug of exactly the worst kind — nothing errors, the `.fseq` exports, and two props light each other's effects. Nothing in the app surfaced that, because each model's assignment is validated against the *controller's* span when it's made and never against the other models already on it. Collisions are now called out on the bar, in the list, and on the tab itself.
+
+Models that merely sit back-to-back are deliberately not flagged: that's the normal, correct arrangement, and warning on it would make the warning useless by firing on every well-packed controller. A model reports *all* of its collisions rather than just the next one along, which is what you need when a mis-typed offset buries three props at once.
+
+Overrun is worth having separately from the per-assignment check: that check catches a bad offset when it's typed, but not a model whose node count grew afterwards — editing a matrix's size doesn't revisit its offset.
+
+Unassigned models get their own section. They still export, written after every controller-routed span, but their channel numbers move whenever a controller assignment changes — which is worth being able to see rather than infer.
+
+Missing, and recorded: xLights' physical port/string breakdown, which needs per-port controller definitions this app doesn't model.
+
+
 ## Sub-models can be made, not just imported
 
 Sub-models already imported, resolved to their own geometry, appeared in the sequencer and rendered in both the preview and the `.fseq` export. What was missing was any way to **make** one — or to fix one that came in wrong. The only route was to go back to xLights and re-import.

@@ -14,6 +14,7 @@ import {
   type SubModelSpec,
 } from "@webxlights/engine";
 import SubModelEditor from "../components/SubModelEditor.vue";
+import { controllerLayouts, slotBarStyle, unassignedModels } from "../lib/controllerLayout";
 import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { confirm } from "../lib/confirm";
@@ -117,7 +118,17 @@ const renameValue = ref("");
 
 // M15.5: Model Groups editor - previously import-only (bulkUpsertModelGroups, resolves
 // membership by name), no path to create/rename/re-member/delete a group from the app itself.
-const activeTab = ref<"models" | "groups">("models");
+const activeTab = ref<"models" | "groups" | "controllers">("models");
+
+// xLights' controller visualiser: what is plugged in where. The reason to have it isn't the
+// picture - it is that two models on overlapping channels is a show-day bug nothing else in this
+// app surfaces. Each model's assignment is validated against the *controller's* span when it is
+// made, never against the other models already on it.
+const controllerViews = computed(() => controllerLayouts(controllers.value, models.value, channelCountForModel));
+const looseModels = computed(() => unassignedModels(models.value));
+const collisionCount = computed(() =>
+  controllerViews.value.reduce((n, view) => n + view.slots.filter((s) => s.collidesWith.length > 0).length, 0),
+);
 const groups = ref<ModelGroupRecord[]>([]);
 const selectedGroupId = ref<number | null>(null);
 const selectedGroup = computed(() => groups.value.find((g) => g.id === selectedGroupId.value) ?? null);
@@ -563,9 +574,61 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
         <div class="tabs">
           <button :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">Models ({{ models.length }})</button>
           <button :class="{ active: activeTab === 'groups' }" @click="activeTab = 'groups'">Groups ({{ groups.length }})</button>
+          <button :class="{ active: activeTab === 'controllers' }" @click="activeTab = 'controllers'">
+            Controllers ({{ controllers.length }}){{ collisionCount ? " ⚠" : "" }}
+          </button>
         </div>
 
-        <template v-if="activeTab === 'groups'">
+        <template v-if="activeTab === 'controllers'">
+          <p v-if="collisionCount" class="controller-warning">
+            {{ collisionCount }} model{{ collisionCount === 1 ? "" : "s" }} share channels with
+            another on the same controller. Nothing will error — they'll simply light each other's
+            effects.
+          </p>
+          <div v-for="view in controllerViews" :key="view.controller.id" class="controller-view">
+            <div class="controller-head">
+              <strong>{{ view.controller.name }}</strong>
+              <span class="controller-meta">
+                ch {{ view.controller.start_channel }}–{{ view.controller.start_channel + view.controller.channel_count - 1 }},
+                {{ view.freeChannels }} free
+                <template v-if="view.overrunChannels">
+                  , <span class="bad">{{ view.overrunChannels }} past the end</span>
+                </template>
+              </span>
+            </div>
+            <div class="channel-track">
+              <div
+                v-for="slot in view.slots"
+                :key="slot.model.id"
+                class="channel-slot"
+                :class="{ bad: slot.collidesWith.length > 0 }"
+                :style="slotBarStyle(view, slot)"
+                :title="`${slot.model.name}: ch ${slot.startChannel}–${slot.endChannel}`"
+              />
+            </div>
+            <ul class="controller-models">
+              <li v-for="slot in view.slots" :key="slot.model.id" :class="{ bad: slot.collidesWith.length > 0 }">
+                <span>{{ slot.model.name }}</span>
+                <span class="controller-meta">ch {{ slot.startChannel }}–{{ slot.endChannel }}</span>
+                <span v-if="slot.collidesWith.length" class="bad">overlaps {{ slot.collidesWith.join(", ") }}</span>
+              </li>
+              <li v-if="view.slots.length === 0" class="empty">Nothing assigned to this controller.</li>
+            </ul>
+          </div>
+          <p v-if="controllers.length === 0" class="empty">No controllers in this project yet.</p>
+          <div v-if="looseModels.length" class="controller-view">
+            <div class="controller-head"><strong>Not assigned to a controller</strong></div>
+            <p class="controller-meta">
+              These still export — they're written after every controller-routed span — but their
+              channel numbers move whenever a controller assignment changes.
+            </p>
+            <ul class="controller-models">
+              <li v-for="m in looseModels" :key="m.id"><span>{{ m.name }}</span></li>
+            </ul>
+          </div>
+        </template>
+
+        <template v-else-if="activeTab === 'groups'">
           <ul class="group-list">
             <li v-for="g in groups" :key="g.id" :class="{ selected: g.id === selectedGroupId }" @click="selectGroup(g)">
               <span>{{ g.name }}</span>
@@ -770,6 +833,62 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 </template>
 
 <style scoped>
+.controller-view {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.controller-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.controller-meta {
+  font-size: 0.7rem;
+  color: #777;
+}
+/* An overlap is the one thing on this screen that will ruin a show, so it is the one thing
+   coloured. Everything else stays quiet. */
+.bad {
+  color: #b3261e;
+}
+.controller-warning {
+  color: #b3261e;
+  font-size: 0.75rem;
+  margin: 0 0 0.4rem;
+}
+.channel-track {
+  position: relative;
+  height: 12px;
+  margin: 0.3rem 0;
+  background: #eee;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.channel-slot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #50a0ff;
+  border-right: 1px solid #fff;
+}
+.channel-slot.bad {
+  background: #b3261e;
+}
+.controller-models {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.72rem;
+}
+.controller-models li {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
 /* M13: xLights' own Layout tab is a dark editor UI throughout the window, not just the
    preview canvas - this page inherited the app shell's default black-on-white (see
    GOAL-M13.md's "Correction found during execution"). Scoped to this page's own chrome only. */
