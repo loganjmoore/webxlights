@@ -59,6 +59,7 @@ written down. Status here means:
 | Timeline tags | ⚠️ | A region boundary is a named point on the timeline, which is what a tag is; xLights' separate tag list, with its own colours and independent of the section structure, isn't offered |
 | Timing tracks | ✅ | Fixed interval + metronome generation |
 | Audio-generated timing tracks (beats/bars/lyrics) | ⚠️ | Interval/BPM only; no onset detection |
+| Timing track from a MIDI file | ✅ | A `.mid`'s notes become a timing track whose cells are labelled with the keys sounding in them — which is what the Piano effect reads, so this is how its "Midi file" notes source works here. Reads formats 0/1/2, running status, tempo changes (pooled across tracks, since format 1 keeps them in the first one) and SMPTE division. The Track picker and the manual's own Midi Start Time Adjust and Midi Speed Adjust are applied at import, because they describe the file rather than the rendering. Note ends are boundaries as well as note starts, so a held note stays pressed while the melody moves over it |
 | Adding effects (drag, double-click, drop) | ✅ | |
 | Radial effect wheel | ✅ | Double-click empty grid, per the manual. Opens where the pointer already is, so the whole gesture is double-click, flick, release — which is what makes it worth having over a menu. Offers the same effects as the single-letter shortcuts, from the same list, so the wheel and the keyboard can't drift apart |
 | Changing effects, moving/stretching, aligning | ⚠️ | Move and resize; no align commands |
@@ -105,8 +106,9 @@ which is a shape nothing else in the engine had. Both were previously listed her
 "Single Range or Node ranges" — the same node-range notation sub-models already use — so they are
 now a property of the model, editable on the Layout page and imported from `<stateInfo>`. Piano's
 notes come from "a timing track source... this is the preferred option", whose labels are key
-letters or MIDI values. What is genuinely still missing is *MIDI file import*, which would fill a
-timing track; the effect itself needs nothing further.
+letters or MIDI values. **MIDI file import now exists too** — a `.mid` becomes a timing track — so
+all four of the manual's notes sources are covered except the Audacity label file and xLights' own
+polyphonic transcription, which is an audio-analysis feature rather than an effect one.
 
 State implements all four modes (Default follows the track, Iterate loops the labels evenly,
 Countdown and Time Countdown drive a seven-segment sign), all four colour modes, and Force Custom

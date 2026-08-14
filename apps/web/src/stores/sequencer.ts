@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
-import { api, type SequenceBody, type SequenceEffect, type SequenceRecord } from "../lib/api";
+import { api, type SequenceBody, type SequenceEffect, type SequenceRecord, type TimingTrack } from "../lib/api";
 
 const UNDO_LIMIT = 100;
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -187,6 +187,20 @@ export const useSequencerStore = defineStore("sequencer", () => {
     body.value.timingTracks.push({ name: trackName, marks });
   }
 
+  /**
+   * Adds a track that came from somewhere else - today, a MIDI file's notes.
+   *
+   * Named uniquely like the generated ones, and for the same reason: an imported sequence's own
+   * tracks are real data, and a name collision that overwrote one would destroy it silently.
+   */
+  function addTimingTrack(track: TimingTrack): void {
+    pushUndoSnapshot();
+    let name = track.name;
+    let n = 2;
+    while (body.value.timingTracks.some((t) => t.name === name)) name = `${track.name} ${n++}`;
+    body.value.timingTracks.push({ ...track, name });
+  }
+
   async function saveNow(): Promise<void> {
     if (!sequence.value) return;
     if (saveTimer) {
@@ -265,6 +279,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     deleteTimingMark,
     ensureDefaultTimingTrack,
     generateTimingMarks,
+    addTimingTrack,
     snapshot: pushUndoSnapshot,
     saveNow,
   };
