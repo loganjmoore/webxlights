@@ -1,5 +1,19 @@
 # Changelog
 
+## Layout previews, and the pixel editor
+
+**Layout previews** are a named view of *some* of the models — a way to work on the roofline without the mega tree in the way. All Models, Default and Unassigned are built in; any other preview is one the models name for themselves.
+
+A model's preview comes from its own attribute or from a **group** it belongs to, which is how a whole section of a yard moves into one in a single edit. The named list is computed from the models rather than stored: a preview with no models has nothing to show, and one that existed only in a list would linger after the last model left it. **Unassigned** exists for the same reason it does in xLights — it's what makes a model that was missed findable rather than invisible.
+
+**The pixel editor** is the matrix drawing tool: *"amend a picture or draw your own pictures or animations."* Eight colour wells, left button draws, right erases, drag to paint a stroke.
+
+It draws **straight into the Pictures effect's image**, which is where this app already stores a picture — so what's drawn renders on the model immediately, with no file to save and reload. That's the whole point of it over a paint program: the grid *is* the model. It flips y between the display and the buffer, or everything drawn would render upside down on the prop.
+
+### A control that was missing entirely
+
+Wiring the editor turned up that `decodeImageForEffect` had existed for some time **with no control anywhere in the app**. A Pictures effect could hold an image only if one had arrived with an imported sequence — there was no way to put one there. It has a file picker now, next to the editor.
+
 ## Generate a Custom model from a photo, and Replace Model
 
 **Generate Custom Model** builds a model from a picture of the prop. The props that most need one — a hand-made snowflake, a wire-frame reindeer — are exactly the ones with no library entry, and hand-writing a node grid for anything past a dozen nodes is why people don't.

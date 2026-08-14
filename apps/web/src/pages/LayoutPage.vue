@@ -18,6 +18,7 @@ import {
 import SubModelEditor from "../components/SubModelEditor.vue";
 import { allocateStartChannels, controllerLayouts, slotBarStyle, unassignedModels } from "../lib/controllerLayout";
 import { backgroundFrom, clampOpacity, prepareBackground, type BackgroundImage } from "../lib/backgroundImage";
+import { ALL_MODELS, modelsInPreview, previewNames } from "../lib/layoutPreviews";
 import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { confirm } from "../lib/confirm";
@@ -157,11 +158,32 @@ async function clearBackground(): Promise<void> {
   await api.replaceBackground(layout.value.id, null);
 }
 
+// xLights' Layout Previews: a named view of some of the models, so a roofline can be worked on
+// without the mega tree in the way. Which preview a model is in comes from the model, or from a
+// group it belongs to - so creating one is nothing more than typing a name onto a model.
+const activePreview = ref<string>(ALL_MODELS);
+const availablePreviews = computed(() => previewNames(models.value, groups.value));
+const previewModels = computed(() => modelsInPreview(models.value, groups.value, activePreview.value));
+
+async function setModelPreview(name: string): Promise<void> {
+  const model = selectedModel.value;
+  if (!layout.value || !model) return;
+  const raw_attrs = { ...model.raw_attrs };
+  // An empty name removes the attribute rather than storing "": a model with a blank preview is
+  // in none, which is what Unassigned means, and an empty string would read as a preview called
+  // nothing at all.
+  if (name.trim()) raw_attrs.Preview = name.trim();
+  else delete raw_attrs.Preview;
+  const updated = await api.updateModel(layout.value.id, model.id, { raw_attrs });
+  const idx = models.value.findIndex((m) => m.id === model.id);
+  if (idx !== -1) models.value[idx] = updated;
+}
+
 const modelFilter = ref("");
 const filteredModels = computed(() => {
   const needle = modelFilter.value.trim().toLowerCase();
-  if (!needle) return models.value;
-  return models.value.filter((m) => {
+  if (!needle) return previewModels.value;
+  return previewModels.value.filter((m) => {
     const controllerName = controllers.value.find((c) => c.id === m.controller_id)?.name ?? "";
     return [m.name, m.type, controllerName].some((field) => field.toLowerCase().includes(needle));
   });
@@ -892,6 +914,18 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
             <option value="">Replace with…</option>
             <option v-for="t in MODEL_TYPES_FOR_REPLACE" :key="t" :value="t">{{ t }}</option>
           </select>
+          <select v-model="activePreview" title="Which preview the layout is showing">
+            <option v-for="p in availablePreviews" :key="p" :value="p">{{ p }}</option>
+          </select>
+          <input
+            v-if="selectedModel"
+            type="text"
+            class="clone-count preview-name"
+            placeholder="In preview…"
+            :value="selectedModel.raw_attrs?.Preview ?? ''"
+            title="Which preview this model is in. Blank means none."
+            @change="setModelPreview(($event.target as HTMLInputElement).value)"
+          />
           <input v-model="modelFilter" type="search" placeholder="Filter by name, type or controller" />
           <label class="background-pick" title="A photo of the house, behind the layout">
             Backdrop
@@ -1090,7 +1124,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           />
           <LayoutCanvas
             v-if="viewMode === '2d'"
-            :models="models"
+            :models="previewModels"
             :view-objects="viewObjects"
             :selected-ids="selectedIds"
             @select="selectedIds = $event"
@@ -1100,7 +1134,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           />
           <LayoutCanvas3D
             v-else
-            :models="models"
+            :models="previewModels"
             :view-objects="viewObjects"
             :selected-model-id="selectedModelId"
             @select="selectedIds = $event === null ? [] : [$event]"
@@ -1148,6 +1182,9 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 }
 .clone-count {
   width: 3rem;
+}
+.preview-name {
+  width: 7rem;
 }
 .controller-view {
   border: 1px solid #ddd;

@@ -39,8 +39,8 @@ written down. Status here means:
 | Objects — 2D background image | ✅ | A photo of the house behind the 2D layout, with an opacity slider. Downscaled on the client before it is stored, since a phone photo is several megabytes and this row is read on every page load. Composited as a sibling of the canvas rather than drawn into it, so it costs nothing per drag frame |
 | Objects — Mesh (3D `.obj`) | 🚫 | No OBJ loader |
 | Objects — Grid | ✅ | Gridlines view object |
-| Objects — Pictures | ❌ | |
-| Layout previews (multiple named previews) | ❌ | One preview |
+| Objects — Pictures | ⚠️ | The Pictures *effect* now has a file picker and the pixel editor — until this, `decodeImageForEffect` existed with no control anywhere, so a Pictures effect could only hold an image that arrived with an import. Layout-level picture *objects* (decorations in the layout view) are still absent |
+| Layout previews (multiple named previews) | ✅ | All Models, Default and Unassigned, plus any preview the models name for themselves. A model's preview comes from its own attribute or from a group it's in, so a whole section moves in one edit. Named previews are computed from the models rather than stored — one that existed only in a list would linger after the last model left it |
 | Moving models: drag, linked sets, bulk rotate, align | ⚠️ | Drag and multi-drag; no linked sets, bulk rotate or align |
 
 ## Chapter 4 — Sequencer tab
@@ -76,7 +76,7 @@ written down. Status here means:
 | Views | ✅ | Named, *ordered* subsets of the sequencer's rows, with a picker in the toolbar. Saved on the layout, because the manual is explicit that "views work across sequences" — a per-sequence copy would have to be duplicated into every new sequence and would drift. The Master View isn't stored: it is "a special (system created) view" containing every row, so it is simply the absence of a selection. Missing: the eye icon that hides a model across all sequences (this app's Models panel is the per-sequence equivalent) |
 | Song structure regions | ⚠️ | Named, coloured sections of the timeline, created at the playhead or from a timing track's labels — "one region for each timing mark, using the timing mark's label as the region name". Plus the bulk action they exist for: copying one section's effects onto another, rebased on the target's start. Missing: per-region palette application, exporting a region as its own sequence, and Song Structure Views |
 | Singing faces / phoneme breakdown | 🚫 | Needs face definitions |
-| Pixel editor (matrix drawing tool) | ❌ | |
+| Pixel editor (matrix drawing tool) | ✅ | Draws straight into the Pictures effect's image, so what's drawn renders on the model immediately — no file to save and reload. Eight colour wells, left-draws/right-erases, drag to stroke. The grid is the model's own, and it flips y so a drawing doesn't render upside down |
 | Command palette | ✅ | Ctrl+Shift+K, per the manual. Searchable, ranked so a prefix match beats one buried mid-string, and every entry shows the key it also answers to — which is how anyone learns sixty shortcuts without reading a list of them |
 | Keyboard shortcuts | ✅ | Transport, timing (including **s** to split a mark), edit, zoom, and all fifteen of xLights' single-letter effect shortcuts. Case is significant, as it is in xLights — **o** is On and **O** is Off. Every shortcut and every palette entry comes from one registry, so a key can't exist without a command or a command be given a key nothing dispatches |
 | Render all / render on save | ⚠️ | We render on demand and on export |

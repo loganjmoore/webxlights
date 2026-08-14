@@ -111,6 +111,11 @@ export interface ModelGroupRecord {
   name: string;
   buffer_style: string;
   members: Array<{ id: number; name: string }>;
+  /**
+   * Free-form group attributes. `Preview` lives here: a group's preview puts every one of its
+   * members into that preview without touching any of them (lib/layoutPreviews.ts).
+   */
+  params?: Record<string, unknown> | null;
 }
 
 export interface ModelUpsertPayload {
