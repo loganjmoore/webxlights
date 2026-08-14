@@ -1,5 +1,39 @@
 # Changelog
 
+## The backup was quietly losing half the show
+
+Package Show has always exported a project as a zip and imported it back. Looking at it properly — the ⚠️ "no show-folder backup" row was the next thing on the list — it turned out the feature that existed was worse than the gap.
+
+It carried models, groups and sequence bodies. It did **not** carry sub-models, states, faces, any controller, any channel assignment, view objects, sequencer views, or effect presets. Every one of those was added to the app *after* the package was written, and none of them announced themselves. A backup taken yesterday would have restored a show with its props in the right places, none of their sub-models, no singing faces, and nothing addressed to a controller.
+
+That is the failure mode a backup has: you find out when you need it.
+
+### What version 2 carries
+
+Everything above, plus the layout backdrop. Controller assignments are carried **by name**, because a controller's id only means something in the project it came from — so they are re-linked after both sides exist, rather than restored as numbers pointing at nothing.
+
+A version 1 package still imports. It simply has less in it, which is a true description of the show it came from as far as that code knew.
+
+### Restoring now says what it restored
+
+"Imported 4 sequence(s)" told you nothing about whether the thing you needed came back. It now lists models, sequences, groups, controllers, channel assignments, view objects, views and presets — and states, every time, that audio isn't in the file and needs re-picking. A restore is exactly the moment to say that, rather than leaving it to be discovered in the sequencer.
+
+### The test that would have caught it
+
+The interesting question is not "does the package carry faces" but "what happens the next time a field is added to a model". So the guard is a `Record<keyof ModelRecord, true>` — TypeScript refuses to compile it when a model gains a field, and the test then requires that field to be either packaged or *explicitly excluded with a reason*.
+
+My first attempt at this checked the keys of a sample record instead, which would not have caught anything: the three fields that went missing are optional, and an optional field can simply be left out of a literal. Excluding a field is still allowed — id, channel_count, controller_id and controller_offset are all excluded — but now it takes a decision and a sentence rather than an oversight.
+
+### One correction, after reading the manual's own Backup page
+
+I wrote this up before reading that page, and got one thing wrong: the missing audio is not a shortfall against xLights. Its Backup copies "all the '\*xml' files from your show directory", and the manual separately advises backing up "media files that may have amended with audacity, GIF or JPEGs etc" yourself. The audio gap here is the same gap there.
+
+What *is* genuinely missing is the automatic half — a timestamped `_onstart` folder at each launch, F10/F11 on demand, Backup on Save, and the periodic `.xbkp` snapshot every few minutes. This app autosaves and keeps per-sequence version snapshots, which covers a sequence but not the layout. And File > Restore Backup restores in place, where importing a package here creates a new project: safer, but not the same gesture.
+
+### Also
+
+The VU Meter's Start/End Note sliders showed a bare MIDI number. "48" is C3, and nobody reads it that way, so the note name now sits next to the number.
+
 ## VU Meter: the note-range types
 
 The last substantial group of VU Meter types, and the one that needed something the analysis wasn't recording. 28 types to 37.

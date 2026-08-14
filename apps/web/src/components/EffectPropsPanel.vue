@@ -13,6 +13,7 @@ import {
   TRANSITION_TYPES,
   isColorCurve,
   isValueCurve,
+  midiKeyName,
   type BlendMode,
   type ColorCurve,
   type PictureImage,
@@ -590,7 +591,13 @@ function curveable(p: EffectParamSpec): boolean {
           :value="effect.params[p.key] ?? p.default"
           @input="setParam(p.key, ($event.target as HTMLInputElement).value)"
         />
-        <span v-if="!hasCurve(p.key) && p.key !== 'sketch' && p.type !== 'text'" class="value">{{ effect.params[p.key] ?? p.default }}</span>
+        <!-- A note param's number is the one value in this panel nobody reads at a glance: 48 is
+             C3, and knowing that is the difference between setting a range and guessing at one. -->
+        <span v-if="!hasCurve(p.key) && p.key !== 'sketch' && p.type !== 'text'" class="value">
+          {{ effect.params[p.key] ?? p.default
+          }}<template v-if="p.key === 'startNote' || p.key === 'endNote'">
+            ({{ midiKeyName(Number(effect.params[p.key] ?? p.default)) }})</template>
+        </span>
         <ValueCurveEditor
           v-if="curveable(p)"
           :model-value="effect.params[p.key] ?? p.default"
