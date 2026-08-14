@@ -149,3 +149,86 @@ describe("Persistent layer setting", () => {
     }
   });
 });
+
+// The two frame controls from xLights' Layer Blending panel. Both are about *when* a layer shows
+// rather than how it combines, so they move or withhold the moment the effect renders at.
+describe("Suppress Until Frame and Freeze At Frame", () => {
+  const geometry = computeSingleLine({ strings: 1, nodesPerString: 20 });
+  const chase = { chaseSizePct: 10, cycles: 1, offsetPct: 0 };
+  const litCount = (colors: ReturnType<typeof renderRowAtMs>) => colors.filter((c) => c.a > 0).length;
+
+  it("shows nothing until the suppressed frames have passed, then renders as normal", () => {
+    // The manual's own reason: it "warms up" an effect whose opening frames aren't wanted, by
+    // starting the clock early and only showing it once it has settled. So the effect is at the
+    // same point in its life either way - it was simply hidden.
+    const effect = { name: "SingleStrand", startMs: 0, endMs: 1000, params: chase, layer: { suppressUntilFrame: 6 } };
+    expect(litCount(renderRowAtMs({ geometry, effects: [effect] }, 100, 50, 1, [RED]))).toBe(0);
+
+    const shown = renderRowAtMs({ geometry, effects: [effect] }, 500, 50, 1, [RED]);
+    const unsuppressed = renderRowAtMs(
+      { geometry, effects: [{ ...effect, layer: {} }] },
+      500,
+      50,
+      1,
+      [RED],
+    );
+    expect(shown).toEqual(unsuppressed);
+  });
+
+  it("holds the frozen frame for the rest of the effect", () => {
+    // "Pause or stop an effect at the specified frame and hold that frame and display it until
+    // the end of the effect."
+    const effect = { name: "SingleStrand", startMs: 0, endMs: 1000, params: chase, layer: { freezeAtFrame: 4 } };
+    const atFreeze = renderRowAtMs({ geometry, effects: [effect] }, 200, 50, 1, [RED]);
+    const wellAfter = renderRowAtMs({ geometry, effects: [effect] }, 900, 50, 1, [RED]);
+    expect(wellAfter).toEqual(atFreeze);
+
+    // ...and it really is frozen, not simply unchanging: without the freeze the chase has moved.
+    const moving = renderRowAtMs({ geometry, effects: [{ ...effect, layer: {} }] }, 900, 50, 1, [RED]);
+    expect(moving).not.toEqual(atFreeze);
+  });
+
+  it("leaves the frames before the freeze alone", () => {
+    const effect = { name: "SingleStrand", startMs: 0, endMs: 1000, params: chase, layer: { freezeAtFrame: 10 } };
+    const plain = { ...effect, layer: {} };
+    expect(renderRowAtMs({ geometry, effects: [effect] }, 200, 50, 1, [RED])).toEqual(
+      renderRowAtMs({ geometry, effects: [plain] }, 200, 50, 1, [RED]),
+    );
+  });
+
+  it("renders the same through the sequential export path as through a scrub", () => {
+    const effects = [
+      { name: "SingleStrand", startMs: 0, endMs: 1000, params: chase, layer: { suppressUntilFrame: 3, freezeAtFrame: 12 } },
+    ];
+    const sequencer = createRowSequencer({ geometry, effects }, 50, 1, [RED]);
+    for (let f = 0; f < 20; f++) {
+      const atMs = f * 50;
+      expect(sequencer.renderFrameAt(atMs)).toEqual(renderRowAtMs({ geometry, effects }, atMs, 50, 1, [RED]));
+    }
+  });
+});
+
+describe("the positional and Morph blend modes reach the layer stack", () => {
+  const geometry = computeSingleLine({ strings: 1, nodesPerString: 8 });
+  const onParams = { startIntensity: 100, endIntensity: 100, transparencyPct: 0, cycles: 1, shimmer: false };
+  const BLUE = rgba(0, 0, 255, 255);
+
+  it("Left-Right puts one layer at each end of the model", () => {
+    const effects = [
+      { name: "On", startMs: 0, endMs: 1000, params: onParams, palette: [RED] },
+      { name: "On", startMs: 0, endMs: 1000, params: onParams, palette: [BLUE], blendMode: "Left-Right" as const },
+    ];
+    const colors = renderRowAtMs({ geometry, effects }, 500, 50, 1, [RED]);
+    expect(colors[0]).toEqual(RED); // the lower layer, at the left
+    expect(colors[colors.length - 1]).toEqual(BLUE); // the upper one, at the right
+  });
+
+  it("Morph crosses one layer into the other over the effect, ignoring the Mix slider", () => {
+    const effects = [
+      { name: "On", startMs: 0, endMs: 1000, params: onParams, palette: [RED] },
+      { name: "On", startMs: 0, endMs: 1000, params: onParams, palette: [BLUE], blendMode: "Morph" as const, mix: 0 },
+    ];
+    expect(renderRowAtMs({ geometry, effects }, 0, 50, 1, [RED])[0]).toEqual(RED);
+    expect(renderRowAtMs({ geometry, effects }, 999, 50, 1, [RED])[0]!.b).toBeGreaterThan(200);
+  });
+});

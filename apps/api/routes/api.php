@@ -8,6 +8,7 @@ use App\Http\Controllers\ModelGroupController;
 use App\Http\Controllers\ViewObjectController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMemberController;
+use App\Http\Controllers\SequencerViewController;
 use App\Http\Controllers\SequenceController;
 use App\Http\Controllers\SequenceVersionController;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +32,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('layouts/{layout}/model-groups', [ModelGroupController::class, 'index']);
         Route::post('layouts/{layout}/model-groups/bulk', [ModelGroupController::class, 'bulkUpsert']);
         Route::delete('layouts/{layout}/model-groups/{modelGroup}', [ModelGroupController::class, 'destroy']);
+
+        Route::get('layouts/{layout}/views', [SequencerViewController::class, 'index']);
+        Route::put('layouts/{layout}/views', [SequencerViewController::class, 'replace']);
+        Route::get('layouts/{layout}/effect-presets', [SequencerViewController::class, 'presets']);
+        Route::put('layouts/{layout}/effect-presets', [SequencerViewController::class, 'replacePresets']);
 
         Route::get('layouts/{layout}/view-objects', [ViewObjectController::class, 'index']);
         Route::post('layouts/{layout}/view-objects/bulk', [ViewObjectController::class, 'bulkUpsert']);

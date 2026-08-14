@@ -68,6 +68,19 @@ export interface LayerSettings {
    * because it is the only layer setting that is about *time* rather than about one frame.
    */
   persistent?: boolean;
+  /**
+   * Hide the effect for its first N frames.
+   *
+   * The manual's reason for it is practical: it "warms up" an effect whose opening frames aren't
+   * wanted - a Fire that starts from a cold black buffer, say - by starting the clock early and
+   * only showing it once it has settled.
+   */
+  suppressUntilFrame?: number;
+  /**
+   * "Pause or stop an effect at the specified frame and hold that frame and display it until the
+   * end of the effect."
+   */
+  freezeAtFrame?: number;
 }
 
 export const FULL_SUB_BUFFER: SubBuffer = { x1: 0, y1: 0, x2: 100, y2: 100 };

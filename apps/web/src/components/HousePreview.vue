@@ -7,7 +7,7 @@ import {
   computeSubModel,
   DEFAULT_PALETTE,
   geometryCenter,
-  hexToRgba,
+  toRenderPalette,
   nodeWorldOffset,
   planGroupRendering,
   scatterGroupColors,
@@ -120,7 +120,7 @@ function updateColors(): void {
     const rowEffects = props.body.rows
       .filter((r) => r.elementType === "model" && r.elementId === entry.model.id)
       .flatMap((r) => r.effects)
-      .map((e) => ({ ...e, palette: e.palette?.map(hexToRgba) }));
+      .map((e) => ({ ...e, palette: toRenderPalette(e.palette) }));
     const nodeColors = renderRowAtMs(
       { geometry: entry.geometry, effects: rowEffects },
       props.playheadMs,
@@ -141,7 +141,7 @@ function updateColors(): void {
       const subEffects = props.body.rows
         .filter((r) => r.elementType === "submodel" && r.elementId === entry.model.id && r.subName === spec.name)
         .flatMap((r) => r.effects)
-        .map((e) => ({ ...e, palette: e.palette?.map(hexToRgba) }));
+        .map((e) => ({ ...e, palette: toRenderPalette(e.palette) }));
       if (subEffects.length === 0) continue;
       const subColors = renderRowAtMs(
         { geometry: sub.geometry, effects: subEffects },

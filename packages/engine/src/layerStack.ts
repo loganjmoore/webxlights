@@ -38,6 +38,22 @@ export interface NodeLayerSpec extends LayerSpec {
   geometry: ModelGeometry;
 }
 
+// Where a node sits along the axis a positional blend mode reads, 0..1. Measured in *buffer*
+// space rather than yard space, because that is what "bottom" and "left" mean for a layer - the
+// same convention every other layer setting uses.
+function positionForBlend(mode: BlendMode, geo: ModelGeometry, index: number): number {
+  if (mode !== "Bottom-Top" && mode !== "Left-Right") return 0.5;
+  const node = geo.nodes[index];
+  if (!node) return 0.5;
+  return mode === "Bottom-Top"
+    ? geo.height > 1
+      ? node.bufY / (geo.height - 1)
+      : 0.5
+    : geo.width > 1
+      ? node.bufX / (geo.width - 1)
+      : 0.5;
+}
+
 // Composites layers in *node* space rather than buffer space.
 //
 // Buffer-space compositing assumes every layer shares one buffer, which stops being true the
@@ -64,7 +80,13 @@ export function renderLayerStackToNodes(nodeCount: number, layers: NodeLayerSpec
     for (let i = 0; i < nodeCount; i++) {
       const fg = colors[i];
       if (!fg) continue;
-      result[i] = blendPixel(fg, result[i]!, layer.blendMode, layer.effectMixThreshold);
+      result[i] = blendPixel(
+        fg,
+        result[i]!,
+        layer.blendMode,
+        layer.effectMixThreshold,
+        positionForBlend(layer.blendMode, layer.geometry, i),
+      );
     }
   }
   return result;

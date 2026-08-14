@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { EFFECT_SCHEMAS, defaultParamsFor, type AudioSeries, type BlendMode, type LayerSettings, type TransitionSpec } from "@webxlights/engine";
-import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
+import { EFFECT_SCHEMAS, defaultParamsFor, type AudioSeries, type BlendMode, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
+import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequencerView, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
 import { openPreviewChannel, postPreviewMessage, previewUrlFor, type PreviewMessage } from "../lib/previewChannel";
+import {
+  effectFromPreset,
+  groupPresets,
+  parsePresetFile,
+  presetFileContents,
+  presetFileName,
+  presetFromEffect,
+  type EffectPreset,
+} from "../lib/effectPresets";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type ContextMenuTarget, type GridRow } from "../components/SequencerGrid.vue";
 import EffectContextMenu from "../components/EffectContextMenu.vue";
@@ -31,6 +40,16 @@ const groupRecords = ref<ModelGroupRecord[]>([]);
 // import/export or collaborate across users the way real sequence content does.
 const hiddenRowKeys = ref<Set<string>>(new Set());
 const showModelsPanel = ref(false);
+const showViewsPanel = ref(false);
+const showPresetsPanel = ref(false);
+const presets = ref<EffectPreset[]>([]);
+const newPresetName = ref("");
+const newPresetGroup = ref("Presets");
+const presetError = ref("");
+const presetImportGroup = ref("Presets");
+const layoutId = ref<number | null>(null);
+const newViewName = ref("");
+const viewError = ref("");
 const controllers = ref<ControllerRecord[]>([]);
 const exportError = ref<string | null>(null);
 const peaks = ref<PeakBucket[]>([]);
@@ -91,6 +110,150 @@ const selectedEffect = computed(() => (store.selectedEffectId ? store.findEffect
 function rowKey(row: GridRow): string {
   return `${row.elementType}:${row.elementId}:${row.subName ?? ""}`;
 }
+async function saveViews(next: SequencerView[]): Promise<void> {
+  if (layoutId.value === null) return;
+  viewError.value = "";
+  try {
+    views.value = (await api.replaceViews(layoutId.value, next)).views;
+  } catch (err) {
+    // The whole list is replaced in one call, so a failure leaves the server holding the previous
+    // set. Showing the error and re-reading is better than leaving the panel displaying a view
+    // that isn't saved.
+    viewError.value = err instanceof Error ? err.message : "Couldn't save views";
+    if (layoutId.value !== null) views.value = (await api.listViews(layoutId.value)).views;
+  }
+}
+
+function addView(): void {
+  const name = newViewName.value.trim();
+  if (!name) return;
+  if (views.value.some((v) => v.name === name)) {
+    viewError.value = `There is already a view called "${name}".`;
+    return;
+  }
+  // A new view starts with the rows currently on the grid, in the order they are in - which is
+  // what you were looking at when you decided to make one.
+  void saveViews([...views.value, { name, rowKeys: visibleRows.value.map(rowKey) }]);
+  newViewName.value = "";
+  activeViewName.value = name;
+}
+
+function deleteView(name: string): void {
+  if (activeViewName.value === name) activeViewName.value = null;
+  void saveViews(views.value.filter((v) => v.name !== name));
+}
+
+function toggleRowInView(row: GridRow): void {
+  const view = activeView.value;
+  if (!view) return;
+  const key = rowKey(row);
+  const rowKeys = view.rowKeys.includes(key)
+    ? view.rowKeys.filter((k) => k !== key)
+    : [...view.rowKeys, key];
+  void saveViews(views.value.map((v) => (v.name === view.name ? { ...v, rowKeys } : v)));
+}
+
+// Up/down within the view, matching xLights' own arrows: the order is the point of a view, so it
+// has to be editable without rebuilding the whole list.
+function moveInView(key: string, delta: number): void {
+  const view = activeView.value;
+  if (!view) return;
+  const from = view.rowKeys.indexOf(key);
+  const to = from + delta;
+  if (from < 0 || to < 0 || to >= view.rowKeys.length) return;
+  const rowKeys = [...view.rowKeys];
+  const [moved] = rowKeys.splice(from, 1);
+  rowKeys.splice(to, 0, moved!);
+  void saveViews(views.value.map((v) => (v.name === view.name ? { ...v, rowKeys } : v)));
+}
+
+function rowNameFor(key: string): string {
+  return rows.value.find((r) => rowKey(r) === key)?.name ?? `${key} (missing)`;
+}
+
+// ---- Effect presets ------------------------------------------------------------------------
+// The manual's own workflow: highlight an effect, save it under a group, then apply it somewhere
+// else "without recreating them from scratch". Presets live on the layout, like views, because
+// they are global in xLights rather than belonging to one sequence.
+const presetGroups = computed(() => groupPresets(presets.value));
+
+async function savePresets(next: EffectPreset[]): Promise<void> {
+  if (layoutId.value === null) return;
+  presetError.value = "";
+  try {
+    presets.value = (await api.replaceEffectPresets(layoutId.value, next)).presets;
+  } catch (err) {
+    presetError.value = err instanceof Error ? err.message : "Couldn't save presets";
+    if (layoutId.value !== null) presets.value = (await api.listEffectPresets(layoutId.value)).presets;
+  }
+}
+
+function savePresetFromSelection(): void {
+  const effect = selectedEffect.value;
+  const name = newPresetName.value.trim();
+  if (!effect || !name) return;
+  if (presets.value.some((p) => p.name === name && p.group === newPresetGroup.value.trim())) {
+    presetError.value = `"${name}" already exists in that group.`;
+    return;
+  }
+  void savePresets([...presets.value, presetFromEffect(effect, name, newPresetGroup.value)]);
+  newPresetName.value = "";
+}
+
+// Which grid row the selected effect sits on - the row a preset applies to. Falls back to the
+// first visible row, because a preset with nowhere to land would look like the button did nothing.
+const presetTargetRow = computed<GridRow | undefined>(() => {
+  const id = store.selectedEffectId;
+  if (id) {
+    const owner = store.body.rows.find((r) => r.effects.some((e) => e.id === id));
+    if (owner) {
+      const match = visibleRows.value.find(
+        (r) => r.elementType === owner.elementType && r.elementId === owner.elementId && (r.subName ?? "") === (owner.subName ?? ""),
+      );
+      if (match) return match;
+    }
+  }
+  return visibleRows.value[0];
+});
+
+function applyPreset(preset: EffectPreset): void {
+  // Applied at the playhead on the row the selection is on, which is the grid location the manual
+  // has you navigate to before applying.
+  const row = presetTargetRow.value;
+  if (!row) return;
+  store.addEffect(row.elementType, row.elementId, row.subName, effectFromPreset(preset, newEffectId(), playheadMs.value));
+}
+
+function deletePreset(preset: EffectPreset): void {
+  void savePresets(presets.value.filter((p) => !(p.name === preset.name && p.group === preset.group)));
+}
+
+function exportPreset(preset: EffectPreset): void {
+  const blob = new Blob([presetFileContents(preset)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = presetFileName(preset);
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function importPreset(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  presetError.value = "";
+  // "A preset will be created under the highlighted group with the name of the selected file."
+  const name = file.name.replace(/\.xpreset$/i, "");
+  const parsed = parsePresetFile(await file.text(), name, presetImportGroup.value);
+  input.value = "";
+  if (!parsed) {
+    presetError.value = `"${file.name}" isn't a preset file.`;
+    return;
+  }
+  await savePresets([...presets.value, parsed]);
+}
+
 function hiddenStorageKey(): string {
   return `webxlights.sequencer.hiddenRows.${sequenceId.value}`;
 }
@@ -121,7 +284,28 @@ function hideAllRows(): void {
   hiddenRowKeys.value = new Set(rows.value.map(rowKey));
   saveHiddenRows();
 }
-const visibleRows = computed(() => rows.value.filter((r) => !hiddenRowKeys.value.has(rowKey(r))));
+// xLights' Views (manual: Sequencer > Views): "a view is used to be able to easily select a list
+// of models *and the sequence in which they are to be displayed* on the sequencer". They live on
+// the layout because "views work across sequences", so one set up here is available in every
+// sequence of the project - which is also why they are saved rather than kept in localStorage the
+// way the Models panel's scratch toggles are.
+//
+// The Master View is not stored: it is "a special (system created) view" containing every row, so
+// it is simply the absence of a selection.
+const views = ref<SequencerView[]>([]);
+const activeViewName = ref<string | null>(null);
+const activeView = computed(() => views.value.find((v) => v.name === activeViewName.value) ?? null);
+
+const visibleRows = computed(() => {
+  const shown = rows.value.filter((r) => !hiddenRowKeys.value.has(rowKey(r)));
+  const view = activeView.value;
+  if (!view) return shown;
+  // A view names its rows *in order*, so the grid follows the view rather than the layout. Rows
+  // the view doesn't name are dropped; a named row the layout no longer has is skipped rather
+  // than left as a gap, which is what happens when a model is deleted after a view was saved.
+  const byKey = new Map(shown.map((r) => [rowKey(r), r]));
+  return view.rowKeys.map((k) => byKey.get(k)).filter((r): r is GridRow => !!r);
+});
 function effectCountFor(row: GridRow): number {
   const found = store.body.rows.find(
     (r) => r.elementType === row.elementType && r.elementId === row.elementId && (r.subName ?? undefined) === row.subName,
@@ -155,6 +339,9 @@ async function loadRows(): Promise<void> {
   modelRecords.value = models;
   groupRecords.value = groups;
   controllers.value = await api.listControllers(Number(route.params.projectId));
+  layoutId.value = layout.id;
+  views.value = (await api.listViews(layout.id)).views;
+  presets.value = (await api.listEffectPresets(layout.id)).presets;
   loadHiddenRows();
 }
 
@@ -339,7 +526,7 @@ function handleContextAction(action: string): void {
 function handleParamsUpdate(params: Record<string, EffectParamValue>): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { params });
 }
-function handlePaletteUpdate(palette: string[]): void {
+function handlePaletteUpdate(palette: StoredSwatch[]): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { palette });
 }
 function handleBlendUpdate(patch: { blendMode?: BlendMode; mix?: number }): void {
@@ -546,6 +733,18 @@ watch(sequenceId, async (id) => {
       <span v-if="exportError" class="export-error">{{ exportError }}</span>
       <button @click="snapshotNow" :disabled="!store.sequence">Snapshot</button>
       <button @click="toggleHistory" :disabled="!store.sequence">History</button>
+      <select
+        v-model="activeViewName"
+        title="Which view the grid is showing. The Master View is every row."
+        :disabled="rows.length === 0"
+      >
+        <option :value="null">Master View</option>
+        <option v-for="v in views" :key="v.name" :value="v.name">{{ v.name }}</option>
+      </select>
+      <button :class="{ active: showViewsPanel }" @click="showViewsPanel = !showViewsPanel">Views</button>
+      <button :class="{ active: showPresetsPanel }" @click="showPresetsPanel = !showPresetsPanel">
+        Presets{{ presets.length ? ` (${presets.length})` : "" }}
+      </button>
       <button :class="{ active: showModelsPanel }" @click="showModelsPanel = !showModelsPanel">
         Models{{ hiddenRowKeys.size ? ` (${visibleRows.length}/${rows.length})` : "" }}
       </button>
@@ -612,6 +811,111 @@ watch(sequenceId, async (id) => {
         </li>
         <li v-if="versions.length === 0" class="empty">No snapshots yet — click "Snapshot" to create one.</li>
       </ul>
+    </div>
+
+    <div v-if="showPresetsPanel" class="models-panel">
+      <div class="models-panel-head">
+        <h2>Effect presets</h2>
+        <div class="models-panel-actions">
+          <input v-model="newPresetName" type="text" placeholder="Preset name" @keyup.enter="savePresetFromSelection" />
+          <input v-model="newPresetGroup" type="text" placeholder="Group" />
+          <button :disabled="!selectedEffect || !newPresetName.trim()" @click="savePresetFromSelection">
+            Save selected effect
+          </button>
+        </div>
+      </div>
+      <p class="timing-note">
+        A preset saves everything about an effect except where it is — its params, colours, blend
+        mode, transitions and layer settings. Applying one drops it at the playhead on the row
+        your selection is on. Presets are saved with the layout, so they're available in every
+        sequence of this project.
+      </p>
+      <p v-if="presetError" class="export-error">{{ presetError }}</p>
+
+      <div class="models-panel-head">
+        <h2>Import</h2>
+        <div class="models-panel-actions">
+          <input v-model="presetImportGroup" type="text" placeholder="Into group" />
+          <input type="file" accept=".xpreset,application/json" @change="importPreset" />
+        </div>
+      </div>
+
+      <template v-for="g in presetGroups" :key="g.group">
+        <div class="models-panel-head"><h2>{{ g.group }}</h2></div>
+        <ul>
+          <li v-for="p in g.presets" :key="`${g.group}/${p.name}`">
+            <label>
+              {{ p.name }}
+              <span class="row-type">{{ p.settings.name }}</span>
+            </label>
+            <span class="models-panel-actions">
+              <button :disabled="!presetTargetRow" @click="applyPreset(p)">Apply</button>
+              <button @click="exportPreset(p)">Export</button>
+              <button @click="deletePreset(p)">Delete</button>
+            </span>
+          </li>
+        </ul>
+      </template>
+      <p v-if="presets.length === 0" class="empty">
+        No presets yet. Select an effect on the grid, name it above and save it.
+      </p>
+    </div>
+
+    <div v-if="showViewsPanel" class="models-panel">
+      <div class="models-panel-head">
+        <h2>Views</h2>
+        <div class="models-panel-actions">
+          <input v-model="newViewName" type="text" placeholder="New view name" @keyup.enter="addView" />
+          <button :disabled="!newViewName.trim()" @click="addView">Add view</button>
+        </div>
+      </div>
+      <p class="timing-note">
+        A view is a named list of rows and the order they show in. Views are saved with the
+        layout, so one set up here is available in every sequence of this project.
+      </p>
+      <p v-if="viewError" class="export-error">{{ viewError }}</p>
+
+      <ul v-if="views.length">
+        <li v-for="v in views" :key="v.name">
+          <label>
+            <input type="radio" :value="v.name" :checked="activeViewName === v.name" @change="activeViewName = v.name" />
+            {{ v.name }}
+            <span class="row-type">{{ v.rowKeys.length }} row{{ v.rowKeys.length === 1 ? "" : "s" }}</span>
+          </label>
+          <button class="row-effect-count" @click="deleteView(v.name)">Delete</button>
+        </li>
+      </ul>
+      <p v-else class="empty">No views yet. The grid is showing the Master View — every row.</p>
+
+      <template v-if="activeView">
+        <div class="models-panel-head">
+          <h2>Rows in "{{ activeView.name }}"</h2>
+        </div>
+        <ul>
+          <li v-for="(key, i) in activeView.rowKeys" :key="key">
+            <label>{{ rowNameFor(key) }}</label>
+            <span class="models-panel-actions">
+              <button :disabled="i === 0" title="Move up" @click="moveInView(key, -1)">↑</button>
+              <button :disabled="i === activeView.rowKeys.length - 1" title="Move down" @click="moveInView(key, 1)">↓</button>
+            </span>
+          </li>
+          <li v-if="activeView.rowKeys.length === 0" class="empty">
+            This view has no rows yet — tick some below.
+          </li>
+        </ul>
+        <div class="models-panel-head">
+          <h2>Add or remove rows</h2>
+        </div>
+        <ul>
+          <li v-for="row in rows" :key="rowKey(row)">
+            <label>
+              <input type="checkbox" :checked="activeView.rowKeys.includes(rowKey(row))" @change="toggleRowInView(row)" />
+              {{ row.name }}
+              <span class="row-type">{{ row.elementType }}</span>
+            </label>
+          </li>
+        </ul>
+      </template>
     </div>
 
     <div v-if="showModelsPanel" class="models-panel">

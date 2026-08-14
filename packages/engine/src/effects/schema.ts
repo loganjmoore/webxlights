@@ -541,6 +541,19 @@ export const ADJUST_EFFECT_SCHEMA: EffectSchema = {
   ],
 };
 
+export const SKETCH_EFFECT_SCHEMA: EffectSchema = {
+  name: "Sketch",
+  params: [
+    // The path itself. A text field rather than a slider because it is a *drawing*; the props
+    // panel gives it a small canvas to trace on, and this is what that canvas writes.
+    { key: "sketch", label: "Sketch", type: "text", default: "M 0.1,0.2 L 0.5,0.85 L 0.9,0.2 L 0.1,0.2" },
+    { key: "drawPercent", label: "Draw Percentage", type: "intSlider", min: 1, max: 100, default: 100, valueCurve: true },
+    { key: "thickness", label: "Thickness", type: "intSlider", min: 1, max: 10, default: 1, valueCurve: true },
+    { key: "motion", label: "Motion", type: "checkbox", default: false },
+    { key: "motionPercent", label: "Motion Percentage", type: "intSlider", min: 1, max: 100, default: 25, valueCurve: true },
+  ],
+};
+
 export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   On: ON_EFFECT_SCHEMA,
   Bars: BARS_EFFECT_SCHEMA,
@@ -585,6 +598,7 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Kaleidoscope: KALEIDOSCOPE_EFFECT_SCHEMA,
   Warp: WARP_EFFECT_SCHEMA,
   Adjust: ADJUST_EFFECT_SCHEMA,
+  Sketch: SKETCH_EFFECT_SCHEMA,
 };
 
 // Effects that read the analysed audio track rather than only their own params - the UI warns

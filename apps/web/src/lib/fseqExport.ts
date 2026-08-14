@@ -5,7 +5,7 @@ import {
   computeSubModel,
   createRowSequencer,
   DEFAULT_PALETTE,
-  hexToRgba,
+  toRenderPalette,
   nodeColorsToChannelBytes,
   planGroupRendering,
   scatterGroupColors,
@@ -95,7 +95,7 @@ export function exportSequenceToFseq(
     const rowEffects = body.rows
       .filter((r) => r.elementType === "model" && r.elementId === model.id)
       .flatMap((r) => r.effects)
-      .map((e) => ({ ...e, palette: e.palette?.map(hexToRgba) }));
+      .map((e) => ({ ...e, palette: toRenderPalette(e.palette) }));
     return createRowSequencer({ geometry: geo, effects: rowEffects }, frameMs, SEED, DEFAULT_PALETTE, audio);
   });
 
@@ -112,7 +112,7 @@ export function exportSequenceToFseq(
         const rowEffects = body.rows
           .filter((r) => r.elementType === "submodel" && r.elementId === model.id && r.subName === spec.name)
           .flatMap((r) => r.effects)
-          .map((e) => ({ ...e, palette: e.palette?.map(hexToRgba) }));
+          .map((e) => ({ ...e, palette: toRenderPalette(e.palette) }));
         if (rowEffects.length === 0) return null;
         return {
           parentIndices: sub.parentIndices,

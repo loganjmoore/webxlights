@@ -114,7 +114,27 @@ describe("mask, shadow and brightness modes", () => {
       const out = blendPixel(RED, BLACK, mode, 0);
       expect(out, mode).toBeDefined();
     }
-    expect(BLEND_MODES).toHaveLength(19);
+    expect(BLEND_MODES).toHaveLength(22);
+  });
+
+  it("the positional modes put one layer at each edge of the model", () => {
+    // Bottom-Top and Left-Right differ only in which axis the caller measured, so they share an
+    // implementation; the axis is chosen where the geometry is known (layerStack.ts).
+    for (const mode of ["Bottom-Top", "Left-Right"] as const) {
+      expect(blendPixel(RED, BLACK, mode, 0, 0), mode).toEqual(BLACK); // the layer below, at the start
+      expect(blendPixel(RED, BLACK, mode, 0, 1), mode).toEqual(RED); // this layer, at the far end
+      const middle = blendPixel(RED, BLACK, mode, 0, 0.5);
+      expect(middle.r, mode).toBeGreaterThan(0);
+      expect(middle.r, mode).toBeLessThan(255);
+    }
+  });
+
+  it("Morph cross-fades on the effect's own position rather than the Mix slider", () => {
+    // "Will magically make effect 1 morph into effect 2 during the length of the timing cell" -
+    // renderFrame puts the position where the slider value normally goes.
+    expect(blendPixel(RED, BLACK, "Morph", 0)).toEqual(BLACK);
+    expect(blendPixel(RED, BLACK, "Morph", 1)).toEqual(RED);
+    expect(blendPixel(RED, BLACK, "Morph", 0.5).r).toBeCloseTo(128, -1);
   });
 
   it("Canvas hands back whatever the layer produced, including where it cleared a pixel", () => {

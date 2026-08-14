@@ -58,11 +58,11 @@ written down. Status here means:
 | Changing effects, moving/stretching, aligning | ⚠️ | Move and resize; no align commands |
 | Copy / paste / delete effects | ✅ | Including one row and across rows |
 | Colour settings — palette | ✅ | Up to 6 swatches |
-| Colour settings — **colour curves** | ❌ | A colour that varies across the effect, like a value curve |
+| Colour settings — colour curves | ✅ | Both kinds. **Time**-based curves resolve once a frame, so all 43 effects gain them for free. **Spatial** ones can't be — within one frame the swatch is a different colour in different places — so the layer is rendered at a few points along the curve's axis and each pixel taken from, or blended between, the renders nearest its own position; exact for any effect whose output is linear in its palette, which is nearly all of them. Gradient and None blending, all four directions, up to the manual's 40 markers |
 | Layers | ⚠️ | Up to 5, bottom-to-top |
-| Layer blending — 24 modes | ⚠️ | 19 implemented, including Canvas. The manual documents these with screenshots and the advice "experience is much better than reading about it" rather than defining them in words, so the eight added beyond the original ten follow what their names unambiguously mean (a mask hides, an unmask reveals, a shadow darkens); whether each matches xLights pixel for pixel is unverified. Bottom-Top and Left-Right need the pixel's position, which the blend function isn't given |
+| Layer blending — 24 modes | ✅ | All of them, including Canvas, Bottom-Top, Left-Right and Morph. The manual documents these with screenshots and the advice "experience is much better than reading about it" rather than defining them in words, so the eight added beyond the original ten follow what their names unambiguously mean (a mask hides, an unmask reveals, a shadow darkens); whether each matches xLights pixel for pixel is unverified. Bottom-Top and Left-Right are given the pixel's position along the axis, measured in buffer space where the geometry is known; Morph's cross-fade is driven by the position in the effect rather than by the Mix slider, per the manual's "during the length of the timing cell that the effects are in" |
 | Layer blending — Canvas | ✅ | The layer is handed what the layers underneath it drew instead of a blank buffer, and its output replaces theirs — including where it cleared a pixel, which a Normal blend would have quietly kept |
-| Layer blending — Morph, Suppress Until Frame, Freeze At Frame | ❌ | |
+| Layer blending — Suppress Until Frame, Freeze At Frame | ✅ | Both move or withhold the moment the effect renders at, rather than changing how it combines. Suppress keeps the effect running underneath while hiding it, which is what "warms up" an effect with unwanted opening frames |
 | Transitions | ✅ | All 16 types, in and out |
 | Mix slider | ✅ | |
 | Layer settings — Render Style (buffer styles) | ✅ | All of them. Six for a single model (Default, Per Preview, Single Line, As Pixel, Horizontal/Vertical Per Strand) and the fourteen that arrange a *group's* members into one shared buffer (the four Stacked variants, Horizontal/Vertical Per Model, the two Per Model/Strand, both Overlays, Single Line as a Pixel, and the three Per Model ones that render on each prop separately). A group's Default is Per Preview, per the manual |
@@ -72,8 +72,8 @@ written down. Status here means:
 | Layer settings — Persistent | ✅ | The scrub path replays the effect's frames into one buffer (capped at 600); the sequential export path keeps the buffer between frames it is already walking |
 | Roto-Zoom | ✅ | Rotation, zoom and pivot. xLights' preset rotation *sequences* over the effect's life are not separated out — this is the single turn the panel's own sliders describe |
 | Value curves | ✅ | All 16 types + custom point editor |
-| Effect presets | ❌ | Save/apply/import/export named effect settings |
-| Views | ❌ | Named subsets of rows |
+| Effect presets | ✅ | Save an effect's whole configuration under a named group, apply it at the playhead, import and export `.xpreset` files. Saved on the layout, since presets are global in xLights rather than belonging to one sequence. Missing: presets spanning several layers or models at once, and Smart Presets |
+| Views | ✅ | Named, *ordered* subsets of the sequencer's rows, with a picker in the toolbar. Saved on the layout, because the manual is explicit that "views work across sequences" — a per-sequence copy would have to be duplicated into every new sequence and would drift. The Master View isn't stored: it is "a special (system created) view" containing every row, so it is simply the absence of a selection. Missing: the eye icon that hides a model across all sequences (this app's Models panel is the per-sequence equivalent) |
 | Song structure regions | ❌ | |
 | Singing faces / phoneme breakdown | 🚫 | Needs face definitions |
 | Pixel editor (matrix drawing tool) | ❌ | |
@@ -84,13 +84,13 @@ written down. Status here means:
 
 ## Chapter 4 — Built-in effects
 
-xLights ships 55 effects. We render 43.
+xLights ships 55 effects. We render 44.
 
-**Implemented (43):** Adjust, Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill,
+**Implemented (44):** Adjust, Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill,
 Fire, Galaxy, Garlands, Kaleidoscope, Life, Lightning, Lines, Marquee, Meteors, Morph, Off, On,
 Pictures, Pinwheel, Fireworks, Music, Plasma, Ripple, Shape, Shimmer, Shockwave, Single Strand,
-Snow Storm, Snowflakes, Spirals, Spirograph, Strobe, Tendrils, Text, Tree, Twinkle, VU Meter,
-Warp, Wave.
+Sketch, Snow Storm, Snowflakes, Spirals, Spirograph, Strobe, Tendrils, Text, Tree, Twinkle,
+VU Meter, Warp, Wave.
 
 Kaleidoscope, Warp and Adjust are **canvas-mode** effects: they modify the layer below them
 rather than drawing their own, and render nothing on any other blend mode — which is what the
@@ -98,9 +98,11 @@ manual means by Kaleidoscope "by itself it does nothing". The layer stack now se
 layer's buffer with what the layers underneath produced, which is what makes them possible; the
 props panel says so when one is placed on a layer that isn't in Canvas mode.
 
-**Missing, and renderable with what the engine already has (1):** Sketch — the path itself is
-easy to draw; what it needs is the Effect Assist editor to *trace* one, since the manual's whole
-workflow is drawing the sketch over a background image.
+**Every effect renderable with what the engine has is now implemented.** Sketch came with a
+tracing canvas in the props panel, which is what xLights' Effect Assist panel is for. Its
+background-image tracing aid is deliberately absent: the manual is explicit that "the image is not
+rendered into the effect output — it is only there to help you trace", so its absence changes
+nothing about what a sketch renders.
 
 **Missing, needs a definition file (2):** Guitar (a tab/track) and State (state definitions).
 
@@ -157,9 +159,11 @@ so effects placed on a group reached nothing at all. Real sequences target group
 37% of one real show's sequenced elements — so this was whole passages of a show going dark
 without an error anywhere.
 
-What is left is smaller and more scattered than it was: colour curves, effect presets, views, a
-sub-model editor, the Effect Assist path editor Sketch needs, preferences, and the controller
-visualiser. No single one of them is load-bearing the way group rendering was.
+What is left is smaller and more scattered than it was: a sub-model editor, preferences, the
+controller visualiser, and a long tail of Layout-tab conveniences (filter, clone, replace, align).
+No single one of them is load-bearing the way group rendering was, and the eleven remaining
+effects all need infrastructure that is a deliberate non-goal — face and state definitions, DMX
+fixtures, shaders and video.
 
 After that, the missing effects are worth taking in batches by how much machinery they share:
 the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Lines) before the

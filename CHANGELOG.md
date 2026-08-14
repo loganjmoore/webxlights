@@ -1,5 +1,65 @@
 # Changelog
 
+## Sketch — the last effect this engine could render
+
+**44 of 55.** More to the point: every effect renderable with what the engine already has is now implemented. The remaining eleven all need infrastructure that's a deliberate non-goal — face and state definitions, DMX fixtures, shaders, video.
+
+Sketch is *"a path (a 'sketch') progressively drawn onto your model over the duration of the effect."* The path is stored as text so it round-trips through the sequence body like any other param, in the smallest notation that expresses what the effect needs — `M` starts a stroke, `L` continues it, coordinates are 0..1 so **a sketch traced once renders on any prop**, whatever shape it is.
+
+Progress is measured along the whole sketch's length rather than per stroke, so a long stroke takes proportionally longer to appear than a short one. That's the difference between something that looks like *drawing* and something that looks like each stroke taking its turn. A segment straddling the visible edge is drawn only as far as that edge reaches, so the line grows smoothly instead of jumping a whole segment at a time.
+
+**Draw Percentage** decides how much of the effect the drawing takes, with the finished sketch staying visible afterwards. **Motion** replaces it with a moving window — *"only a percentage of it is rendered at any given moment"* — and the two are mutually exclusive, as the manual says. Each separate stroke takes the next palette colour.
+
+It comes with a **tracing canvas** in the props panel, which is what xLights' Effect Assist panel is for: click to drop points, "Finish stroke" to start the next colour. The background-image tracing aid is deliberately absent — the manual is explicit that *"the image is not rendered into the effect output; it is only there to help you trace"*, so leaving it out changes nothing about what a sketch renders.
+
+
+## Effect presets
+
+Save an effect's whole configuration under a name, and drop it somewhere else later "without recreating them from scratch". Params, palette (colour curves included), blend mode, mix, transitions and layer settings — everything about an effect **except where it is**.
+
+A preset keeps a *duration*, not a start and end. A preset saved from an effect at 12.4s isn't about 12.4s — it's about what that effect looked like — and carrying the absolute times would mean subtracting them back out at every apply, with the result depending on where it happened to be saved from.
+
+Organised into groups, the manual's own arrangement. Exported and imported as `.xpreset` files, and the file deliberately doesn't contain its own name or group: the manual has the *importer* supply both — *"a preset will be created under the highlighted group with the name of the selected file"* — so what's in the file is the configuration, not where it's filed. A file that isn't a preset comes back as null rather than throwing; a file picker is exactly where the wrong file gets chosen, and a throw there would take the tab down.
+
+**apps/web has a test runner now.** It had none, so the pure logic there — the code deciding what gets rendered and what gets saved — went unchecked. The first thing it caught was real: Laravel's `validate()` returns only the keys that have rules, so reading the preset's `settings` from the validator's output was silently dropping **every effect parameter**. Presets would have saved, listed, applied — and come back as bare defaults.
+
+
+## Views
+
+xLights' sequencer Views: *"a view is used to be able to easily select a list of models **and the sequence in which they are to be displayed** on the sequencer."* Named, ordered subsets of the grid's rows, picked from the toolbar.
+
+They're saved on the **layout**, not the sequence, because the manual is explicit: *"views work across sequences, so once you have setup a view with the models that you require, if you open any sequence, that view is available to use in that sequence."* A per-sequence copy would have to be duplicated into every new sequence and would drift apart the moment a model was renamed.
+
+The **Master View** isn't stored at all — it's *"a special (system created) view"* containing every row, which makes it exactly the absence of a selection.
+
+The order is the point of a view, so it's editable in place with up/down arrows rather than by rebuilding the list. A row a view names that the layout no longer has is skipped rather than left as a gap — which is what happens as soon as a model is deleted after a view was saved.
+
+Views ride in the layout's existing settings JSON rather than earning a table: a view is a name and an ordered list of row keys, read and written whole, and nothing joins against one. The write merges rather than replacing the column, so it can't clobber anything else stored there — there's a test for exactly that.
+
+This is distinct from the existing Models panel, which stays: that's a per-sequence scratch toggle kept in localStorage, and a view is a saved, shared, ordered thing.
+
+
+## Colour curves, and the last of the blend modes
+
+**Blend modes are now 24 of 24.** Colour curves are in, both kinds.
+
+### Colour curves
+
+A palette swatch normally holds one colour for the whole effect. A colour curve lets it change — *"where previously the same color value would have been displayed for a particular segment duration it can now be made to change within that segment duration."* The manual splits them in two, and they really are different mechanisms:
+
+- **Time based** — *"will change color over the duration of the effect."* Resolved once per frame, before any effect runs, so **all 43 effects gain it without knowing it exists** — the same trick value curves already use for numeric params.
+- **Spatial** — *"will change over the models X/Y location. A spatial color curve has direction."* This one can't be collapsed per frame: within a single frame the swatch is a different colour in different places. Making all 43 effects position-aware for one feature isn't a trade worth taking, so instead the layer is rendered a handful of times, each with the palette resolved at a different point along the curve's axis, and each pixel is taken from — or blended between — the renders nearest its own position. **That's exact for any effect whose output is linear in its palette** (an effect picks a swatch and scales it, which is nearly all of them) and close for the rest. The extra renders are only paid for by a layer that actually uses a spatial curve, capped at eight.
+
+Gradient and None blending, all four directions, up to the manual's 40 markers. The props panel gets a `~` button per swatch and an editor with a live gradient strip — a curve is very hard to reason about from four numbers and easy to see.
+
+One thing worth noting: all five places that converted a stored palette (`preview`, popped-out preview, group rows, sub-model rows, export) now go through one engine function. A swatch holding a curve that reached the old `parseInt`-based hex parse would have come out **white**, silently, in the yard.
+
+### The last five blend modes
+
+- **Bottom-Top** and **Left-Right** — the layer below shows at one edge of the model and this layer at the other, mixed across the span. These had been deferred because *"they need the pixel's position, and the blend function is given only two colours."* The answer turned out to be that the layer stack already composites in node space and knows the geometry, so it can hand the position down — and only three of the twenty-four modes read it, so it's an optional argument rather than noise threaded through the rest.
+- **Morph** — *"will magically make effect 1 'morph' into effect 2 during the length of the timing cell that the effects are in."* So its mix comes from how far through the effect the playhead is, not from the Mix slider.
+- **Suppress Until Frame** and **Freeze At Frame** — not really blend modes at all: both are about *when* a layer shows rather than how it combines, so they move or withhold the moment the effect renders at. Suppress keeps the effect running underneath while hiding it, which is exactly what "warming up" an effect with unwanted opening frames means; a version that simply started it late wouldn't do that.
+
 ## Five more model types
 
 **12 of xLights' 21 becomes 17.** Spinner, Cube, Sphere, Channel Block and Image now import, render and appear in the drag-create palette. Until now a show containing any of them imported them as labelled placeholders — kept, but inert.

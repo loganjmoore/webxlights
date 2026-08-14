@@ -68,6 +68,8 @@ export * from "./blend";
 export * from "./nodeMapping";
 export * from "./layerStack";
 export * from "./layerSettings";
+export * from "./colorCurve";
+export * from "./effects/sketch";
 export * from "./renderStyle";
 export * from "./groupRenderStyle";
 export * from "./renderFrame";

@@ -1,4 +1,5 @@
-import type { BlendMode, LayerSettings, PictureImage, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
+import type { EffectPreset } from "./effectPresets";
+import type { BlendMode, LayerSettings, PictureImage, StoredSwatch, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
 
 export class ApiError extends Error {
   status: number;
@@ -91,6 +92,12 @@ export interface ControllerUpsertPayload {
   active?: boolean;
 }
 
+/** A named, ordered subset of the sequencer's rows. `rowKeys` are opaque to the server. */
+export interface SequencerView {
+  name: string;
+  rowKeys: string[];
+}
+
 export interface ModelGroupRecord {
   id: number;
   name: string;
@@ -150,7 +157,9 @@ export interface SequenceEffect {
   params: Record<string, EffectParamValue>;
   // Per-effect color override (real xLights' Color tab), hex strings. Unset = inherit the
   // row's default palette.
-  palette?: string[];
+  // A swatch is a hex colour, or a colour curve that changes over the effect or across the
+  // model (engine/colorCurve.ts).
+  palette?: StoredSwatch[];
   // Real xLights' Layer Blending panel.
   blendMode?: BlendMode;
   mix?: number; // 0..1, the "Mix" slider
@@ -252,6 +261,14 @@ export const api = {
     request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups/bulk`, { method: "POST", body: JSON.stringify({ groups }) }),
   deleteModelGroup: (layoutId: number, groupId: number) =>
     request<void>(`/v1/layouts/${layoutId}/model-groups/${groupId}`, { method: "DELETE" }),
+  // xLights' sequencer Views: named, ordered subsets of the sequencer's rows. Stored on the
+  // layout because the manual says they "work across sequences".
+  listViews: (layoutId: number) => request<{ views: SequencerView[] }>(`/v1/layouts/${layoutId}/views`),
+  replaceViews: (layoutId: number, views: SequencerView[]) =>
+    request<{ views: SequencerView[] }>(`/v1/layouts/${layoutId}/views`, { method: "PUT", body: JSON.stringify({ views }) }),
+  listEffectPresets: (layoutId: number) => request<{ presets: EffectPreset[] }>(`/v1/layouts/${layoutId}/effect-presets`),
+  replaceEffectPresets: (layoutId: number, presets: EffectPreset[]) =>
+    request<{ presets: EffectPreset[] }>(`/v1/layouts/${layoutId}/effect-presets`, { method: "PUT", body: JSON.stringify({ presets }) }),
   listViewObjects: (layoutId: number) => request<ViewObjectRecord[]>(`/v1/layouts/${layoutId}/view-objects`),
   bulkUpsertViewObjects: (layoutId: number, objects: ViewObjectUpsertPayload[]) =>
     request<ViewObjectRecord[]>(`/v1/layouts/${layoutId}/view-objects/bulk`, { method: "POST", body: JSON.stringify({ objects }) }),
