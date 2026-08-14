@@ -6,8 +6,9 @@ import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, ty
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
-import { parseMidi, type ParsedMidi } from "@webxlights/formats";
+import { parseMidi, parsePapagayo, type ParsedMidi } from "@webxlights/formats";
 import { ALL_TRACKS, describeMidiImport, midiTrackChoices, timingTrackFromMidi } from "../lib/midiTiming";
+import { describePapagayoImport, tracksFromPapagayo } from "../lib/papagayoTiming";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
 import { openPanelWindow, openPreviewChannel, postPreviewMessage, previewUrlFor, type PreviewMessage } from "../lib/previewChannel";
@@ -142,6 +143,30 @@ async function pickMidiFile(e: Event): Promise<void> {
   } catch (err) {
     midiFile.value = null;
     midiMessage.value = err instanceof Error ? err.message : "Couldn't read that MIDI file.";
+  }
+}
+
+// A Papagayo lipsync file's voices as timing tracks - phrases, words and phonemes, which is what
+// a Faces effect is driven by. Added straight away rather than through a settings step: the only
+// choice the manual's own dialog offers is the frame offset, and it is next to the picker.
+const papagayoOffsetFrames = ref(0);
+const papagayoMessage = ref("");
+
+async function pickPapagayoFile(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  papagayoMessage.value = "";
+  try {
+    const parsed = parsePapagayo(await file.text());
+    const tracks = tracksFromPapagayo(parsed, { offsetFrames: papagayoOffsetFrames.value });
+    for (const track of tracks) store.addTimingTrack(track);
+    papagayoMessage.value = describePapagayoImport(parsed, tracks);
+  } catch (err) {
+    papagayoMessage.value = err instanceof Error ? err.message : "Couldn't read that Papagayo file.";
+  } finally {
+    // So the same file can be picked again after changing the offset.
+    input.value = "";
   }
 }
 
@@ -1154,6 +1179,18 @@ watch(sequenceId, async (id) => {
         </template>
       </div>
       <p v-if="midiMessage" class="timing-note">{{ midiMessage }}</p>
+
+      <p class="timing-note">
+        Or import a Papagayo <code>.pgo</code> lipsync file. Each voice becomes three tracks —
+        phrases, words and phonemes — and the phonemes track is what a Faces effect reads. The
+        offset is for files that were split into segments: the second segment starts where the
+        first one ended.
+      </p>
+      <div class="timing-row">
+        <input type="file" accept=".pgo,text/plain" @change="pickPapagayoFile" />
+        <label class="midi-field">Offset <input v-model.number="papagayoOffsetFrames" type="number" step="1" /> frames</label>
+      </div>
+      <p v-if="papagayoMessage" class="timing-note">{{ papagayoMessage }}</p>
     </div>
 
     <div v-if="showFppPanel" class="fpp-panel">
