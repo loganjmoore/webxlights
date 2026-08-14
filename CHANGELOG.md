@@ -1,5 +1,26 @@
 # Changelog
 
+## Papagayo `.pgo` import
+
+Papagayo is what people used to break lyrics into phonemes before xLights could do it itself, and a lot of existing singing faces were built with it. Its files import now: each voice becomes three timing tracks — phrases, words and phonemes — and the phonemes track is what a Faces effect reads.
+
+The manual's frame offset is there too, for the reason it gives: "Due to a performance limitation in the Papagayo software, a sequence often had to be broken up into segments. In which case the second segment had to be offset by the number of frames of the first segment."
+
+### Three tracks, not one
+
+xLights nests the three components inside a single timing track. This app's tracks are flat, so a voice becomes three of them. That is a real difference rather than a presentational one — here the three can be dragged out of alignment with each other in a way they can't be there — and it seemed better to name it than to gloss it. What matters for rendering is unchanged: a Faces effect reads the phonemes.
+
+### Writing a parser without a specimen
+
+There was no `.pgo` file to test against, and the manual describes the format only in prose and one screenshot: "The 4th line contains the total number of frames and the 5th line has the number of Voices in the file, followed by the details for each voice."
+
+That's enough, because the format is **count-driven**: every list states its length before it starts. A wrong guess about the layout doesn't produce plausible garbage — the counts stop lining up and the parse throws. So the parser refuses anything that doesn't fit rather than returning what it managed. A leniently-read lipsync file would import as a track whose words drift out of sync partway through, which is far harder to notice than an import that said no.
+
+Two details that follow from the format rather than from taste:
+
+- **A word's frames are taken from the end of its line, not its text from the front.** A word containing a space would otherwise swallow its own start frame.
+- **A phoneme has a start and no end**, so each runs until the next one and the last until its word ends. Without that rule the closing phoneme of every word would be an instant rather than a mouth position that is actually held.
+
 ## Matrix singing faces
 
 The other half of Faces: a picture per mouth position, for P5/P10 matrices and pixel screens rather than coro props.
