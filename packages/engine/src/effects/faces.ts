@@ -1,27 +1,28 @@
 import type { RGBA } from "../color";
 import { hexToRgba, rgba } from "../color";
 import type { RenderBuffer } from "../renderBuffer";
-import { REST_PHONEME, findMouth, type FaceSpec } from "../models/faces";
+import { REST_PHONEME, findMouth, findMouthImage, hasMouth, isMatrixFace, type FaceSpec } from "../models/faces";
+import { drawImageInto, facePlacement } from "./imageDraw";
 import { parseNodeRanges } from "../models/subModel";
 import { labelAt, splitLabel } from "../timing";
 import type { FrameContext } from "./types";
 
 // SPEC/manual "Faces": "used by xLights to generate singing and talking face effects".
 //
-// This renders the two *node-range* face types - the coro faces the manual describes as "Single
-// Node" and "Node Ranges". The Matrix type shows a picture per mouth position and is not this
-// effect's shape at all; it needs image storage and placement, and is deliberately absent rather
-// than half-done.
+// It renders all three of the manual's face types. The two node-range ones - "Single Node" and
+// "Node Ranges", the coro faces - light named sets of the model's nodes. The "Matrix" type draws a
+// picture per mouth position instead, centred or stretched to the matrix.
 //
 // The mechanism is the one the State effect established: a timing track's labels name what the
 // prop does, and named sets of the model's nodes light up. A phoneme track is a lyric track that
 // has been broken down twice - phrases into words, words into phonemes - and each phoneme cell's
 // label is a mouth position.
 
-// Two settings from the manual's table are absent, both because they act on a picture and a
-// node-range face doesn't draw one. "Transparent Black" makes an image's black pixels transparent,
-// and this effect never writes a pixel it wasn't asked to. "Suppress Shimmer" skips a `-shimmer`
-// tag whose shimmer isn't rendered here, so the face already behaves as if it were always on.
+// One setting from the manual's table is absent: "Suppress Shimmer" skips a `-shimmer` tag whose
+// shimmer isn't rendered here, so the face already behaves as if it were always checked. (This
+// comment used to say the same of "Transparent Black" - true while only node-range faces existed,
+// since they never write a pixel they weren't asked to, and wrong as soon as a face could draw a
+// picture. It is a real setting again, and it is below.)
 
 export const FACE_EYE_MODES = ["Open", "Close", "Automatic", "(off)"] as const;
 export type FaceEyeMode = (typeof FACE_EYE_MODES)[number];
@@ -47,6 +48,13 @@ export interface FacesParams {
   leadInFrames: number;
   leadOutFrames: number;
   fadeDuringLeadInOut: boolean;
+  /**
+   * "Sets the black pixels transparent to show effects on lower layers."
+   *
+   * Only a matrix face draws pixels it wasn't asked to - a photograph's background is black, and
+   * without this it covers whatever the layer below drew.
+   */
+  transparentBlack: boolean;
 }
 
 // The manual's palette table, verbatim:
@@ -109,7 +117,7 @@ export function activePhoneme(params: FacesParams, spec: FaceSpec, ctx: FrameCon
 
   // A label can carry a tag after the phoneme; the first token that names a mouth is the mouth.
   for (const token of splitLabel(cell.label)) {
-    if (findMouth(spec, token)) return token;
+    if (hasMouth(spec, token)) return token;
   }
   return REST_PHONEME;
 }
@@ -140,6 +148,12 @@ export function renderFaces(buffer: RenderBuffer, palette: RGBA[], params: Faces
   const visibility = faceVisibility(params, ctx);
   if (visibility <= 0) return;
 
+  const phonemeNow = activePhoneme(params, spec, ctx);
+  if (isMatrixFace(spec)) {
+    renderMatrixFace(buffer, spec, params, phonemeNow, visibility, ctx);
+    return;
+  }
+
   const swatch = (index: number): RGBA => palette[index] ?? palette[0] ?? rgba(255, 255, 255);
   const paint = (ranges: string | undefined, color: RGBA): void => {
     if (!ranges || ranges.trim() === "") return;
@@ -156,7 +170,7 @@ export function renderFaces(buffer: RenderBuffer, palette: RGBA[], params: Faces
     paint(spec.outline2, dim(swatch(OUTLINE2_COLOR), visibility));
   }
 
-  const phoneme = activePhoneme(params, spec, ctx);
+  const phoneme = phonemeNow;
   const closed = eyesClosedAt(params, phoneme, ctx);
   if (params.eyes !== "(off)") {
     paint(closed ? spec.eyesClosed : spec.eyesOpen, dim(swatch(EYES_COLOR), visibility));
@@ -171,6 +185,38 @@ export function renderFaces(buffer: RenderBuffer, palette: RGBA[], params: Faces
     const color = mouth.color ? hexToRgba(mouth.color) : swatch(MOUTH_COLOR);
     paint(mouth.nodes, dim(color, visibility));
   }
+}
+
+/**
+ * A matrix face: one picture, placed.
+ *
+ * The eyes aren't separate nodes here - they are part of the picture - so the eye setting chooses
+ * between the two images a mouth position can carry, and "(off)" simply means never use the
+ * closed one. A mouth with no picture draws nothing rather than falling back to another mouth's,
+ * which would be a face that mouths the wrong shape without ever looking broken.
+ */
+function renderMatrixFace(
+  buffer: RenderBuffer,
+  spec: FaceSpec,
+  params: FacesParams,
+  phoneme: string,
+  visibility: number,
+  ctx: FrameContext,
+): void {
+  const entry = findMouthImage(spec, phoneme) ?? findMouthImage(spec, REST_PHONEME);
+  if (!entry) return;
+
+  const closed = params.eyes !== "(off)" && eyesClosedAt(params, phoneme, ctx);
+  // "You can specify different images for the Eyes Closed position or by default, the same image
+  // is copied across."
+  const image = (closed ? entry.imageClosed : entry.image) ?? entry.image;
+  if (!image) return;
+
+  drawImageInto(buffer, image, {
+    ...facePlacement(spec.placement ?? "Centered", image, buffer.width, buffer.height),
+    transparentBlack: params.transparentBlack,
+    opacity: visibility,
+  });
 }
 
 function dim(color: RGBA, amount: number): RGBA {

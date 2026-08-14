@@ -1,5 +1,29 @@
 # Changelog
 
+## Matrix singing faces
+
+The other half of Faces: a picture per mouth position, for P5/P10 matrices and pixel screens rather than coro props.
+
+It was the smaller half, and worth saying why. The Pictures effect already decoded images, sampled them into the buffer and dealt with the row flip between an image's top-first rows and the buffer's bottom-left origin. That sampling loop is now shared by both, because two copies of a coordinate flip are two chances to get it wrong in different directions — and the symptom, a picture upside down on one effect but not the other, is the kind that gets blamed on the model rather than the code.
+
+Both of the manual's placements: **Centered** keeps the picture's aspect ratio and only ever shrinks it, **Scaled** stretches X and Y separately to fill the matrix. A mouth position can carry a second picture for closed eyes — "by default, the same image is copied across", so one is optional.
+
+### A correction
+
+The previous release said Transparent Black was omitted because it "acts on a picture, and a node-range face doesn't draw one". That was true of the faces that existed then, and stopped being true the moment one could draw a picture: a face photo's background is black, and without this it covers whatever the layer below drew. It is implemented, and the note that explained it away has been replaced rather than quietly deleted.
+
+### Pictures are decoded to the model's size
+
+A face definition lives on the model row, which is fetched with every layout load — so ten full-resolution photographs there would be megabytes of JSON on every visit to the Layout page. Pictures are decoded down to the model's own resolution, capped at the same 64px edge the Pictures effect uses.
+
+Nothing is lost by it: anything larger than the matrix is downscaled when drawn anyway, and the manual warns from the other direction that "high resolution image will not scale well to low resolution matrices".
+
+### Importing a Matrix face
+
+A Matrix definition in an `xlights_rgbeffects.xml` names image *paths* on the machine that made the show. They can't be read as node ranges — that would light arbitrary nodes rather than fail — and they can't be fetched.
+
+What does come across is the definition itself: its name, its placement, and which mouth positions it had. The editor then shows those rows waiting for their pictures, instead of the import quietly losing that a singing face existed at all.
+
 ## Singing faces, for coro props
 
 Faces was the last effect still listed as blocked on something this app can't have. The blocker was recorded as "a picture per mouth position" — and reading the *Singing Faces* chapter rather than just the effect page shows that's true of only one of its three definition types:

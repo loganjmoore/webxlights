@@ -265,6 +265,51 @@ class LayoutModelsTest extends TestCase
         $this->assertSame('30-40', $fresh->faces[0]['outline']);
     }
 
+    public function test_a_matrix_face_stores_its_pictures_and_placement(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_id' => $user->id]);
+        $layout = $project->layouts()->create(['name' => 'Layout']);
+        $model = $layout->models()->create(['name' => 'Matrix', 'type' => 'Matrix', 'supported' => true]);
+
+        $this->actingAs($user)->patchJson("/api/v1/layouts/{$layout->id}/models/{$model->id}", [
+            'faces' => [[
+                'name' => 'Matrix Face',
+                'kind' => 'matrix',
+                'placement' => 'Scaled',
+                'mouths' => [],
+                'images' => [
+                    ['name' => 'AI', 'image' => ['width' => 1, 'height' => 1, 'data' => [255, 0, 0, 255]]],
+                    // A mouth position with no picture yet still saves: pictures are picked one
+                    // at a time, and a face isn't finished in a single sitting.
+                    ['name' => 'rest'],
+                ],
+            ]],
+        ])->assertOk();
+
+        $fresh = $model->fresh();
+        $this->assertSame('matrix', $fresh->faces[0]['kind']);
+        $this->assertSame('Scaled', $fresh->faces[0]['placement']);
+        $this->assertSame([255, 0, 0, 255], $fresh->faces[0]['images'][0]['image']['data']);
+        $this->assertArrayNotHasKey('image', $fresh->faces[0]['images'][1]);
+    }
+
+    public function test_a_face_with_an_unknown_kind_is_rejected(): void
+    {
+        // The two kinds render completely differently. A third would save and then draw nothing,
+        // which reads as a broken definition rather than a rejected one.
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_id' => $user->id]);
+        $layout = $project->layouts()->create(['name' => 'Layout']);
+        $model = $layout->models()->create(['name' => 'Matrix', 'type' => 'Matrix', 'supported' => true]);
+
+        $this->actingAs($user)
+            ->patchJson("/api/v1/layouts/{$layout->id}/models/{$model->id}", [
+                'faces' => [['name' => 'Face1', 'kind' => 'something-else', 'mouths' => []]],
+            ])
+            ->assertStatus(422);
+    }
+
     public function test_a_face_mouth_without_a_name_is_rejected(): void
     {
         // A mouth with no name can never be matched by a phoneme label, so it would sit in the

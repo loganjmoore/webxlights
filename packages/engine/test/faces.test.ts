@@ -50,6 +50,7 @@ const DEFAULTS: FacesParams = {
   leadInFrames: 0,
   leadOutFrames: 0,
   fadeDuringLeadInOut: false,
+  transparentBlack: false,
 };
 
 function ctxAt(atMs: number, over: Partial<FrameContext> = {}): FrameContext {
@@ -215,5 +216,112 @@ describe("a new face definition", () => {
     expect(spec.mouths.map((m) => m.name)).toContain("rest");
     expect(spec.mouths.map((m) => m.name)).toContain("MBP");
     expect(spec.mouths.every((m) => m.nodes === "")).toBe(true);
+  });
+});
+
+describe("Matrix faces", () => {
+  // A 2x2 picture: red, green / blue, black. Row-major, top row first.
+  const picture = (r: number): { width: number; height: number; data: number[] } => ({
+    width: 2,
+    height: 2,
+    data: [r, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 0, 0, 0, 255],
+  });
+
+  const matrixFace: FaceSpec = {
+    name: "Matrix Face",
+    kind: "matrix",
+    mouths: [],
+    placement: "Scaled",
+    images: [
+      { name: "rest", image: picture(100) },
+      { name: "AI", image: picture(255), imageClosed: picture(50) },
+    ],
+  };
+
+  function matrixCtx(atMs: number, over: Partial<FrameContext> = {}): FrameContext {
+    return { ...ctxAt(atMs), data: { face: matrixFace, timing: phonemes }, ...over };
+  }
+
+  it("draws the picture for the mouth the track names", () => {
+    const buffer = new RenderBuffer(2, 2);
+    renderFaces(buffer, PALETTE, DEFAULTS, matrixCtx(100));
+    // Scaled fills the buffer; the image's top-left red pixel lands on the buffer's top row,
+    // because the buffer's origin is bottom-left and the image's rows are top-first.
+    expect(buffer.getPixel(0, 1)).toEqual(rgba(255, 0, 0, 255));
+    expect(buffer.getPixel(0, 0)).toEqual(rgba(0, 0, 255, 255));
+  });
+
+  it("falls back to the rest picture for a mouth it hasn't got", () => {
+    const buffer = new RenderBuffer(2, 2);
+    const params = { ...DEFAULTS, useTimingTrack: false, phoneme: "WQ" };
+    renderFaces(buffer, PALETTE, params, matrixCtx(100));
+    expect(buffer.getPixel(0, 1)).toEqual(rgba(100, 0, 0, 255)); // the rest picture
+  });
+
+  it("uses the closed-eyes picture when the eyes are shut, and the open one when it has none", () => {
+    const closedParams = { ...DEFAULTS, useTimingTrack: false, phoneme: "AI", eyes: "Close" as const };
+    const closed = new RenderBuffer(2, 2);
+    renderFaces(closed, PALETTE, closedParams, matrixCtx(100));
+    expect(closed.getPixel(0, 1)).toEqual(rgba(50, 0, 0, 255));
+
+    // "rest" has no closed variant, so the open one is used - "by default, the same image is
+    // copied across".
+    const rest = new RenderBuffer(2, 2);
+    renderFaces(rest, PALETTE, { ...closedParams, phoneme: "rest" }, matrixCtx(100));
+    expect(rest.getPixel(0, 1)).toEqual(rgba(100, 0, 0, 255));
+  });
+
+  it("Centered keeps the picture's own size when the matrix is bigger", () => {
+    const buffer = new RenderBuffer(6, 6);
+    const centred: FaceSpec = { ...matrixFace, placement: "Centered" };
+    renderFaces(buffer, PALETTE, { ...DEFAULTS, useTimingTrack: false, phoneme: "rest" }, matrixCtx(100, { data: { face: centred } }));
+    let painted = 0;
+    for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) if (buffer.getPixel(x, y).a > 0) painted++;
+    expect(painted).toBe(4); // the 2x2 picture, not stretched across 36 pixels
+    expect(buffer.getPixel(0, 0).a).toBe(0); // and it is in the middle
+  });
+
+  it("Scaled stretches the picture over the whole matrix", () => {
+    const buffer = new RenderBuffer(6, 6);
+    renderFaces(buffer, PALETTE, { ...DEFAULTS, useTimingTrack: false, phoneme: "rest" }, matrixCtx(100));
+    let painted = 0;
+    for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) if (buffer.getPixel(x, y).a > 0) painted++;
+    expect(painted).toBe(36);
+  });
+
+  it("Transparent Black leaves the picture's black pixels alone", () => {
+    // A face photo's background is black, and without this it covers the layer below - which is
+    // the setting's whole purpose, and only a matrix face has pixels it wasn't asked to draw.
+    const opaque = new RenderBuffer(2, 2);
+    renderFaces(opaque, PALETTE, { ...DEFAULTS, useTimingTrack: false, phoneme: "rest" }, matrixCtx(100));
+    expect(opaque.getPixel(1, 0).a).toBe(255); // the black pixel is drawn
+
+    const transparent = new RenderBuffer(2, 2);
+    renderFaces(transparent, PALETTE, { ...DEFAULTS, useTimingTrack: false, phoneme: "rest", transparentBlack: true }, matrixCtx(100));
+    expect(transparent.getPixel(1, 0).a).toBe(0);
+  });
+
+  it("draws nothing for a mouth with no picture", () => {
+    const bare: FaceSpec = { name: "Bare", kind: "matrix", mouths: [], images: [{ name: "rest" }] };
+    const buffer = new RenderBuffer(2, 2);
+    renderFaces(buffer, PALETTE, { ...DEFAULTS, useTimingTrack: false, phoneme: "rest" }, matrixCtx(100, { data: { face: bare } }));
+    for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) expect(buffer.getPixel(x, y).a).toBe(0);
+  });
+
+  it("fades with the rest of the face", () => {
+    const fading = {
+      ...DEFAULTS,
+      useTimingTrack: false,
+      phoneme: "rest",
+      suppressWhenNotSinging: true,
+      leadInFrames: 10,
+      fadeDuringLeadInOut: true,
+    };
+    const sparse = labelsFromTrack([0, 500, 2000, 2500], ["AI", "", "MBP"]);
+    const buffer = new RenderBuffer(2, 2);
+    renderFaces(buffer, PALETTE, fading, matrixCtx(1700, { data: { face: matrixFace, timing: sparse } }));
+    const pixel = buffer.getPixel(0, 1);
+    expect(pixel.a).toBeGreaterThan(0);
+    expect(pixel.a).toBeLessThan(255);
   });
 });

@@ -77,6 +77,7 @@ export * from "./effects/sketch";
 export * from "./effects/state";
 export * from "./effects/piano";
 export * from "./effects/faces";
+export * from "./effects/imageDraw";
 export * from "./timing";
 export * from "./renderStyle";
 export * from "./groupRenderStyle";

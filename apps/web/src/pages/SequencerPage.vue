@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { EFFECT_SCHEMAS, defaultParamsFor, type AudioSeries, type BlendMode, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
+import { EFFECT_SCHEMAS, defaultParamsFor, mouthNames, type AudioSeries, type BlendMode, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
 import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequencerView, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
@@ -247,7 +247,7 @@ const phonemeNames = computed(() => {
   if (faces.length === 0) return [];
   const named = String(selectedEffect.value?.params.faceDefinition ?? "").trim();
   const face = named ? faces.find((f) => f.name === named) : faces.length === 1 ? faces[0] : undefined;
-  return (face?.mouths ?? []).map((m) => m.name);
+  return face ? mouthNames(face) : [];
 });
 
 function rowKey(row: GridRow): string {

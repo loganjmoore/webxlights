@@ -109,6 +109,15 @@ class ModelEntityController extends Controller
             // until it was finished in a single sitting.
             'faces' => ['sometimes', 'array'],
             'faces.*.name' => ['required', 'string', 'max:200'],
+            'faces.*.kind' => ['sometimes', 'string', 'in:nodes,matrix'],
+            'faces.*.placement' => ['sometimes', 'nullable', 'string', 'in:Centered,Scaled'],
+            // A matrix face's pictures. Already downscaled client-side to the model's own size
+            // (capped at 64px), the same way the Pictures effect's are - a full-resolution photo
+            // on a model row would be megabytes of JSON fetched with every layout load.
+            'faces.*.images' => ['array'],
+            'faces.*.images.*.name' => ['required', 'string', 'max:200'],
+            'faces.*.images.*.image' => ['sometimes', 'nullable', 'array'],
+            'faces.*.images.*.imageClosed' => ['sometimes', 'nullable', 'array'],
             'faces.*.mouths' => ['array'],
             'faces.*.mouths.*.name' => ['required', 'string', 'max:200'],
             // Nullable as well as present: Laravel converts empty request strings to null, so an

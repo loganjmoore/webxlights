@@ -612,6 +612,8 @@ export const FACES_EFFECT_SCHEMA: EffectSchema = {
     { key: "leadInFrames", label: "Lead In Frames", type: "intSlider", min: 0, max: 100, default: 0 },
     { key: "leadOutFrames", label: "Lead Out Frames", type: "intSlider", min: 0, max: 100, default: 0 },
     { key: "fadeDuringLeadInOut", label: "Fade During Lead In/Out", type: "checkbox", default: false },
+    // Matrix faces only: a node-range face never writes a pixel it wasn't asked to.
+    { key: "transparentBlack", label: "Transparent Black", type: "checkbox", default: false },
   ],
 };
 
