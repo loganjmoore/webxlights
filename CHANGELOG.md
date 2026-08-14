@@ -1,5 +1,20 @@
 # Changelog
 
+## Preferences, and the time display
+
+A Preferences panel — and a deliberately short one. **Every setting in it drives something**, with a test asserting that no preference exists which nothing reads. xLights' Settings dialog has eight tabs, most of them configuring machinery this app doesn't have (output devices, backup paths, services); offering those would be a screen full of switches with nothing behind them, which is worse than a short screen.
+
+What's in it: **time display format** (minutes:seconds, plain seconds, or frames), **default effect length**, **snap effect edges to timing marks**, and the **autosave interval** — where 0 genuinely turns autosave off, for someone who'd rather save deliberately than have a half-finished edit persisted.
+
+Frames are counted against the sequence's own frame rate rather than a constant: a 20ms sequence and a 50ms one number the same second very differently, and a frame count that assumed one of them would be wrong for half of all shows.
+
+**Preferences live in the browser, not with the project.** A preference belongs to the person at the keyboard, not to the show — one that travelled with the project would let two people editing the same sequence change each other's settings.
+
+Stored values are merged over the defaults rather than replacing them, so a preference added later doesn't come back `undefined` for everyone who already has a stored bag — which is how a number field ends up NaN and a duration ends up zero. And everything is clamped on read: a hand-edited bag can't produce a zero-length default effect, which couldn't be selected on the grid and so would be unrecoverable once made.
+
+I cut one setting while building this. "Confirm before deleting several things at once" was in the panel until I checked what read it — nothing did. Shipping it would have been the exact thing the test above exists to prevent.
+
+
 ## Keyboard shortcuts and a command palette, from one registry
 
 xLights documents around sixty keyboard shortcuts. We had a handful, dispatched from a `switch` statement — the arrangement where a shortcut, a help list and a palette drift apart until a documented key quietly does nothing.

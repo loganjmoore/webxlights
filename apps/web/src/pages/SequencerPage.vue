@@ -19,8 +19,9 @@ import {
   type EffectPreset,
 } from "../lib/effectPresets";
 import { buildCommands, commandForEvent, isTypingTarget } from "../lib/commands";
+import { formatTime, loadPreferences, sanitize, savePreferences, type Preferences } from "../lib/preferences";
 import CommandPalette from "../components/CommandPalette.vue";
-import { newEffectId, useSequencerStore } from "../stores/sequencer";
+import { newEffectId, setAutosaveDebounce, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type ContextMenuTarget, type GridRow } from "../components/SequencerGrid.vue";
 import EffectContextMenu from "../components/EffectContextMenu.vue";
 import Waveform from "../components/Waveform.vue";
@@ -445,6 +446,8 @@ function onEffectDragStart(e: DragEvent, name: string): void {
   e.dataTransfer.effectAllowed = "copy";
 }
 
+// Kept as the fallback for anything that runs before preferences load; the preference is what
+// actually drives a drop (see prefs.defaultEffectMs).
 const DEFAULT_DROPPED_EFFECT_MS = 1000;
 
 // Native drag-and-drop from the palette (SequencerGrid.vue's onDrop), matching ModelPalette.vue's
@@ -452,7 +455,8 @@ const DEFAULT_DROPPED_EFFECT_MS = 1000;
 // resize after" pattern as a dropped model. The existing arm+drag-on-grid gesture (which lets
 // you size the effect in one motion) is untouched and still the way to place a specific length.
 function handleDropEffect(row: GridRow, name: string, startMs: number): void {
-  const endMs = Math.min(startMs + DEFAULT_DROPPED_EFFECT_MS, store.sequence?.duration_ms ?? startMs + DEFAULT_DROPPED_EFFECT_MS);
+  const length = prefs.value.defaultEffectMs || DEFAULT_DROPPED_EFFECT_MS;
+  const endMs = Math.min(startMs + length, store.sequence?.duration_ms ?? startMs + length);
   store.addEffect(row.elementType, row.elementId, row.subName, {
     id: newEffectId(),
     name,
@@ -663,6 +667,23 @@ function openPreviewWindow(): void {
 // palette in agreement by hand is exactly what drifts until a documented key does nothing.
 const paletteOpen = ref(false);
 
+// Application preferences (lib/preferences.ts). They live in localStorage, not on the server: a
+// preference belongs to the person at the keyboard, not to the show, and one that travelled with
+// the project would let two people editing it change each other's settings.
+const prefs = ref<Preferences>(loadPreferences(typeof localStorage === "undefined" ? null : localStorage));
+const showPrefsPanel = ref(false);
+function patchPrefs(changes: Partial<Preferences>): void {
+  prefs.value = sanitize({ ...prefs.value, ...changes });
+  savePreferences(typeof localStorage === "undefined" ? null : localStorage, prefs.value);
+  applyPrefs();
+}
+// Preferences that something else has to be told about, rather than simply read from.
+function applyPrefs(): void {
+  setAutosaveDebounce(prefs.value.autosaveSeconds * 1000);
+}
+applyPrefs();
+const playheadLabel = computed(() => formatTime(playheadMs.value, prefs.value.timeFormat, store.sequence?.frame_ms ?? 50));
+
 // The row a keyboard-placed effect lands on: the one the selection is on, falling back to the
 // first visible row. Without a fallback the effect shortcuts would silently do nothing until
 // something had been clicked.
@@ -708,7 +729,7 @@ const commands = computed(() =>
         id: newEffectId(),
         name,
         startMs: playheadMs.value,
-        endMs: playheadMs.value + 1000,
+        endMs: playheadMs.value + prefs.value.defaultEffectMs,
         params: defaultParamsFor(name),
       });
     },
@@ -780,7 +801,7 @@ watch(sequenceId, async (id) => {
       <div class="transport">
         <button @click="togglePlay" :disabled="!audioLoaded">{{ playing ? "Pause" : "Play" }}</button>
         <button @click="stop" :disabled="!audioLoaded">Stop</button>
-        <span class="time">{{ (playheadMs / 1000).toFixed(2) }}s</span>
+        <span class="time" :title="`Time shown as ${prefs.timeFormat}`">{{ playheadLabel }}</span>
       </div>
       <div class="undo">
         <button @click="store.undo" :disabled="!store.canUndo">Undo</button>
@@ -808,6 +829,7 @@ watch(sequenceId, async (id) => {
         <option v-for="v in views" :key="v.name" :value="v.name">{{ v.name }}</option>
       </select>
       <button title="Command palette (Ctrl+Shift+K)" @click="paletteOpen = true">⌘K</button>
+      <button :class="{ active: showPrefsPanel }" @click="showPrefsPanel = !showPrefsPanel">Preferences</button>
       <button :class="{ active: showViewsPanel }" @click="showViewsPanel = !showViewsPanel">Views</button>
       <button :class="{ active: showPresetsPanel }" @click="showPresetsPanel = !showPresetsPanel">
         Presets{{ presets.length ? ` (${presets.length})` : "" }}
@@ -881,6 +903,57 @@ watch(sequenceId, async (id) => {
     </div>
 
     <CommandPalette :open="paletteOpen" :commands="commands" @close="paletteOpen = false" />
+
+    <div v-if="showPrefsPanel" class="models-panel">
+      <div class="models-panel-head"><h2>Preferences</h2></div>
+      <p class="timing-note">
+        These are yours, not the show's — they're kept in this browser rather than saved with the
+        project, so two people editing the same sequence don't change each other's settings.
+      </p>
+      <label class="blend-row">
+        Time display
+        <select :value="prefs.timeFormat" @change="patchPrefs({ timeFormat: ($event.target as HTMLSelectElement).value as Preferences['timeFormat'] })">
+          <option value="mmss">Minutes:seconds (1:05.43)</option>
+          <option value="seconds">Seconds (65.43s)</option>
+          <option value="frames">Frames</option>
+        </select>
+      </label>
+      <label class="blend-row">
+        Default effect length
+        <span>
+          <input
+            type="number"
+            min="50"
+            max="60000"
+            step="50"
+            :value="prefs.defaultEffectMs"
+            @change="patchPrefs({ defaultEffectMs: Number(($event.target as HTMLInputElement).value) })"
+          />
+          ms
+        </span>
+      </label>
+      <label class="blend-row">
+        <input
+          type="checkbox"
+          :checked="prefs.snapToTiming"
+          @change="patchPrefs({ snapToTiming: ($event.target as HTMLInputElement).checked })"
+        />
+        Snap effect edges to timing marks
+      </label>
+      <label class="blend-row">
+        Autosave
+        <span>
+          <input
+            type="number"
+            min="0"
+            max="600"
+            :value="prefs.autosaveSeconds"
+            @change="patchPrefs({ autosaveSeconds: Number(($event.target as HTMLInputElement).value) })"
+          />
+          seconds (0 turns it off)
+        </span>
+      </label>
+    </div>
 
     <div v-if="showPresetsPanel" class="models-panel">
       <div class="models-panel-head">
@@ -1063,6 +1136,7 @@ watch(sequenceId, async (id) => {
             :rows="visibleRows"
             :body="store.body"
             :duration-ms="store.sequence?.duration_ms ?? 0"
+            :snap-to-timing="prefs.snapToTiming"
             :px-per-ms="pxPerMs"
             :playhead-ms="playheadMs"
             :selected-effect-id="store.selectedEffectId"

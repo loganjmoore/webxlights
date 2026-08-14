@@ -49,7 +49,7 @@ written down. Status here means:
 |---|---|---|
 | Timeline + waveform, zoom, scroll | ✅ | 3 zoom levels |
 | Audio scrubbing | ❌ | Play-on-drag over the waveform |
-| Time display format | ❌ | |
+| Time display format | ✅ | Minutes:seconds, plain seconds, or frames — frames counted against the sequence's own frame rate, since a 20ms sequence and a 50ms one number the same second very differently |
 | Timeline tags | ❌ | |
 | Timing tracks | ✅ | Fixed interval + metronome generation |
 | Audio-generated timing tracks (beats/bars/lyrics) | ⚠️ | Interval/BPM only; no onset detection |
@@ -120,7 +120,7 @@ Moving Head + Servo (DMX fixtures).
 | Feature | Status | Notes |
 |---|---|---|
 | New sequence, sequence settings | ✅ | |
-| Preferences (backup, view, effects grid, sequences, output, colours, other, services) | ❌ | No preferences at all |
+| Preferences | ⚠️ | A Preferences panel with the settings that drive something here: time display format, default effect length, snap-to-timing marks, and the autosave interval (0 turns it off). Kept per-browser rather than with the project — a preference belongs to the person at the keyboard, and one that travelled with the show would let two people editing it change each other's. xLights' remaining Settings tabs configure machinery this app doesn't have (output devices, backup paths, services); offering them would be controls with nothing behind them, and a test asserts no such preference exists |
 | Backup and recovery | ⚠️ | Sequence version snapshots; no show-folder backup |
 | Tools — Test | ❌ | Channel test patterns against live output |
 | Tools — Convert | ❌ | Between sequence formats |

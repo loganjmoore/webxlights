@@ -23,6 +23,9 @@ const props = defineProps<{
   playheadMs: number;
   selectedEffectId: string | null;
   pendingEffectName: string | null; // armed from the palette; next drag places this
+  // xLights' "snap to timing marks" preference. Off, an edge lands exactly where it was dropped,
+  // which is what you want when placing against the music by ear rather than against the marks.
+  snapToTiming?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -73,6 +76,7 @@ function allMarks(): number[] {
 }
 
 function snapMs(ms: number): number {
+  if (props.snapToTiming === false) return ms;
   const toleranceMs = SNAP_PX / props.pxPerMs;
   let closest = ms;
   let closestDist = toleranceMs;

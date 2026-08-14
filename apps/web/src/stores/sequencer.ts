@@ -5,6 +5,14 @@ import { api, type SequenceBody, type SequenceEffect, type SequenceRecord } from
 const UNDO_LIMIT = 100;
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
+// How long an edit sits before it is saved, and whether it is saved at all. Driven by the user's
+// Autosave preference (lib/preferences.ts); 0 turns it off, which is the setting for someone who
+// would rather save deliberately than have a half-finished edit persisted.
+let autosaveDebounceMs = AUTOSAVE_DEBOUNCE_MS;
+export function setAutosaveDebounce(ms: number): void {
+  autosaveDebounceMs = Math.max(0, Math.round(ms));
+}
+
 // structuredClone() throws DataCloneError on Vue/Pinia reactive Proxy objects (observed
 // live: it silently aborted every mutation, since pushUndoSnapshot() runs before the
 // actual state change). JSON round-trip sidesteps proxies entirely and is fine here since
@@ -227,7 +235,8 @@ export const useSequencerStore = defineStore("sequencer", () => {
     () => {
       if (suppressAutosave || !sequence.value) return;
       if (saveTimer) clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveNow, AUTOSAVE_DEBOUNCE_MS);
+      if (autosaveDebounceMs === 0) return; // autosave off; the Snapshot button still saves
+      saveTimer = setTimeout(saveNow, autosaveDebounceMs);
     },
     { deep: true },
   );
