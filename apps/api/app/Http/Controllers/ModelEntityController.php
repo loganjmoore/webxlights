@@ -33,6 +33,7 @@ class ModelEntityController extends Controller
             'models.*.raw_attrs' => ['array'],
             'models.*.sub_models' => ['array'],
             'models.*.states' => ['array'],
+            'models.*.faces' => ['array'],
             'models.*.screen' => ['array'],
             'models.*.strings' => ['nullable', 'integer'],
             'models.*.nodes_per_string' => ['nullable', 'integer'],
@@ -53,6 +54,7 @@ class ModelEntityController extends Controller
                         'raw_attrs' => $m['raw_attrs'] ?? [],
                         'sub_models' => $m['sub_models'] ?? [],
                         'states' => $m['states'] ?? [],
+                        'faces' => $m['faces'] ?? [],
                         'screen' => $m['screen'] ?? [],
                         'strings' => $m['strings'] ?? null,
                         'nodes_per_string' => $m['nodes_per_string'] ?? null,
@@ -101,6 +103,26 @@ class ModelEntityController extends Controller
             'states.*.entries.*.name' => ['required', 'string', 'max:200'],
             'states.*.entries.*.nodes' => ['required', 'string', 'max:2000'],
             'states.*.entries.*.color' => ['nullable', 'string', 'max:9'],
+            // Face definitions, same wholesale replacement. A mouth with no nodes is allowed here
+            // and isn't in a state, because a face is created with every phoneme listed and the
+            // ranges filled in one at a time - rejecting the empty ones would make it unsaveable
+            // until it was finished in a single sitting.
+            'faces' => ['sometimes', 'array'],
+            'faces.*.name' => ['required', 'string', 'max:200'],
+            'faces.*.mouths' => ['array'],
+            'faces.*.mouths.*.name' => ['required', 'string', 'max:200'],
+            // Nullable as well as present: Laravel converts empty request strings to null, so an
+            // unfilled mouth arrives as null rather than "". Both mean "no nodes yet".
+            'faces.*.mouths.*.nodes' => ['present', 'nullable', 'string', 'max:2000'],
+            'faces.*.mouths.*.color' => ['nullable', 'string', 'max:9'],
+            'faces.*.eyesOpen' => ['nullable', 'string', 'max:2000'],
+            'faces.*.eyesClosed' => ['nullable', 'string', 'max:2000'],
+            'faces.*.eyesOpen2' => ['nullable', 'string', 'max:2000'],
+            'faces.*.eyesClosed2' => ['nullable', 'string', 'max:2000'],
+            'faces.*.eyesOpen3' => ['nullable', 'string', 'max:2000'],
+            'faces.*.eyesClosed3' => ['nullable', 'string', 'max:2000'],
+            'faces.*.outline' => ['nullable', 'string', 'max:2000'],
+            'faces.*.outline2' => ['nullable', 'string', 'max:2000'],
             'controller_id' => ['sometimes', 'nullable', 'integer', 'exists:controllers,id'],
             'controller_offset' => ['sometimes', 'nullable', 'integer', 'min:0'],
             // Channel geometry lives in packages/engine (TS-only) - the client computes this

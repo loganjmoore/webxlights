@@ -1,5 +1,6 @@
 import { ADJUST_MODES } from "./adjust";
 import { KALEIDOSCOPE_TYPES } from "./kaleidoscope";
+import { FACE_EYE_MODES } from "./faces";
 import { PIANO_SOURCES, PIANO_TYPES } from "./piano";
 import { STATE_COLOR_MODES, STATE_MODES } from "./state";
 import { TENDRIL_MOVEMENTS } from "./tendrils";
@@ -21,7 +22,7 @@ export interface EffectParamSpec {
    * the source and the props panel fills it in; an empty list is a real answer ("no timing tracks
    * yet"), which is why it isn't just `options`.
    */
-  optionsFrom?: "timingTracks" | "stateDefinitions";
+  optionsFrom?: "timingTracks" | "stateDefinitions" | "faceDefinitions" | "phonemes";
   default: number | boolean | string;
   valueCurve?: boolean; // param accepts a ValueCurve as well as a flat number (valueCurve.ts)
 }
@@ -594,6 +595,26 @@ export const PIANO_EFFECT_SCHEMA: EffectSchema = {
   ],
 };
 
+// The Faces effect (faces.ts). Its Phoneme and Face Definition lists come from the model, so they
+// are filled in by the props panel rather than fixed here.
+export const FACES_EFFECT_SCHEMA: EffectSchema = {
+  name: "Faces",
+  params: [
+    { key: "faceDefinition", label: "Face Definition", type: "choice", optionsFrom: "faceDefinitions", default: "" },
+    { key: "useTimingTrack", label: "Use Timing Track", type: "checkbox", default: true },
+    { key: "timingTrack", label: "Timing Track", type: "choice", optionsFrom: "timingTracks", default: "" },
+    { key: "phoneme", label: "Phoneme", type: "choice", optionsFrom: "phonemes", default: "rest" },
+    { key: "eyes", label: "Eyes", type: "choice", options: [...FACE_EYE_MODES], default: "Open" },
+    { key: "eyeBlinkSeconds", label: "Eye Blink Frequency", type: "floatSlider", min: 0.5, max: 30, step: 0.5, default: 5 },
+    { key: "eyeBlinkLengthMs", label: "Eye Blink Length", type: "intSlider", min: 50, max: 1000, default: 150 },
+    { key: "showOutline", label: "Show Outline", type: "checkbox", default: true },
+    { key: "suppressWhenNotSinging", label: "Suppress When Not Singing", type: "checkbox", default: false },
+    { key: "leadInFrames", label: "Lead In Frames", type: "intSlider", min: 0, max: 100, default: 0 },
+    { key: "leadOutFrames", label: "Lead Out Frames", type: "intSlider", min: 0, max: 100, default: 0 },
+    { key: "fadeDuringLeadInOut", label: "Fade During Lead In/Out", type: "checkbox", default: false },
+  ],
+};
+
 export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   On: ON_EFFECT_SCHEMA,
   Bars: BARS_EFFECT_SCHEMA,
@@ -641,12 +662,13 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Sketch: SKETCH_EFFECT_SCHEMA,
   State: STATE_EFFECT_SCHEMA,
   Piano: PIANO_EFFECT_SCHEMA,
+  Faces: FACES_EFFECT_SCHEMA,
 };
 
 // Effects driven by the words on a timing track rather than by their own parameters. The props
 // panel warns when one of these names a track the sequence hasn't got, because the symptom
 // otherwise is an effect that renders nothing for no visible reason.
-export const TIMING_TRACK_EFFECTS = new Set<string>(["State", "Piano"]);
+export const TIMING_TRACK_EFFECTS = new Set<string>(["State", "Piano", "Faces"]);
 
 // Effects that read the analysed audio track rather than only their own params - the UI warns
 // when one of these is placed in a sequence with no audio loaded.

@@ -1,5 +1,43 @@
 # Changelog
 
+## Singing faces, for coro props
+
+Faces was the last effect still listed as blocked on something this app can't have. The blocker was recorded as "a picture per mouth position" — and reading the *Singing Faces* chapter rather than just the effect page shows that's true of only one of its three definition types:
+
+| Type | Use case | What it needs |
+|---|---|---|
+| Single Node | coro faces on dumb RGB / LOR channels | node ranges |
+| Node Ranges | coro faces on smart pixels | node ranges |
+| Matrix | P5/P10 matrices | an image per mouth position |
+
+Two of the three are node ranges — the shape the State work already built. Those are implemented here. Matrix faces are not, and are now listed as their own row rather than hiding inside "Faces is blocked".
+
+### What's in
+
+Mouth positions driven by a phoneme timing track; eyes open, closed, off, or automatic; the outline; and the manual's palette table, which assigns each of the six swatches to a part (mouth, eyes, outline, outline2, eyes2, eyes3). Force Custom Colors on a mouth beats the palette, as it does for states.
+
+**Automatic blinking happens only at rest.** The manual is specific — "blink every few seconds when the rest phenome is on" — so a face doesn't blink mid-syllable. It's driven by absolute time, so a scrub and a sequential export agree on when the eyes are shut.
+
+**Suppress when not singing** hides the face between lyrics, with lead-in and lead-out *frames* either side and an optional fade rather than a cut. Those settings are in frames, which is why the frame context now carries the sequence's frame time: a frame isn't a duration until you know it.
+
+### The phoneme names are data, not a list
+
+The manual never writes the phoneme set down — it only appears in screenshots. Hardcoding a guess would fail the worst way available: a label naming a mouth the definition hasn't got renders as a closed mouth, with nothing to say why.
+
+So a face carries whatever names it was built or imported with, matched case-insensitively, and a new definition is seeded with the standard set as a starting point you can edit. The effect's Phoneme dropdown lists *that face's own* mouths rather than an assumed set. If the standard names turn out to be wrong, nothing breaks — the definition is still the authority.
+
+A label that names no mouth falls back to rest rather than to nothing, so a face pointed at a lyric track that hasn't been broken down closes its mouth instead of vanishing.
+
+### Import
+
+`<faceInfo>` is read on import: `mouth-<PHONEME>` attributes, the eyes and outline parts, and per-mouth forced colours.
+
+**A Matrix definition is skipped rather than imported.** Its values are image paths, and reading them as node ranges wouldn't fail — it would light arbitrary nodes. Of the three possible outcomes (right, visibly wrong, quietly wrong) that's the one worth spending code to avoid.
+
+### Still outstanding, and now named separately
+
+Matrix faces; **Import Lyrics / Breakdown Phrases / Breakdown Words**, which needs xLights' pronunciation dictionaries; and Papagayo `.pgo` import. Without the dictionary the manual's own manual path still works: type phoneme labels onto a timing track and the effect runs off them.
+
 ## A MIDI file becomes a timing track
 
 The Piano effect lists a MIDI file as one of its notes sources. Shipping the effect left that as the one real gap, so this fills it — but as an *import* rather than as a second way for the effect to read notes.

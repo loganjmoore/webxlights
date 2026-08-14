@@ -2,6 +2,7 @@ import type { AudioFrame } from "../audio";
 import { SILENT_AUDIO_FRAME } from "../audio";
 import type { ModelNode } from "../models/types";
 import type { StateEntry } from "../models/states";
+import type { FaceSpec } from "../models/faces";
 import type { TimingLabel } from "../timing";
 
 // Shared per-frame context for all effects. `seed` feeds the deterministic RNG helpers
@@ -30,6 +31,10 @@ export interface EffectClock {
   atMs: number; // absolute playhead
   startMs: number; // effect bounds, so an effect can measure elapsed real time
   endMs: number;
+  // The sequence's frame time. Some of xLights' settings are specified in *frames* rather than
+  // milliseconds - a face's lead-in and lead-out, for instance - and a frame is only a duration
+  // once you know this.
+  frameMs: number;
 }
 
 // Per-effect data resolved by the caller, because the engine renders one row at a time and has no
@@ -39,6 +44,8 @@ export interface EffectData {
   timing?: readonly TimingLabel[];
   /** The entries of the model state definition this effect names (models/states.ts). */
   states?: readonly StateEntry[];
+  /** The model face definition this effect names (models/faces.ts). */
+  face?: FaceSpec;
 }
 
 export function audioOf(ctx: FrameContext): AudioFrame {

@@ -232,6 +232,55 @@ class LayoutModelsTest extends TestCase
         $this->assertSame('wink', $model->states[0]['entries'][0]['name']);
     }
 
+    public function test_faces_can_be_edited_on_a_model(): void
+    {
+        // The in-app face editor: which nodes are the mouth in each phoneme, and which are the
+        // eyes and outline.
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_id' => $user->id]);
+        $layout = $project->layouts()->create(['name' => 'Layout']);
+        $model = $layout->models()->create(['name' => 'Singing Face', 'type' => 'Custom', 'supported' => true]);
+
+        $this->actingAs($user)->patchJson("/api/v1/layouts/{$layout->id}/models/{$model->id}", [
+            'faces' => [[
+                'name' => 'Face1',
+                'mouths' => [
+                    ['name' => 'AI', 'nodes' => '1-5', 'color' => '#ff0000'],
+                    // A phoneme whose nodes haven't been filled in yet has to save: a face is
+                    // created with every mouth listed and assigned one at a time.
+                    ['name' => 'MBP', 'nodes' => ''],
+                ],
+                'eyesOpen' => '20',
+                'eyesClosed' => '21',
+                'outline' => '30-40',
+            ]],
+        ])->assertOk();
+
+        $fresh = $model->fresh();
+        $this->assertSame('AI', $fresh->faces[0]['mouths'][0]['name']);
+        $this->assertSame('1-5', $fresh->faces[0]['mouths'][0]['nodes']);
+        // Empty rather than a specific value: an unfilled mouth arrives as null, since Laravel
+        // turns empty request strings into null before validation sees them.
+        $this->assertEmpty($fresh->faces[0]['mouths'][1]['nodes']);
+        $this->assertSame('30-40', $fresh->faces[0]['outline']);
+    }
+
+    public function test_a_face_mouth_without_a_name_is_rejected(): void
+    {
+        // A mouth with no name can never be matched by a phoneme label, so it would sit in the
+        // definition doing nothing.
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_id' => $user->id]);
+        $layout = $project->layouts()->create(['name' => 'Layout']);
+        $model = $layout->models()->create(['name' => 'Singing Face', 'type' => 'Custom', 'supported' => true]);
+
+        $this->actingAs($user)
+            ->patchJson("/api/v1/layouts/{$layout->id}/models/{$model->id}", [
+                'faces' => [['name' => 'Face1', 'mouths' => [['nodes' => '1-5']]]],
+            ])
+            ->assertStatus(422);
+    }
+
     public function test_deleting_a_model_group_removes_it(): void
     {
         $user = User::factory()->create();

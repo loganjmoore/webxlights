@@ -35,6 +35,7 @@ export interface ImportSummary {
   subModels: number;
   /** How many state definitions came across, so an import can say whether it found any. */
   states: number;
+  faces: number;
   // Which reading of ScaleX the boxed models were placed with, and what it was decided from.
   boxedScale: BoxedScaleChoice;
   // How many models stored a negative scale. The importer reads those as magnitudes, because in
@@ -84,6 +85,20 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
     sub_models: m.subModels,
     // State definitions arrive the same way and for the same reason.
     states: m.states,
+    // Face definitions arrive the same way. The parser has already dropped Matrix ones, which
+    // hold image paths rather than node ranges.
+    faces: m.faces.map((f) => ({
+      name: f.name,
+      mouths: f.mouths,
+      eyesOpen: f.parts["Eyes-Open"],
+      eyesClosed: f.parts["Eyes-Closed"],
+      eyesOpen2: f.parts["Eyes-Open2"],
+      eyesClosed2: f.parts["Eyes-Closed2"],
+      eyesOpen3: f.parts["Eyes-Open3"],
+      eyesClosed3: f.parts["Eyes-Closed3"],
+      outline: f.parts.Outline,
+      outline2: f.parts.Outline2,
+    })),
     string_type: m.attrs.StringType ?? null,
     start_channel: m.attrs.StartChannel ?? null,
     order: i,
@@ -117,5 +132,6 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
 
   const subModels = parsed.models.reduce((n, m) => n + m.subModels.length, 0);
   const states = parsed.models.reduce((n, m) => n + m.states.length, 0);
-  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length, placement, boxedScale, negativeScales, subModels, states };
+  const faces = parsed.models.reduce((n, m) => n + m.faces.length, 0);
+  return { imported: models.length, unsupported: parsed.unsupportedTypes, groups: groups.length, placement, boxedScale, negativeScales, subModels, states, faces };
 }

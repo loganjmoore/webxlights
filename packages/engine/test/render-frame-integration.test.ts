@@ -118,10 +118,11 @@ describe("Effect registry", () => {
     // for them - they modify the layer below. The test below covers them instead, with the
     // canvas they need, so they aren't simply exempted.
     //
-    // State is excluded for the same shape of reason: everything it draws comes from the model's
-    // own state definitions, so with nothing but its defaults there is nothing to light. It gets
-    // its own assertion below, with the definitions and the labels it is driven by.
-    const needsContent = new Set(["Pictures", "State", ...CANVAS_ONLY_EFFECTS]);
+    // State and Faces are excluded for the same shape of reason: everything they draw comes from
+    // a definition on the *model*, so with nothing but their own defaults there is nothing to
+    // light. Both get their own assertions below, with the definitions and labels that drive
+    // them, rather than being exempted outright.
+    const needsContent = new Set(["Pictures", "State", "Faces", ...CANVAS_ONLY_EFFECTS]);
     const series: AudioSeries = { frameMs: 50, bandCount: 2, frames: [{ level: 1, bands: [1, 1] }] };
 
     for (const name of Object.keys(EFFECT_SCHEMAS)) {
@@ -184,6 +185,22 @@ describe("Effect registry", () => {
     };
     const colors = renderRowAtMs({ geometry: matrix, effects: [effect] }, 400, 50, 42, PALETTE);
     expect(colors.filter((c) => c.a > 0)).toHaveLength(4);
+  });
+
+  it("Faces renders through the pipeline once it has a face definition and phonemes", () => {
+    const effect: RenderableEffect = {
+      name: "Faces",
+      startMs: 0,
+      endMs: 1000,
+      params: { ...defaultParamsFor("Faces"), useTimingTrack: true },
+      data: {
+        face: { name: "Face1", mouths: [{ name: "AI", nodes: "1-3" }], eyesOpen: "10", outline: "20-21" },
+        timing: [{ startMs: 0, endMs: 1000, label: "AI" }],
+      },
+    };
+    const colors = renderRowAtMs({ geometry: matrix, effects: [effect] }, 400, 50, 42, PALETTE);
+    // three mouth nodes, one eye, two outline
+    expect(colors.filter((c) => c.a > 0)).toHaveLength(6);
   });
 
   it("defaultParamsFor covers every param the schema declares", () => {

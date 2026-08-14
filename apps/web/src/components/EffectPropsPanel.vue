@@ -41,6 +41,9 @@ const props = defineProps<{
   // the model under this row carries. Both are named by the label-driven effects.
   timingTrackNames?: string[];
   stateDefinitionNames?: string[];
+  faceDefinitionNames?: string[];
+  /** The mouth positions the selected face definition actually has. */
+  phonemeNames?: string[];
 }>();
 const emit = defineEmits<{
   update: [params: Record<string, EffectParamValue>];
@@ -145,6 +148,8 @@ const needsCanvas = computed(
 function optionsFor(p: EffectParamSpec): string[] {
   if (p.optionsFrom === "timingTracks") return props.timingTrackNames ?? [];
   if (p.optionsFrom === "stateDefinitions") return props.stateDefinitionNames ?? [];
+  if (p.optionsFrom === "faceDefinitions") return props.faceDefinitionNames ?? [];
+  if (p.optionsFrom === "phonemes") return props.phonemeNames ?? [];
   return p.options ?? [];
 }
 
@@ -153,8 +158,8 @@ function optionsFor(p: EffectParamSpec): string[] {
 const missingTimingTrack = computed(() => {
   const effect = props.effect;
   if (!effect || !TIMING_TRACK_EFFECTS.has(effect.name)) return false;
-  // A State effect told not to use a track is driven by its own State field instead.
-  if (effect.name === "State" && effect.params.useTimingTrack === false) return false;
+  // An effect told not to use a track is driven by its own State or Phoneme field instead.
+  if ((effect.name === "State" || effect.name === "Faces") && effect.params.useTimingTrack === false) return false;
   if (effect.name === "Piano" && effect.params.notesSource === "Audio") return false;
   const chosen = effect.params.timingTrack;
   return typeof chosen !== "string" || !chosen || !(props.timingTrackNames ?? []).includes(chosen);

@@ -158,3 +158,38 @@ describe("States", () => {
     expect(arch.states).toEqual([]);
   });
 });
+
+// Face definitions live inside <model> too, and two of their three types are node ranges.
+describe("Faces", () => {
+  const xml = `<?xml version="1.0"?>
+<xrgb>
+  <models>
+    <model name="Singing Face" DisplayAs="Custom" parm1="10" parm2="4" CustomModel="1,2;3,4">
+      <faceInfo Name="Face1" Type="NodeRange" mouth-AI="1-5" mouth-rest="6" mouth-MBP-Color="#00FF00" mouth-MBP="7-8" Eyes-Open="9" Eyes-Closed="10" Outline="11-20" />
+      <faceInfo Name="Matrix Face" Type="Matrix" mouth-AI="C:/faces/ai.png" mouth-rest="C:/faces/rest.png" />
+    </model>
+    <model name="Arch" DisplayAs="Arches" parm1="1" parm2="20" />
+  </models>
+</xrgb>`;
+
+  it("reads the mouths, the eyes and the outline of a node-range face", () => {
+    const face = parseRgbEffectsXml(xml).models.find((m) => m.name === "Singing Face")!.faces[0]!;
+    expect(face.name).toBe("Face1");
+    expect(face.mouths.find((m) => m.name === "AI")!.nodes).toBe("1-5");
+    expect(face.mouths.find((m) => m.name === "MBP")).toEqual({ name: "MBP", nodes: "7-8", color: "#00FF00" });
+    expect(face.parts["Eyes-Open"]).toBe("9");
+    expect(face.parts.Outline).toBe("11-20");
+  });
+
+  it("skips a Matrix face rather than reading its image paths as node ranges", () => {
+    // A Matrix definition's values are file paths. Read as ranges they would light arbitrary
+    // nodes instead of failing, which is the worst of the three outcomes.
+    const faces = parseRgbEffectsXml(xml).models.find((m) => m.name === "Singing Face")!.faces;
+    expect(faces).toHaveLength(1);
+    expect(faces.map((f) => f.name)).not.toContain("Matrix Face");
+  });
+
+  it("gives a model with no faces an empty list, not undefined", () => {
+    expect(parseRgbEffectsXml(xml).models.find((m) => m.name === "Arch")!.faces).toEqual([]);
+  });
+});

@@ -239,6 +239,16 @@ const selectedEffectModel = computed(() => {
   return modelRecords.value.find((m) => m.id === row.elementId) ?? null;
 });
 const stateDefinitionNames = computed(() => (selectedEffectModel.value?.states ?? []).map((s) => s.name));
+const faceDefinitionNames = computed(() => (selectedEffectModel.value?.faces ?? []).map((f) => f.name));
+// The mouth positions of the face this effect is actually pointed at - so the Phoneme list is
+// this face's own names rather than a set we assumed it would use.
+const phonemeNames = computed(() => {
+  const faces = selectedEffectModel.value?.faces ?? [];
+  if (faces.length === 0) return [];
+  const named = String(selectedEffect.value?.params.faceDefinition ?? "").trim();
+  const face = named ? faces.find((f) => f.name === named) : faces.length === 1 ? faces[0] : undefined;
+  return (face?.mouths ?? []).map((m) => m.name);
+});
 
 function rowKey(row: GridRow): string {
   return `${row.elementType}:${row.elementId}:${row.subName ?? ""}`;
@@ -1568,6 +1578,8 @@ watch(sequenceId, async (id) => {
           :effect="selectedEffect"
           :timing-track-names="timingTrackNames"
           :state-definition-names="stateDefinitionNames"
+          :face-definition-names="faceDefinitionNames"
+          :phoneme-names="phonemeNames"
           @update="handleParamsUpdate"
           @update-palette="handlePaletteUpdate"
           @update-blend="handleBlendUpdate"
