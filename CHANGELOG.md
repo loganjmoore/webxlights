@@ -1,5 +1,88 @@
 # Changelog
 
+## Audio scrubbing
+
+Drag across the waveform and the track plays under the pointer. It's how a downbeat gets found by ear rather than by counting — a plain seek moves the playhead in silence, which is what makes lining effects up to music slow without this.
+
+The burst is **stopped on a timer** rather than left running. A scrub that kept playing would drift away from the pointer within about a second, and dragging back would then be seeking against audio that had already moved on — which feels worse than no scrubbing at all.
+
+It only starts a burst when the transport is stopped: scrubbing during playback would fight the thing already playing. And a blocked autoplay is swallowed rather than surfaced — the playhead still moves, which is the part that matters; the sound is the bonus.
+
+
+## Song structure regions
+
+*"Let you divide the sequence timeline into named, colored sections — for example Intro, Verse, Chorus, Bridge and Outro."*
+
+They earn their keep in **bulk**. Once the timeline is labelled, "copy the chorus's effects onto the second chorus" is one action instead of a rubber-band selection across a hundred rows that has to land on exactly the right boundary.
+
+Sections can be added at the playhead, or generated from a timing track: *"one region for each timing mark, using the timing mark's label as the region name."* An unlabelled mark is named by its position rather than left blank — an unnamed region is indistinguishable from its neighbours in the one place regions are meant to help.
+
+Three decisions worth stating, each pinned by a test:
+
+- **Stored as boundaries, not start/end pairs.** A region ends where the next begins, so keeping both would let the two disagree — and a gap or an overlap between two sections isn't a state the timeline can actually be in.
+- **A straddling effect belongs to the section it began in.** Splitting it would change what the sequence renders; counting it in both would duplicate it on every copy.
+- **A copy that wouldn't fit is skipped, not trimmed.** A half-length copy of an effect is a different effect, and silently shortening one is worse than not copying it.
+
+And one I got wrong on the first pass and the test caught: labels are paired with their marks **before** the marks are sorted. Sorting first and then indexing the labels hands "Chorus" to whichever mark happened to be earliest — the same thing only when the track was already in order.
+
+
+## A Channel Block was claiming three times the channels it needed
+
+The Channel Block model shipped a fortnight's worth of PRs ago with the right geometry and the wrong output. Every model in this app put three bytes on the wire per node, because every model until then was an RGB pixel.
+
+A Channel Block isn't. The manual describes it as a way to *"model generic channel to be used or AC Lights, relays, smoke machines"* — **each channel drives one device, so each takes one byte.**
+
+At three bytes a channel, a 24-channel relay board claims 72. Every model after it on that controller is shifted by 48 channels. Nothing errors; the wrong props light. It's the same class of failure as the overlapping-channel bug the visualiser exists to find, arriving by a different route — and it was in code I wrote earlier in this same run.
+
+With it, the setting that decides *which* of a rendered pixel's channels supplies that byte: **Channel Color**, model-wide and per channel. *"If set to 'White' all three RGB channel values will be use... If set to 'Red' only the Red channel values will be use."*
+
+White takes the **brightest** of the three rather than their average. An average would put a pure red effect out at a third power, which reads as a relay that never quite closes. And an unknown colour in the per-channel list becomes White rather than being dropped — dropping it would shift every channel after it along by one, which is the same silent mis-addressing all over again.
+
+
+## The radial effect wheel
+
+*"Double-click empty sequencer grid area displays a radial effect wheel for quick effect placement."*
+
+It exists because the alternative is a trip to the palette on the far side of the screen and back. The wheel opens **where the pointer already is**, and the effect lands there rather than at the playhead — so the whole gesture is double-click, flick, release. That's what makes it worth having over a menu.
+
+Only on empty grid: double-clicking an effect is how you'd open it, not how you'd place another on top of it.
+
+Its list is **the single-letter shortcut list**, not a second copy of one. The wheel and the keyboard are two ways at the same set of effects, and a wheel with its own list would be a third place for that set to drift.
+
+
+## Preferences, and the time display
+
+A Preferences panel — and a deliberately short one. **Every setting in it drives something**, with a test asserting that no preference exists which nothing reads. xLights' Settings dialog has eight tabs, most of them configuring machinery this app doesn't have (output devices, backup paths, services); offering those would be a screen full of switches with nothing behind them, which is worse than a short screen.
+
+What's in it: **time display format** (minutes:seconds, plain seconds, or frames), **default effect length**, **snap effect edges to timing marks**, and the **autosave interval** — where 0 genuinely turns autosave off, for someone who'd rather save deliberately than have a half-finished edit persisted.
+
+Frames are counted against the sequence's own frame rate rather than a constant: a 20ms sequence and a 50ms one number the same second very differently, and a frame count that assumed one of them would be wrong for half of all shows.
+
+**Preferences live in the browser, not with the project.** A preference belongs to the person at the keyboard, not to the show — one that travelled with the project would let two people editing the same sequence change each other's settings.
+
+Stored values are merged over the defaults rather than replacing them, so a preference added later doesn't come back `undefined` for everyone who already has a stored bag — which is how a number field ends up NaN and a duration ends up zero. And everything is clamped on read: a hand-edited bag can't produce a zero-length default effect, which couldn't be selected on the grid and so would be unrecoverable once made.
+
+I cut one setting while building this. "Confirm before deleting several things at once" was in the panel until I checked what read it — nothing did. Shipping it would have been the exact thing the test above exists to prevent.
+
+
+## Keyboard shortcuts and a command palette, from one registry
+
+xLights documents around sixty keyboard shortcuts. We had a handful, dispatched from a `switch` statement — the arrangement where a shortcut, a help list and a palette drift apart until a documented key quietly does nothing.
+
+So all three now come from **one registry**. A command carries its own key, which means a shortcut can't exist without a command, and a command can't be given a key nothing dispatches.
+
+**What's in it:** transport (play, start, end, nudge), timing (`t` to add a mark, `s` to split the one the playhead is inside), edit (delete, copy, paste, duplicate, undo, redo), zoom, and **all fifteen of xLights' single-letter effect shortcuts** — `b` Bars, `f` Fire, `r` Ripple, and the rest.
+
+Three details that are easy to get wrong and are pinned by tests:
+
+- **Case is significant**, as it is in xLights: `o` is On and `O` is Off, `f` is Fire and `F` is Fan. Lower-casing the key would collapse each pair, and which effect you got would depend on list order.
+- **Modifier commands match before bare letters.** `c` is xLights' Curtain shortcut, so without that ordering every Ctrl+C would also drop an effect on the grid.
+- **`=` counts as `+`.** On most layouts the zoom-in key is typed without shift, so accepting only `+` makes the documented shortcut do nothing on a US keyboard.
+
+A further test asserts **no two commands answer the same key** — two matches means the second is unreachable, and which one loses depends on list order rather than on a decision anyone made.
+
+**The command palette** (Ctrl+Shift+K, the key the manual documents) searches the same registry, ranks a prefix match above one buried mid-string, and shows each command's key beside it — which is how anyone learns sixty shortcuts without reading a list of them. It also carries the commands that have no key at all, like Export .fseq: a command reachable only through a menu is exactly what a palette exists to replace.
+
 ## A photo of the house behind the layout
 
 The 2D layout's background image — the thing that turns it from a diagram into a plan of *a particular house*. Pick a photo, and props can be placed where they physically are instead of by eye against an empty grid. An opacity slider keeps it from competing with the props.

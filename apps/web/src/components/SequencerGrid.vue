@@ -23,6 +23,9 @@ const props = defineProps<{
   playheadMs: number;
   selectedEffectId: string | null;
   pendingEffectName: string | null; // armed from the palette; next drag places this
+  // xLights' "snap to timing marks" preference. Off, an edge lands exactly where it was dropped,
+  // which is what you want when placing against the music by ear rather than against the marks.
+  snapToTiming?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -34,6 +37,10 @@ const emit = defineEmits<{
   dragStart: [];
   addMark: [trackIndex: number, ms: number];
   contextmenu: [target: ContextMenuTarget];
+  // xLights' radial effect wheel: "double-click empty sequencer grid area displays a radial
+  // effect wheel for quick effect placement". Only on empty grid - double-clicking an effect is
+  // how you would open it, not how you would place another on top of it.
+  wheel: [row: GridRow, ms: number, x: number, y: number];
 }>();
 
 const ROW_HEIGHT = 28;
@@ -73,6 +80,7 @@ function allMarks(): number[] {
 }
 
 function snapMs(ms: number): number {
+  if (props.snapToTiming === false) return ms;
   const toleranceMs = SNAP_PX / props.pxPerMs;
   let closest = ms;
   let closestDist = toleranceMs;
@@ -218,6 +226,17 @@ function onScroll(): void {
   if (!scrollRef.value) return;
   scrollTop.value = scrollRef.value.scrollTop;
   draw();
+}
+
+function onDoubleClick(e: MouseEvent): void {
+  const canvas = canvasRef.value;
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const hit = hitTest(x, y);
+  if (hit.kind !== "row-empty") return;
+  emit("wheel", hit.row, snapMs(xToMs(x)), e.clientX, e.clientY);
 }
 
 function onContextMenu(e: MouseEvent): void {
@@ -377,6 +396,7 @@ watch(() => [props.rows, props.body, props.playheadMs, props.selectedEffectId, p
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
+        @dblclick="onDoubleClick"
         @contextmenu="onContextMenu"
         @dragover="onDragOver"
         @drop="onDrop"

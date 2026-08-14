@@ -8,6 +8,7 @@ export * from "./models/polyPoints";
 export * from "./models/subModel";
 export * from "./models/boxedScale";
 export * from "./models/units";
+export * from "./models/channelOutput";
 export * from "./models/matrix";
 export * from "./models/line";
 export * from "./models/arches";

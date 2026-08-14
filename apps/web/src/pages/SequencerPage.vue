@@ -18,7 +18,12 @@ import {
   presetFromEffect,
   type EffectPreset,
 } from "../lib/effectPresets";
-import { newEffectId, useSequencerStore } from "../stores/sequencer";
+import { buildCommands, commandForEvent, isTypingTarget } from "../lib/commands";
+import { formatTime, loadPreferences, sanitize, savePreferences, type Preferences } from "../lib/preferences";
+import { REGION_COLORS, boundariesFromTimingTrack, effectsInRegion, rebaseEffects, regionAt, regionsFrom } from "../lib/songRegions";
+import CommandPalette from "../components/CommandPalette.vue";
+import EffectWheel from "../components/EffectWheel.vue";
+import { newEffectId, setAutosaveDebounce, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type ContextMenuTarget, type GridRow } from "../components/SequencerGrid.vue";
 import EffectContextMenu from "../components/EffectContextMenu.vue";
 import Waveform from "../components/Waveform.vue";
@@ -416,6 +421,34 @@ function seekTo(ms: number): void {
   if (el) el.currentTime = ms / 1000;
 }
 
+// Audio scrubbing (manual: "play-on-drag over the waveform"). Dragging the waveform plays the
+// track under the pointer, which is how a downbeat gets found by ear instead of by counting.
+//
+// The burst is stopped on a timer rather than left running: a scrub that kept playing would drift
+// away from the pointer within a second, and dragging back would then be seeking against audio
+// that had moved on. It is also only started when the transport is stopped - scrubbing during
+// playback would fight the thing already playing.
+let scrubStopTimer: ReturnType<typeof setTimeout> | null = null;
+const SCRUB_BURST_MS = 120;
+
+function scrubTo(ms: number): void {
+  seekTo(ms);
+  const el = audioEl.value;
+  if (!el || playing.value) return;
+  if (scrubStopTimer) clearTimeout(scrubStopTimer);
+  void el.play().catch(() => {
+    // Autoplay policy, or no track loaded. The playhead still moved, which is the part that
+    // matters; the burst is a bonus.
+  });
+  scrubStopTimer = setTimeout(() => el.pause(), SCRUB_BURST_MS);
+}
+
+function endScrub(): void {
+  if (scrubStopTimer) clearTimeout(scrubStopTimer);
+  scrubStopTimer = null;
+  if (!playing.value) audioEl.value?.pause();
+}
+
 function onTimeUpdate(): void {
   if (audioEl.value) playheadMs.value = Math.round(audioEl.value.currentTime * 1000);
 }
@@ -443,6 +476,8 @@ function onEffectDragStart(e: DragEvent, name: string): void {
   e.dataTransfer.effectAllowed = "copy";
 }
 
+// Kept as the fallback for anything that runs before preferences load; the preference is what
+// actually drives a drop (see prefs.defaultEffectMs).
 const DEFAULT_DROPPED_EFFECT_MS = 1000;
 
 // Native drag-and-drop from the palette (SequencerGrid.vue's onDrop), matching ModelPalette.vue's
@@ -450,7 +485,8 @@ const DEFAULT_DROPPED_EFFECT_MS = 1000;
 // resize after" pattern as a dropped model. The existing arm+drag-on-grid gesture (which lets
 // you size the effect in one motion) is untouched and still the way to place a specific length.
 function handleDropEffect(row: GridRow, name: string, startMs: number): void {
-  const endMs = Math.min(startMs + DEFAULT_DROPPED_EFFECT_MS, store.sequence?.duration_ms ?? startMs + DEFAULT_DROPPED_EFFECT_MS);
+  const length = prefs.value.defaultEffectMs || DEFAULT_DROPPED_EFFECT_MS;
+  const endMs = Math.min(startMs + length, store.sequence?.duration_ms ?? startMs + length);
   store.addEffect(row.elementType, row.elementId, row.subName, {
     id: newEffectId(),
     name,
@@ -656,30 +692,176 @@ function openPreviewWindow(): void {
   // A window opened now won't have its listener attached yet; it says hello when it's ready.
 }
 
-function onKeydown(e: KeyboardEvent): void {
-  if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "SELECT") return;
+// Every keyboard shortcut and every palette entry comes from one registry (lib/commands.ts).
+// xLights documents around sixty shortcuts, and keeping a switch statement, a help list and a
+// palette in agreement by hand is exactly what drifts until a documented key does nothing.
+// Song structure regions (lib/songRegions.ts): named, coloured sections of the timeline. They
+// earn their keep in bulk - once the timeline is labelled, "copy the chorus onto the second
+// chorus" is one action instead of a rubber-band selection across a hundred rows that has to land
+// on exactly the right boundary.
+const showRegionsPanel = ref(false);
+const regionCopyFrom = ref("");
+const regionCopyTo = ref("");
+const songRegions = computed(() => regionsFrom(store.body.songBoundaries ?? [], store.sequence?.duration_ms ?? 0));
+const currentRegion = computed(() => regionAt(songRegions.value, playheadMs.value));
 
-  if (e.code === "Space") {
-    e.preventDefault();
-    togglePlay();
-  } else if (e.code === "Home") {
-    seekTo(0);
-  } else if (e.key === "t") {
-    addTimingMarkAtPlayhead();
-  } else if (e.key === "Delete" || e.key === "Backspace") {
-    if (store.selectedEffectId) store.deleteEffect(store.selectedEffectId);
-  } else if ((e.metaKey || e.ctrlKey) && e.key === "z") {
-    e.preventDefault();
-    if (e.shiftKey) store.redo();
-    else store.undo();
-  } else if ((e.metaKey || e.ctrlKey) && e.key === "c") {
-    if (store.selectedEffectId) clipboard.value = store.copyEffect(store.selectedEffectId);
-  } else if ((e.metaKey || e.ctrlKey) && e.key === "v") {
-    if (clipboard.value) {
-      const row = visibleRows.value[0]; // pasting onto a hidden row would look like paste did nothing
-      if (row) store.pasteEffectAt(row.elementType, row.elementId, row.subName, clipboard.value, playheadMs.value);
+function addBoundaryHere(): void {
+  store.snapshot();
+  const boundaries = [...(store.body.songBoundaries ?? []), { ms: playheadMs.value, name: `Section ${(store.body.songBoundaries?.length ?? 0) + 1}` }];
+  store.body.songBoundaries = boundaries;
+}
+function renameBoundary(index: number, name: string): void {
+  const boundaries = [...(store.body.songBoundaries ?? [])];
+  const boundary = boundaries[index];
+  if (!boundary) return;
+  boundaries[index] = { ...boundary, name };
+  store.body.songBoundaries = boundaries;
+}
+function removeBoundary(index: number): void {
+  store.snapshot();
+  store.body.songBoundaries = (store.body.songBoundaries ?? []).filter((_, i) => i !== index);
+}
+function regionsFromTrack(trackIndex: number): void {
+  const track = store.body.timingTracks[trackIndex];
+  if (!track) return;
+  store.snapshot();
+  store.body.songBoundaries = boundariesFromTimingTrack(track);
+}
+// "Copy effects between regions" - the bulk action regions exist for.
+function copyRegionEffects(): void {
+  const from = songRegions.value.find((r) => r.name === regionCopyFrom.value);
+  const to = songRegions.value.find((r) => r.name === regionCopyTo.value);
+  if (!from || !to || from === to) return;
+  store.snapshot();
+  for (const row of store.body.rows) {
+    for (const copy of rebaseEffects(effectsInRegion(row.effects, from), from, to, newEffectId)) {
+      store.addEffect(row.elementType, row.elementId, row.subName, copy);
     }
   }
+}
+
+const paletteOpen = ref(false);
+
+// The radial effect wheel, opened by double-clicking empty grid. It carries where it was opened
+// so the effect lands under the pointer rather than at the playhead - the whole point of the
+// gesture is that it happens where you already are.
+const wheel = ref<{ row: GridRow; ms: number; x: number; y: number } | null>(null);
+function openWheel(row: GridRow, ms: number, x: number, y: number): void {
+  wheel.value = { row, ms, x, y };
+}
+function placeFromWheel(name: string): void {
+  const at = wheel.value;
+  wheel.value = null;
+  if (!at) return;
+  store.addEffect(at.row.elementType, at.row.elementId, at.row.subName, {
+    id: newEffectId(),
+    name,
+    startMs: at.ms,
+    endMs: at.ms + prefs.value.defaultEffectMs,
+    params: defaultParamsFor(name),
+  });
+}
+
+// Application preferences (lib/preferences.ts). They live in localStorage, not on the server: a
+// preference belongs to the person at the keyboard, not to the show, and one that travelled with
+// the project would let two people editing it change each other's settings.
+const prefs = ref<Preferences>(loadPreferences(typeof localStorage === "undefined" ? null : localStorage));
+const showPrefsPanel = ref(false);
+function patchPrefs(changes: Partial<Preferences>): void {
+  prefs.value = sanitize({ ...prefs.value, ...changes });
+  savePreferences(typeof localStorage === "undefined" ? null : localStorage, prefs.value);
+  applyPrefs();
+}
+// Preferences that something else has to be told about, rather than simply read from.
+function applyPrefs(): void {
+  setAutosaveDebounce(prefs.value.autosaveSeconds * 1000);
+}
+applyPrefs();
+const playheadLabel = computed(() => formatTime(playheadMs.value, prefs.value.timeFormat, store.sequence?.frame_ms ?? 50));
+
+// The row a keyboard-placed effect lands on: the one the selection is on, falling back to the
+// first visible row. Without a fallback the effect shortcuts would silently do nothing until
+// something had been clicked.
+function keyboardTargetRow(): GridRow | undefined {
+  return presetTargetRow.value;
+}
+
+const commands = computed(() =>
+  buildCommands({
+    togglePlay,
+    seekStart: () => seekTo(0),
+    seekEnd: () => seekTo(store.sequence?.duration_ms ?? 0),
+    nudgePlayhead: (delta) => seekTo(Math.max(0, playheadMs.value + delta)),
+    addTimingMark: addTimingMarkAtPlayhead,
+    splitTimingMark: splitTimingMarkAtPlayhead,
+    deleteSelected: () => {
+      if (store.selectedEffectId) store.deleteEffect(store.selectedEffectId);
+    },
+    copySelected: () => {
+      if (store.selectedEffectId) clipboard.value = store.copyEffect(store.selectedEffectId);
+    },
+    pasteAtPlayhead: () => {
+      const row = keyboardTargetRow();
+      if (clipboard.value && row) store.pasteEffectAt(row.elementType, row.elementId, row.subName, clipboard.value, playheadMs.value);
+    },
+    duplicateSelected: () => {
+      const copy = store.selectedEffectId ? store.copyEffect(store.selectedEffectId) : null;
+      const row = keyboardTargetRow();
+      if (copy && row) store.pasteEffectAt(row.elementType, row.elementId, row.subName, copy, copy.endMs);
+    },
+    undo: () => store.undo(),
+    redo: () => store.redo(),
+    zoomIn: () => {
+      zoomLevel.value = Math.min(2, zoomLevel.value + 1);
+    },
+    zoomOut: () => {
+      zoomLevel.value = Math.max(0, zoomLevel.value - 1);
+    },
+    placeEffect: (name) => {
+      const row = keyboardTargetRow();
+      if (!row) return;
+      store.addEffect(row.elementType, row.elementId, row.subName, {
+        id: newEffectId(),
+        name,
+        startMs: playheadMs.value,
+        endMs: playheadMs.value + prefs.value.defaultEffectMs,
+        params: defaultParamsFor(name),
+      });
+    },
+    openPalette: () => {
+      paletteOpen.value = true;
+    },
+    exportFseq,
+    snapshot: () => void snapshotNow(),
+  }),
+);
+
+function onKeydown(e: KeyboardEvent): void {
+  // The palette owns the keyboard while it is open - its own arrow keys and Enter would otherwise
+  // also be scrubbing the playhead behind it.
+  if (paletteOpen.value) return;
+  if (isTypingTarget(e.target)) return;
+
+  const command = commandForEvent(commands.value, e);
+  if (!command) return;
+  e.preventDefault();
+  command.run();
+}
+
+// xLights' "s": splits the timing mark the playhead is inside, which is how a beat gets halved
+// without counting. Falls back to simply adding a mark when the playhead isn't inside one.
+function splitTimingMarkAtPlayhead(): void {
+  store.ensureDefaultTimingTrack();
+  const track = store.body.timingTracks[0];
+  if (!track) return;
+  const marks = [...track.marks].sort((a, b) => a - b);
+  const before = [...marks].reverse().find((m) => m < playheadMs.value);
+  const after = marks.find((m) => m > playheadMs.value);
+  if (before === undefined || after === undefined) {
+    addTimingMarkAtPlayhead();
+    return;
+  }
+  store.addTimingMark(0, Math.round((before + after) / 2));
 }
 
 onMounted(async () => {
@@ -714,7 +896,7 @@ watch(sequenceId, async (id) => {
       <div class="transport">
         <button @click="togglePlay" :disabled="!audioLoaded">{{ playing ? "Pause" : "Play" }}</button>
         <button @click="stop" :disabled="!audioLoaded">Stop</button>
-        <span class="time">{{ (playheadMs / 1000).toFixed(2) }}s</span>
+        <span class="time" :title="`Time shown as ${prefs.timeFormat}`">{{ playheadLabel }}</span>
       </div>
       <div class="undo">
         <button @click="store.undo" :disabled="!store.canUndo">Undo</button>
@@ -741,6 +923,11 @@ watch(sequenceId, async (id) => {
         <option :value="null">Master View</option>
         <option v-for="v in views" :key="v.name" :value="v.name">{{ v.name }}</option>
       </select>
+      <button title="Command palette (Ctrl+Shift+K)" @click="paletteOpen = true">⌘K</button>
+      <button :class="{ active: showPrefsPanel }" @click="showPrefsPanel = !showPrefsPanel">Preferences</button>
+      <button :class="{ active: showRegionsPanel }" @click="showRegionsPanel = !showRegionsPanel">
+        Regions{{ currentRegion ? `: ${currentRegion.name}` : "" }}
+      </button>
       <button :class="{ active: showViewsPanel }" @click="showViewsPanel = !showViewsPanel">Views</button>
       <button :class="{ active: showPresetsPanel }" @click="showPresetsPanel = !showPresetsPanel">
         Presets{{ presets.length ? ` (${presets.length})` : "" }}
@@ -811,6 +998,116 @@ watch(sequenceId, async (id) => {
         </li>
         <li v-if="versions.length === 0" class="empty">No snapshots yet — click "Snapshot" to create one.</li>
       </ul>
+    </div>
+
+    <CommandPalette :open="paletteOpen" :commands="commands" @close="paletteOpen = false" />
+    <EffectWheel v-if="wheel" :x="wheel.x" :y="wheel.y" @pick="placeFromWheel" @close="wheel = null" />
+
+    <div v-if="showRegionsPanel" class="models-panel">
+      <div class="models-panel-head">
+        <h2>Song structure</h2>
+        <div class="models-panel-actions">
+          <button :disabled="!store.sequence" @click="addBoundaryHere">Add boundary at playhead</button>
+          <select v-if="store.body.timingTracks.length" @change="regionsFromTrack(Number(($event.target as HTMLSelectElement).value))">
+            <option value="">Create from timing track…</option>
+            <option v-for="(t, i) in store.body.timingTracks" :key="i" :value="i">{{ t.name }}</option>
+          </select>
+        </div>
+      </div>
+      <p class="timing-note">
+        Named, coloured sections of the timeline — Intro, Verse, Chorus. Creating them from a
+        timing track uses each mark's label as the section name.
+      </p>
+
+      <ul v-if="songRegions.length">
+        <li v-for="(region, i) in songRegions" :key="i">
+          <label>
+            <span class="region-swatch" :style="{ background: REGION_COLORS[region.colorIndex] }" />
+            <input
+              type="text"
+              :value="region.name"
+              @change="renameBoundary(i, ($event.target as HTMLInputElement).value)"
+            />
+          </label>
+          <span class="row-effect-count">
+            {{ Math.round(region.startMs / 1000) }}s–{{ Math.round(region.endMs / 1000) }}s
+          </span>
+          <button @click="removeBoundary(i)">×</button>
+        </li>
+      </ul>
+      <p v-else class="empty">No sections yet.</p>
+
+      <template v-if="songRegions.length > 1">
+        <div class="models-panel-head"><h2>Copy a section's effects</h2></div>
+        <div class="models-panel-actions">
+          <select v-model="regionCopyFrom">
+            <option value="">From…</option>
+            <option v-for="r in songRegions" :key="`f-${r.startMs}`" :value="r.name">{{ r.name }}</option>
+          </select>
+          <select v-model="regionCopyTo">
+            <option value="">To…</option>
+            <option v-for="r in songRegions" :key="`t-${r.startMs}`" :value="r.name">{{ r.name }}</option>
+          </select>
+          <button :disabled="!regionCopyFrom || !regionCopyTo || regionCopyFrom === regionCopyTo" @click="copyRegionEffects">
+            Copy
+          </button>
+        </div>
+        <p class="timing-note">
+          Effects are rebased on the target's start, so a chorus copied onto a later chorus lands
+          in step with it. Anything that wouldn't fit is skipped rather than trimmed.
+        </p>
+      </template>
+    </div>
+
+    <div v-if="showPrefsPanel" class="models-panel">
+      <div class="models-panel-head"><h2>Preferences</h2></div>
+      <p class="timing-note">
+        These are yours, not the show's — they're kept in this browser rather than saved with the
+        project, so two people editing the same sequence don't change each other's settings.
+      </p>
+      <label class="blend-row">
+        Time display
+        <select :value="prefs.timeFormat" @change="patchPrefs({ timeFormat: ($event.target as HTMLSelectElement).value as Preferences['timeFormat'] })">
+          <option value="mmss">Minutes:seconds (1:05.43)</option>
+          <option value="seconds">Seconds (65.43s)</option>
+          <option value="frames">Frames</option>
+        </select>
+      </label>
+      <label class="blend-row">
+        Default effect length
+        <span>
+          <input
+            type="number"
+            min="50"
+            max="60000"
+            step="50"
+            :value="prefs.defaultEffectMs"
+            @change="patchPrefs({ defaultEffectMs: Number(($event.target as HTMLInputElement).value) })"
+          />
+          ms
+        </span>
+      </label>
+      <label class="blend-row">
+        <input
+          type="checkbox"
+          :checked="prefs.snapToTiming"
+          @change="patchPrefs({ snapToTiming: ($event.target as HTMLInputElement).checked })"
+        />
+        Snap effect edges to timing marks
+      </label>
+      <label class="blend-row">
+        Autosave
+        <span>
+          <input
+            type="number"
+            min="0"
+            max="600"
+            :value="prefs.autosaveSeconds"
+            @change="patchPrefs({ autosaveSeconds: Number(($event.target as HTMLInputElement).value) })"
+          />
+          seconds (0 turns it off)
+        </span>
+      </label>
     </div>
 
     <div v-if="showPresetsPanel" class="models-panel">
@@ -989,16 +1286,26 @@ watch(sequenceId, async (id) => {
           />
         </div>
         <div class="h-scroll">
-          <Waveform :peaks="peaks" :duration-ms="store.sequence?.duration_ms ?? 0" :px-per-ms="pxPerMs" :playhead-ms="playheadMs" @seek="seekTo" />
+          <Waveform
+            :peaks="peaks"
+            :duration-ms="store.sequence?.duration_ms ?? 0"
+            :px-per-ms="pxPerMs"
+            :playhead-ms="playheadMs"
+            @seek="seekTo"
+            @scrub="scrubTo"
+            @scrub-end="endScrub"
+          />
           <SequencerGrid
             :rows="visibleRows"
             :body="store.body"
             :duration-ms="store.sequence?.duration_ms ?? 0"
+            :snap-to-timing="prefs.snapToTiming"
             :px-per-ms="pxPerMs"
             :playhead-ms="playheadMs"
             :selected-effect-id="store.selectedEffectId"
             :pending-effect-name="pendingEffectName"
             @select="handleSelect"
+            @wheel="openWheel"
             @place="handlePlace"
             @drop-effect="handleDropEffect"
             @move="handleMove"
@@ -1159,6 +1466,14 @@ header select {
 }
 .history-panel .empty {
   color: #666;
+}
+.region-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 0.3rem;
+  vertical-align: middle;
 }
 .models-panel {
   padding: 0.6rem 1rem;

@@ -1,5 +1,6 @@
 import type { EffectPreset } from "./effectPresets";
 import type { BackgroundImage } from "./backgroundImage";
+import type { SongBoundary } from "./songRegions";
 import type { BlendMode, LayerSettings, PictureImage, StoredSwatch, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
 
 export class ApiError extends Error {
@@ -189,11 +190,22 @@ export interface SequenceRow {
 export interface TimingTrack {
   name: string;
   marks: number[];
+  /**
+   * Optional label per mark, positionally. xLights' lyric and phrase tracks carry these, and
+   * "Create Song Regions from Timing Track" uses them as the region names.
+   */
+  labels?: string[];
 }
 
 export interface SequenceBody {
   timingTracks: TimingTrack[];
   rows: SequenceRow[];
+  /**
+   * Song structure boundaries (lib/songRegions.ts). Stored as boundaries rather than start/end
+   * pairs: a region ends where the next begins, so keeping both would let the two disagree, and
+   * a gap or overlap between regions isn't a state the timeline can be in.
+   */
+  songBoundaries?: SongBoundary[];
 }
 
 export interface SequenceRecord {

@@ -30,7 +30,7 @@ written down. Status here means:
 | **Model types** | | xLights ships 21; we render 17 |
 | Arches, Candy Cane, Circle, Custom, Icicles, Matrix, PolyLine, Single Line, Star, Tree, Window Frame, Wreath | ✅ | |
 | Spinner, Cube, Sphere, Channel Block, Image | ✅ | Spinner's arms, hollow centre, arc, start angle and zig-zag wiring; Cube as a box or a cylinder, with real depth and an unwrapped buffer (the manual: "while the model is 3D, xLights renders the effects in 2D"); Sphere with degrees and both latitudes; Channel Block as a row of independent cells, one per device. Image is a *single-channel prop* — "blow-molds, inflatables, incandescent cutouts" — so one node is its whole geometry; the picture itself is a layout-view concern this engine doesn't draw |
-| Channel Block — per-channel "Channel Color" | ❌ | Which of the RGB values drives each output channel. Belongs to channel assignment on export rather than to geometry |
+| Channel Block — per-channel "Channel Color" | ✅ | Both the model-wide default and the per-channel list. And with it the thing that actually mattered: a Channel Block now emits **one byte per channel**, not three. It drives single devices — relays, AC lights, a smoke machine — so three-per-channel had a 24-channel relay board claim 72, shifting every model after it on the controller by 48 and lighting the wrong props, silently |
 | Label | 🚫 | "A simple text model that displays a line of text directly in the layout and preview. It does not control any lights or channels" — an annotation, not a prop |
 | DMX, DMX Moving Head Advance, Servo | 🚫 | Fixture control, not pixel rendering |
 | Download / import models from the vendor library | ❌ | |
@@ -48,13 +48,13 @@ written down. Status here means:
 | Feature | Status | Notes |
 |---|---|---|
 | Timeline + waveform, zoom, scroll | ✅ | 3 zoom levels |
-| Audio scrubbing | ❌ | Play-on-drag over the waveform |
-| Time display format | ❌ | |
-| Timeline tags | ❌ | |
+| Audio scrubbing | ✅ | Drag the waveform and the track plays under the pointer, in short bursts. The burst is stopped on a timer rather than left running: a scrub that kept playing would drift away from the pointer within a second, and dragging back would then be seeking against audio that had moved on |
+| Time display format | ✅ | Minutes:seconds, plain seconds, or frames — frames counted against the sequence's own frame rate, since a 20ms sequence and a 50ms one number the same second very differently |
+| Timeline tags | ⚠️ | A region boundary is a named point on the timeline, which is what a tag is; xLights' separate tag list, with its own colours and independent of the section structure, isn't offered |
 | Timing tracks | ✅ | Fixed interval + metronome generation |
 | Audio-generated timing tracks (beats/bars/lyrics) | ⚠️ | Interval/BPM only; no onset detection |
 | Adding effects (drag, double-click, drop) | ✅ | |
-| Radial effect wheel | ❌ | |
+| Radial effect wheel | ✅ | Double-click empty grid, per the manual. Opens where the pointer already is, so the whole gesture is double-click, flick, release — which is what makes it worth having over a menu. Offers the same effects as the single-letter shortcuts, from the same list, so the wheel and the keyboard can't drift apart |
 | Changing effects, moving/stretching, aligning | ⚠️ | Move and resize; no align commands |
 | Copy / paste / delete effects | ✅ | Including one row and across rows |
 | Colour settings — palette | ✅ | Up to 6 swatches |
@@ -74,11 +74,11 @@ written down. Status here means:
 | Value curves | ✅ | All 16 types + custom point editor |
 | Effect presets | ✅ | Save an effect's whole configuration under a named group, apply it at the playhead, import and export `.xpreset` files. Saved on the layout, since presets are global in xLights rather than belonging to one sequence. Missing: presets spanning several layers or models at once, and Smart Presets |
 | Views | ✅ | Named, *ordered* subsets of the sequencer's rows, with a picker in the toolbar. Saved on the layout, because the manual is explicit that "views work across sequences" — a per-sequence copy would have to be duplicated into every new sequence and would drift. The Master View isn't stored: it is "a special (system created) view" containing every row, so it is simply the absence of a selection. Missing: the eye icon that hides a model across all sequences (this app's Models panel is the per-sequence equivalent) |
-| Song structure regions | ❌ | |
+| Song structure regions | ⚠️ | Named, coloured sections of the timeline, created at the playhead or from a timing track's labels — "one region for each timing mark, using the timing mark's label as the region name". Plus the bulk action they exist for: copying one section's effects onto another, rebased on the target's start. Missing: per-region palette application, exporting a region as its own sequence, and Song Structure Views |
 | Singing faces / phoneme breakdown | 🚫 | Needs face definitions |
 | Pixel editor (matrix drawing tool) | ❌ | |
-| Command palette | ❌ | |
-| Keyboard shortcuts | ⚠️ | A handful; xLights documents ~60 |
+| Command palette | ✅ | Ctrl+Shift+K, per the manual. Searchable, ranked so a prefix match beats one buried mid-string, and every entry shows the key it also answers to — which is how anyone learns sixty shortcuts without reading a list of them |
+| Keyboard shortcuts | ✅ | Transport, timing (including **s** to split a mark), edit, zoom, and all fifteen of xLights' single-letter effect shortcuts. Case is significant, as it is in xLights — **o** is On and **O** is Off. Every shortcut and every palette entry comes from one registry, so a key can't exist without a command or a command be given a key nothing dispatches |
 | Render all / render on save | ⚠️ | We render on demand and on export |
 | Export model as video / render-and-export | ❌ | |
 
@@ -120,7 +120,7 @@ Moving Head + Servo (DMX fixtures).
 | Feature | Status | Notes |
 |---|---|---|
 | New sequence, sequence settings | ✅ | |
-| Preferences (backup, view, effects grid, sequences, output, colours, other, services) | ❌ | No preferences at all |
+| Preferences | ⚠️ | A Preferences panel with the settings that drive something here: time display format, default effect length, snap-to-timing marks, and the autosave interval (0 turns it off). Kept per-browser rather than with the project — a preference belongs to the person at the keyboard, and one that travelled with the show would let two people editing it change each other's. xLights' remaining Settings tabs configure machinery this app doesn't have (output devices, backup paths, services); offering them would be controls with nothing behind them, and a test asserts no such preference exists |
 | Backup and recovery | ⚠️ | Sequence version snapshots; no show-folder backup |
 | Tools — Test | ❌ | Channel test patterns against live output |
 | Tools — Convert | ❌ | Between sequence formats |
