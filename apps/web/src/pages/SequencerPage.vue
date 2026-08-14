@@ -21,6 +21,7 @@ import {
 import { buildCommands, commandForEvent, isTypingTarget } from "../lib/commands";
 import { formatTime, loadPreferences, sanitize, savePreferences, type Preferences } from "../lib/preferences";
 import CommandPalette from "../components/CommandPalette.vue";
+import EffectWheel from "../components/EffectWheel.vue";
 import { newEffectId, setAutosaveDebounce, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type ContextMenuTarget, type GridRow } from "../components/SequencerGrid.vue";
 import EffectContextMenu from "../components/EffectContextMenu.vue";
@@ -667,6 +668,26 @@ function openPreviewWindow(): void {
 // palette in agreement by hand is exactly what drifts until a documented key does nothing.
 const paletteOpen = ref(false);
 
+// The radial effect wheel, opened by double-clicking empty grid. It carries where it was opened
+// so the effect lands under the pointer rather than at the playhead - the whole point of the
+// gesture is that it happens where you already are.
+const wheel = ref<{ row: GridRow; ms: number; x: number; y: number } | null>(null);
+function openWheel(row: GridRow, ms: number, x: number, y: number): void {
+  wheel.value = { row, ms, x, y };
+}
+function placeFromWheel(name: string): void {
+  const at = wheel.value;
+  wheel.value = null;
+  if (!at) return;
+  store.addEffect(at.row.elementType, at.row.elementId, at.row.subName, {
+    id: newEffectId(),
+    name,
+    startMs: at.ms,
+    endMs: at.ms + prefs.value.defaultEffectMs,
+    params: defaultParamsFor(name),
+  });
+}
+
 // Application preferences (lib/preferences.ts). They live in localStorage, not on the server: a
 // preference belongs to the person at the keyboard, not to the show, and one that travelled with
 // the project would let two people editing it change each other's settings.
@@ -903,6 +924,7 @@ watch(sequenceId, async (id) => {
     </div>
 
     <CommandPalette :open="paletteOpen" :commands="commands" @close="paletteOpen = false" />
+    <EffectWheel v-if="wheel" :x="wheel.x" :y="wheel.y" @pick="placeFromWheel" @close="wheel = null" />
 
     <div v-if="showPrefsPanel" class="models-panel">
       <div class="models-panel-head"><h2>Preferences</h2></div>
@@ -1142,6 +1164,7 @@ watch(sequenceId, async (id) => {
             :selected-effect-id="store.selectedEffectId"
             :pending-effect-name="pendingEffectName"
             @select="handleSelect"
+            @wheel="openWheel"
             @place="handlePlace"
             @drop-effect="handleDropEffect"
             @move="handleMove"

@@ -31,6 +31,7 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Feature | Status | Notes |
 |---|---|---|
 | Timeline grid, effect place/select/move/resize | ✅ | Canvas-based, virtualized to a fixed viewport (M9); resize from either edge with snap-to-timing-mark, right-click context menu (copy/cut/paste/duplicate/delete) (M10) |
+| Radial effect wheel | ✅ | Double-click empty grid opens a ring of effects at the pointer, and the picked one lands there rather than at the playhead - the point of the gesture is that it happens where you already are. Its list is the single-letter shortcut list, not a second copy of it |
 | Effect placement gesture | ✅ | Arm a palette effect + drag on the grid (xLights' own gesture, sizes the effect in one motion) **and** native HTML5 drag-and-drop straight from the palette button onto the grid at a default 1s length (M15) — two ways to the same result, not two different mechanisms |
 | Horizontal zoom/scroll | ✅ | Fixed M10 — canvas now sizes to the real content width instead of clipping at the container edge |
 | Keyboard shortcuts and command palette | ✅ | One registry drives the key dispatch, the palette (Ctrl+Shift+K) and the key labels shown beside each command. Transport, timing, edit, zoom and xLights' fifteen single-letter effect shortcuts, with case significant as it is there (`o` is On, `O` is Off). A test asserts no two commands answer the same key - two matches means the second is unreachable and which one loses depends on list order rather than on a decision |

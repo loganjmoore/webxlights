@@ -37,6 +37,10 @@ const emit = defineEmits<{
   dragStart: [];
   addMark: [trackIndex: number, ms: number];
   contextmenu: [target: ContextMenuTarget];
+  // xLights' radial effect wheel: "double-click empty sequencer grid area displays a radial
+  // effect wheel for quick effect placement". Only on empty grid - double-clicking an effect is
+  // how you would open it, not how you would place another on top of it.
+  wheel: [row: GridRow, ms: number, x: number, y: number];
 }>();
 
 const ROW_HEIGHT = 28;
@@ -224,6 +228,17 @@ function onScroll(): void {
   draw();
 }
 
+function onDoubleClick(e: MouseEvent): void {
+  const canvas = canvasRef.value;
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const hit = hitTest(x, y);
+  if (hit.kind !== "row-empty") return;
+  emit("wheel", hit.row, snapMs(xToMs(x)), e.clientX, e.clientY);
+}
+
 function onContextMenu(e: MouseEvent): void {
   e.preventDefault();
   const canvas = canvasRef.value;
@@ -381,6 +396,7 @@ watch(() => [props.rows, props.body, props.playheadMs, props.selectedEffectId, p
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
+        @dblclick="onDoubleClick"
         @contextmenu="onContextMenu"
         @dragover="onDragOver"
         @drop="onDrop"

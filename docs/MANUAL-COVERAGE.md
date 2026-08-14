@@ -54,7 +54,7 @@ written down. Status here means:
 | Timing tracks | ✅ | Fixed interval + metronome generation |
 | Audio-generated timing tracks (beats/bars/lyrics) | ⚠️ | Interval/BPM only; no onset detection |
 | Adding effects (drag, double-click, drop) | ✅ | |
-| Radial effect wheel | ❌ | |
+| Radial effect wheel | ✅ | Double-click empty grid, per the manual. Opens where the pointer already is, so the whole gesture is double-click, flick, release — which is what makes it worth having over a menu. Offers the same effects as the single-letter shortcuts, from the same list, so the wheel and the keyboard can't drift apart |
 | Changing effects, moving/stretching, aligning | ⚠️ | Move and resize; no align commands |
 | Copy / paste / delete effects | ✅ | Including one row and across rows |
 | Colour settings — palette | ✅ | Up to 6 swatches |

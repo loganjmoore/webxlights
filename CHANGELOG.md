@@ -1,5 +1,16 @@
 # Changelog
 
+## The radial effect wheel
+
+*"Double-click empty sequencer grid area displays a radial effect wheel for quick effect placement."*
+
+It exists because the alternative is a trip to the palette on the far side of the screen and back. The wheel opens **where the pointer already is**, and the effect lands there rather than at the playhead — so the whole gesture is double-click, flick, release. That's what makes it worth having over a menu.
+
+Only on empty grid: double-clicking an effect is how you'd open it, not how you'd place another on top of it.
+
+Its list is **the single-letter shortcut list**, not a second copy of one. The wheel and the keyboard are two ways at the same set of effects, and a wheel with its own list would be a third place for that set to drift.
+
+
 ## Preferences, and the time display
 
 A Preferences panel — and a deliberately short one. **Every setting in it drives something**, with a test asserting that no preference exists which nothing reads. xLights' Settings dialog has eight tabs, most of them configuring machinery this app doesn't have (output devices, backup paths, services); offering those would be a screen full of switches with nothing behind them, which is worse than a short screen.
