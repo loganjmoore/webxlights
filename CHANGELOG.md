@@ -1,5 +1,17 @@
 # Changelog
 
+## Sub-models can be made, not just imported
+
+Sub-models already imported, resolved to their own geometry, appeared in the sequencer and rendered in both the preview and the `.fseq` export. What was missing was any way to **make** one — or to fix one that came in wrong. The only route was to go back to xLights and re-import.
+
+That gap mattered more than it sounds. A sub-model is how the star on a mega tree, or one arch of a set, gets its own sequencer row. Without an editor, a show that didn't already have the sub-model you wanted couldn't get it here at all.
+
+The editor sits on the Layout page beside the property grid: add, rename, delete, switch between node-range and sub-buffer kinds, and edit the rows. **Each spec shows what it actually resolves to against the parent's real node list** — a range list is very easy to get wrong by one, and the symptom otherwise is a sequencer row that renders on nothing, silently, because a sub-model selecting no node is dropped at render time. A spec that selects nothing, or names nodes past the end of the model, says so in the editor.
+
+Removing the last row of a range sub-model leaves an empty one rather than none, for the same reason: a range sub-model with no rows selects nothing and would simply vanish from the sequencer without ever explaining why.
+
+Still missing: xLights' Draw Model and Generate Slices tools, which generate a spec from a drawing rather than from typed ranges.
+
 ## Sketch — the last effect this engine could render
 
 **44 of 55.** More to the point: every effect renderable with what the engine already has is now implemented. The remaining eleven all need infrastructure that's a deliberate non-goal — face and state definitions, DMX fixtures, shaders, video.

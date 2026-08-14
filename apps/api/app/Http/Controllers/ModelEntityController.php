@@ -80,6 +80,16 @@ class ModelEntityController extends Controller
             // same convention as `screen` (caller spreads the model's existing raw_attrs first).
             'raw_attrs' => ['sometimes', 'array'],
             'order' => ['sometimes', 'integer'],
+            // The in-app sub-model editor (Layout page). Replaced wholesale like `screen` and
+            // `raw_attrs`: a sub-model list is only ever read and written as a set, and a partial
+            // patch would need a stable id per sub-model, which xLights' format doesn't give them.
+            'sub_models' => ['sometimes', 'array'],
+            'sub_models.*.name' => ['required', 'string', 'max:200'],
+            'sub_models.*.type' => ['required', 'string', 'in:ranges,subbuffer'],
+            'sub_models.*.rows' => ['array'],
+            'sub_models.*.rows.*' => ['string', 'max:2000'],
+            'sub_models.*.subBuffer' => ['nullable', 'string', 'max:200'],
+            'sub_models.*.vertical' => ['boolean'],
             'controller_id' => ['sometimes', 'nullable', 'integer', 'exists:controllers,id'],
             'controller_offset' => ['sometimes', 'nullable', 'integer', 'min:0'],
             // Channel geometry lives in packages/engine (TS-only) - the client computes this

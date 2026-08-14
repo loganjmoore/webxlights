@@ -11,7 +11,9 @@ import {
   screenFromAttrs,
   type BoxedScaleReading,
   type ModelGeometry,
+  type SubModelSpec,
 } from "@webxlights/engine";
+import SubModelEditor from "../components/SubModelEditor.vue";
 import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { confirm } from "../lib/confirm";
@@ -269,6 +271,25 @@ function handlePositionField(field: "x" | "y" | "z" | "scale" | "scaleY" | "scal
 // scoped to exactly the raw_attrs keys computeGeometryFromAttrs actually reads for this type
 // (packages/engine's propertyFieldsFor) so every field here has a real, visible effect.
 const propertyFields = computed(() => (selectedModel.value ? propertyFieldsFor(selectedModel.value.type) : []));
+
+// The selected model's geometry, so the sub-model editor can say what each spec resolves to.
+const selectedGeometry = computed<ModelGeometry | null>(() => {
+  const model = selectedModel.value;
+  if (!model) return null;
+  try {
+    return computeGeometryFromAttrs(model.type, model.raw_attrs);
+  } catch {
+    return null;
+  }
+});
+
+async function updateSubModels(subModels: SubModelSpec[]): Promise<void> {
+  if (!layout.value || !selectedModel.value) return;
+  const model = selectedModel.value;
+  const updated = await api.updateModel(layout.value.id, model.id, { sub_models: subModels });
+  const idx = models.value.findIndex((m) => m.id === model.id);
+  if (idx !== -1) models.value[idx] = updated;
+}
 
 async function updateProperty(key: string, raw: string): Promise<void> {
   if (!layout.value || !selectedModel.value) return;
@@ -678,6 +699,13 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
               <button class="delete-btn" @click="handleDelete(selectedModel.id)">Delete model</button>
             </div>
 
+            <div v-if="selectedModel" class="properties-panel">
+              <SubModelEditor
+                :sub-models="selectedModel.sub_models ?? []"
+                :geometry="selectedGeometry"
+                @update="updateSubModels"
+              />
+            </div>
             <div v-if="selectedModel && propertyFields.length" class="properties-panel">
               <h2>Properties</h2>
               <label v-for="field in propertyFields" :key="field.key">

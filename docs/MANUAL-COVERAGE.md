@@ -35,7 +35,7 @@ written down. Status here means:
 | DMX, DMX Moving Head Advance, Servo | 🚫 | Fixture control, not pixel rendering |
 | Download / import models from the vendor library | ❌ | |
 | Model groups (add, modify, delete, rename, clone, delete-empty) | ⚠️ | Add/modify/delete/rename; no clone, no delete-empty |
-| **SubModels** (node range, sub-buffer) | ⚠️ | Imported from `<subModel>` elements, resolved to their own geometry, listed under their parent in the sequencer, and rendered in both the preview and the `.fseq` export. No editor for creating them in-app yet, and Draw Model / Generate Slices aren't implemented |
+| SubModels (node range, sub-buffer) | ⚠️ | Imported, resolved to their own geometry, listed under their parent in the sequencer, rendered in both the preview and the `.fseq` export, and now **created and edited in-app** on the Layout page - with a live count of what each spec actually resolves to, since a range list is easy to get wrong by one and the symptom otherwise is a row that renders on nothing. Missing: xLights' Draw Model and Generate Slices tools |
 | Objects — 2D background image | ❌ | The photo of the house behind the layout |
 | Objects — Mesh (3D `.obj`) | 🚫 | No OBJ loader |
 | Objects — Grid | ✅ | Gridlines view object |
@@ -159,8 +159,8 @@ so effects placed on a group reached nothing at all. Real sequences target group
 37% of one real show's sequenced elements — so this was whole passages of a show going dark
 without an error anywhere.
 
-What is left is smaller and more scattered than it was: a sub-model editor, preferences, the
-controller visualiser, and a long tail of Layout-tab conveniences (filter, clone, replace, align).
+What is left is smaller and more scattered than it was: preferences, the controller visualiser,
+and a long tail of Layout-tab conveniences (filter, clone, replace, align).
 No single one of them is load-bearing the way group rendering was, and the eleven remaining
 effects all need infrastructure that is a deliberate non-goal — face and state definitions, DMX
 fixtures, shaders and video.

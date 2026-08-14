@@ -127,6 +127,45 @@ class LayoutModelsTest extends TestCase
         $this->assertFalse(collect($list->json())->firstWhere('name', 'Mesh')['supported']);
     }
 
+    public function test_sub_models_can_be_edited_on_a_model(): void
+    {
+        // The in-app sub-model editor. Until this, sub-models could only arrive by importing an
+        // xlights_rgbeffects.xml - there was no way to make one, or to fix one that came in wrong.
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_id' => $user->id]);
+        $layout = $project->layouts()->create(['name' => 'Layout']);
+        $model = $layout->models()->create(['name' => 'Mega Tree', 'type' => 'Tree', 'supported' => true]);
+
+        $this->actingAs($user)->patchJson("/api/v1/layouts/{$layout->id}/models/{$model->id}", [
+            'sub_models' => [
+                ['name' => 'Star', 'type' => 'ranges', 'rows' => ['1-25'], 'vertical' => false],
+                ['name' => 'Top Half', 'type' => 'subbuffer', 'subBuffer' => '0,50,100,100'],
+            ],
+        ])->assertOk();
+
+        $fresh = $model->fresh();
+        $this->assertCount(2, $fresh->sub_models);
+        $this->assertSame('Star', $fresh->sub_models[0]['name']);
+        $this->assertSame(['1-25'], $fresh->sub_models[0]['rows']);
+        $this->assertSame('0,50,100,100', $fresh->sub_models[1]['subBuffer']);
+    }
+
+    public function test_a_sub_model_with_an_unknown_type_is_rejected(): void
+    {
+        // Only the two kinds the engine can resolve. Anything else would import, save, and then
+        // render as nothing - which looks like the effects on that row were lost.
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_id' => $user->id]);
+        $layout = $project->layouts()->create(['name' => 'Layout']);
+        $model = $layout->models()->create(['name' => 'Mega Tree', 'type' => 'Tree', 'supported' => true]);
+
+        $this->actingAs($user)
+            ->patchJson("/api/v1/layouts/{$layout->id}/models/{$model->id}", [
+                'sub_models' => [['name' => 'Odd', 'type' => 'something-else']],
+            ])
+            ->assertStatus(422);
+    }
+
     public function test_deleting_a_model_group_removes_it(): void
     {
         $user = User::factory()->create();
