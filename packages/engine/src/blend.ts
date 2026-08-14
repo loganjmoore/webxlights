@@ -18,7 +18,8 @@ export type BlendMode =
   | "Shadow 1 on 2"
   | "Shadow 2 on 1"
   | "Layered"
-  | "Brightness";
+  | "Brightness"
+  | "Canvas";
 
 // The set the props panel offers, in the manual's own order.
 export const BLEND_MODES: BlendMode[] = [
@@ -40,7 +41,16 @@ export const BLEND_MODES: BlendMode[] = [
   "Shadow 2 on 1",
   "Layered",
   "Brightness",
+  "Canvas",
 ];
+
+// Canvas isn't a way of combining two colours - it is the layer being handed what is underneath
+// it to modify, so by the time blending happens the effect has already accounted for the
+// background and its output replaces it. The layer stack seeds the buffer; this is the other
+// half of the same rule, and keeping it here means no caller has to special-case the mode.
+export function isCanvasMode(mode: BlendMode): boolean {
+  return mode === "Canvas";
+}
 
 const clamp255 = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));
 
@@ -171,6 +181,10 @@ export function blendPixel(fg: RGBA, bg: RGBA, mode: BlendMode, effectMixThresho
       const level = value(fg);
       return rgba(clamp255(bg.r * level), clamp255(bg.g * level), clamp255(bg.b * level), bg.a);
     }
+    // The effect was given the background to work on, so what it returns is the whole answer -
+    // including where it cleared a pixel, which a Normal blend would have quietly kept.
+    case "Canvas":
+      return fg;
     default:
       return bg;
   }

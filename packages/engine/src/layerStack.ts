@@ -1,6 +1,6 @@
 import { RenderBuffer } from "./renderBuffer";
-import { blendPixel, type BlendMode } from "./blend";
-import { bufferToNodeColors } from "./nodeMapping";
+import { blendPixel, isCanvasMode, type BlendMode } from "./blend";
+import { bufferToNodeColors, nodeColorsToBuffer } from "./nodeMapping";
 import { rgba, type RGBA } from "./color";
 import type { ModelGeometry } from "./models/types";
 
@@ -54,6 +54,11 @@ export function renderLayerStackToNodes(nodeCount: number, layers: NodeLayerSpec
   const result: RGBA[] = new Array(nodeCount).fill(null).map(() => rgba(0, 0, 0, 0));
   for (const layer of layers) {
     const buffer = new RenderBuffer(layer.geometry.width, layer.geometry.height);
+    // A Canvas layer is handed what the layers underneath it drew, rather than a blank buffer.
+    // That is the whole mechanism behind the effects that modify the layer below - Kaleidoscope,
+    // which the manual says "by itself does nothing", Warp and Adjust - and it is why they can't
+    // be written as ordinary effects: an ordinary effect's buffer starts empty.
+    if (isCanvasMode(layer.blendMode)) nodeColorsToBuffer(result, layer.geometry, buffer);
     layer.render(buffer);
     const colors = bufferToNodeColors(buffer, layer.geometry);
     for (let i = 0; i < nodeCount; i++) {

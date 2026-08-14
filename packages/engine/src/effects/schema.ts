@@ -1,4 +1,7 @@
+import { ADJUST_MODES } from "./adjust";
+import { KALEIDOSCOPE_TYPES } from "./kaleidoscope";
 import { TENDRIL_MOVEMENTS } from "./tendrils";
+import { WARP_TREATMENTS, WARP_TYPES } from "./warp";
 
 // SPEC ch7-9 parameter tables -> UI control descriptors. Keys match each effect's *Params
 // interface exactly (e.g. OnParams) so the props panel can bind straight to them.
@@ -500,6 +503,44 @@ export const TENDRILS_EFFECT_SCHEMA: EffectSchema = {
   ],
 };
 
+// The three canvas-mode effects. They modify what the layers underneath them drew rather than
+// drawing anything themselves, so each is only useful on a layer whose blend mode is Canvas -
+// the props panel says so, and the manual is blunt about it: Kaleidoscope "by itself does
+// nothing".
+export const KALEIDOSCOPE_EFFECT_SCHEMA: EffectSchema = {
+  name: "Kaleidoscope",
+  params: [
+    { key: "type", label: "Kaleidoscope Type", type: "choice", options: KALEIDOSCOPE_TYPES, default: "Square" },
+    { key: "centerX", label: "Center X", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "centerY", label: "Center Y", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "size", label: "Size", type: "intSlider", min: 1, max: 100, default: 25, valueCurve: true },
+    { key: "rotation", label: "Rotation", type: "intSlider", min: -180, max: 180, default: 0, valueCurve: true },
+  ],
+};
+
+export const WARP_EFFECT_SCHEMA: EffectSchema = {
+  name: "Warp",
+  params: [
+    { key: "type", label: "Warp Type", type: "choice", options: WARP_TYPES, default: "Ripple" },
+    { key: "treatment", label: "Treatment", type: "choice", options: WARP_TREATMENTS, default: "Constant" },
+    { key: "x", label: "X", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "y", label: "Y", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "cycleCount", label: "Cycle Count", type: "intSlider", min: 1, max: 20, default: 1 },
+    { key: "speed", label: "Speed", type: "intSlider", min: 1, max: 50, default: 10, valueCurve: true },
+    { key: "frequency", label: "Frequency", type: "intSlider", min: 1, max: 20, default: 4, valueCurve: true },
+  ],
+};
+
+export const ADJUST_EFFECT_SCHEMA: EffectSchema = {
+  name: "Adjust",
+  params: [
+    { key: "mode", label: "Adjustment", type: "choice", options: ADJUST_MODES, default: "Adjust By Percentage" },
+    { key: "value", label: "Value", type: "intSlider", min: -255, max: 255, default: -50, valueCurve: true },
+    { key: "minimum", label: "Minimum", type: "intSlider", min: 0, max: 255, default: 0 },
+    { key: "maximum", label: "Maximum", type: "intSlider", min: 0, max: 255, default: 255 },
+  ],
+};
+
 export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   On: ON_EFFECT_SCHEMA,
   Bars: BARS_EFFECT_SCHEMA,
@@ -541,11 +582,19 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Tree: TREE_EFFECT_SCHEMA,
   Morph: MORPH_EFFECT_SCHEMA,
   Tendrils: TENDRILS_EFFECT_SCHEMA,
+  Kaleidoscope: KALEIDOSCOPE_EFFECT_SCHEMA,
+  Warp: WARP_EFFECT_SCHEMA,
+  Adjust: ADJUST_EFFECT_SCHEMA,
 };
 
 // Effects that read the analysed audio track rather than only their own params - the UI warns
 // when one of these is placed in a sequence with no audio loaded.
 export const AUDIO_REACTIVE_EFFECTS = new Set<string>(["VU Meter", "Music", "Fireworks", "Tendrils"]);
+
+// Effects that modify the layer below rather than drawing their own. On any other blend mode
+// they are handed a blank buffer and have nothing to work on, so the props panel warns rather
+// than leaving a layer that silently renders nothing.
+export const CANVAS_ONLY_EFFECTS = new Set<string>(["Kaleidoscope", "Warp", "Adjust"]);
 
 export function defaultParamsFor(effectName: string): Record<string, number | boolean | string> {
   const schema = EFFECT_SCHEMAS[effectName];

@@ -114,6 +114,14 @@ describe("mask, shadow and brightness modes", () => {
       const out = blendPixel(RED, BLACK, mode, 0);
       expect(out, mode).toBeDefined();
     }
-    expect(BLEND_MODES).toHaveLength(18);
+    expect(BLEND_MODES).toHaveLength(19);
+  });
+
+  it("Canvas hands back whatever the layer produced, including where it cleared a pixel", () => {
+    // Canvas isn't a way of combining two colours: the layer was given the background to work on,
+    // so its output is the whole answer. A Normal blend would have quietly kept the background
+    // wherever a canvas effect had deliberately erased something.
+    expect(blendPixel(RED, BLACK, "Canvas", 0)).toEqual(RED);
+    expect(blendPixel(rgba(0, 0, 0, 0), RED, "Canvas", 0)).toEqual(rgba(0, 0, 0, 0));
   });
 });

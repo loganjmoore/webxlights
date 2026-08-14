@@ -1,5 +1,25 @@
 # Changelog
 
+## Canvas mode, and the three effects that needed it
+
+Kaleidoscope, Warp and Adjust have sat in the coverage doc under *"needs a canvas the render pipeline doesn't have"* for three passes. They aren't ordinary effects: each one **modifies the layer below it** rather than drawing anything of its own. The manual is blunt about it — Kaleidoscope *"is a canvas mode effect. By itself it does nothing."*
+
+The mechanism turns out to be small. An ordinary layer is handed a blank buffer; a **Canvas** layer is handed what the layers underneath it produced. The layer stack already composites in *node* space, so the seed goes through node colours — which is the only honest route when the layer below may have rendered into a differently-shaped buffer under its own render style. One inverse of the existing node mapping, one check in the stack, and the whole family becomes writable.
+
+**Canvas is also the blend mode**, and it isn't a way of combining two colours: the effect was given the background to work on, so what it returns *replaces* it. That matters for exactly the case a Normal blend would get wrong — a pixel the effect deliberately cleared. Under Normal the background would show through and every reveal-style warp would be a no-op.
+
+### The three effects
+
+- **Kaleidoscope** — samples a region and mirrors it. The fold is a triangle-wave reflection rather than a wrap, because a wrap tiles the sample and a tiled sample is a grid, not a kaleidoscope. Square, Triangle and Rectangle sample shapes, with a centre, size and rotation. The source is copied before the pass: the fold reads cells the pass is also writing, and sampling in place would mirror pixels that had already been replaced — a bug that produces a plausible-looking pattern and can't be spotted by eye.
+- **Warp** — eight distortions, each expressed as one displacement: *where does this pixel read from instead of itself*. Ripple, Single Water Drop, Circle Reveal, Banded Swirl, Circular Swirl, Wavy and Drop, plus Dissolve, which is the exception that removes pixels rather than moving them. Treatment (Constant / In / Out) decides whether the distortion loops or runs once, and in which direction.
+- **Adjust** — all ten channel modes: offset by value or percentage, set a floor/ceiling/range, shift with wrap, prevent a range, reverse. Set Range *rescales* into the range rather than clipping to it, so the shape of what the layer below drew survives. Alpha is left alone throughout — changing coverage as well would make "Set Minimum" light pixels the layer below had deliberately left dark.
+
+### Not rendering is the failure mode here
+
+A canvas effect on a non-Canvas layer renders nothing, with no error — the sequence looks fine because the layer below still shows. So: the props panel warns when one is placed on a layer that isn't in Canvas mode, and the test suite's existing "every schema actually renders something" guard gets a *paired* test rather than an exemption — one asserting each canvas effect changes the layer underneath it when given one, and one asserting it draws nothing when it isn't.
+
+That leaves **Sketch** as the only remaining effect renderable with what exists today, and what it actually needs is the Effect Assist path editor to trace one with.
+
 ## Model groups render
 
 **A group row used to reach nothing at all.** You could create a group, drop effects on it, watch it autosave — and both the house preview and the `.fseq` export filtered their rows to models and sub-models, so every one of those effects was dropped on the floor. No error, no warning, just a prop that stayed dark. Real sequences target groups constantly (37% of one real show's sequenced elements), which makes this whole passages of a show going missing between the screen and the yard.

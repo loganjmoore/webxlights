@@ -47,6 +47,9 @@ import { renderMusic, type MusicParams } from "./effects/music";
 import { renderFireworks, type FireworksParams } from "./effects/fireworks";
 import { renderTreeEffect, type TreeEffectParams } from "./effects/treeEffect";
 import { renderMorph, type MorphParams } from "./effects/morph";
+import { renderKaleidoscope, type KaleidoscopeParams } from "./effects/kaleidoscope";
+import { renderWarp, type WarpParams } from "./effects/warp";
+import { renderAdjust, type AdjustParams } from "./effects/adjust";
 import { createTendrilsState, renderTendrils, type TendrilsParams, type TendrilsState } from "./effects/tendrils";
 import type { FrameContext } from "./effects/types";
 import { resolveParamsAtPosition } from "./valueCurve";
@@ -131,6 +134,17 @@ function renderStateless(
       break;
     case "Morph":
       renderMorph(buffer, palette, params as unknown as MorphParams, ctx);
+      break;
+    // The canvas effects. They take no palette because they don't draw - the buffer they are
+    // handed already holds what the layers underneath produced, and they rewrite it.
+    case "Kaleidoscope":
+      renderKaleidoscope(buffer, params as unknown as KaleidoscopeParams);
+      break;
+    case "Warp":
+      renderWarp(buffer, params as unknown as WarpParams, ctx);
+      break;
+    case "Adjust":
+      renderAdjust(buffer, params as unknown as AdjustParams);
       break;
     case "Lines":
       renderLines(buffer, palette, params as unknown as LinesParams, ctx);
