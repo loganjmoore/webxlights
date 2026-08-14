@@ -3,11 +3,15 @@ import { computed } from "vue";
 import {
   DEFAULT_PALETTE_HEX,
   EFFECT_SCHEMAS,
+  LAYER_TRANSFORMS,
   PATTERNED_TRANSITION_TYPES,
   TRANSITION_TYPES,
   isValueCurve,
   type BlendMode,
   type EffectParamSpec,
+  type LayerSettings,
+  type LayerTransform,
+  type SubBuffer,
   type TransitionSpec,
   type TransitionType,
 } from "@webxlights/engine";
@@ -36,6 +40,7 @@ const emit = defineEmits<{
   updatePalette: [palette: string[]];
   updateBlend: [patch: { blendMode?: BlendMode; mix?: number }];
   updateTransition: [transition: TransitionSpec];
+  updateLayer: [layer: LayerSettings];
 }>();
 
 const schema = computed(() => (props.effect ? EFFECT_SCHEMAS[props.effect.name] : undefined));
@@ -82,6 +87,25 @@ const transition = computed<TransitionSpec>(() => props.effect?.transition ?? {}
 // pattern's density); showing the slider for a Fade would be a control that does nothing.
 const inPatterned = computed(() => PATTERNED_TRANSITION_TYPES.has(transition.value.inType ?? "Fade"));
 const outPatterned = computed(() => PATTERNED_TRANSITION_TYPES.has(transition.value.outType ?? "Fade"));
+
+const layer = computed<LayerSettings>(() => props.effect?.layer ?? {});
+const subBuffer = computed<SubBuffer>(() => layer.value.subBuffer ?? { x1: 0, y1: 0, x2: 100, y2: 100 });
+
+// Same wholesale-replace contract as the transition patch: SequencerPage swaps `layer` out
+// entirely, so a partial emit would drop the settings it didn't mention.
+function patchLayer(changes: Partial<LayerSettings>): void {
+  emit("updateLayer", { ...layer.value, ...changes });
+}
+function patchSubBuffer(changes: Partial<SubBuffer>): void {
+  patchLayer({ subBuffer: { ...subBuffer.value, ...changes } });
+}
+function resetSubBuffer(): void {
+  patchLayer({ subBuffer: { x1: 0, y1: 0, x2: 100, y2: 100 } });
+}
+const subBufferTrimmed = computed(() => {
+  const s = subBuffer.value;
+  return s.x1 > 0 || s.y1 > 0 || s.x2 < 100 || s.y2 < 100;
+});
 
 // A value curve replaces the param's flat value, so the slider is hidden while one is on -
 // leaving both visible would show a number that isn't what the effect is rendering.
@@ -224,6 +248,51 @@ function curveable(p: EffectParamSpec): boolean {
         <p class="hint">A transition only shows with a duration above 0.</p>
       </div>
 
+      <div class="blend-panel">
+        <h4>Layer Settings</h4>
+        <label class="blend-row">
+          Transformation
+          <select
+            :value="layer.transform ?? 'None'"
+            @change="patchLayer({ transform: ($event.target as HTMLSelectElement).value as LayerTransform })"
+          >
+            <option v-for="t in LAYER_TRANSFORMS" :key="t" :value="t">{{ t }}</option>
+          </select>
+        </label>
+        <label class="blend-row">
+          Blur
+          <span class="blend-inline">
+            <input
+              type="range"
+              min="1"
+              max="15"
+              :value="layer.blur ?? 1"
+              @input="patchLayer({ blur: Number(($event.target as HTMLInputElement).value) })"
+            />
+            <span class="value">{{ layer.blur ?? 1 }}</span>
+          </span>
+        </label>
+
+        <p class="hint">
+          Sub-buffer — the part of the model this effect draws on, as percentages. The effect
+          composes itself into that area rather than being cropped to it.
+        </p>
+        <label v-for="edge in (['x1', 'y1', 'x2', 'y2'] as const)" :key="edge" class="blend-row">
+          {{ { x1: 'Left', y1: 'Bottom', x2: 'Right', y2: 'Top' }[edge] }}
+          <span class="blend-inline">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              :value="subBuffer[edge]"
+              @input="patchSubBuffer({ [edge]: Number(($event.target as HTMLInputElement).value) })"
+            />
+            <span class="value">{{ subBuffer[edge] }}</span>
+          </span>
+        </label>
+        <button v-if="subBufferTrimmed" class="reset-sub" @click="resetSubBuffer">Full buffer</button>
+      </div>
+
       <div v-for="p in schema.params" :key="p.key" class="param">
         <label>{{ p.label }}</label>
         <template v-if="hasCurve(p.key)">
@@ -296,6 +365,11 @@ function curveable(p: EffectParamSpec): boolean {
   grid-column: 1 / -1;
   color: #aaa;
   font-size: 0.75rem;
+}
+.reset-sub {
+  margin-top: 0.3rem;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
 }
 .hint {
   margin: 0.2rem 0 0;

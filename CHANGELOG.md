@@ -1,5 +1,18 @@
 # Changelog
 
+## Read the xLights manual, and built the layer settings it documents
+
+All 176 pages of the [xLights manual](https://manual.xlights.org/xlights) are now catalogued in `docs/MANUAL-COVERAGE.md` — every documented feature with a status against this app. It is deliberately separate from PARITY.md: that file records what was built and how faithfully, this one records what *exists in xLights*, so a gap can't hide by never being written down. It puts the count plainly: 55 effects to our 25, 21 model types to our 12, and a Layer Settings panel we had none of.
+
+The first thing built from it is that panel, because it is the best value per line in the whole inventory — these apply *between* the effect and the model, so all 25 effects gain them at once:
+
+- **Transformation** — rotate 90° either way, rotate 180°, flip horizontally or vertically. Rotation samples backwards from each destination pixel, so a non-square buffer turned a quarter turn stretches to fit rather than leaving holes or spilling out; a model's buffer can't change shape to suit the effect.
+- **Blur** — a box blur weighted by alpha, so a lit pixel next to a transparent one spreads its colour instead of being dragged toward black. Averaging straight RGB is what makes naive blurs look muddy.
+- **Sub-buffer** — confines an effect to part of a model. Implemented the way the manual defines it: *"the entire effect is rendered based on this new model size, whereas a mask covers up what you specify"*. The effect is handed a smaller buffer and composes itself into it, so Bars confined to the top half draws all its bars in that half rather than showing the top half of a full-size set.
+
+Render Style (the 19 buffer layouts), Persistent and Roto-Zoom are not built; Persistent in particular needs the buffer to survive between frames, which this pipeline deliberately doesn't do. All three are recorded in the coverage doc.
+
+
 ## 3D layout: one axis at a time, a ground to stand on, and a way back
 
 - **Dragging moves X and Y; hold Z for depth.** Free 3D dragging — what `DragControls` does, moving a model in whatever plane happens to face the camera — makes the other two axes drift every time you nudge one. A drag now moves a prop along the house and up the wall, and depth is an explicit modifier you hold. The hint in the corner says which mode the next drag will use.

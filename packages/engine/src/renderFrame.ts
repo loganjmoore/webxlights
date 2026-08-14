@@ -6,6 +6,7 @@ import { renderLayerStack, type LayerSpec } from "./layerStack";
 import { bufferToNodeColors } from "./nodeMapping";
 import type { BlendMode } from "./blend";
 import { audioFrameAt, type AudioSeries } from "./audio";
+import { renderWithLayerSettings, type LayerSettings } from "./layerSettings";
 import { renderOn, type OnParams } from "./effects/on";
 import { renderBars, type BarsParams } from "./effects/bars";
 import { renderColorWash, type ColorWashParams } from "./effects/colorWash";
@@ -49,6 +50,10 @@ export interface RenderableEffect {
   // modes read as their reveal/fade threshold (see blend.ts's blendPixel).
   blendMode?: BlendMode;
   mix?: number; // 0..1
+  // Real xLights' Layer Settings panel: transformation, blur and sub-buffer. These sit between
+  // the effect and the model, so they apply to every effect without any effect knowing
+  // (layerSettings.ts).
+  layer?: LayerSettings;
 }
 
 export interface RenderableRow {
@@ -223,9 +228,14 @@ export function renderRowAtMs(
 
   const layers: LayerSpec[] = active.map((effect) => ({
     render: (buffer: RenderBuffer) => {
-      if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(buffer, palette, effect, atMs, frameMs, seed);
-      else renderStateless(buffer, palette, effect, atMs, seed, audio);
-      if (effect.transition) applyTransitions(buffer, effect, atMs, effect.transition);
+      // Layer settings wrap the effect rather than post-processing the model: a sub-buffer hands
+      // the effect a smaller canvas to compose itself into, instead of cropping a full-size
+      // render down to it (layerSettings.ts).
+      renderWithLayerSettings(buffer, effect.layer, (target) => {
+        if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(target, palette, effect, atMs, frameMs, seed);
+        else renderStateless(target, palette, effect, atMs, seed, audio);
+        if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
+      });
     },
     blendMode: effect.blendMode ?? "Normal",
     effectMixThreshold: effect.mix ?? 0,
@@ -271,12 +281,14 @@ export function createRowSequencer(
 
     const layers: LayerSpec[] = activeWithIndex.map(({ effect, index }) => ({
       render: (buffer: RenderBuffer) => {
-        if (STATEFUL_EFFECTS.has(effect.name)) {
-          renderStatefulIncremental(buffer, palette, effect, atMs, frameMs, seed, index, statefulStates);
-        } else {
-          renderStateless(buffer, palette, effect, atMs, seed, audio);
-        }
-        if (effect.transition) applyTransitions(buffer, effect, atMs, effect.transition);
+        renderWithLayerSettings(buffer, effect.layer, (target) => {
+          if (STATEFUL_EFFECTS.has(effect.name)) {
+            renderStatefulIncremental(target, palette, effect, atMs, frameMs, seed, index, statefulStates);
+          } else {
+            renderStateless(target, palette, effect, atMs, seed, audio);
+          }
+          if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
+        });
       },
       blendMode: effect.blendMode ?? "Normal",
       effectMixThreshold: effect.mix ?? 0,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { EFFECT_SCHEMAS, defaultParamsFor, type AudioSeries, type BlendMode, type TransitionSpec } from "@webxlights/engine";
+import { EFFECT_SCHEMAS, defaultParamsFor, type AudioSeries, type BlendMode, type LayerSettings, type TransitionSpec } from "@webxlights/engine";
 import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
@@ -333,6 +333,9 @@ function handleBlendUpdate(patch: { blendMode?: BlendMode; mix?: number }): void
 }
 function handleTransitionUpdate(transition: TransitionSpec): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { transition });
+}
+function handleLayerUpdate(layer: LayerSettings): void {
+  if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { layer });
 }
 
 function addTimingMarkAtPlayhead(): void {
@@ -693,6 +696,7 @@ watch(sequenceId, async (id) => {
           @update-palette="handlePaletteUpdate"
           @update-blend="handleBlendUpdate"
           @update-transition="handleTransitionUpdate"
+          @update-layer="handleLayerUpdate"
         />
       </aside>
     </div>

@@ -54,9 +54,11 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Pictures effect | ⚠️ | Images stored in the sequence body, downscaled to 64px on the long edge (no asset store yet) |
 | Shader (ISF), Liquid, Glediator, Video | ❌ | Non-goal for v1 |
 | Layer blend modes | ⚠️ | 10 of 24 (Normal, Effect 1/2, Average, Additive, Subtractive, Max, Min, 1/2 reveals) |
+| Layer settings: Transformation / Blur / Sub-buffer | ✅ | Rotate 90 either way, rotate 180, flip H/V; an alpha-weighted box blur; and a percentage sub-buffer, all applied between the effect and the model so they work on every effect |
+| Layer settings: Render Style / Persistent / Roto-Zoom | ❌ | See docs/MANUAL-COVERAGE.md |
 | Value curves | ✅ | All 16 types (Flat, Ramp, Ramp Up/Down, Ramp Down/Up, Saw Tooth, Triangle, Sine, Abs Sine, Square, Parabolic Up/Down, Logarithmic Up/Down, Exponential Up/Down, Custom) with cycles/phase/reverse, a draggable point editor for Custom and six presets, reachable from the props panel on every VC-flagged param of every effect |
 | Transitions | ✅ | 16 types (Fade, Wipe, Wipe Vertical, From Middle, To Middle, Square Explode/Implode, Circle Explode/Implode, Clock, Blinds, Slide Bars, Bow Tie, Star, Checkerboard, Ripple), in and out, each with its own type, duration and reverse, plus a pattern-density knob on the three types that read one - all set from the props panel's Transitions section |
-| Buffer styles / sub-buffers | ❌ | Every effect renders into the model's default full buffer |
+| Buffer styles / sub-buffers | ⚠️ | Sub-buffer implemented: an effect can be confined to part of a model, and is handed that smaller buffer to compose itself into rather than being cropped to it (the manual's own distinction). The 19 *render styles* (Per Preview, stacked, per-model, ...) are still unimplemented - every effect renders into the model's default buffer |
 
 ## File formats (SPEC ch11)
 
