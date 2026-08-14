@@ -81,7 +81,8 @@ written down. Status here means:
 | Effect presets | ✅ | Save an effect's whole configuration under a named group, apply it at the playhead, import and export `.xpreset` files. Saved on the layout, since presets are global in xLights rather than belonging to one sequence. Missing: presets spanning several layers or models at once, and Smart Presets |
 | Views | ✅ | Named, *ordered* subsets of the sequencer's rows, with a picker in the toolbar. Saved on the layout, because the manual is explicit that "views work across sequences" — a per-sequence copy would have to be duplicated into every new sequence and would drift. The Master View isn't stored: it is "a special (system created) view" containing every row, so it is simply the absence of a selection. Missing: the eye icon that hides a model across all sequences (this app's Models panel is the per-sequence equivalent) |
 | Song structure regions | ⚠️ | Named, coloured sections of the timeline, created at the playhead or from a timing track's labels — "one region for each timing mark, using the timing mark's label as the region name". Plus the bulk action they exist for: copying one section's effects onto another, rebased on the target's start. Missing: per-region palette application, exporting a region as its own sequence, and Song Structure Views |
-| Singing faces / phoneme breakdown | 🚫 | Needs face definitions |
+| Singing faces / phoneme breakdown | 🚫 | Needs per-phoneme mouth definitions. The timing-track half of it is now built — the State effect reads a track's labels the same way a phoneme track is read — so what is left is the face definition itself, not the plumbing |
+| Model states (Layout tab) | ✅ | Named sets of a model's nodes, edited on the Layout page and imported from `<stateInfo>`. Up to the manual's 40 per definition, with a one-click seven-segment set (42 predefined names) so lighting a countdown sign isn't 42 rows of typing. Each state shows live how many nodes it resolves to and how many are past the end of the model |
 | Pixel editor (matrix drawing tool) | ✅ | Draws straight into the Pictures effect's image, so what's drawn renders on the model immediately — no file to save and reload. Eight colour wells, left-draws/right-erases, drag to stroke. The grid is the model's own, and it flips y so a drawing doesn't render upside down |
 | Command palette | ✅ | Ctrl+Shift+K, per the manual. Searchable, ranked so a prefix match beats one buried mid-string, and every entry shows the key it also answers to — which is how anyone learns sixty shortcuts without reading a list of them |
 | Keyboard shortcuts | ✅ | Transport, timing (including **s** to split a mark), edit, zoom, and all fifteen of xLights' single-letter effect shortcuts. Case is significant, as it is in xLights — **o** is On and **O** is Off. Every shortcut and every palette entry comes from one registry, so a key can't exist without a command or a command be given a key nothing dispatches |
@@ -90,13 +91,27 @@ written down. Status here means:
 
 ## Chapter 4 — Built-in effects
 
-xLights ships 55 effects. We render 44.
+xLights ships 55 effects. We render 46.
 
-**Implemented (44):** Adjust, Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill,
+**Implemented (46):** Adjust, Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill,
 Fire, Galaxy, Garlands, Kaleidoscope, Life, Lightning, Lines, Marquee, Meteors, Morph, Off, On,
-Pictures, Pinwheel, Fireworks, Music, Plasma, Ripple, Shape, Shimmer, Shockwave, Single Strand,
-Sketch, Snow Storm, Snowflakes, Spirals, Spirograph, Strobe, Tendrils, Text, Tree, Twinkle,
-VU Meter, Warp, Wave.
+Piano, Pictures, Pinwheel, Fireworks, Music, Plasma, Ripple, Shape, Shimmer, Shockwave, Single
+Strand, Sketch, Snow Storm, Snowflakes, Spirals, Spirograph, State, Strobe, Tendrils, Text, Tree,
+Twinkle, VU Meter, Warp, Wave.
+
+**State and Piano** are driven by the words on a timing track rather than by their own parameters,
+which is a shape nothing else in the engine had. Both were previously listed here as blocked on
+"definition files"; re-reading their manual pages showed neither is. State's definitions are
+"Single Range or Node ranges" — the same node-range notation sub-models already use — so they are
+now a property of the model, editable on the Layout page and imported from `<stateInfo>`. Piano's
+notes come from "a timing track source... this is the preferred option", whose labels are key
+letters or MIDI values. What is genuinely still missing is *MIDI file import*, which would fill a
+timing track; the effect itself needs nothing further.
+
+State implements all four modes (Default follows the track, Iterate loops the labels evenly,
+Countdown and Time Countdown drive a seven-segment sign), all four colour modes, and Force Custom
+Colors per state. Piano implements both types, the MIDI range, sharps, vertical scale and
+horizontal offset, and falls back to the analysed spectrum when no track drives it.
 
 Kaleidoscope, Warp and Adjust are **canvas-mode** effects: they modify the layer below them
 rather than drawing their own, and render nothing on any other blend mode — which is what the
@@ -110,14 +125,18 @@ background-image tracing aid is deliberately absent: the manual is explicit that
 rendered into the effect output — it is only there to help you trace", so its absence changes
 nothing about what a sketch renders.
 
-**Missing, needs a definition file (2):** Guitar (a tab/track) and State (state definitions).
+**Missing, needs a definition file (1):** Guitar (a tab/track).
 
 (Shape's Emoji and system-font glyphs are not drawn - this engine has no font beyond its own
 5x7 bitmap - so its Character setting is absent while the five geometric shapes are in.)
 
-**Missing, needs infrastructure we don't have (5):**
-Duplicate (renders another model's layer), Faces + Piano (face/state definitions),
-Moving Head + Servo (DMX fixtures).
+**Missing, needs infrastructure we don't have (4):**
+Duplicate (renders another model's layer), Faces (per-phoneme mouth definitions), Moving Head +
+Servo (DMX fixtures).
+
+Faces is the nearest of these. Its definitions have the same shape as a state's, and the timing
+machinery State now uses is what a phoneme track needs — but a face also needs a *picture per
+mouth position*, which is a larger piece than the plumbing, and worth scoping before starting.
 
 **Deliberate non-goals (4):** Shader (ISF), Liquid (physics), Glediator, Video.
 
@@ -163,10 +182,16 @@ open a UDP socket at all — no amount of work here changes that. It is why FPP 
 Everything else that was ❌ has been built: Tools > Convert, export model as video, and
 detachable panel windows.
 
-The eleven unimplemented effects are the same shape: Faces, Piano and State need face and state
-definition files; Duplicate needs to render another model's layer; Moving Head and Servo are DMX
-fixtures; Shader, Liquid, Glediator and Video were recorded as non-goals at the start and remain
-so. Every effect renderable with what this engine has is implemented.
+Two of the effects previously listed as blocked turned out not to be. **State** and **Piano** were
+both recorded as needing "definition files"; their manual pages say otherwise — a state is defined
+with the same node-range notation sub-models already use, and Piano's preferred notes source is a
+timing track. Both are now implemented, which is a reminder that a blocked row is worth re-reading
+rather than inherited.
+
+The nine that remain: **Faces** needs a picture per mouth position (its timing half now exists);
+**Guitar** needs a tab or track file; **Duplicate** needs to render another model's layer; **Moving
+Head** and **Servo** are DMX fixtures; **Shader**, **Liquid**, **Glediator** and **Video** were
+recorded as non-goals at the start and remain so.
 
 ## What this says about priorities
 
