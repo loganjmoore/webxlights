@@ -58,7 +58,7 @@ written down. Status here means:
 | Colour settings — palette | ✅ | Up to 6 swatches |
 | Colour settings — **colour curves** | ❌ | A colour that varies across the effect, like a value curve |
 | Layers | ⚠️ | Up to 5, bottom-to-top |
-| Layer blending — 24 modes | ⚠️ | 10 implemented |
+| Layer blending — 24 modes | ⚠️ | 18 implemented. The manual documents these with screenshots and the advice "experience is much better than reading about it" rather than defining them in words, so the eight added beyond the original ten follow what their names unambiguously mean (a mask hides, an unmask reveals, a shadow darkens); whether each matches xLights pixel for pixel is unverified. Bottom-Top and Left-Right need the pixel's position, which the blend function isn't given |
 | Layer blending — Morph, Suppress Until Frame, Freeze At Frame, Canvas | ❌ | |
 | Transitions | ✅ | All 16 types, in and out |
 | Mix slider | ✅ | |
@@ -81,16 +81,25 @@ written down. Status here means:
 
 ## Chapter 4 — Built-in effects
 
-xLights ships 55 effects. We render 32.
+xLights ships 55 effects. We render 38.
 
-**Implemented (32):** Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill, Fire,
-Galaxy, Garlands, Life, Lightning, Marquee, Meteors, Off, On, Pictures, Pinwheel, Plasma,
-Ripple, Shimmer, Shockwave, Single Strand, Snow Storm, Snowflakes, Spirals, Strobe, Text,
-Twinkle, VU Meter, Wave.
+**Implemented (38):** Bars, Butterfly, Candle, Circles, Color Wash, Curtain, Fan, Fill, Fire,
+Galaxy, Garlands, Life, Lightning, Lines, Marquee, Meteors, Off, On, Pictures, Pinwheel,
+Fireworks, Music, Plasma, Ripple, Shape, Shimmer, Shockwave, Single Strand, Snow Storm,
+Snowflakes, Spirals, Spirograph, Strobe, Text, Tree, Twinkle, VU Meter, Wave.
 
-**Missing, and renderable with what the engine already has (14):**
-Adjust, Fireworks, Guitar, Kaleidoscope, Lines, Morph, Music, Shape, Sketch, Spirograph, State,
-Tendrils, Tree, Warp.
+**Missing, and renderable with what the engine already has (5):**
+Adjust, Morph, Sketch, Tendrils, Warp.
+
+**Missing, needs a canvas the render pipeline doesn't have (2):** Kaleidoscope and Warp both
+modify *the layer below them* rather than drawing their own; the manual is explicit that
+Kaleidoscope "is a canvas mode effect. By itself it does nothing." That needs the layer stack to
+expose what is underneath, which it doesn't.
+
+**Missing, needs a definition file (2):** Guitar (a tab/track) and State (state definitions).
+
+(Shape's Emoji and system-font glyphs are not drawn - this engine has no font beyond its own
+5x7 bitmap - so its Character setting is absent while the five geometric shapes are in.)
 
 **Missing, needs infrastructure we don't have (5):**
 Duplicate (renders another model's layer), Faces + Piano (face/state definitions),

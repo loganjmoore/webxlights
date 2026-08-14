@@ -19,6 +19,9 @@ describe("effect param-schema registry", () => {
   });
 
   it("returns an empty object for an unknown effect name", () => {
-    expect(defaultParamsFor("Spirograph")).toEqual({});
+    // Deliberately not a real xLights effect. This used to name Spirograph, which stopped being
+    // unknown the moment it was implemented - a placeholder that quietly becomes real is worse
+    // than a nonsense one, because the test starts asserting the opposite of its own name.
+    expect(defaultParamsFor("Not An Effect")).toEqual({});
   });
 });

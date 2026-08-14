@@ -40,6 +40,12 @@ import { createSnowStormState, renderSnowStorm, type SnowStormParams, type SnowS
 import { createLifeState, renderLife, type LifeParams, type LifeState } from "./effects/life";
 import { renderLightning, type LightningParams } from "./effects/lightning";
 import { renderCandle, type CandleParams } from "./effects/candle";
+import { renderLines, type LinesParams } from "./effects/lines";
+import { renderSpirograph, type SpirographParams } from "./effects/spirograph";
+import { renderShape, type ShapeParams } from "./effects/shape";
+import { renderMusic, type MusicParams } from "./effects/music";
+import { renderFireworks, type FireworksParams } from "./effects/fireworks";
+import { renderTreeEffect, type TreeEffectParams } from "./effects/treeEffect";
 import type { FrameContext } from "./effects/types";
 import { resolveParamsAtPosition } from "./valueCurve";
 import { applyTransitions, type TransitionSpec } from "./transition";
@@ -111,6 +117,24 @@ function renderStateless(
   switch (effect.name) {
     case "Off":
       renderOff(buffer, params as unknown as OffParams);
+      break;
+    case "Music":
+      renderMusic(buffer, palette, params as unknown as MusicParams, ctx);
+      break;
+    case "Fireworks":
+      renderFireworks(buffer, palette, params as unknown as FireworksParams, ctx);
+      break;
+    case "Tree":
+      renderTreeEffect(buffer, palette, params as unknown as TreeEffectParams, ctx);
+      break;
+    case "Lines":
+      renderLines(buffer, palette, params as unknown as LinesParams, ctx);
+      break;
+    case "Spirograph":
+      renderSpirograph(buffer, palette, params as unknown as SpirographParams, ctx);
+      break;
+    case "Shape":
+      renderShape(buffer, palette, params as unknown as ShapeParams, ctx);
       break;
     case "Lightning":
       renderLightning(buffer, palette, params as unknown as LightningParams, ctx);
