@@ -1,5 +1,58 @@
 # Changelog
 
+## Render styles: an effect can be laid out along the string, across the prop, or as one pixel
+
+xLights' Render Style controls "how the buffer is laid out for a model when the effect is rendered". Six of them are now implemented — the ones that mean something for a single model:
+
+- **Default** — the model's own buffer, unchanged.
+- **Single Line** — every node end to end on one row, in wiring order. A chase runs along the physical string rather than across the model's grid.
+- **As Pixel** — the whole prop behaves as one light.
+- **Per Preview** — the buffer is laid out the way the model physically stands, so an effect sweeps across the prop rather than along the string. On a mega tree that's the difference between Bars chasing up the strands and Bars chasing up the tree.
+- **Horizontal / Vertical Per Strand** — each strand becomes a row or a column.
+
+The insight that made this cheap: a render style isn't a rendering mode, it's a **remap of which buffer cell each node reads from**. Effects already draw into a buffer and nodes already pull their colour out by `(bufX, bufY)`, so a style hands the effect a differently-shaped buffer and re-points the nodes at it. No effect needed changing. Screen coordinates are deliberately untouched — a style that shifted those would silently rearrange someone's yard.
+
+One structural change came with it: **layers now composite in node space rather than buffer space**. Buffer-space compositing assumes every layer shares one buffer, which stops being true the moment styles exist — one layer may draw into a 16×50 grid while the layer under it draws into a single pixel. For layers that all use Default the result is identical, since blending is per-pixel and the mapping is per-node.
+
+The remaining thirteen styles describe how several models in a *group* are arranged relative to each other, which needs group rendering this app doesn't have. Recorded in the coverage doc rather than faked.
+
+
+## Three more effects: Life, Lightning and Candle
+
+29 of 55 becomes 32.
+
+- **Life** — Conway's Game of Life, whose four rules the manual quotes verbatim, plus three rule variants for its Type setting. The grid **wraps at the edges**: a model-sized buffer is nearly all edge — a 16×50 mega tree has more boundary cells than interior ones — so on a bounded grid every glider would die at a wall within a second and the effect would settle into nothing. Speed is generations per frame, so a slow setting holds a generation on screen rather than skipping the simulation forward.
+- **Lightning** — a zigzag bolt with an optional fork. The palette colours the core and *white always edges it*, which the manual states as a fact about the effect rather than an option, and is what makes a bolt read as lightning instead of a coloured line. Width 1 gives a straight vertical line, as documented.
+- **Candle** — a flickering flame. The palette is **opt-in** here, the opposite way round from every other effect: "by default the Color Palette is not used and the flame is always an orange to reddish color". Per Node gives every pixel its own flicker; without it the whole model flickers together, which is what you want when the model *is* one candle.
+
+Tested against the canonical patterns rather than against our own output: a blinker oscillating with period two, a block staying still, and a blinker straddling the boundary surviving — which it only does if the grid wraps.
+
+
+## Four more effects from the manual: Off, Shimmer, Fill and Snow Storm
+
+Taking the coverage inventory in order, these four are the ones that need nothing the engine doesn't already have. 25 of 55 becomes 29.
+
+- **Off** — every pixel off. The part that isn't a no-op is **Transparent**: an opaque Off hides the layers under it, which is the point when it's used to punch a gap in a sequence; a transparent one leaves them showing, which is the point when it gates another layer. Rendering nothing at all would only ever give the second.
+- **Shimmer** — lights turning rapidly on and off, with Duty Factor as the share of each cycle they're on. **Use All Colors** changes what the effect *is* rather than just its colour: the manual calls it "a pulse rather than a shimmer with the selected colors pulsing off and on in sequence", so it steps one palette colour per cycle.
+- **Fill** — fills from an edge to a position, cut into bands by Band Size and Skip Size. The direction names describe where the fill *starts*, and the manual is explicit that Left "starts at right and moves left" — the opposite of what the word suggests on its own.
+- **Snow Storm** — particles blowing rather than falling (that's Snowflakes), each leaving a fading trail. Stateful, so it runs through both the scrub and sequential-export paths. Particles wrap at the edges rather than respawning, so the storm keeps its density instead of thinning out.
+
+A pre-existing guard test — "every schema in the palette actually renders something through the pipeline" — caught Snow Storm rendering an empty frame, because it had been wired into the sequential-export path but not the scrubbing one. That test existed precisely for this and did its job.
+
+
+## Read the xLights manual, and built the layer settings it documents
+
+All 176 pages of the [xLights manual](https://manual.xlights.org/xlights) are now catalogued in `docs/MANUAL-COVERAGE.md` — every documented feature with a status against this app. It is deliberately separate from PARITY.md: that file records what was built and how faithfully, this one records what *exists in xLights*, so a gap can't hide by never being written down. It puts the count plainly: 55 effects to our 25, 21 model types to our 12, and a Layer Settings panel we had none of.
+
+The first thing built from it is that panel, because it is the best value per line in the whole inventory — these apply *between* the effect and the model, so all 25 effects gain them at once:
+
+- **Transformation** — rotate 90° either way, rotate 180°, flip horizontally or vertically. Rotation samples backwards from each destination pixel, so a non-square buffer turned a quarter turn stretches to fit rather than leaving holes or spilling out; a model's buffer can't change shape to suit the effect.
+- **Blur** — a box blur weighted by alpha, so a lit pixel next to a transparent one spreads its colour instead of being dragged toward black. Averaging straight RGB is what makes naive blurs look muddy.
+- **Sub-buffer** — confines an effect to part of a model. Implemented the way the manual defines it: *"the entire effect is rendered based on this new model size, whereas a mask covers up what you specify"*. The effect is handed a smaller buffer and composes itself into it, so Bars confined to the top half draws all its bars in that half rather than showing the top half of a full-size set.
+
+Render Style (the 19 buffer layouts), Persistent and Roto-Zoom are not built; Persistent in particular needs the buffer to survive between frames, which this pipeline deliberately doesn't do. All three are recorded in the coverage doc.
+
+
 ## 3D layout: one axis at a time, a ground to stand on, and a way back
 
 - **Dragging moves X and Y; hold Z for depth.** Free 3D dragging — what `DragControls` does, moving a model in whatever plane happens to face the camera — makes the other two axes drift every time you nudge one. A drag now moves a prop along the house and up the wall, and depth is an explicit modifier you hold. The hint in the corner says which mode the next drag will use.

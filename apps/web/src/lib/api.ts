@@ -1,4 +1,4 @@
-import type { BlendMode, PictureImage, TransitionSpec, ValueCurve } from "@webxlights/engine";
+import type { BlendMode, LayerSettings, PictureImage, TransitionSpec, ValueCurve } from "@webxlights/engine";
 
 export class ApiError extends Error {
   status: number;
@@ -152,6 +152,9 @@ export interface SequenceEffect {
   mix?: number; // 0..1, the "Mix" slider
   // In/out reveals - now the full transition system (engine/transition.ts), not just fades.
   transition?: TransitionSpec;
+  // Real xLights' Layer Settings panel - transformation, blur and sub-buffer. Applies between
+  // the effect and the model, so it works on every effect (engine/layerSettings.ts).
+  layer?: LayerSettings;
 }
 
 export interface SequenceRow {

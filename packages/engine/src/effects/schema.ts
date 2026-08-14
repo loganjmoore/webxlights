@@ -303,6 +303,74 @@ export const VU_METER_EFFECT_SCHEMA: EffectSchema = {
   ],
 };
 
+export const OFF_EFFECT_SCHEMA: EffectSchema = {
+  name: "Off",
+  params: [{ key: "transparent", label: "Transparent", type: "checkbox", default: false }],
+};
+
+export const SHIMMER_EFFECT_SCHEMA: EffectSchema = {
+  name: "Shimmer",
+  params: [
+    { key: "dutyFactor", label: "Duty Factor", type: "intSlider", min: 1, max: 100, default: 50, valueCurve: true },
+    { key: "cycleCount", label: "Cycle Count", type: "intSlider", min: 1, max: 100, default: 10, valueCurve: true },
+    { key: "useAllColors", label: "Use All Colors", type: "checkbox", default: false },
+  ],
+};
+
+export const FILL_EFFECT_SCHEMA: EffectSchema = {
+  name: "Fill",
+  params: [
+    { key: "position", label: "Position", type: "intSlider", min: 0, max: 100, default: 100, valueCurve: true },
+    { key: "bandSize", label: "Band Size", type: "intSlider", min: 0, max: 100, default: 0, valueCurve: true },
+    { key: "skipSize", label: "Skip Size", type: "intSlider", min: 0, max: 100, default: 0, valueCurve: true },
+    { key: "offset", label: "Offset", type: "intSlider", min: 0, max: 100, default: 0, valueCurve: true },
+    { key: "changeColorOverTime", label: "Change Color based on Time", type: "checkbox", default: false },
+    { key: "direction", label: "Direction", type: "choice", options: ["up", "down", "left", "right"], default: "up" },
+  ],
+};
+
+export const SNOW_STORM_EFFECT_SCHEMA: EffectSchema = {
+  name: "Snow Storm",
+  params: [
+    { key: "maxFlakes", label: "Max Flakes", type: "intSlider", min: 1, max: 100, default: 20 },
+    { key: "trailLength", label: "Trail Length", type: "intSlider", min: 0, max: 20, default: 3 },
+    { key: "speed", label: "Speed", type: "intSlider", min: 1, max: 100, default: 20 },
+  ],
+};
+
+export const LIFE_EFFECT_SCHEMA: EffectSchema = {
+  name: "Life",
+  params: [
+    { key: "cellsToStart", label: "Cells to Start", type: "intSlider", min: 1, max: 100, default: 30 },
+    { key: "type", label: "Type", type: "intSlider", min: 0, max: 3, default: 0 },
+    { key: "speed", label: "Speed", type: "intSlider", min: 1, max: 100, default: 25 },
+  ],
+};
+
+export const LIGHTNING_EFFECT_SCHEMA: EffectSchema = {
+  name: "Lightning",
+  params: [
+    { key: "segments", label: "Number of Segments", type: "intSlider", min: 1, max: 20, default: 4, valueCurve: true },
+    { key: "boltWidth", label: "Width of Bolt", type: "intSlider", min: 1, max: 20, default: 3, valueCurve: true },
+    { key: "forked", label: "Forked Lightning", type: "checkbox", default: false },
+    { key: "topX", label: "Top Location X", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
+    { key: "xMovement", label: "X Movement", type: "intSlider", min: -100, max: 100, default: 0, valueCurve: true },
+    { key: "direction", label: "Direction", type: "choice", options: ["down", "up"], default: "down" },
+  ],
+};
+
+export const CANDLE_EFFECT_SCHEMA: EffectSchema = {
+  name: "Candle",
+  params: [
+    { key: "flameAgility", label: "Flame Agility", type: "intSlider", min: 1, max: 20, default: 10 },
+    { key: "windBaseline", label: "Wind Baseline", type: "intSlider", min: 0, max: 100, default: 60 },
+    { key: "windVariability", label: "Wind Variability", type: "intSlider", min: 0, max: 100, default: 40 },
+    { key: "windCalmness", label: "Wind Calmness", type: "intSlider", min: 0, max: 100, default: 30 },
+    { key: "perNode", label: "Per Node", type: "checkbox", default: false },
+    { key: "useColorPalette", label: "Use Color Palette", type: "checkbox", default: false },
+  ],
+};
+
 export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   On: ON_EFFECT_SCHEMA,
   Bars: BARS_EFFECT_SCHEMA,
@@ -329,6 +397,13 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Text: TEXT_EFFECT_SCHEMA,
   Pictures: PICTURES_EFFECT_SCHEMA,
   "VU Meter": VU_METER_EFFECT_SCHEMA,
+  Off: OFF_EFFECT_SCHEMA,
+  Shimmer: SHIMMER_EFFECT_SCHEMA,
+  Fill: FILL_EFFECT_SCHEMA,
+  "Snow Storm": SNOW_STORM_EFFECT_SCHEMA,
+  Life: LIFE_EFFECT_SCHEMA,
+  Lightning: LIGHTNING_EFFECT_SCHEMA,
+  Candle: CANDLE_EFFECT_SCHEMA,
 };
 
 // Effects that read the analysed audio track rather than only their own params - the UI warns

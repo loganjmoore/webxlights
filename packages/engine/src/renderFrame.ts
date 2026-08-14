@@ -2,10 +2,12 @@ import type { RGBA } from "./color";
 import { rgba } from "./color";
 import { RenderBuffer } from "./renderBuffer";
 import type { ModelGeometry } from "./models/types";
-import { renderLayerStack, type LayerSpec } from "./layerStack";
-import { bufferToNodeColors } from "./nodeMapping";
+import { renderLayerStackToNodes, type NodeLayerSpec } from "./layerStack";
+
 import type { BlendMode } from "./blend";
 import { audioFrameAt, type AudioSeries } from "./audio";
+import { renderWithLayerSettings, type LayerSettings } from "./layerSettings";
+import { applyRenderStyle } from "./renderStyle";
 import { renderOn, type OnParams } from "./effects/on";
 import { renderBars, type BarsParams } from "./effects/bars";
 import { renderColorWash, type ColorWashParams } from "./effects/colorWash";
@@ -31,6 +33,13 @@ import { renderCircles, type CirclesParams } from "./effects/circles";
 import { renderText, type TextParams } from "./effects/text";
 import { renderPictures, type PicturesParams } from "./effects/pictures";
 import { renderVuMeter, type VuMeterParams } from "./effects/vuMeter";
+import { renderOff, type OffParams } from "./effects/off";
+import { renderShimmer, type ShimmerParams } from "./effects/shimmer";
+import { renderFill, type FillParams } from "./effects/fill";
+import { createSnowStormState, renderSnowStorm, type SnowStormParams, type SnowStormState } from "./effects/snowStorm";
+import { createLifeState, renderLife, type LifeParams, type LifeState } from "./effects/life";
+import { renderLightning, type LightningParams } from "./effects/lightning";
+import { renderCandle, type CandleParams } from "./effects/candle";
 import type { FrameContext } from "./effects/types";
 import { resolveParamsAtPosition } from "./valueCurve";
 import { applyTransitions, type TransitionSpec } from "./transition";
@@ -49,6 +58,10 @@ export interface RenderableEffect {
   // modes read as their reveal/fade threshold (see blend.ts's blendPixel).
   blendMode?: BlendMode;
   mix?: number; // 0..1
+  // Real xLights' Layer Settings panel: transformation, blur and sub-buffer. These sit between
+  // the effect and the model, so they apply to every effect without any effect knowing
+  // (layerSettings.ts).
+  layer?: LayerSettings;
 }
 
 export interface RenderableRow {
@@ -61,7 +74,7 @@ const MAX_LAYERS = 5;
 // Effects with per-frame state (heat map / particle list) that must be simulated forward
 // frame-by-frame from the effect's start to reach `atMs` - correct for a scrubbing preview
 // (not a real-time constraint), cheap at typical effect lengths (a few hundred frames).
-const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe"]);
+const STATEFUL_EFFECTS = new Set(["Fire", "Meteors", "Snowflakes", "Strobe", "Snow Storm", "Life"]);
 
 function positionOf(effect: RenderableEffect, atMs: number): number {
   const duration = effect.endMs - effect.startMs || 1;
@@ -96,6 +109,21 @@ function renderStateless(
   const params = paramsAt(effect, positionInEffect01);
 
   switch (effect.name) {
+    case "Off":
+      renderOff(buffer, params as unknown as OffParams);
+      break;
+    case "Lightning":
+      renderLightning(buffer, palette, params as unknown as LightningParams, ctx);
+      break;
+    case "Candle":
+      renderCandle(buffer, palette, params as unknown as CandleParams, ctx);
+      break;
+    case "Shimmer":
+      renderShimmer(buffer, palette, params as unknown as ShimmerParams, ctx);
+      break;
+    case "Fill":
+      renderFill(buffer, palette, params as unknown as FillParams, ctx);
+      break;
     case "On":
       renderOn(buffer, palette, params as unknown as OnParams, ctx);
       break;
@@ -201,6 +229,18 @@ function renderStateful(
       const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as StrobeParams;
       renderStrobe(buffer, palette, params, state);
     }
+  } else if (effect.name === "Snow Storm") {
+    const state = createSnowStormState(buffer.width, buffer.height, paramsAt(effect, 0) as unknown as SnowStormParams, seed);
+    for (let f = 0; f <= framesElapsed; f++) {
+      const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as SnowStormParams;
+      renderSnowStorm(buffer, palette, params, state);
+    }
+  } else if (effect.name === "Life") {
+    const state = createLifeState(buffer.width, buffer.height, paramsAt(effect, 0) as unknown as LifeParams, seed);
+    for (let f = 0; f <= framesElapsed; f++) {
+      const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as LifeParams;
+      renderLife(buffer, palette, params, state);
+    }
   }
 }
 
@@ -221,18 +261,25 @@ export function renderRowAtMs(
     return row.geometry.nodes.map(() => rgba(0, 0, 0, 0));
   }
 
-  const layers: LayerSpec[] = active.map((effect) => ({
+  const layers: NodeLayerSpec[] = active.map((effect) => ({
+    // The render style reshapes the buffer this effect draws into, and re-points the nodes at
+    // it (renderStyle.ts). Nothing in the effect changes.
+    geometry: applyRenderStyle(row.geometry, effect.layer?.renderStyle),
     render: (buffer: RenderBuffer) => {
-      if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(buffer, palette, effect, atMs, frameMs, seed);
-      else renderStateless(buffer, palette, effect, atMs, seed, audio);
-      if (effect.transition) applyTransitions(buffer, effect, atMs, effect.transition);
+      // Layer settings wrap the effect rather than post-processing the model: a sub-buffer hands
+      // the effect a smaller canvas to compose itself into, instead of cropping a full-size
+      // render down to it (layerSettings.ts).
+      renderWithLayerSettings(buffer, effect.layer, (target) => {
+        if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(target, palette, effect, atMs, frameMs, seed);
+        else renderStateless(target, palette, effect, atMs, seed, audio);
+        if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
+      });
     },
     blendMode: effect.blendMode ?? "Normal",
     effectMixThreshold: effect.mix ?? 0,
   }));
 
-  const composited = renderLayerStack(row.geometry.width, row.geometry.height, layers);
-  return bufferToNodeColors(composited, row.geometry);
+  return renderLayerStackToNodes(row.geometry.nodes.length, layers);
 }
 
 export interface RowSequencer {
@@ -269,21 +316,23 @@ export function createRowSequencer(
       return row.geometry.nodes.map(() => rgba(0, 0, 0, 0));
     }
 
-    const layers: LayerSpec[] = activeWithIndex.map(({ effect, index }) => ({
+    const layers: NodeLayerSpec[] = activeWithIndex.map(({ effect, index }) => ({
+      geometry: applyRenderStyle(row.geometry, effect.layer?.renderStyle),
       render: (buffer: RenderBuffer) => {
-        if (STATEFUL_EFFECTS.has(effect.name)) {
-          renderStatefulIncremental(buffer, palette, effect, atMs, frameMs, seed, index, statefulStates);
-        } else {
-          renderStateless(buffer, palette, effect, atMs, seed, audio);
-        }
-        if (effect.transition) applyTransitions(buffer, effect, atMs, effect.transition);
+        renderWithLayerSettings(buffer, effect.layer, (target) => {
+          if (STATEFUL_EFFECTS.has(effect.name)) {
+            renderStatefulIncremental(target, palette, effect, atMs, frameMs, seed, index, statefulStates);
+          } else {
+            renderStateless(target, palette, effect, atMs, seed, audio);
+          }
+          if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
+        });
       },
       blendMode: effect.blendMode ?? "Normal",
       effectMixThreshold: effect.mix ?? 0,
     }));
 
-    const composited = renderLayerStack(row.geometry.width, row.geometry.height, layers);
-    return bufferToNodeColors(composited, row.geometry);
+    return renderLayerStackToNodes(row.geometry.nodes.length, layers);
   }
 
   return { renderFrameAt };
@@ -333,5 +382,21 @@ function renderStatefulIncremental(
       states.set(key, state);
     }
     renderStrobe(buffer, palette, params as unknown as StrobeParams, state);
+  } else if (effect.name === "Snow Storm") {
+    const snowParams = params as unknown as SnowStormParams;
+    let state = states.get(key) as SnowStormState | undefined;
+    if (!state) {
+      state = createSnowStormState(buffer.width, buffer.height, snowParams, seed);
+      states.set(key, state);
+    }
+    renderSnowStorm(buffer, palette, snowParams, state);
+  } else if (effect.name === "Life") {
+    const lifeParams = params as unknown as LifeParams;
+    let state = states.get(key) as LifeState | undefined;
+    if (!state) {
+      state = createLifeState(buffer.width, buffer.height, lifeParams, seed);
+      states.set(key, state);
+    }
+    renderLife(buffer, palette, lifeParams, state);
   }
 }

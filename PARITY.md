@@ -43,7 +43,7 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 
 | Feature | Status | Notes |
 |---|---|---|
-| Effects implemented | ⚠️ | 25 of ~56 named effects (On, Bars, Color Wash, Fire, Meteors, Butterfly, SingleStrand, Snowflakes, Spirals, Twinkle, Strobe, Ripple, Wave, Pinwheel, Shockwave, Garlands, Curtain, Plasma, Galaxy, Fan, Marquee, Circles, Text, Pictures, VU Meter) |
+| Effects implemented | ⚠️ | 32 of 55 named effects (On, Off, Bars, Candle, Life, Lightning, Color Wash, Fire, Meteors, Butterfly, SingleStrand, Snowflakes, Snow Storm, Spirals, Twinkle, Shimmer, Strobe, Ripple, Wave, Pinwheel, Shockwave, Garlands, Curtain, Fill, Plasma, Galaxy, Fan, Marquee, Circles, Text, Pictures, VU Meter). The full list, and which of the remaining 26 need infrastructure we don't have, is in docs/MANUAL-COVERAGE.md |
 | Each implemented effect's default/common render path | ✅ | Faithful to the SPEC's math; rarer option combinations (alternate directions, other render methods, etc.) are per-effect documented ceilings — see DECISIONS.md M3/M6 notes |
 | Per-effect Color palette | ⚠️ | Real xLights' Color tab: 1–6 swatches per effect (M15.3), editable via the Sequencer's effect panel, falling back to the app-wide default when unset. Multi-color blending across the palette (`multiColorBlend`) already existed for effects that use it; still missing real xLights' per-swatch checkboxes ("C"/"c" toggles), palette presets, and the "colors reflect music" audio-reactive option |
 | Shader (ISF), Liquid, Glediator, Video, VUMeter | ❌ | Non-goal for v1 / no audio-reactive pipeline yet |
@@ -54,9 +54,12 @@ Legend: ✅ implemented (default/common path) · ⚠️ partial (documented ceil
 | Pictures effect | ⚠️ | Images stored in the sequence body, downscaled to 64px on the long edge (no asset store yet) |
 | Shader (ISF), Liquid, Glediator, Video | ❌ | Non-goal for v1 |
 | Layer blend modes | ⚠️ | 10 of 24 (Normal, Effect 1/2, Average, Additive, Subtractive, Max, Min, 1/2 reveals) |
+| Layer settings: Transformation / Blur / Sub-buffer | ✅ | Rotate 90 either way, rotate 180, flip H/V; an alpha-weighted box blur; and a percentage sub-buffer, all applied between the effect and the model so they work on every effect |
+| Layer settings: Render Style | ⚠️ | The six styles meaningful for a single model (Default, Per Preview, Single Line, As Pixel, Horizontal/Vertical Per Strand). Layers now composite in node space rather than buffer space, so each layer can render into a differently-shaped buffer |
+| Layer settings: Persistent / Roto-Zoom | ❌ | See docs/MANUAL-COVERAGE.md |
 | Value curves | ✅ | All 16 types (Flat, Ramp, Ramp Up/Down, Ramp Down/Up, Saw Tooth, Triangle, Sine, Abs Sine, Square, Parabolic Up/Down, Logarithmic Up/Down, Exponential Up/Down, Custom) with cycles/phase/reverse, a draggable point editor for Custom and six presets, reachable from the props panel on every VC-flagged param of every effect |
 | Transitions | ✅ | 16 types (Fade, Wipe, Wipe Vertical, From Middle, To Middle, Square Explode/Implode, Circle Explode/Implode, Clock, Blinds, Slide Bars, Bow Tie, Star, Checkerboard, Ripple), in and out, each with its own type, duration and reverse, plus a pattern-density knob on the three types that read one - all set from the props panel's Transitions section |
-| Buffer styles / sub-buffers | ❌ | Every effect renders into the model's default full buffer |
+| Buffer styles / sub-buffers | ⚠️ | Sub-buffer implemented: an effect can be confined to part of a model, and is handed that smaller buffer to compose itself into rather than being cropped to it (the manual's own distinction). The 19 *render styles* (Per Preview, stacked, per-model, ...) are still unimplemented - every effect renders into the model's default buffer |
 
 ## File formats (SPEC ch11)
 
