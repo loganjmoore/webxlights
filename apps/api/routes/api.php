@@ -37,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('layouts/{layout}/views', [SequencerViewController::class, 'replace']);
         Route::get('layouts/{layout}/effect-presets', [SequencerViewController::class, 'presets']);
         Route::put('layouts/{layout}/effect-presets', [SequencerViewController::class, 'replacePresets']);
+        Route::put('layouts/{layout}/background', [SequencerViewController::class, 'replaceBackground']);
 
         Route::get('layouts/{layout}/view-objects', [ViewObjectController::class, 'index']);
         Route::post('layouts/{layout}/view-objects/bulk', [ViewObjectController::class, 'bulkUpsert']);

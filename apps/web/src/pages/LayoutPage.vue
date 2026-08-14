@@ -11,7 +11,11 @@ import {
   screenFromAttrs,
   type BoxedScaleReading,
   type ModelGeometry,
+  type SubModelSpec,
 } from "@webxlights/engine";
+import SubModelEditor from "../components/SubModelEditor.vue";
+import { allocateStartChannels, controllerLayouts, slotBarStyle, unassignedModels } from "../lib/controllerLayout";
+import { backgroundFrom, clampOpacity, prepareBackground, type BackgroundImage } from "../lib/backgroundImage";
 import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { confirm } from "../lib/confirm";
@@ -115,7 +119,61 @@ const renameValue = ref("");
 
 // M15.5: Model Groups editor - previously import-only (bulkUpsertModelGroups, resolves
 // membership by name), no path to create/rename/re-member/delete a group from the app itself.
-const activeTab = ref<"models" | "groups">("models");
+const activeTab = ref<"models" | "groups" | "controllers">("models");
+
+// xLights filters its model list by name, type and controller. A show has a hundred-odd models,
+// so scrolling for one is the single most repeated action on this page.
+// The Layout tab's background image: a photo of the house behind the models, so props can be
+// placed where they physically are rather than by eye against an empty grid.
+const background = ref<BackgroundImage | null>(null);
+const backgroundError = ref("");
+
+async function pickBackground(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !layout.value) return;
+  backgroundError.value = "";
+  const { image, error } = await prepareBackground(file);
+  if (!image) {
+    backgroundError.value = error;
+    return;
+  }
+  background.value = (await api.replaceBackground(layout.value.id, image)).background;
+}
+
+async function setBackgroundOpacity(raw: string): Promise<void> {
+  if (!layout.value || !background.value) return;
+  const next = { ...background.value, opacity: clampOpacity(raw) };
+  background.value = next; // applied straight away; the slider should not wait on a round trip
+  await api.replaceBackground(layout.value.id, next);
+}
+
+async function clearBackground(): Promise<void> {
+  if (!layout.value) return;
+  background.value = null;
+  await api.replaceBackground(layout.value.id, null);
+}
+
+const modelFilter = ref("");
+const filteredModels = computed(() => {
+  const needle = modelFilter.value.trim().toLowerCase();
+  if (!needle) return models.value;
+  return models.value.filter((m) => {
+    const controllerName = controllers.value.find((c) => c.id === m.controller_id)?.name ?? "";
+    return [m.name, m.type, controllerName].some((field) => field.toLowerCase().includes(needle));
+  });
+});
+
+// xLights' controller visualiser: what is plugged in where. The reason to have it isn't the
+// picture - it is that two models on overlapping channels is a show-day bug nothing else in this
+// app surfaces. Each model's assignment is validated against the *controller's* span when it is
+// made, never against the other models already on it.
+const controllerViews = computed(() => controllerLayouts(controllers.value, models.value, channelCountForModel));
+const looseModels = computed(() => unassignedModels(models.value));
+const collisionCount = computed(() =>
+  controllerViews.value.reduce((n, view) => n + view.slots.filter((s) => s.collidesWith.length > 0).length, 0),
+);
 const groups = ref<ModelGroupRecord[]>([]);
 const selectedGroupId = ref<number | null>(null);
 const selectedGroup = computed(() => groups.value.find((g) => g.id === selectedGroupId.value) ?? null);
@@ -270,6 +328,25 @@ function handlePositionField(field: "x" | "y" | "z" | "scale" | "scaleY" | "scal
 // (packages/engine's propertyFieldsFor) so every field here has a real, visible effect.
 const propertyFields = computed(() => (selectedModel.value ? propertyFieldsFor(selectedModel.value.type) : []));
 
+// The selected model's geometry, so the sub-model editor can say what each spec resolves to.
+const selectedGeometry = computed<ModelGeometry | null>(() => {
+  const model = selectedModel.value;
+  if (!model) return null;
+  try {
+    return computeGeometryFromAttrs(model.type, model.raw_attrs);
+  } catch {
+    return null;
+  }
+});
+
+async function updateSubModels(subModels: SubModelSpec[]): Promise<void> {
+  if (!layout.value || !selectedModel.value) return;
+  const model = selectedModel.value;
+  const updated = await api.updateModel(layout.value.id, model.id, { sub_models: subModels });
+  const idx = models.value.findIndex((m) => m.id === model.id);
+  if (idx !== -1) models.value[idx] = updated;
+}
+
 async function updateProperty(key: string, raw: string): Promise<void> {
   if (!layout.value || !selectedModel.value) return;
   const model = selectedModel.value;
@@ -319,6 +396,68 @@ async function handleCreate(type: string, x: number, y: number): Promise<void> {
   if (!created) return;
   models.value = [...models.value, created];
   selectedIds.value = [created.id];
+}
+
+// xLights can clone a model, and create N instances in one action. Both matter for the same
+// reason: a run of identical props - twelve mini-trees, eight arches - is set up once and then
+// repeated, and doing that by hand means twelve trips through the property grid.
+//
+// Copies are offset from the original rather than placed on top of it, or the whole run would be
+// one indistinguishable pile that has to be dragged apart before it can be told apart.
+const cloneCount = ref(1);
+
+async function cloneSelectedModel(): Promise<void> {
+  const source = selectedModel.value;
+  if (!layout.value || !source) return;
+  const copies = Math.max(1, Math.min(50, Math.trunc(cloneCount.value)));
+  const spacing = 8; // local units, roughly a prop's width apart
+
+  const payloads = Array.from({ length: copies }, (_, i) => ({
+    name: nextNameForType(source.type),
+    type: source.type,
+    supported: source.supported,
+    params: { ...source.params },
+    raw_attrs: { ...source.raw_attrs },
+    screen: { ...source.screen, x: (source.screen.x ?? 0) + spacing * (i + 1) },
+    sub_models: source.sub_models ?? [],
+    string_type: source.string_type,
+    // Deliberately not copied: the controller assignment. Two models on the same channels is a
+    // show-day bug that nothing errors on, and a clone is exactly how you would create one by
+    // accident. The new copies come out unassigned, ready for auto-allocation.
+    order: models.value.length + i,
+  }));
+
+  // Names are generated one at a time from what already exists, so a batch would otherwise give
+  // every copy the same name.
+  const created: ModelRecord[] = [];
+  for (const payload of payloads) {
+    const [model] = await api.bulkUpsertModels(layout.value.id, [{ ...payload, name: nextNameForType(source.type) }]);
+    if (model) {
+      created.push(model);
+      models.value = [...models.value, model];
+    }
+  }
+  if (created.length) selectedIds.value = created.map((m) => m.id);
+}
+
+// xLights' auto start-channel allocation. Pairs with the collision view above: run it and the
+// visualiser should have nothing left to complain about.
+const allocationNote = ref("");
+async function autoAllocateChannels(): Promise<void> {
+  if (!layout.value) return;
+  const { allocations, unplaced } = allocateStartChannels(controllers.value, models.value, channelCountForModel);
+  for (const a of allocations) {
+    const updated = await api.updateModel(layout.value.id, a.modelId, {
+      controller_id: a.controllerId,
+      controller_offset: a.controllerOffset,
+      channel_count: a.channelCount,
+    });
+    const idx = models.value.findIndex((m) => m.id === a.modelId);
+    if (idx !== -1) models.value[idx] = updated;
+  }
+  allocationNote.value = unplaced.length
+    ? `Assigned ${allocations.length}. No room for: ${unplaced.map((u) => `${u.model.name} (${u.reason})`).join(", ")}`
+    : `Assigned ${allocations.length} model${allocations.length === 1 ? "" : "s"}.`;
 }
 
 // The necessary complement to create (see GOAL-M13.md) - a mis-dropped or duplicate model has
@@ -387,6 +526,7 @@ async function loadLayout(): Promise<void> {
   const [layouts, controllerList] = await Promise.all([api.listLayouts(projectId.value), api.listControllers(projectId.value)]);
   layout.value = layouts[0] ?? null;
   controllers.value = controllerList;
+  background.value = backgroundFrom(layout.value?.settings as Record<string, unknown> | undefined);
   if (layout.value) {
     // View objects are a decorative helper layer (Gridlines and friends) - the layout is
     // perfectly usable without them, so a failure there degrades to "no gridlines" rather than
@@ -542,9 +682,67 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
         <div class="tabs">
           <button :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">Models ({{ models.length }})</button>
           <button :class="{ active: activeTab === 'groups' }" @click="activeTab = 'groups'">Groups ({{ groups.length }})</button>
+          <button :class="{ active: activeTab === 'controllers' }" @click="activeTab = 'controllers'">
+            Controllers ({{ controllers.length }}){{ collisionCount ? " ⚠" : "" }}
+          </button>
         </div>
 
-        <template v-if="activeTab === 'groups'">
+        <template v-if="activeTab === 'controllers'">
+          <p v-if="collisionCount" class="controller-warning">
+            {{ collisionCount }} model{{ collisionCount === 1 ? "" : "s" }} share channels with
+            another on the same controller. Nothing will error — they'll simply light each other's
+            effects.
+          </p>
+          <div v-for="view in controllerViews" :key="view.controller.id" class="controller-view">
+            <div class="controller-head">
+              <strong>{{ view.controller.name }}</strong>
+              <span class="controller-meta">
+                ch {{ view.controller.start_channel }}–{{ view.controller.start_channel + view.controller.channel_count - 1 }},
+                {{ view.freeChannels }} free
+                <template v-if="view.overrunChannels">
+                  , <span class="bad">{{ view.overrunChannels }} past the end</span>
+                </template>
+              </span>
+            </div>
+            <div class="channel-track">
+              <div
+                v-for="slot in view.slots"
+                :key="slot.model.id"
+                class="channel-slot"
+                :class="{ bad: slot.collidesWith.length > 0 }"
+                :style="slotBarStyle(view, slot)"
+                :title="`${slot.model.name}: ch ${slot.startChannel}–${slot.endChannel}`"
+              />
+            </div>
+            <ul class="controller-models">
+              <li v-for="slot in view.slots" :key="slot.model.id" :class="{ bad: slot.collidesWith.length > 0 }">
+                <span>{{ slot.model.name }}</span>
+                <span class="controller-meta">ch {{ slot.startChannel }}–{{ slot.endChannel }}</span>
+                <span v-if="slot.collidesWith.length" class="bad">overlaps {{ slot.collidesWith.join(", ") }}</span>
+              </li>
+              <li v-if="view.slots.length === 0" class="empty">Nothing assigned to this controller.</li>
+            </ul>
+          </div>
+          <div class="controller-head">
+            <button :disabled="controllers.length === 0 || looseModels.length === 0" @click="autoAllocateChannels">
+              Auto-assign start channels
+            </button>
+            <span v-if="allocationNote" class="controller-meta">{{ allocationNote }}</span>
+          </div>
+          <p v-if="controllers.length === 0" class="empty">No controllers in this project yet.</p>
+          <div v-if="looseModels.length" class="controller-view">
+            <div class="controller-head"><strong>Not assigned to a controller</strong></div>
+            <p class="controller-meta">
+              These still export — they're written after every controller-routed span — but their
+              channel numbers move whenever a controller assignment changes.
+            </p>
+            <ul class="controller-models">
+              <li v-for="m in looseModels" :key="m.id"><span>{{ m.name }}</span></li>
+            </ul>
+          </div>
+        </template>
+
+        <template v-else-if="activeTab === 'groups'">
           <ul class="group-list">
             <li v-for="g in groups" :key="g.id" :class="{ selected: g.id === selectedGroupId }" @click="selectGroup(g)">
               <span>{{ g.name }}</span>
@@ -590,9 +788,34 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
         </template>
 
         <template v-else>
+        <div class="model-filter">
+          <button :disabled="!selectedModel" title="Copy the selected model" @click="cloneSelectedModel">
+            Clone
+          </button>
+          <input v-model.number="cloneCount" type="number" min="1" max="50" class="clone-count" title="How many copies" />
+          <input v-model="modelFilter" type="search" placeholder="Filter by name, type or controller" />
+          <label class="background-pick" title="A photo of the house, behind the layout">
+            Backdrop
+            <input type="file" accept="image/*" @change="pickBackground" />
+          </label>
+          <template v-if="background">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              class="background-opacity"
+              :value="background.opacity"
+              title="How strongly the photo shows through"
+              @input="setBackgroundOpacity(($event.target as HTMLInputElement).value)"
+            />
+            <button title="Remove the backdrop" @click="clearBackground">×</button>
+          </template>
+          <span v-if="modelFilter" class="controller-meta">{{ filteredModels.length }}/{{ models.length }}</span>
+        </div>
+        <p v-if="backgroundError" class="export-error">{{ backgroundError }}</p>
         <ul>
           <li
-            v-for="m in models"
+            v-for="m in filteredModels"
             :key="m.id"
             :class="{ unsupported: !m.supported, selected: selectedIds.includes(m.id) }"
             @click="selectFromList(m, $event)"
@@ -678,6 +901,13 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
               <button class="delete-btn" @click="handleDelete(selectedModel.id)">Delete model</button>
             </div>
 
+            <div v-if="selectedModel" class="properties-panel">
+              <SubModelEditor
+                :sub-models="selectedModel.sub_models ?? []"
+                :geometry="selectedGeometry"
+                @update="updateSubModels"
+              />
+            </div>
             <div v-if="selectedModel && propertyFields.length" class="properties-panel">
               <h2>Properties</h2>
               <label v-for="field in propertyFields" :key="field.key">
@@ -717,6 +947,19 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
       <div class="canvas-wrap">
         <ModelPalette v-if="viewMode === '2d'" />
         <div class="canvas-area">
+          <!--
+            The house photo sits behind the 2D canvas rather than being drawn into it: the canvas
+            redraws on every drag, and re-painting a 1600px photo on each pointermove is the one
+            thing that would make dragging a model feel heavy. As a sibling it is composited by
+            the browser and costs nothing per frame.
+          -->
+          <img
+            v-if="viewMode === '2d' && background"
+            class="layout-background"
+            :src="background.dataUrl"
+            :style="{ opacity: background.opacity / 100 }"
+            alt=""
+          />
           <LayoutCanvas
             v-if="viewMode === '2d'"
             :models="models"
@@ -742,6 +985,98 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 </template>
 
 <style scoped>
+.layout-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 0;
+}
+.background-pick {
+  font-size: 0.7rem;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.background-pick input[type="file"] {
+  width: 5.5rem;
+  font-size: 0.6rem;
+}
+.background-opacity {
+  width: 4rem;
+}
+.model-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.3rem;
+}
+.model-filter input[type="search"] {
+  flex: 1;
+  min-width: 0;
+}
+.clone-count {
+  width: 3rem;
+}
+.controller-view {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.controller-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.controller-meta {
+  font-size: 0.7rem;
+  color: #777;
+}
+/* An overlap is the one thing on this screen that will ruin a show, so it is the one thing
+   coloured. Everything else stays quiet. */
+.bad {
+  color: #b3261e;
+}
+.controller-warning {
+  color: #b3261e;
+  font-size: 0.75rem;
+  margin: 0 0 0.4rem;
+}
+.channel-track {
+  position: relative;
+  height: 12px;
+  margin: 0.3rem 0;
+  background: #eee;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.channel-slot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #50a0ff;
+  border-right: 1px solid #fff;
+}
+.channel-slot.bad {
+  background: #b3261e;
+}
+.controller-models {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.72rem;
+}
+.controller-models li {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
 /* M13: xLights' own Layout tab is a dark editor UI throughout the window, not just the
    preview canvas - this page inherited the app shell's default black-on-white (see
    GOAL-M13.md's "Correction found during execution"). Scoped to this page's own chrome only. */
@@ -1110,5 +1445,8 @@ header h1 {
 .canvas-area {
   flex: 1;
   min-height: 0;
+  /* The backdrop is absolutely positioned inside this box, so it has to be the containing block -
+     otherwise the photo would size itself against the page rather than the canvas. */
+  position: relative;
 }
 </style>

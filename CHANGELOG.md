@@ -1,5 +1,57 @@
 # Changelog
 
+## A photo of the house behind the layout
+
+The 2D layout's background image — the thing that turns it from a diagram into a plan of *a particular house*. Pick a photo, and props can be placed where they physically are instead of by eye against an empty grid. An opacity slider keeps it from competing with the props.
+
+**It's composited as a sibling of the canvas, not drawn into it.** The canvas redraws on every `pointermove` of a drag, and re-painting a 1600px photo on each of those is the one thing that would make dragging a model feel heavy. As a sibling the browser composites it and it costs nothing per frame.
+
+**Downscaled on the client before it's stored.** A photo straight off a phone is several megabytes; this lives in the layout's settings row, which is read on every page load. The long edge is capped at 1600px — enough to show a roofline clearly at any zoom the canvas offers, which is all this image ever has to do. Encoded as JPEG rather than PNG: it's a photograph, and a PNG of one is several times the size for no visible gain behind a half-transparent layer of props.
+
+Two things are checked rather than trusted. A file that isn't an image returns an error instead of throwing — a file input is exactly where the wrong file gets picked, and a throw in that handler reaches the app's error overlay and takes the page down. And the stored value is validated as an image data URL on both sides, because it's handed straight to an `<img src>`: a stray URL there would have the layout page fetch whatever it pointed at.
+
+
+## Model-list conveniences, and auto start-channel allocation
+
+Four items off the Layout tab, all of them things you do constantly on a real show.
+
+- **Filter the model list** by name, type or controller — the three xLights offers. A show has a hundred-odd models, so scrolling for one is the single most repeated action on the page.
+- **Clone a model**, N copies in one action. Geometry, sub-models and string type come across; each copy is offset from the last, because a run placed on top of itself is one indistinguishable pile that has to be dragged apart before it can be told apart.
+- **The controller assignment is deliberately not cloned.** Two models on the same channels is a show-day bug nothing errors on — and a clone is exactly how you'd create one by accident. Copies come out unassigned, ready for:
+- **Auto-assign start channels.** First-fit packing of every unassigned model into the first active controller with room, starting after everything already on it.
+
+The allocator's rules are the interesting part. **Existing assignments are never moved**: someone who hand-placed a model has done so for a reason, usually because a physical port starts there, and repositioning it would break the wiring rather than the spreadsheet. **A hand-made gap stays a gap**, for the same reason — it's usually a port boundary, and the model tucked into it would be the one that broke. It's first-fit rather than best-fit on purpose: best-fit packs tighter but scatters related props across controllers, and a run created together almost always wants to be contiguous.
+
+It reports what it couldn't place and why, rather than silently leaving models loose. And a test asserts the thing that actually matters: **run the allocator, apply it, and the collision visualiser has nothing to complain about.**
+
+
+## A controller visualiser, and the bug it exists to find
+
+A Controllers tab on the Layout page: each controller's channel span drawn to scale, with every model assigned to it, plus how many channels are free and how many run past the end.
+
+**The reason to build it isn't the picture.** Two models assigned to overlapping channels is a show-day bug of exactly the worst kind — nothing errors, the `.fseq` exports, and two props light each other's effects. Nothing in the app surfaced that, because each model's assignment is validated against the *controller's* span when it's made and never against the other models already on it. Collisions are now called out on the bar, in the list, and on the tab itself.
+
+Models that merely sit back-to-back are deliberately not flagged: that's the normal, correct arrangement, and warning on it would make the warning useless by firing on every well-packed controller. A model reports *all* of its collisions rather than just the next one along, which is what you need when a mis-typed offset buries three props at once.
+
+Overrun is worth having separately from the per-assignment check: that check catches a bad offset when it's typed, but not a model whose node count grew afterwards — editing a matrix's size doesn't revisit its offset.
+
+Unassigned models get their own section. They still export, written after every controller-routed span, but their channel numbers move whenever a controller assignment changes — which is worth being able to see rather than infer.
+
+Missing, and recorded: xLights' physical port/string breakdown, which needs per-port controller definitions this app doesn't model.
+
+
+## Sub-models can be made, not just imported
+
+Sub-models already imported, resolved to their own geometry, appeared in the sequencer and rendered in both the preview and the `.fseq` export. What was missing was any way to **make** one — or to fix one that came in wrong. The only route was to go back to xLights and re-import.
+
+That gap mattered more than it sounds. A sub-model is how the star on a mega tree, or one arch of a set, gets its own sequencer row. Without an editor, a show that didn't already have the sub-model you wanted couldn't get it here at all.
+
+The editor sits on the Layout page beside the property grid: add, rename, delete, switch between node-range and sub-buffer kinds, and edit the rows. **Each spec shows what it actually resolves to against the parent's real node list** — a range list is very easy to get wrong by one, and the symptom otherwise is a sequencer row that renders on nothing, silently, because a sub-model selecting no node is dropped at render time. A spec that selects nothing, or names nodes past the end of the model, says so in the editor.
+
+Removing the last row of a range sub-model leaves an empty one rather than none, for the same reason: a range sub-model with no rows selects nothing and would simply vanish from the sequencer without ever explaining why.
+
+Still missing: xLights' Draw Model and Generate Slices tools, which generate a spec from a drawing rather than from typed ranges.
+
 ## Sketch — the last effect this engine could render
 
 **44 of 55.** More to the point: every effect renderable with what the engine already has is now implemented. The remaining eleven all need infrastructure that's a deliberate non-goal — face and state definitions, DMX fixtures, shaders, video.

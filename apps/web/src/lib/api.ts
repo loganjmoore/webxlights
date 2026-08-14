@@ -1,4 +1,5 @@
 import type { EffectPreset } from "./effectPresets";
+import type { BackgroundImage } from "./backgroundImage";
 import type { BlendMode, LayerSettings, PictureImage, StoredSwatch, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
 
 export class ApiError extends Error {
@@ -43,6 +44,12 @@ export interface User {
 export interface Layout {
   id: number;
   name: string;
+  /**
+   * A free-form bag the layout carries alongside its models: the sequencer's views, effect
+   * presets and the background image all live here rather than in tables of their own, because
+   * each is only ever read and written whole and nothing joins against one.
+   */
+  settings?: Record<string, unknown> | null;
 }
 
 export interface ModelRecord {
@@ -269,6 +276,11 @@ export const api = {
   listEffectPresets: (layoutId: number) => request<{ presets: EffectPreset[] }>(`/v1/layouts/${layoutId}/effect-presets`),
   replaceEffectPresets: (layoutId: number, presets: EffectPreset[]) =>
     request<{ presets: EffectPreset[] }>(`/v1/layouts/${layoutId}/effect-presets`, { method: "PUT", body: JSON.stringify({ presets }) }),
+  replaceBackground: (layoutId: number, background: BackgroundImage | null) =>
+    request<{ background: BackgroundImage | null }>(`/v1/layouts/${layoutId}/background`, {
+      method: "PUT",
+      body: JSON.stringify({ background }),
+    }),
   listViewObjects: (layoutId: number) => request<ViewObjectRecord[]>(`/v1/layouts/${layoutId}/view-objects`),
   bulkUpsertViewObjects: (layoutId: number, objects: ViewObjectUpsertPayload[]) =>
     request<ViewObjectRecord[]>(`/v1/layouts/${layoutId}/view-objects/bulk`, { method: "POST", body: JSON.stringify({ objects }) }),
