@@ -56,6 +56,40 @@ class SequencerViewController extends Controller
         return ['views' => $views];
     }
 
+    /**
+     * The Layout tab's background image (manual: Layout > Objects). A photo of the house behind
+     * the models, so props can be placed where they physically are.
+     *
+     * Stored in the same settings bag as the views and presets, and written the same way - merged,
+     * never replacing the column, or saving a background would delete every view.
+     *
+     * The image arrives as a data URL because `settings` is JSON. The client downscales it first;
+     * the cap here is a backstop against a request large enough to be a problem on its own, not a
+     * quality judgement.
+     */
+    public function replaceBackground(Request $request, Layout $layout)
+    {
+        $this->authorizeLayout($request, $layout, 'editor');
+
+        $data = $request->validate([
+            'background' => ['present', 'nullable', 'array'],
+            'background.dataUrl' => ['required_with:background', 'string', 'max:8000000', 'starts_with:data:image/'],
+            'background.width' => ['required_with:background', 'integer', 'min:1'],
+            'background.height' => ['required_with:background', 'integer', 'min:1'],
+            'background.opacity' => ['required_with:background', 'integer', 'min:0', 'max:100'],
+        ]);
+
+        $settings = $layout->settings ?? [];
+        if (($data['background'] ?? null) === null) {
+            unset($settings['backgroundImage']);
+        } else {
+            $settings['backgroundImage'] = $data['background'];
+        }
+        $layout->update(['settings' => $settings]);
+
+        return ['background' => $settings['backgroundImage'] ?? null];
+    }
+
     // The same three-liner the other layout-scoped controllers use: a layout's permissions are
     // its project's.
     private function authorizeLayout(Request $request, Layout $layout, string $need = 'viewer'): void

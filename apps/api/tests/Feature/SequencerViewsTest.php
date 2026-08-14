@@ -166,6 +166,54 @@ class SequencerViewsTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_a_background_image_round_trips_and_can_be_cleared(): void
+    {
+        $user = User::factory()->create();
+        $layout = $this->layoutFor($user);
+        $png = 'data:image/png;base64,iVBORw0KGgo=';
+
+        $this->actingAs($user)->putJson("/api/v1/layouts/{$layout->id}/background", [
+            'background' => ['dataUrl' => $png, 'width' => 1600, 'height' => 900, 'opacity' => 60],
+        ])->assertOk()->assertJsonPath('background.opacity', 60);
+
+        $this->assertSame($png, $layout->fresh()->settings['backgroundImage']['dataUrl']);
+
+        $this->actingAs($user)->putJson("/api/v1/layouts/{$layout->id}/background", ['background' => null])
+            ->assertOk()
+            ->assertJsonPath('background', null);
+        $this->assertArrayNotHasKey('backgroundImage', $layout->fresh()->settings ?? []);
+    }
+
+    public function test_a_background_that_is_not_an_image_data_url_is_rejected(): void
+    {
+        // The value is handed straight to an <img src> on the client, so a stray URL here would
+        // have the layout page fetch whatever it pointed at.
+        $user = User::factory()->create();
+        $layout = $this->layoutFor($user);
+
+        $this->actingAs($user)
+            ->putJson("/api/v1/layouts/{$layout->id}/background", [
+                'background' => ['dataUrl' => 'https://example.com/house.jpg', 'width' => 10, 'height' => 10, 'opacity' => 50],
+            ])
+            ->assertStatus(422);
+    }
+
+    public function test_saving_a_background_does_not_disturb_views_or_presets(): void
+    {
+        $user = User::factory()->create();
+        $layout = $this->layoutFor($user);
+
+        $this->actingAs($user)->putJson("/api/v1/layouts/{$layout->id}/views", [
+            'views' => [['name' => 'All', 'rowKeys' => ['model:1']]],
+        ])->assertOk();
+
+        $this->actingAs($user)->putJson("/api/v1/layouts/{$layout->id}/background", [
+            'background' => ['dataUrl' => 'data:image/png;base64,iVBORw0KGgo=', 'width' => 8, 'height' => 8, 'opacity' => 50],
+        ])->assertOk();
+
+        $this->actingAs($user)->getJson("/api/v1/layouts/{$layout->id}/views")->assertJsonPath('views.0.name', 'All');
+    }
+
     public function test_a_view_without_a_name_is_rejected(): void
     {
         $user = User::factory()->create();

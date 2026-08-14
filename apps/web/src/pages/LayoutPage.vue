@@ -15,6 +15,7 @@ import {
 } from "@webxlights/engine";
 import SubModelEditor from "../components/SubModelEditor.vue";
 import { allocateStartChannels, controllerLayouts, slotBarStyle, unassignedModels } from "../lib/controllerLayout";
+import { backgroundFrom, clampOpacity, prepareBackground, type BackgroundImage } from "../lib/backgroundImage";
 import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { confirm } from "../lib/confirm";
@@ -122,6 +123,38 @@ const activeTab = ref<"models" | "groups" | "controllers">("models");
 
 // xLights filters its model list by name, type and controller. A show has a hundred-odd models,
 // so scrolling for one is the single most repeated action on this page.
+// The Layout tab's background image: a photo of the house behind the models, so props can be
+// placed where they physically are rather than by eye against an empty grid.
+const background = ref<BackgroundImage | null>(null);
+const backgroundError = ref("");
+
+async function pickBackground(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !layout.value) return;
+  backgroundError.value = "";
+  const { image, error } = await prepareBackground(file);
+  if (!image) {
+    backgroundError.value = error;
+    return;
+  }
+  background.value = (await api.replaceBackground(layout.value.id, image)).background;
+}
+
+async function setBackgroundOpacity(raw: string): Promise<void> {
+  if (!layout.value || !background.value) return;
+  const next = { ...background.value, opacity: clampOpacity(raw) };
+  background.value = next; // applied straight away; the slider should not wait on a round trip
+  await api.replaceBackground(layout.value.id, next);
+}
+
+async function clearBackground(): Promise<void> {
+  if (!layout.value) return;
+  background.value = null;
+  await api.replaceBackground(layout.value.id, null);
+}
+
 const modelFilter = ref("");
 const filteredModels = computed(() => {
   const needle = modelFilter.value.trim().toLowerCase();
@@ -493,6 +526,7 @@ async function loadLayout(): Promise<void> {
   const [layouts, controllerList] = await Promise.all([api.listLayouts(projectId.value), api.listControllers(projectId.value)]);
   layout.value = layouts[0] ?? null;
   controllers.value = controllerList;
+  background.value = backgroundFrom(layout.value?.settings as Record<string, unknown> | undefined);
   if (layout.value) {
     // View objects are a decorative helper layer (Gridlines and friends) - the layout is
     // perfectly usable without them, so a failure there degrades to "no gridlines" rather than
@@ -760,8 +794,25 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
           </button>
           <input v-model.number="cloneCount" type="number" min="1" max="50" class="clone-count" title="How many copies" />
           <input v-model="modelFilter" type="search" placeholder="Filter by name, type or controller" />
+          <label class="background-pick" title="A photo of the house, behind the layout">
+            Backdrop
+            <input type="file" accept="image/*" @change="pickBackground" />
+          </label>
+          <template v-if="background">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              class="background-opacity"
+              :value="background.opacity"
+              title="How strongly the photo shows through"
+              @input="setBackgroundOpacity(($event.target as HTMLInputElement).value)"
+            />
+            <button title="Remove the backdrop" @click="clearBackground">×</button>
+          </template>
           <span v-if="modelFilter" class="controller-meta">{{ filteredModels.length }}/{{ models.length }}</span>
         </div>
+        <p v-if="backgroundError" class="export-error">{{ backgroundError }}</p>
         <ul>
           <li
             v-for="m in filteredModels"
@@ -896,6 +947,19 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
       <div class="canvas-wrap">
         <ModelPalette v-if="viewMode === '2d'" />
         <div class="canvas-area">
+          <!--
+            The house photo sits behind the 2D canvas rather than being drawn into it: the canvas
+            redraws on every drag, and re-painting a 1600px photo on each pointermove is the one
+            thing that would make dragging a model feel heavy. As a sibling it is composited by
+            the browser and costs nothing per frame.
+          -->
+          <img
+            v-if="viewMode === '2d' && background"
+            class="layout-background"
+            :src="background.dataUrl"
+            :style="{ opacity: background.opacity / 100 }"
+            alt=""
+          />
           <LayoutCanvas
             v-if="viewMode === '2d'"
             :models="models"
@@ -921,6 +985,29 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 </template>
 
 <style scoped>
+.layout-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 0;
+}
+.background-pick {
+  font-size: 0.7rem;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.background-pick input[type="file"] {
+  width: 5.5rem;
+  font-size: 0.6rem;
+}
+.background-opacity {
+  width: 4rem;
+}
 .model-filter {
   display: flex;
   align-items: center;
@@ -1358,5 +1445,8 @@ header h1 {
 .canvas-area {
   flex: 1;
   min-height: 0;
+  /* The backdrop is absolutely positioned inside this box, so it has to be the containing block -
+     otherwise the photo would size itself against the page rather than the canvas. */
+  position: relative;
 }
 </style>

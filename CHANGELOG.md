@@ -1,5 +1,16 @@
 # Changelog
 
+## A photo of the house behind the layout
+
+The 2D layout's background image — the thing that turns it from a diagram into a plan of *a particular house*. Pick a photo, and props can be placed where they physically are instead of by eye against an empty grid. An opacity slider keeps it from competing with the props.
+
+**It's composited as a sibling of the canvas, not drawn into it.** The canvas redraws on every `pointermove` of a drag, and re-painting a 1600px photo on each of those is the one thing that would make dragging a model feel heavy. As a sibling the browser composites it and it costs nothing per frame.
+
+**Downscaled on the client before it's stored.** A photo straight off a phone is several megabytes; this lives in the layout's settings row, which is read on every page load. The long edge is capped at 1600px — enough to show a roofline clearly at any zoom the canvas offers, which is all this image ever has to do. Encoded as JPEG rather than PNG: it's a photograph, and a PNG of one is several times the size for no visible gain behind a half-transparent layer of props.
+
+Two things are checked rather than trusted. A file that isn't an image returns an error instead of throwing — a file input is exactly where the wrong file gets picked, and a throw in that handler reaches the app's error overlay and takes the page down. And the stored value is validated as an image data URL on both sides, because it's handed straight to an `<img src>`: a stray URL there would have the layout page fetch whatever it pointed at.
+
+
 ## Model-list conveniences, and auto start-channel allocation
 
 Four items off the Layout tab, all of them things you do constantly on a real show.

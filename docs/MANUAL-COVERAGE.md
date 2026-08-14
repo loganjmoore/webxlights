@@ -36,7 +36,7 @@ written down. Status here means:
 | Download / import models from the vendor library | ❌ | |
 | Model groups (add, modify, delete, rename, clone, delete-empty) | ⚠️ | Add/modify/delete/rename; no clone, no delete-empty |
 | SubModels (node range, sub-buffer) | ⚠️ | Imported, resolved to their own geometry, listed under their parent in the sequencer, rendered in both the preview and the `.fseq` export, and now **created and edited in-app** on the Layout page - with a live count of what each spec actually resolves to, since a range list is easy to get wrong by one and the symptom otherwise is a row that renders on nothing. Missing: xLights' Draw Model and Generate Slices tools |
-| Objects — 2D background image | ❌ | The photo of the house behind the layout |
+| Objects — 2D background image | ✅ | A photo of the house behind the 2D layout, with an opacity slider. Downscaled on the client before it is stored, since a phone photo is several megabytes and this row is read on every page load. Composited as a sibling of the canvas rather than drawn into it, so it costs nothing per drag frame |
 | Objects — Mesh (3D `.obj`) | 🚫 | No OBJ loader |
 | Objects — Grid | ✅ | Gridlines view object |
 | Objects — Pictures | ❌ | |
