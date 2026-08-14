@@ -24,6 +24,12 @@ The interesting question is not "does the package carry faces" but "what happens
 
 My first attempt at this checked the keys of a sample record instead, which would not have caught anything: the three fields that went missing are optional, and an optional field can simply be left out of a literal. Excluding a field is still allowed — id, channel_count, controller_id and controller_offset are all excluded — but now it takes a decision and a sentence rather than an oversight.
 
+### One correction, after reading the manual's own Backup page
+
+I wrote this up before reading that page, and got one thing wrong: the missing audio is not a shortfall against xLights. Its Backup copies "all the '\*xml' files from your show directory", and the manual separately advises backing up "media files that may have amended with audacity, GIF or JPEGs etc" yourself. The audio gap here is the same gap there.
+
+What *is* genuinely missing is the automatic half — a timestamped `_onstart` folder at each launch, F10/F11 on demand, Backup on Save, and the periodic `.xbkp` snapshot every few minutes. This app autosaves and keeps per-sequence version snapshots, which covers a sequence but not the layout. And File > Restore Backup restores in place, where importing a package here creates a new project: safer, but not the same gesture.
+
 ### Also
 
 The VU Meter's Start/End Note sliders showed a bare MIDI number. "48" is C3, and nobody reads it that way, so the note name now sits next to the number.
