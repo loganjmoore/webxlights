@@ -72,7 +72,7 @@ written down. Status here means:
 | Layer settings — Persistent | ✅ | The scrub path replays the effect's frames into one buffer (capped at 600); the sequential export path keeps the buffer between frames it is already walking |
 | Roto-Zoom | ✅ | Rotation, zoom and pivot. xLights' preset rotation *sequences* over the effect's life are not separated out — this is the single turn the panel's own sliders describe |
 | Value curves | ✅ | All 16 types + custom point editor |
-| Effect presets | ❌ | Save/apply/import/export named effect settings |
+| Effect presets | ✅ | Save an effect's whole configuration under a named group, apply it at the playhead, import and export `.xpreset` files. Saved on the layout, since presets are global in xLights rather than belonging to one sequence. Missing: presets spanning several layers or models at once, and Smart Presets |
 | Views | ✅ | Named, *ordered* subsets of the sequencer's rows, with a picker in the toolbar. Saved on the layout, because the manual is explicit that "views work across sequences" — a per-sequence copy would have to be duplicated into every new sequence and would drift. The Master View isn't stored: it is "a special (system created) view" containing every row, so it is simply the absence of a selection. Missing: the eye icon that hides a model across all sequences (this app's Models panel is the per-sequence equivalent) |
 | Song structure regions | ❌ | |
 | Singing faces / phoneme breakdown | 🚫 | Needs face definitions |
@@ -157,9 +157,9 @@ so effects placed on a group reached nothing at all. Real sequences target group
 37% of one real show's sequenced elements — so this was whole passages of a show going dark
 without an error anywhere.
 
-What is left is smaller and more scattered than it was: effect presets, a sub-model editor, the
-Effect Assist path editor Sketch needs, preferences, and the controller visualiser. No single one
-of them is load-bearing the way group rendering was.
+What is left is smaller and more scattered than it was: a sub-model editor, the Effect Assist
+path editor Sketch needs, preferences, and the controller visualiser. No single one of them is
+load-bearing the way group rendering was.
 
 After that, the missing effects are worth taking in batches by how much machinery they share:
 the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Lines) before the

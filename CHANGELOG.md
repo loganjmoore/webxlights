@@ -1,5 +1,16 @@
 # Changelog
 
+## Effect presets
+
+Save an effect's whole configuration under a name, and drop it somewhere else later "without recreating them from scratch". Params, palette (colour curves included), blend mode, mix, transitions and layer settings — everything about an effect **except where it is**.
+
+A preset keeps a *duration*, not a start and end. A preset saved from an effect at 12.4s isn't about 12.4s — it's about what that effect looked like — and carrying the absolute times would mean subtracting them back out at every apply, with the result depending on where it happened to be saved from.
+
+Organised into groups, the manual's own arrangement. Exported and imported as `.xpreset` files, and the file deliberately doesn't contain its own name or group: the manual has the *importer* supply both — *"a preset will be created under the highlighted group with the name of the selected file"* — so what's in the file is the configuration, not where it's filed. A file that isn't a preset comes back as null rather than throwing; a file picker is exactly where the wrong file gets chosen, and a throw there would take the tab down.
+
+**apps/web has a test runner now.** It had none, so the pure logic there — the code deciding what gets rendered and what gets saved — went unchecked. The first thing it caught was real: Laravel's `validate()` returns only the keys that have rules, so reading the preset's `settings` from the validator's output was silently dropping **every effect parameter**. Presets would have saved, listed, applied — and come back as bare defaults.
+
+
 ## Views
 
 xLights' sequencer Views: *"a view is used to be able to easily select a list of models **and the sequence in which they are to be displayed** on the sequencer."* Named, ordered subsets of the grid's rows, picked from the toolbar.

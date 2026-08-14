@@ -111,6 +111,61 @@ class SequencerViewsTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_effect_presets_round_trip_with_their_settings_intact(): void
+    {
+        $user = User::factory()->create();
+        $layout = $this->layoutFor($user);
+
+        $this->actingAs($user)->putJson("/api/v1/layouts/{$layout->id}/effect-presets", [
+            'presets' => [[
+                'name' => 'Slow Spiral',
+                'group' => 'Spirals',
+                'durationMs' => 2000,
+                'settings' => ['name' => 'Spirals', 'params' => ['paletteRep' => 2], 'blendMode' => 'Additive'],
+            ]],
+        ])->assertOk();
+
+        $this->actingAs($user)
+            ->getJson("/api/v1/layouts/{$layout->id}/effect-presets")
+            ->assertOk()
+            ->assertJsonPath('presets.0.group', 'Spirals')
+            ->assertJsonPath('presets.0.settings.params.paletteRep', 2)
+            ->assertJsonPath('presets.0.settings.blendMode', 'Additive');
+    }
+
+    public function test_presets_and_views_do_not_overwrite_each_other(): void
+    {
+        // They share the layout's settings column, so each write has to merge rather than
+        // replace - otherwise saving a preset would silently delete every view.
+        $user = User::factory()->create();
+        $layout = $this->layoutFor($user);
+
+        $this->actingAs($user)->putJson("/api/v1/layouts/{$layout->id}/views", [
+            'views' => [['name' => 'All', 'rowKeys' => ['model:1']]],
+        ])->assertOk();
+
+        $this->actingAs($user)->putJson("/api/v1/layouts/{$layout->id}/effect-presets", [
+            'presets' => [['name' => 'P', 'group' => 'G', 'durationMs' => 500, 'settings' => ['name' => 'On']]],
+        ])->assertOk();
+
+        $this->actingAs($user)
+            ->getJson("/api/v1/layouts/{$layout->id}/views")
+            ->assertJsonPath('views.0.name', 'All');
+    }
+
+    public function test_a_preset_with_no_effect_name_is_rejected(): void
+    {
+        // Without one there is nothing to render, and the preset would apply as a blank effect.
+        $user = User::factory()->create();
+        $layout = $this->layoutFor($user);
+
+        $this->actingAs($user)
+            ->putJson("/api/v1/layouts/{$layout->id}/effect-presets", [
+                'presets' => [['name' => 'P', 'group' => 'G', 'durationMs' => 500, 'settings' => ['params' => []]]],
+            ])
+            ->assertStatus(422);
+    }
+
     public function test_a_view_without_a_name_is_rejected(): void
     {
         $user = User::factory()->create();

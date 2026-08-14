@@ -1,3 +1,4 @@
+import type { EffectPreset } from "./effectPresets";
 import type { BlendMode, LayerSettings, PictureImage, StoredSwatch, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
 
 export class ApiError extends Error {
@@ -265,6 +266,9 @@ export const api = {
   listViews: (layoutId: number) => request<{ views: SequencerView[] }>(`/v1/layouts/${layoutId}/views`),
   replaceViews: (layoutId: number, views: SequencerView[]) =>
     request<{ views: SequencerView[] }>(`/v1/layouts/${layoutId}/views`, { method: "PUT", body: JSON.stringify({ views }) }),
+  listEffectPresets: (layoutId: number) => request<{ presets: EffectPreset[] }>(`/v1/layouts/${layoutId}/effect-presets`),
+  replaceEffectPresets: (layoutId: number, presets: EffectPreset[]) =>
+    request<{ presets: EffectPreset[] }>(`/v1/layouts/${layoutId}/effect-presets`, { method: "PUT", body: JSON.stringify({ presets }) }),
   listViewObjects: (layoutId: number) => request<ViewObjectRecord[]>(`/v1/layouts/${layoutId}/view-objects`),
   bulkUpsertViewObjects: (layoutId: number, objects: ViewObjectUpsertPayload[]) =>
     request<ViewObjectRecord[]>(`/v1/layouts/${layoutId}/view-objects/bulk`, { method: "POST", body: JSON.stringify({ objects }) }),

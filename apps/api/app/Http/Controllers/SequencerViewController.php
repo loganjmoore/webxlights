@@ -63,6 +63,60 @@ class SequencerViewController extends Controller
         $layout->project->authorize($request->user(), $need);
     }
 
+    /**
+     * xLights' Effect Presets (manual: Sequencer > Effect Presets). Saved effect configurations,
+     * organised into named groups, so an effect can be reused "without recreating them from
+     * scratch".
+     *
+     * Stored beside the views and for the same reasons: presets are global in xLights rather than
+     * belonging to one sequence, they are only ever read and written whole, and nothing joins
+     * against one.
+     */
+    public function presets(Request $request, Layout $layout)
+    {
+        $this->authorizeLayout($request, $layout);
+
+        $presets = ($layout->settings ?? [])['effectPresets'] ?? [];
+
+        return ['presets' => is_array($presets) ? array_values($presets) : []];
+    }
+
+    public function replacePresets(Request $request, Layout $layout)
+    {
+        $this->authorizeLayout($request, $layout, 'editor');
+
+        $request->validate([
+            'presets' => ['present', 'array'],
+            'presets.*.name' => ['required', 'string', 'max:200'],
+            'presets.*.group' => ['required', 'string', 'max:200'],
+            'presets.*.durationMs' => ['required', 'integer', 'min:1'],
+            // The effect's own configuration. Its shape belongs to the engine, and validating it
+            // field by field here would mean changing this endpoint every time an effect gained a
+            // parameter - so only the one field without which a preset can't render is required.
+            'presets.*.settings' => ['required', 'array'],
+            'presets.*.settings.name' => ['required', 'string'],
+        ]);
+
+        // Read from the raw input rather than the validator's return: `validate()` gives back only
+        // the keys that have rules, so taking `settings` from there would silently drop every
+        // effect parameter and leave presets that applied as bare defaults.
+        $presets = [];
+        foreach ((array) $request->input('presets', []) as $preset) {
+            $presets[] = [
+                'name' => $preset['name'],
+                'group' => $preset['group'],
+                'durationMs' => (int) $preset['durationMs'],
+                'settings' => $preset['settings'],
+            ];
+        }
+
+        $settings = $layout->settings ?? [];
+        $settings['effectPresets'] = $presets;
+        $layout->update(['settings' => $settings]);
+
+        return ['presets' => $presets];
+    }
+
     private function viewsOf(Layout $layout): array
     {
         $views = ($layout->settings ?? [])['views'] ?? [];
