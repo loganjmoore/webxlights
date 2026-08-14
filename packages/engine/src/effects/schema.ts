@@ -318,8 +318,8 @@ export const VU_METER_EFFECT_SCHEMA: EffectSchema = {
     { key: "timingTrack", label: "Timing Track", type: "choice", optionsFrom: "timingTracks", default: "" },
     // MIDI note numbers: 48 is C3 and 84 is C6, which spans most of where a mix has melody.
     // Only the note and dominant-frequency types read them.
-    { key: "startNote", label: "Start Note", type: "intSlider", min: 0, max: 127, default: 48 },
-    { key: "endNote", label: "End Note", type: "intSlider", min: 0, max: 127, default: 84 },
+    { key: "startNote", label: "Start Note (MIDI: 60 = C4)", type: "intSlider", min: 0, max: 127, default: 48 },
+    { key: "endNote", label: "End Note (MIDI: 60 = C4)", type: "intSlider", min: 0, max: 127, default: 84 },
     { key: "bars", label: "Bars", type: "intSlider", min: 1, max: 32, default: 12, valueCurve: true },
     { key: "gainPct", label: "Gain", type: "intSlider", min: 0, max: 300, default: 100, valueCurve: true },
     { key: "sensitivityPct", label: "Sensitivity", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },

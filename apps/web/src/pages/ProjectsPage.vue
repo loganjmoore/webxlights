@@ -4,7 +4,7 @@ import { useRouter } from "vue-router";
 import { useProjectsStore } from "../stores/projects";
 import { useAuthStore } from "../stores/auth";
 import { api, type Project, type ProjectMember } from "../lib/api";
-import { downloadPackage, exportPackage, importPackage } from "../lib/packageShow";
+import { describeRestore, downloadPackage, exportPackage, importPackage } from "../lib/packageShow";
 import { createSampleProject } from "../lib/demoProject";
 
 const projects = useProjectsStore();
@@ -39,7 +39,9 @@ async function onImportPackage(e: Event): Promise<void> {
   try {
     const result = await importPackage(file);
     await projects.fetchAll();
-    packageMessage.value = `Imported ${result.sequenceCount} sequence(s) into a new project.`;
+    // Says what came back rather than only how many sequences: a restore is checked against
+    // what was expected, and the audio caveat matters most at exactly this moment.
+    packageMessage.value = `Restored ${describeRestore(result)}`;
   } catch (err) {
     packageMessage.value = err instanceof Error ? `Import failed: ${err.message}` : "Import failed";
   } finally {
