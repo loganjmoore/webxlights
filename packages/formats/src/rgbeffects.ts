@@ -61,8 +61,12 @@ export interface ParsedStateDefinition {
 // outline. Stored as <faceInfo> inside <model>, like sub-models and states.
 export interface ParsedFaceDefinition {
   name: string;
-  /** Phoneme -> node ranges. */
+  /** "matrix" definitions name image *files*, which can't come across; their mouths arrive empty. */
+  kind: "nodes" | "matrix";
+  /** Phoneme -> node ranges. Empty for a matrix definition. */
   mouths: { name: string; nodes: string; color?: string }[];
+  /** Phoneme names only, for a matrix definition - the pictures have to be picked again here. */
+  imageNames: string[];
   parts: Record<string, string>;
 }
 
@@ -175,9 +179,11 @@ function parseStates(model: Record<string, unknown>): ParsedStateDefinition[] {
 // xLights writes a face definition's mouths as `mouth-<PHONEME>` attributes and its other parts
 // as `Eyes-Open`, `Eyes-Closed`, `Outline` and their numbered variants.
 //
-// A *Matrix* definition is skipped rather than imported: its values are image file paths, not node
-// ranges, and reading them as ranges would light arbitrary nodes instead of failing. Matrix faces
-// need image storage that doesn't exist here yet, so they are better absent than wrong.
+// A *Matrix* definition's values are image file paths on the machine that made the show. They
+// can't be read as node ranges - that would light arbitrary nodes instead of failing - and they
+// can't be fetched. What does come across is the definition itself: its name, its placement and
+// which mouth positions it had, so the editor shows the rows waiting for their pictures rather
+// than losing that a singing face existed at all.
 const FACE_PART_KEYS = [
   "Eyes-Open",
   "Eyes-Closed",
@@ -194,24 +200,37 @@ function parseFaces(model: Record<string, unknown>): ParsedFaceDefinition[] {
   const out: ParsedFaceDefinition[] = [];
   for (const info of raw) {
     if (!info || typeof info !== "object") continue;
-    if (`${info.Type ?? info.type ?? ""}`.toLowerCase().includes("matrix")) continue;
+    const isMatrix = `${info.Type ?? info.type ?? ""}`.toLowerCase().includes("matrix");
 
     const mouths: ParsedFaceDefinition["mouths"] = [];
+    const imageNames: string[] = [];
     for (const [key, value] of Object.entries(info)) {
       const match = /^mouth-(.+?)(-Color)?$/.exec(key);
       if (!match || match[2] || value === undefined || `${value}` === "") continue;
+      if (isMatrix) {
+        imageNames.push(match[1]!);
+        continue;
+      }
       const color = info[`mouth-${match[1]}-Color`];
       mouths.push({ name: match[1]!, nodes: `${value}`, ...(color ? { color: `${color}` } : {}) });
     }
 
     const parts: Record<string, string> = {};
-    for (const key of FACE_PART_KEYS) {
-      const value = info[key];
-      if (value !== undefined && `${value}` !== "") parts[key] = `${value}`;
+    if (!isMatrix) {
+      for (const key of FACE_PART_KEYS) {
+        const value = info[key];
+        if (value !== undefined && `${value}` !== "") parts[key] = `${value}`;
+      }
     }
 
-    if (mouths.length === 0 && Object.keys(parts).length === 0) continue;
-    out.push({ name: info.Name ?? info.name ?? "", mouths, parts });
+    if (mouths.length === 0 && imageNames.length === 0 && Object.keys(parts).length === 0) continue;
+    out.push({
+      name: info.Name ?? info.name ?? "",
+      kind: isMatrix ? "matrix" : "nodes",
+      mouths,
+      imageNames,
+      parts,
+    });
   }
   return out;
 }

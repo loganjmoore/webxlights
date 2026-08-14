@@ -83,7 +83,7 @@ written down. Status here means:
 | Views | ✅ | Named, *ordered* subsets of the sequencer's rows, with a picker in the toolbar. Saved on the layout, because the manual is explicit that "views work across sequences" — a per-sequence copy would have to be duplicated into every new sequence and would drift. The Master View isn't stored: it is "a special (system created) view" containing every row, so it is simply the absence of a selection. Missing: the eye icon that hides a model across all sequences (this app's Models panel is the per-sequence equivalent) |
 | Song structure regions | ⚠️ | Named, coloured sections of the timeline, created at the playhead or from a timing track's labels — "one region for each timing mark, using the timing mark's label as the region name". Plus the bulk action they exist for: copying one section's effects onto another, rebased on the target's start. Missing: per-region palette application, exporting a region as its own sequence, and Song Structure Views |
 | Singing faces — face definitions and the Faces effect | ✅ | For coro faces (both node-range types). Defined per model on the Layout page, imported from `<faceInfo>`, and driven by a phoneme timing track |
-| Singing faces — Matrix faces | ❌ | A picture per mouth position, plus Centered/Scaled placement. The rendering isn't new (the Pictures effect and its image storage exist), but a definition holding ten images and an editor for it is a piece of work in its own right |
+| Singing faces — Matrix faces | ✅ | A picture per mouth position, with Centered/Scaled placement and an optional separate closed-eyes picture. Pictures are decoded down to the model's own resolution (capped at 64px, as the Pictures effect's are): a model row is fetched with every layout load, and the manual warns from the other direction that "high resolution image will not scale well to low resolution matrices". A Matrix definition imports as a *shell* — its name, placement and mouth positions, with no pictures — because the file names image paths on the machine that made the show |
 | Singing faces — Import Lyrics, Breakdown Phrases / Words | ❌ | Turning lyrics into phonemes needs xLights' pronunciation dictionaries (`standard_library`, `extended_library`, `user_dictionary`). Without them the manual's own manual path still works — type or paste phoneme labels onto a timing track and the Faces effect runs off them |
 | Singing faces — Papagayo `.pgo` import | ❌ | A phrase/word/phoneme timing track per voice, from a Papagayo file |
 | Model states (Layout tab) | ✅ | Named sets of a model's nodes, edited on the Layout page and imported from `<stateInfo>`. Up to the manual's 40 per definition, with a one-click seven-segment set (42 predefined names) so lighting a countdown sign isn't 42 rows of typing. Each state shows live how many nodes it resolves to and how many are past the end of the model |
@@ -103,21 +103,19 @@ On, Piano, Pictures, Pinwheel, Fireworks, Music, Plasma, Ripple, Shape, Shimmer,
 Strand, Sketch, Snow Storm, Snowflakes, Spirals, Spirograph, State, Strobe, Tendrils, Text, Tree,
 Twinkle, VU Meter, Warp, Wave.
 
-**Faces** is implemented for the two *node-range* definition types — the manual's own "Single Node"
-(dumb RGB coro faces) and "Node Ranges" (smart-pixel coro faces). Its third type, **Matrix**, is a
-picture per mouth position and is not built: it needs image storage and Centered/Scaled placement,
-and a Matrix definition is deliberately skipped on import rather than read as node ranges, because
-its values are file paths and reading those as node numbers would light arbitrary nodes instead of
-failing. Mouth positions, eyes (open/closed/automatic/off with blink frequency and length), the
-outline, "suppress when not singing" with lead-in/lead-out frames and fading, and the manual's
-six-swatch palette mapping are all in.
+**Faces** is implemented for all three definition types. The two node-range ones — "Single Node"
+(dumb RGB coro faces) and "Node Ranges" (smart-pixel coro faces) — light named sets of the model's
+nodes. **Matrix** draws a picture per mouth position, with the manual's Centered and Scaled
+placement and an optional separate picture for closed eyes. Mouth positions, eyes
+(open/closed/automatic/off with blink frequency and length), the outline, "suppress when not
+singing" with lead-in/lead-out frames and fading, Transparent Black, and the manual's six-swatch
+palette mapping are all in.
 
-Two of the effect's settings are deliberately absent, both for the same reason: they act on a
-*picture*, and a node-range face doesn't draw one. **Transparent Black** ("sets the black pixels
-transparent to show effects on lower layers") has nothing to act on when the effect only lights the
-nodes it names and leaves every other pixel untouched, and **Suppress Shimmer** skips a `-shimmer`
-tag whose shimmer this engine doesn't render, so the face already behaves as though it were always
-checked. Offering either would be a control that changes nothing.
+One setting is deliberately absent: **Suppress Shimmer** skips a `-shimmer` tag whose shimmer this
+engine doesn't render, so the face already behaves as though it were always checked. (Transparent
+Black was in this paragraph too while only node-range faces existed — correctly, since they never
+write a pixel they weren't asked to. Adding matrix faces made it a real setting, and it is now
+implemented rather than explained away.)
 
 The phoneme names are **data, not a fixed list**: the manual only shows them in screenshots, so a
 hardcoded set would be a guess that silently mismatched an imported definition. A new face is
@@ -209,9 +207,10 @@ timing track. Both are now implemented, which is a reminder that a blocked row i
 rather than inherited.
 
 **Faces went the same way.** It was listed as needing "a picture per mouth position" — true only of
-its Matrix type. Two of its three definition types are node ranges, which is the shape the State
-work already built, so coro singing faces are now implemented and what remains of Faces is the
-Matrix type, the lyric-to-phoneme breakdown (a pronunciation dictionary) and Papagayo import.
+its Matrix type, and that turned out to be a smaller piece than it sounded, because the Pictures
+effect's image decoding and sampling already existed. All three definition types are now
+implemented. What remains of singing faces is the lyric-to-phoneme breakdown (a pronunciation
+dictionary) and Papagayo import — neither of which is the effect.
 
 The eight effects that remain: **Guitar** needs a tab or track file; **Duplicate** needs to render
 another model's layer; **Moving Head** and **Servo** are DMX fixtures; **Shader**, **Liquid**,

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { emptyFaceSpec, parseNodeRanges, type FaceSpec, type ModelGeometry } from "@webxlights/engine";
+import { emptyFaceSpec, isMatrixFace, parseNodeRanges, type FaceSpec, type ModelGeometry } from "@webxlights/engine";
+import { decodeImageForEffect, MAX_PICTURE_EDGE } from "../lib/pictureImport";
 
 // The in-app face editor (xLights: Layout tab, the model's Faces property).
 //
-// This covers the two node-range face types — the manual's "Single Node" and "Node Ranges", which
-// are the coro faces. Its Matrix type is a picture per mouth position and needs image storage this
-// doesn't have, so it isn't offered here rather than being offered and not working.
+// All three of the manual's face types. The two node-range ones — "Single Node" and "Node Ranges",
+// the coro faces — assign nodes to each mouth position. The "Matrix" type assigns a picture
+// instead, and offers the manual's Centered/Scaled placement.
 //
 // The phoneme rows are editable names, not a fixed list. The manual only shows the set in
 // screenshots, so a hardcoded list would be a guess that silently mismatched an imported
@@ -33,11 +34,48 @@ function patch(index: number, changes: Partial<FaceSpec>): void {
   );
 }
 
-function addFace(): void {
+function addFace(kind: "nodes" | "matrix"): void {
   const names = new Set(props.faces.map((f) => f.name));
-  let name = "Face1";
-  for (let n = 1; names.has(name); n++) name = `Face${n + 1}`;
-  emit("update", [...props.faces, emptyFaceSpec(name)]);
+  let name = kind === "matrix" ? "Matrix Face" : "Face1";
+  for (let n = 1; names.has(name); n++) name = kind === "matrix" ? `Matrix Face ${n + 1}` : `Face${n + 1}`;
+  emit("update", [...props.faces, emptyFaceSpec(name, kind)]);
+}
+
+function patchImage(index: number, imageIndex: number, changes: Partial<NonNullable<FaceSpec["images"]>[number]>): void {
+  patch(index, { images: (props.faces[index]?.images ?? []).map((m, i) => (i === imageIndex ? { ...m, ...changes } : m)) });
+}
+
+function addImageRow(index: number): void {
+  patch(index, { images: [...(props.faces[index]?.images ?? []), { name: "" }] });
+}
+
+function removeImageRow(index: number, imageIndex: number): void {
+  patch(index, { images: (props.faces[index]?.images ?? []).filter((_, i) => i !== imageIndex) });
+}
+
+/**
+ * Picks a picture for one mouth position.
+ *
+ * Decoded down to the model's own resolution rather than the full file. The manual warns about
+ * this from the other direction — "High resolution image will not scale well to low resolution
+ * matrices" — and here it is also what keeps a model row from carrying megabytes of JSON that is
+ * fetched with every layout load: anything bigger than the matrix is downscaled when drawn anyway.
+ */
+async function pickFaceImage(index: number, imageIndex: number, key: "image" | "imageClosed", e: Event): Promise<void> {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const edge = Math.min(MAX_PICTURE_EDGE, Math.max(8, props.geometry?.width ?? MAX_PICTURE_EDGE, props.geometry?.height ?? 0));
+  patchImage(index, imageIndex, { [key]: await decodeImageForEffect(file, edge) });
+}
+
+function clearFaceImage(index: number, imageIndex: number, key: "image" | "imageClosed"): void {
+  const images = (props.faces[index]?.images ?? []).map((m, i) => {
+    if (i !== imageIndex) return m;
+    const cleared = { ...m };
+    delete cleared[key];
+    return cleared;
+  });
+  patch(index, { images });
 }
 
 function removeFace(index: number): void {
@@ -81,12 +119,15 @@ function countFor(ranges: string | undefined): { count: number; past: number } {
   <div class="faces">
     <div class="head">
       <h4>Faces</h4>
-      <button @click="addFace">Add face</button>
+      <span class="head-actions">
+        <button @click="addFace('nodes')">Add coro face</button>
+        <button @click="addFace('matrix')">Add matrix face</button>
+      </span>
     </div>
     <p class="hint">
-      Which nodes are the mouth in each position, and which are the eyes and outline. A phoneme
-      timing track drives them: each cell's label is a mouth position. Node numbers are 1-based:
-      <code>1-12,24-30</code>.
+      What the prop does in each mouth position — nodes for a coro face, a picture for a matrix
+      one. A phoneme timing track drives them: each cell's label is a mouth position. Node numbers
+      are 1-based: <code>1-12,24-30</code>.
       <template v-if="nodeCount"> This model has {{ nodeCount }} nodes.</template>
     </p>
 
@@ -101,6 +142,41 @@ function countFor(ranges: string | undefined): { count: number; past: number } {
         <button title="Remove this face" @click="removeFace(i)">×</button>
       </div>
 
+      <template v-if="isMatrixFace(face)">
+        <div class="row">
+          <label class="part-label">Placement</label>
+          <select :value="face.placement ?? 'Centered'" @change="patch(i, { placement: ($event.target as HTMLSelectElement).value as 'Centered' | 'Scaled' })">
+            <option value="Centered">Centered</option>
+            <option value="Scaled">Scaled</option>
+          </select>
+          <span class="hint">Centered draws the picture at its own size and only shrinks it; Scaled stretches it to fill the matrix.</span>
+        </div>
+
+        <p class="sub-head">Mouth pictures</p>
+        <div v-for="(entry, m) in face.images ?? []" :key="m" class="row entry">
+          <input
+            class="phoneme"
+            :value="entry.name"
+            type="text"
+            placeholder="AI"
+            @input="patchImage(i, m, { name: ($event.target as HTMLInputElement).value })"
+          />
+          <label class="pick">
+            <span :class="{ set: entry.image }">{{ entry.image ? `${entry.image.width}×${entry.image.height}` : "Eyes open…" }}</span>
+            <input type="file" accept="image/*" @change="pickFaceImage(i, m, 'image', $event)" />
+          </label>
+          <button v-if="entry.image" title="Remove this picture" @click="clearFaceImage(i, m, 'image')">⟲</button>
+          <label class="pick">
+            <span :class="{ set: entry.imageClosed }">{{ entry.imageClosed ? `${entry.imageClosed.width}×${entry.imageClosed.height}` : "Eyes closed…" }}</span>
+            <input type="file" accept="image/*" @change="pickFaceImage(i, m, 'imageClosed', $event)" />
+          </label>
+          <button v-if="entry.imageClosed" title="Use the open-eyes picture instead" @click="clearFaceImage(i, m, 'imageClosed')">⟲</button>
+          <button title="Remove this mouth" @click="removeImageRow(i, m)">×</button>
+        </div>
+        <div class="row"><button @click="addImageRow(i)">Add mouth</button></div>
+      </template>
+
+      <template v-else>
       <p class="sub-head">Mouths</p>
       <div v-for="(mouth, m) in face.mouths" :key="m" class="row entry">
         <input
@@ -145,6 +221,7 @@ function countFor(ranges: string | undefined): { count: number; past: number } {
         />
         <span class="count" :class="{ bad: countFor(face[part.key]).past }">{{ countFor(face[part.key]).count }}</span>
       </div>
+      </template>
     </div>
 
     <p v-if="faces.length === 0" class="hint">None yet.</p>
@@ -193,6 +270,22 @@ function countFor(ranges: string | undefined): { count: number; past: number } {
 }
 .entry .nodes {
   flex: 1 1 auto;
+}
+.pick {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.65rem;
+  color: #777;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  padding: 0.1rem 0.3rem;
+  cursor: pointer;
+}
+.pick input[type="file"] {
+  display: none;
+}
+.pick .set {
+  color: #2c6e3f;
 }
 .part-label {
   font-size: 0.7rem;

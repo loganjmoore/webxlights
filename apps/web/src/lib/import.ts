@@ -89,7 +89,11 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
     // hold image paths rather than node ranges.
     faces: m.faces.map((f) => ({
       name: f.name,
+      kind: f.kind,
       mouths: f.mouths,
+      // A matrix face arrives as a shell: the mouth positions it had, with no pictures, because
+      // the file names paths on the machine that made the show.
+      ...(f.kind === "matrix" ? { images: f.imageNames.map((name) => ({ name })), placement: "Centered" as const } : {}),
       eyesOpen: f.parts["Eyes-Open"],
       eyesClosed: f.parts["Eyes-Closed"],
       eyesOpen2: f.parts["Eyes-Open2"],

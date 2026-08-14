@@ -1,6 +1,7 @@
 import type { RGBA } from "../color";
 import type { RenderBuffer } from "../renderBuffer";
 import type { FrameContext } from "./types";
+import { drawImageInto } from "./imageDraw";
 
 // A decoded still image. The engine never touches the DOM (DECISIONS.md), so decoding happens
 // in the browser (createImageBitmap -> canvas -> getImageData) and the raw RGBA rows arrive
@@ -56,33 +57,14 @@ export function renderPictures(buffer: RenderBuffer, _palette: RGBA[], params: P
       break;
   }
 
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const u = (x - originX) / drawW;
-      const v = (y - originY) / drawH;
-      if (u < 0 || u >= 1 || v < 0 || v >= 1) continue;
-
-      const sx = Math.min(image.width - 1, Math.floor(u * image.width));
-      // buffer origin is bottom-left, image rows are top-first. Flip the *row index* rather
-      // than the coordinate: `floor((1 - v) * height)` puts the exact half-way pixel on the
-      // wrong side of the boundary, which shears the image by one source row.
-      const sy = image.height - 1 - Math.min(image.height - 1, Math.floor(v * image.height));
-      const i = (sy * image.width + sx) * 4;
-      const r = image.data[i] ?? 0;
-      const g = image.data[i + 1] ?? 0;
-      const b = image.data[i + 2] ?? 0;
-      const a = image.data[i + 3] ?? 255;
-      if (a === 0) continue;
-      if (params.transparentBlack && r === 0 && g === 0 && b === 0) continue;
-
-      buffer.setPixel(x, y, {
-        r: Math.round(r * brightness),
-        g: Math.round(g * brightness),
-        b: Math.round(b * brightness),
-        a,
-      });
-    }
-  }
+  drawImageInto(buffer, image, {
+    originX,
+    originY,
+    drawW,
+    drawH,
+    brightness,
+    transparentBlack: params.transparentBlack,
+  });
 }
 
 function fitSize(

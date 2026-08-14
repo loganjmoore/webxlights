@@ -175,18 +175,22 @@ describe("Faces", () => {
   it("reads the mouths, the eyes and the outline of a node-range face", () => {
     const face = parseRgbEffectsXml(xml).models.find((m) => m.name === "Singing Face")!.faces[0]!;
     expect(face.name).toBe("Face1");
+    expect(face.kind).toBe("nodes");
     expect(face.mouths.find((m) => m.name === "AI")!.nodes).toBe("1-5");
     expect(face.mouths.find((m) => m.name === "MBP")).toEqual({ name: "MBP", nodes: "7-8", color: "#00FF00" });
     expect(face.parts["Eyes-Open"]).toBe("9");
     expect(face.parts.Outline).toBe("11-20");
   });
 
-  it("skips a Matrix face rather than reading its image paths as node ranges", () => {
-    // A Matrix definition's values are file paths. Read as ranges they would light arbitrary
-    // nodes instead of failing, which is the worst of the three outcomes.
-    const faces = parseRgbEffectsXml(xml).models.find((m) => m.name === "Singing Face")!.faces;
-    expect(faces).toHaveLength(1);
-    expect(faces.map((f) => f.name)).not.toContain("Matrix Face");
+  it("brings a Matrix face across as a shell, without reading its image paths as node ranges", () => {
+    // A Matrix definition's values are file paths on the machine that made the show. Read as
+    // ranges they would light arbitrary nodes instead of failing; fetched, they aren't there at
+    // all. What can come across is which mouth positions the face had, so the editor shows the
+    // rows waiting for pictures rather than losing that a singing face existed.
+    const face = parseRgbEffectsXml(xml).models.find((m) => m.name === "Singing Face")!.faces.find((f) => f.name === "Matrix Face")!;
+    expect(face.kind).toBe("matrix");
+    expect(face.mouths).toEqual([]);
+    expect(face.imageNames.sort()).toEqual(["AI", "rest"]);
   });
 
   it("gives a model with no faces an empty list, not undefined", () => {
