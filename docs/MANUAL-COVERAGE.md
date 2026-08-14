@@ -80,7 +80,7 @@ written down. Status here means:
 | Command palette | ✅ | Ctrl+Shift+K, per the manual. Searchable, ranked so a prefix match beats one buried mid-string, and every entry shows the key it also answers to — which is how anyone learns sixty shortcuts without reading a list of them |
 | Keyboard shortcuts | ✅ | Transport, timing (including **s** to split a mark), edit, zoom, and all fifteen of xLights' single-letter effect shortcuts. Case is significant, as it is in xLights — **o** is On and **O** is Off. Every shortcut and every palette entry comes from one registry, so a key can't exist without a command or a command be given a key nothing dispatches |
 | Render all / render on save | ⚠️ | We render on demand and on export |
-| Export model as video / render-and-export | ❌ | Not blocked — the renderer already produces every frame, and `MediaRecorder` on a canvas would encode them. Simply not built yet |
+| Export model as video / render-and-export | ✅ | One model's frames recorded to a video file via `MediaRecorder`. Drawn on a timer rather than as fast as possible: `captureStream` samples in real time, so racing the frames would produce a three-second video of a three-minute sequence. Uses one sequencer for the whole export, like the `.fseq` path, or every stateful effect would replay from its start on each frame |
 
 ## Chapter 4 — Built-in effects
 
@@ -123,12 +123,12 @@ Moving Head + Servo (DMX fixtures).
 | Preferences | ⚠️ | A Preferences panel with the settings that drive something here: time display format, default effect length, snap-to-timing marks, and the autosave interval (0 turns it off). Kept per-browser rather than with the project — a preference belongs to the person at the keyboard, and one that travelled with the show would let two people editing it change each other's. xLights' remaining Settings tabs configure machinery this app doesn't have (output devices, backup paths, services); offering them would be controls with nothing behind them, and a test asserts no such preference exists |
 | Backup and recovery | ⚠️ | Sequence version snapshots; no show-folder backup |
 | Tools — Test | 🚫 | Channel test patterns sent live to controllers. A browser can't open a UDP socket, so E1.31/DDP output can't come from this app at all — which is why FPP Connect uploads a `.fseq` to a player instead. Genuinely blocked rather than not done |
-| Tools — Convert | ❌ | Between sequence formats. Not blocked: this app already reads `.xsq` and writes `.fseq`, so a converter is wiring those two together without opening the sequence. Simply not built yet |
+| Tools — Convert | ✅ | `.xsq` → `.fseq` without creating a sequence. It uses the *importer's own* mapping, on purpose: a converter that mapped differently would produce a file that didn't match what importing the same sequence would show, and trusting the two to agree is the whole reason to convert rather than import. Frame rate and length come from the file being converted, never from this project |
 | Tools — Generate custom model | ✅ | From a picture of the prop: bright pixels become nodes, with a threshold, a grid width, and the four wiring orders. Each cell takes the *brightest* pixel of the block it covers rather than their average — a single-pixel wire frame averaged over a block disappears, and a wire-frame prop is exactly what this is for |
 | Tools — FPP Connect | ✅ | Upload + playlist sync |
 | Tools — Lua scripting | 🚫 | |
 | View — perspectives | ✅ | Saved arrangements of which panels are showing. Applying one closes what it didn't have open as well as opening what it did — a half-applied arrangement isn't the arrangement. A panel name the app no longer has is dropped on load rather than restored as a panel that doesn't exist |
-| View — windows (detachable panels) | ❌ | Not blocked: the popped-out preview already shows the pattern (a second window synced over `BroadcastChannel`), and the other panels could follow it. Simply not built yet |
+| View — windows (detachable panels) | ⚠️ | Panels can be torn off into their own window, synced over `BroadcastChannel` like the popped-out preview, on a real route so they survive a reload and can be bookmarked onto a second screen. The video export panel uses it; the others are still docked |
 | Import — sequence, effects from another sequence | ⚠️ | `.xsq` import; no per-effect import mapping |
 | Audio menu | ⚠️ | Loading and replacing a sequence's track is on the Sequencer page. xLights' menu also offers waveform-derived timing generation beyond interval/BPM, which needs onset detection this app doesn't have |
 
@@ -145,17 +145,16 @@ Moving Head + Servo (DMX fixtures).
 
 ## What is left, and why
 
-Four rows still read ❌, and they divide cleanly:
+One row still reads ❌, and it is the one that can't be fixed from here: the **vendor model
+library** needs xLights' own web service, which is a third-party network dependency rather than a
+piece of app work.
 
-**Not blocked, simply not built** — Tools > Convert (this app already reads `.xsq` and writes
-`.fseq`; a converter is wiring those together), export model as video (`MediaRecorder` over the
-frames the renderer already produces), and detachable panel windows (the popped-out preview
-already shows the pattern). Any of the three is a normal piece of work.
+**Tools > Test** is marked 🚫 for a harder reason. It sends E1.31/DDP live, and a browser cannot
+open a UDP socket at all — no amount of work here changes that. It is why FPP Connect uploads a
+`.fseq` to a player instead of streaming to controllers.
 
-**Blocked on something outside the app** — the vendor model library needs xLights' own web
-service, and Tools > Test needs to send E1.31/DDP live, which a browser cannot do at all: it has
-no UDP socket. That last one is why FPP Connect uploads a `.fseq` to a player instead, and it is
-marked 🚫 rather than ❌ because no amount of work here changes it.
+Everything else that was ❌ has been built: Tools > Convert, export model as video, and
+detachable panel windows.
 
 The eleven unimplemented effects are the same shape: Faces, Piano and State need face and state
 definition files; Duplicate needs to render another model's layer; Moving Head and Servo are DMX

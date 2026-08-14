@@ -97,3 +97,27 @@ export function openPreviewChannel(sequenceId: number): BroadcastChannel | null 
 export function previewUrlFor(projectId: number | string, sequenceId: number | string): string {
   return `/projects/${projectId}/sequences/${sequenceId}/preview`;
 }
+
+/**
+ * Opens a panel in its own window.
+ *
+ * xLights lets its docked panels be torn off onto a second monitor; the popped-out preview
+ * already showed the pattern here, and this is that pattern made general. The window is named per
+ * sequence and panel, so re-opening one focuses the window that is already there rather than
+ * stacking a second copy of it on top.
+ *
+ * Sizing is a hint the browser is free to ignore, which is fine - the point is that it opens
+ * somewhere sensible rather than full-screen over the thing it was torn off.
+ */
+export function openPanelWindow(
+  projectId: number | string,
+  sequenceId: number | string,
+  panel: string,
+  size: { width: number; height: number } = { width: 480, height: 720 },
+): Window | null {
+  return window.open(
+    `/projects/${projectId}/sequences/${sequenceId}/panel/${panel}`,
+    `webxlights-panel-${sequenceId}-${panel}`,
+    `width=${size.width},height=${size.height}`,
+  );
+}

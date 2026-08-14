@@ -8,7 +8,7 @@ import { analyzeAudioBuffer } from "../lib/audioAnalysis";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
-import { openPreviewChannel, postPreviewMessage, previewUrlFor, type PreviewMessage } from "../lib/previewChannel";
+import { openPanelWindow, openPreviewChannel, postPreviewMessage, previewUrlFor, type PreviewMessage } from "../lib/previewChannel";
 import {
   effectFromPreset,
   groupPresets,
@@ -32,6 +32,7 @@ import {
 import { REGION_COLORS, boundariesFromTimingTrack, effectsInRegion, rebaseEffects, regionAt, regionsFrom } from "../lib/songRegions";
 import CommandPalette from "../components/CommandPalette.vue";
 import EffectWheel from "../components/EffectWheel.vue";
+import ModelVideoExport from "../components/ModelVideoExport.vue";
 import { newEffectId, setAutosaveDebounce, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type ContextMenuTarget, type GridRow } from "../components/SequencerGrid.vue";
 import EffectContextMenu from "../components/EffectContextMenu.vue";
@@ -1140,6 +1141,21 @@ watch(sequenceId, async (id) => {
           </span>
         </li>
       </ul>
+
+      <div class="models-panel-actions">
+        <button
+          title="Tear this panel off into its own window"
+          @click="openPanelWindow(route.params.projectId as string, sequenceId, 'video')"
+        >
+          Open in its own window
+        </button>
+      </div>
+      <ModelVideoExport
+        :models="modelRecords"
+        :body="store.body"
+        :sequence="store.sequence"
+        :audio="audioSeries ?? undefined"
+      />
 
       <div class="models-panel-head"><h2>Settings</h2></div>
       <label class="blend-row">
