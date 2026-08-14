@@ -30,6 +30,10 @@ describe("parseRgbEffectsXml", () => {
     expect(result.groups).toHaveLength(2);
     const all = result.groups.find((g) => g.name === "ALL")!;
     expect(all.members).toEqual(["Mega Tree", "Arch 1", "Porch Roofline", "Spinner Prop"]);
+    // The `layout` attribute is the group's render style - how its members are arranged into the
+    // one buffer an effect on the group draws into. It has to survive import: a group that lost
+    // it would render with a different layout than the show was sequenced against.
+    expect(all.layout).toBe("minimalGrid");
   });
 
   it("throws on a non-rgbeffects file", () => {

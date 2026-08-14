@@ -1,5 +1,21 @@
 # Changelog
 
+## Model groups render
+
+**A group row used to reach nothing at all.** You could create a group, drop effects on it, watch it autosave — and both the house preview and the `.fseq` export filtered their rows to models and sub-models, so every one of those effects was dropped on the floor. No error, no warning, just a prop that stayed dark. Real sequences target groups constantly (37% of one real show's sequenced elements), which makes this whole passages of a show going missing between the screen and the yard.
+
+Groups now render, and with all fourteen of xLights' group render styles — the part the previous pass had recorded as blocked on exactly this.
+
+**Composing.** A group render style decides how several separate props are arranged into the single buffer an effect draws into. The four **Stacked** variants put them side by side or one above the other, plain or scaled so a small prop gets an equal share instead of a sliver. **Horizontal/Vertical Per Model** gives each prop one row; the **Per Model/Strand** pair gives each *strand* one, so a mega tree contributes as many rows as it has strands instead of collapsing to a line. The two **Overlays** set the props on top of each other, centred or scaled. **Single Line as a Pixel** makes each prop one cell, which is how a run of twenty mini-trees is driven as a twenty-pixel string. **Per Preview** keeps them where they physically stand, so an effect sweeps across the yard rather than across a list — and it is what a group's **Default** means, per the manual.
+
+The three **Per Model** styles are a different mechanism, not a variation: they render the effect separately on each prop rather than across all of them. They come back from the planner in the same shape as a composed style, so nothing downstream has to know which kind it got.
+
+**Scattering back.** A group borrows its members' lights the way a sub-model borrows its parent's, so the rendered frame is written back onto real props. Transparent cells are skipped — a model can belong to more than one group, and the second to render would otherwise erase the first. A group sits *under* a model's own rows, which sit under its sub-models': most general to most specific.
+
+**Written once.** The composing, slicing and scattering all live in the engine, where they're under test; the app keeps only the record-to-spec adaptation. The preview and the export reaching different code was the failure mode worth designing against — a show that looks right on screen and plays wrong in the yard is the worst bug this app can have. A test drives a group through both paths over the same frames and requires them to agree.
+
+**Two fixes that came with it.** The Layout page's group style picker was a hardcoded four-option list (`Default / Single Line / Horizontal / Vertical`) — none of them real xLights names — so opening an imported group and saving it rewrote `Horizontal Per Model` as `Horizontal`. It now offers the real names, and a style it doesn't recognise is kept as its own option rather than silently reset. And the popped-out preview window now receives groups in its snapshot; without them it would have had the models but not the memberships, and would have dropped exactly the rows the main window had just learned to draw.
+
 ## Morph and Tendrils
 
 Two more effects off `docs/MANUAL-COVERAGE.md`, both of them ones real sequences reach for.

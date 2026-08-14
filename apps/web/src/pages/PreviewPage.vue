@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 import { useRoute } from "vue-router";
 import type { AudioSeries } from "@webxlights/engine";
-import { api, type ModelRecord, type SequenceBody } from "../lib/api";
+import { api, type ModelGroupRecord, type ModelRecord, type SequenceBody } from "../lib/api";
 import { openPreviewChannel, postPreviewMessage, type PreviewMessage } from "../lib/previewChannel";
 import HousePreview from "../components/HousePreview.vue";
 
@@ -15,6 +15,7 @@ const projectId = computed(() => Number(route.params.projectId));
 const sequenceId = computed(() => Number(route.params.sequenceId));
 
 const models = ref<ModelRecord[]>([]);
+const groups = ref<ModelGroupRecord[]>([]);
 const body = ref<SequenceBody>({ timingTracks: [], rows: [] });
 const frameMs = ref(50);
 const durationMs = ref(0);
@@ -56,7 +57,10 @@ function onScrub(e: Event): void {
 async function loadOwnData(): Promise<void> {
   const [layouts, sequence] = await Promise.all([api.listLayouts(projectId.value), api.getSequence(sequenceId.value)]);
   const layout = layouts[0];
-  if (layout) models.value = await api.listModels(layout.id);
+  if (layout) {
+    models.value = await api.listModels(layout.id);
+    groups.value = await api.listModelGroups(layout.id);
+  }
   body.value = sequence.body && sequence.body.rows ? sequence.body : { timingTracks: [], rows: [] };
   frameMs.value = sequence.frame_ms;
   durationMs.value = sequence.duration_ms;
@@ -68,6 +72,7 @@ function onMessage(e: MessageEvent<PreviewMessage>): void {
   if (message.type === "snapshot") {
     connected.value = true;
     models.value = message.models;
+    groups.value = message.groups;
     body.value = message.body;
     frameMs.value = message.frameMs;
     durationMs.value = message.durationMs;
@@ -125,7 +130,7 @@ onBeforeUnmount(() => {
     </header>
 
     <div class="stage">
-      <HousePreview :models="models" :body="body" :playhead-ms="playheadMs" :frame-ms="frameMs" :audio="audio ?? undefined" />
+      <HousePreview :models="models" :groups="groups" :body="body" :playhead-ms="playheadMs" :frame-ms="frameMs" :audio="audio ?? undefined" />
     </div>
 
     <p v-if="!connected" class="hint">

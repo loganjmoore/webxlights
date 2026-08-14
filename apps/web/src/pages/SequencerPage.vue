@@ -24,6 +24,7 @@ const importMessage = ref(typeof route.query.importMessage === "string" ? route.
 
 const rows = ref<GridRow[]>([]);
 const modelRecords = ref<ModelRecord[]>([]);
+const groupRecords = ref<ModelGroupRecord[]>([]);
 // Which rows are shown on the grid - a workspace/view preference (like which panels are open),
 // not sequence data, so it lives in localStorage per sequence rather than in the sequence body:
 // hiding a row here never touches its effects, and doesn't need to round-trip through .xsq
@@ -152,6 +153,7 @@ async function loadRows(): Promise<void> {
     ...groups.map((g) => ({ elementType: "group" as const, elementId: g.id, name: g.name })),
   ];
   modelRecords.value = models;
+  groupRecords.value = groups;
   controllers.value = await api.listControllers(Number(route.params.projectId));
   loadHiddenRows();
 }
@@ -359,7 +361,7 @@ function exportFseq(): void {
   if (!store.sequence) return;
   exportError.value = null;
   try {
-    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, controllers.value, audioSeries.value ?? undefined);
+    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, controllers.value, audioSeries.value ?? undefined, groupRecords.value);
     downloadFseq(bytes, store.sequence.name);
   } catch (err) {
     exportError.value = err instanceof Error ? err.message : "Export failed";
@@ -403,7 +405,7 @@ async function fppUpload(): Promise<void> {
   fppBusy.value = true;
   fppStatus.value = "Uploading...";
   try {
-    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, controllers.value, audioSeries.value ?? undefined);
+    const bytes = exportSequenceToFseq(modelRecords.value, store.body, store.sequence, controllers.value, audioSeries.value ?? undefined, groupRecords.value);
     const filename = `${store.sequence.name}.fseq`;
     await uploadFseqToFpp(fppHost.value.trim(), filename, bytes);
     fppStatus.value = `Uploaded ${filename} to ${fppSystemInfo.value.HostName}.`;
@@ -427,6 +429,7 @@ function previewSnapshot(): PreviewMessage {
   return {
     type: "snapshot",
     models: JSON.parse(JSON.stringify(modelRecords.value)) as ModelRecord[],
+    groups: JSON.parse(JSON.stringify(groupRecords.value)) as ModelGroupRecord[],
     body: JSON.parse(JSON.stringify(store.body)) as typeof store.body,
     frameMs: store.sequence?.frame_ms ?? 50,
     durationMs: store.sequence?.duration_ms ?? 0,
@@ -674,6 +677,7 @@ watch(sequenceId, async (id) => {
         <div class="preview-wrap">
           <HousePreview
             :models="modelRecords"
+            :groups="groupRecords"
             :body="store.body"
             :playhead-ms="playheadMs"
             :frame-ms="store.sequence?.frame_ms ?? 50"

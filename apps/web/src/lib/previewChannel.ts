@@ -1,6 +1,6 @@
 import { toRaw } from "vue";
 import type { AudioSeries } from "@webxlights/engine";
-import type { ModelRecord, SequenceBody } from "./api";
+import type { ModelGroupRecord, ModelRecord, SequenceBody } from "./api";
 
 // Links the sequencer to a popped-out preview window (real xLights has the same idea: the
 // house preview lives on a second monitor while you sequence on the first).
@@ -16,6 +16,10 @@ import type { ModelRecord, SequenceBody } from "./api";
 export interface PreviewSnapshot {
   type: "snapshot";
   models: ModelRecord[];
+  // Groups travel with the models because a group row renders across several of them, and a
+  // preview window that had the models but not the groups would silently drop those rows - the
+  // exact bug the main window had before groups rendered at all.
+  groups: ModelGroupRecord[];
   body: SequenceBody;
   frameMs: number;
   durationMs: number;

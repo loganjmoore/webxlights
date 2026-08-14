@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import {
   appliedPlacementFor,
   computeGeometryFromAttrs,
+  GROUP_RENDER_STYLES,
   propertyFieldsFor,
   transformedHalfExtents,
   propertyValueFor,
@@ -122,6 +123,15 @@ const groupNameDraft = ref("");
 const groupBufferStyleDraft = ref("Default");
 const groupMemberIds = ref<Set<number>>(new Set());
 const groupError = ref("");
+
+// A style the imported show carries that isn't in our list. Kept as an option of its own rather
+// than silently reset to Default: the value came out of the show's own XML, and re-saving a
+// group after glancing at it shouldn't rewrite what it said. (The four-option select this
+// replaced did exactly that - "Horizontal Per Model" became "Horizontal" on the next save.)
+const unknownGroupStyle = computed(() => {
+  const current = groupBufferStyleDraft.value;
+  return current && !(GROUP_RENDER_STYLES as string[]).includes(current) ? current : null;
+});
 
 function selectGroup(g: ModelGroupRecord): void {
   selectedGroupId.value = g.id;
@@ -550,12 +560,16 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
               <input v-model="groupNameDraft" type="text" />
             </label>
             <label>
-              Buffer style
+              Render style
               <select v-model="groupBufferStyleDraft">
-                <option value="Default">Default</option>
-                <option value="Single Line">Single Line</option>
-                <option value="Horizontal">Horizontal</option>
-                <option value="Vertical">Vertical</option>
+                <option v-for="s in GROUP_RENDER_STYLES" :key="s" :value="s">{{ s }}</option>
+                <!--
+                  A style this app doesn't know - an older spelling, or one xLights added - is
+                  still offered so saving the group doesn't quietly rewrite what the show said.
+                -->
+                <option v-if="unknownGroupStyle" :value="unknownGroupStyle">
+                  {{ unknownGroupStyle }} (imported)
+                </option>
               </select>
             </label>
             <p class="members-label">Members</p>

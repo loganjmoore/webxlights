@@ -62,7 +62,7 @@ written down. Status here means:
 | Layer blending — Morph, Suppress Until Frame, Freeze At Frame, Canvas | ❌ | |
 | Transitions | ✅ | All 16 types, in and out |
 | Mix slider | ✅ | |
-| **Layer settings — Render Style (buffer styles)** | ⚠️ | The six that mean something for a single model are implemented (Default, Per Preview, Single Line, As Pixel, Horizontal/Vertical Per Strand). The rest describe how several models in a *group* are arranged relative to each other, which needs group rendering this app doesn't have |
+| Layer settings — Render Style (buffer styles) | ✅ | All of them. Six for a single model (Default, Per Preview, Single Line, As Pixel, Horizontal/Vertical Per Strand) and the fourteen that arrange a *group's* members into one shared buffer (the four Stacked variants, Horizontal/Vertical Per Model, the two Per Model/Strand, both Overlays, Single Line as a Pixel, and the three Per Model ones that render on each prop separately). A group's Default is Per Preview, per the manual |
 | Layer settings — Transformation (rotate/flip) | ✅ | Rotate 90 either way, rotate 180, flip H/V |
 | Layer settings — Blur | ✅ | Alpha-weighted, so a blur softens coverage rather than dragging colour towards black |
 | Layer settings — Sub-buffer | ✅ | The effect is handed a smaller buffer, per the manual's own distinction from a mask |
@@ -141,16 +141,21 @@ Moving Head + Servo (DMX fixtures).
 
 Layer settings were the largest single lever, because they apply to every effect at once rather
 than adding one more, and the panel is now complete: render style, transformation, blur,
-sub-buffer, roto-zoom and persistent. Only Render Style is still partial, and for a reason that
-belongs to something else — thirteen of its nineteen styles describe how several models in a
-*group* are arranged, so they wait on group rendering rather than on the panel.
+sub-buffer, roto-zoom and persistent — including the group render styles, now that groups render
+at all.
 
 Sub-models now import and render, which was the piece real sequences leaned on hardest. What is
 left of them is an in-app editor for creating one, which matters far less than not losing the
 ones a show already has.
 
-The largest gaps remaining are group rendering (which the thirteen group render styles depend
-on), the nine unimplemented model types, and the effects that need a canvas.
+Group rows now render, which had been the quietest serious gap in the app: a group row could be
+created and sequenced and would autosave, but both the preview and the `.fseq` export dropped it,
+so effects placed on a group reached nothing at all. Real sequences target groups constantly —
+37% of one real show's sequenced elements — so this was whole passages of a show going dark
+without an error anywhere.
+
+The largest gaps remaining are the nine unimplemented model types and the effects that need a
+canvas.
 
 After that, the missing effects are worth taking in batches by how much machinery they share:
 the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Lines) before the
