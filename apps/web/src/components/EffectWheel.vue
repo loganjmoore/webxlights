@@ -13,15 +13,18 @@ import { EFFECT_SHORTCUTS } from "../lib/commands";
 // shortcut: the wheel and the keyboard are two ways at one set, and a wheel with its own list
 // would be a third place for that set to drift.
 
-const props = defineProps<{ x: number; y: number }>();
+// The shortcuts in force rather than the defaults: they can be changed now (keybindings.ts), and
+// a wheel showing the letter that used to place an effect would be worse than showing none.
+const props = defineProps<{ x: number; y: number; shortcuts?: Array<{ key: string; effect: string }> }>();
 const emit = defineEmits<{ pick: [effect: string]; close: [] }>();
 
 const RADIUS = 78;
 const BUTTON = 26;
 
-const spokes = computed(() =>
-  EFFECT_SHORTCUTS.map(({ key, effect }, i) => {
-    const angle = (i / EFFECT_SHORTCUTS.length) * Math.PI * 2 - Math.PI / 2;
+const spokes = computed(() => {
+  const list = props.shortcuts ?? EFFECT_SHORTCUTS;
+  return list.map(({ key, effect }, i) => {
+    const angle = (i / list.length) * Math.PI * 2 - Math.PI / 2;
     return {
       effect,
       key,
@@ -30,8 +33,8 @@ const spokes = computed(() =>
       left: props.x + Math.cos(angle) * RADIUS - BUTTON / 2,
       top: props.y + Math.sin(angle) * RADIUS - BUTTON / 2,
     };
-  }),
-);
+  });
+});
 </script>
 
 <template>

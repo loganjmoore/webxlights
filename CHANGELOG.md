@@ -1,5 +1,29 @@
 # Changelog
 
+## Re-audited the coverage doc, and found the shortcuts were a one-way street
+
+The coverage doc is only worth what its last audit was worth, and a lot has changed since the last one. So: all 176 manual pages fetched again (88,653 words), every page title checked against the doc, and the doc's own counts checked against the code.
+
+Three findings, one of them a real feature gap.
+
+### Shortcuts could not be changed, and nothing said so
+
+The manual, on the shortcuts page: *"These effects are stored in the xlights\_keybindings.xml file and can be modified by the user."*
+
+This app had xLights' defaults and treated them as rules. Nothing in the coverage doc mentioned that they were only defaults — the row said "all fifteen of xLights' single-letter effect shortcuts" and stopped there, which is true and misses the point. Single-letter shortcuts are exactly the thing muscle memory owns, and someone who wants `z` for Fire had no way to say so.
+
+Each effect's letter is now editable in Preferences, kept per-browser with the other preferences. A key that already places another effect is **refused, naming the clash** — two effects on one key means one of them silently stops working, and which one is an accident of registry order. Space, `t` and `s` stay reserved for the transport and timing keys, because shadowing those wouldn't fail, it would place an effect when someone meant to add a timing mark.
+
+The effect wheel reads whatever is in force rather than the defaults. It exists so the wheel and the keyboard can't drift, and a wheel showing the letter that *used* to place an effect would be worse than a wheel showing none.
+
+### A 🚫 row with no reason
+
+**Tools > Lua scripting** was marked as a non-goal with an empty justification. Every other 🚫 explains itself; this one asserted. It now says what it would take — a Lua interpreter in the browser, and an API surface for scripts to drive, without which it is the feature in name only.
+
+### An off-by-one in the effect count
+
+The doc said xLights ships 55 effects. The manual's index has 56 pages under `effects/off/`. We render 47 of them.
+
 ## The backup was quietly losing half the show
 
 Package Show has always exported a project as a zip and imported it back. Looking at it properly — the ⚠️ "no show-folder backup" row was the next thing on the list — it turned out the feature that existed was worse than the gap.

@@ -27,6 +27,11 @@ export interface CommandContext {
   openPalette: () => void;
   exportFseq: () => void;
   snapshot: () => void;
+  /**
+   * The effect shortcuts in force. Absent means xLights' own, which is what they were before they
+   * could be changed (keybindings.ts).
+   */
+  effectShortcuts?: Array<{ key: string; effect: string }>;
 }
 
 export interface Command {
@@ -166,7 +171,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
     { id: "file.snapshot", label: "Save a snapshot", group: "File", run: ctx.snapshot },
   ];
 
-  for (const { key, effect } of EFFECT_SHORTCUTS) {
+  for (const { key, effect } of ctx.effectShortcuts ?? EFFECT_SHORTCUTS) {
     commands.push({
       id: `effect.${effect}`,
       label: `Place ${effect}`,
