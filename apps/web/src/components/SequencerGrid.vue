@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import type { SequenceBody, SequenceEffect } from "../lib/api";
+import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
 
 export interface GridRow {
   elementType: "model" | "group" | "submodel";
@@ -26,7 +27,12 @@ const props = defineProps<{
   // xLights' "snap to timing marks" preference. Off, an edge lands exactly where it was dropped,
   // which is what you want when placing against the music by ear rather than against the marks.
   snapToTiming?: boolean;
+  // The user's chosen chrome colours (lib/uiColors.ts). Optional so the grid still draws with
+  // sensible defaults anywhere it is mounted without them.
+  colors?: UiColors;
 }>();
+
+const ui = (): UiColors => props.colors ?? DEFAULT_UI_COLORS;
 
 const emit = defineEmits<{
   select: [effectId: string | null];
@@ -123,10 +129,10 @@ function draw(): void {
   for (let i = firstRow; i < lastRow; i++) {
     const row = props.rows[i]!;
     const y = HEADER_HEIGHT + i * ROW_HEIGHT - scrollTop.value;
-    ctx.fillStyle = i % 2 === 0 ? "#1a1a20" : "#18181d";
+    ctx.fillStyle = i % 2 === 0 ? ui().rowHeading : ui().rowHeadingSelected;
     ctx.fillRect(0, y, rect.width, ROW_HEIGHT);
 
-    ctx.fillStyle = "#aaa";
+    ctx.fillStyle = ui().rowHeadingText;
     ctx.font = "11px system-ui";
     ctx.fillText(row.name, 8, y + ROW_HEIGHT / 2 + 4, ROW_LABEL_WIDTH - 12);
 
@@ -134,7 +140,7 @@ function draw(): void {
       const x1 = msToX(effect.startMs);
       const x2 = msToX(effect.endMs);
       const selected = effect.id === props.selectedEffectId;
-      ctx.fillStyle = selected ? "#e8c468" : "#5b7fb5";
+      ctx.fillStyle = selected ? ui().effectSelected : ui().effect;
       ctx.fillRect(x1, y + 2, Math.max(2, x2 - x1), ROW_HEIGHT - 4);
       ctx.strokeStyle = selected ? "#fff" : "#2c3e5c";
       ctx.strokeRect(x1, y + 2, Math.max(2, x2 - x1), ROW_HEIGHT - 4);
@@ -147,19 +153,19 @@ function draw(): void {
   }
 
   // pinned timing-track ruler - always drawn at y=0..HEADER_HEIGHT regardless of scrollTop
-  ctx.fillStyle = "#20202a";
+  ctx.fillStyle = ui().timingTrackHeader;
   ctx.fillRect(0, 0, rect.width, HEADER_HEIGHT);
   ctx.fillStyle = "#777";
   ctx.font = "10px system-ui";
   ctx.fillText("Marks", 8, HEADER_HEIGHT / 2 + 3);
   for (const ms of allMarks()) {
     const x = msToX(ms);
-    ctx.strokeStyle = "#e8c468";
+    ctx.strokeStyle = ui().timingMark;
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, HEADER_HEIGHT);
     ctx.stroke();
-    ctx.fillStyle = "#e8c468";
+    ctx.fillStyle = ui().timingMark;
     ctx.beginPath();
     ctx.moveTo(x - 4, 0);
     ctx.lineTo(x + 4, 0);
@@ -167,14 +173,14 @@ function draw(): void {
     ctx.closePath();
     ctx.fill();
   }
-  ctx.strokeStyle = "#333";
+  ctx.strokeStyle = ui().gridlines;
   ctx.beginPath();
   ctx.moveTo(0, HEADER_HEIGHT);
   ctx.lineTo(rect.width, HEADER_HEIGHT);
   ctx.stroke();
 
   // row label divider
-  ctx.strokeStyle = "#333";
+  ctx.strokeStyle = ui().gridlines;
   ctx.beginPath();
   ctx.moveTo(ROW_LABEL_WIDTH, 0);
   ctx.lineTo(ROW_LABEL_WIDTH, rect.height);

@@ -2,7 +2,13 @@
 
 A page-by-page inventory of what the [xLights manual](https://manual.xlights.org/xlights) documents,
 and where webXLights stands against it. Built by reading all 176 pages of the manual (the site
-publishes a markdown version of every page, indexed at `llms.txt`).
+publishes a markdown version of every page, indexed at `llms.txt`), and re-verified against a
+fresh fetch of every one of those 176 pages — 88,710 words.
+
+That re-read was worth doing twice over. It found a whole settings tab this inventory had never
+named (Settings — Colors), and it found that the manual's own `llms-full.txt` bundle is *not*
+complete: 25 of the 176 indexed pages are absent from it, including several effects. Anything
+auditing this manual from that bundle alone would silently miss them.
 
 This is deliberately separate from `PARITY.md`. That file records what has been *built* and how
 faithful it is; this one records what *exists in xLights*, so a gap can't hide by never being
@@ -121,6 +127,7 @@ Moving Head + Servo (DMX fixtures).
 |---|---|---|
 | New sequence, sequence settings | ✅ | |
 | Preferences | ⚠️ | A Preferences panel with the settings that drive something here: time display format, default effect length, snap-to-timing marks, and the autosave interval (0 turns it off). Kept per-browser rather than with the project — a preference belongs to the person at the keyboard, and one that travelled with the show would let two people editing it change each other's. xLights' remaining Settings tabs configure machinery this app doesn't have (output devices, backup paths, services); offering them would be controls with nothing behind them, and a test asserts no such preference exists |
+| Settings — Colors | ✅ | The app's own chrome colours: timing-track headers, timing marks, effects and selected effects, row headings, gridlines, the waveform, and the layout's model/selected/overlap colours. Reset, export and import, as the dialog offers. **This row was missing from this inventory entirely** — found by re-reading all 176 pages rather than by working the list |
 | Backup and recovery | ⚠️ | Sequence version snapshots; no show-folder backup |
 | Tools — Test | 🚫 | Channel test patterns sent live to controllers. A browser can't open a UDP socket, so E1.31/DDP output can't come from this app at all — which is why FPP Connect uploads a `.fseq` to a player instead. Genuinely blocked rather than not done |
 | Tools — Convert | ✅ | `.xsq` → `.fseq` without creating a sequence. It uses the *importer's own* mapping, on purpose: a converter that mapped differently would produce a file that didn't match what importing the same sequence would show, and trusting the two to agree is the whole reason to convert rather than import. Frame rate and length come from the file being converted, never from this project |

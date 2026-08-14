@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
 import type { PeakBucket } from "../lib/audio";
 
 const props = defineProps<{
@@ -7,9 +8,12 @@ const props = defineProps<{
   durationMs: number;
   pxPerMs: number;
   playheadMs: number;
+  colors?: UiColors;
 }>();
 
 const emit = defineEmits<{ seek: [ms: number]; scrub: [ms: number]; scrubEnd: [] }>();
+
+const ui = (): UiColors => props.colors ?? DEFAULT_UI_COLORS;
 
 const ROW_LABEL_WIDTH = 140; // stays aligned with SequencerGrid's row-label gutter
 const canvasRef = ref<HTMLCanvasElement | null>(null);
@@ -29,12 +33,12 @@ function draw(): void {
   canvas.height = rect.height * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  ctx.fillStyle = "#0e0e12";
+  ctx.fillStyle = ui().waveformBackground;
   ctx.fillRect(0, 0, rect.width, rect.height);
 
   const mid = rect.height / 2;
   const widthPx = props.durationMs * props.pxPerMs;
-  ctx.strokeStyle = "#7aa2c9";
+  ctx.strokeStyle = ui().waveform;
   ctx.beginPath();
   props.peaks.forEach((p, i) => {
     const x = ROW_LABEL_WIDTH + (i / props.peaks.length) * widthPx;

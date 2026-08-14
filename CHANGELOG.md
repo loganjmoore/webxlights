@@ -1,5 +1,23 @@
 # Changelog
 
+## Re-read all 176 manual pages, and found a tab we'd never named
+
+The coverage doc was built by reading the whole manual once. I re-fetched every one of the 176 indexed pages — **88,710 words** — and audited the doc against them rather than against my memory of them.
+
+Two things came out of it.
+
+**A whole settings tab was missing from the inventory.** File > Settings > **Colors** — the app's own chrome colours — had never been named in `docs/MANUAL-COVERAGE.md` at all. Not marked ❌, not marked as a non-goal: simply absent, which is the one failure mode an inventory is supposed to make impossible. It's implemented now, and the row says how it was found.
+
+**The manual's own `llms-full.txt` bundle is incomplete.** 25 of the 176 indexed pages are absent from it, including Sketch, Tendrils, Spirograph, Candle, Fireworks, Galaxy, Garlands, Guitar, Life, Lightning, Liquid, Marquee, Meteors, Plasma, Shimmer, Snow Storm and Generate Custom Model. Anything auditing this manual from that bundle alone would silently miss them — which is exactly the kind of gap that looks like completeness. The coverage doc now says so.
+
+### Settings > Colors
+
+Timing-track headers and marks, effects and selected effects, row headings and their text, gridlines, the waveform and its background, and the layout's model / selected / overlap colours. Reset, export and import, as the dialog offers.
+
+It matters more than a theme usually would: a sequencer grid is dense, people work in one for hours, and someone colour-blind may need the selected/unselected pair to differ by more than hue.
+
+Values are **validated as hex on read**. They go straight into a canvas `fillStyle`, where a bad value paints *nothing* rather than erroring — which on a sequencer grid reads as effects that have vanished. And an import needs at least one real colour in the file, or any JSON at all would "import" as the defaults and look like it worked.
+
 ## The last three that weren't blocked
 
 `docs/MANUAL-COVERAGE.md` had four rows reading ❌ and a note saying which were blocked and which were simply not built. Three were not blocked. They are built.

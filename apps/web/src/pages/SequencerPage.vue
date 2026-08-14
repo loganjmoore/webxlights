@@ -19,6 +19,16 @@ import {
   type EffectPreset,
 } from "../lib/effectPresets";
 import { buildCommands, commandForEvent, isTypingTarget } from "../lib/commands";
+import {
+  UI_COLOR_LABELS,
+  exportUiColors,
+  importUiColors,
+  loadUiColors,
+  resetUiColors,
+  sanitizeColors,
+  saveUiColors,
+  type UiColors,
+} from "../lib/uiColors";
 import { formatTime, loadPreferences, sanitize, savePreferences, type Preferences } from "../lib/preferences";
 import {
   loadPerspectives,
@@ -824,6 +834,45 @@ function placeFromWheel(name: string): void {
 // preference belongs to the person at the keyboard, not to the show, and one that travelled with
 // the project would let two people editing it change each other's settings.
 const prefs = ref<Preferences>(loadPreferences(typeof localStorage === "undefined" ? null : localStorage));
+
+// xLights' File > Settings > Colors: the app's own chrome colours, not show data. A sequencer
+// grid is dense, and people who work in one for hours have real preferences about which things
+// stand out - and someone colour-blind may need the selected/unselected pair to differ by more
+// than hue.
+const uiColors = ref<UiColors>(loadUiColors(typeof localStorage === "undefined" ? null : localStorage));
+const colorsError = ref("");
+
+function patchColor(key: keyof UiColors, value: string): void {
+  uiColors.value = sanitizeColors({ ...uiColors.value, [key]: value });
+  saveUiColors(typeof localStorage === "undefined" ? null : localStorage, uiColors.value);
+}
+function resetColors(): void {
+  uiColors.value = resetUiColors();
+  saveUiColors(typeof localStorage === "undefined" ? null : localStorage, uiColors.value);
+}
+function exportColors(): void {
+  const blob = new Blob([exportUiColors(uiColors.value)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "webxlights-colors.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+async function importColors(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  colorsError.value = "";
+  const imported = importUiColors(await file.text());
+  if (!imported) {
+    colorsError.value = `"${file.name}" isn't a colour set.`;
+    return;
+  }
+  uiColors.value = imported;
+  saveUiColors(typeof localStorage === "undefined" ? null : localStorage, imported);
+}
 const showPrefsPanel = ref(false);
 function patchPrefs(changes: Partial<Preferences>): void {
   prefs.value = sanitize({ ...prefs.value, ...changes });
@@ -1157,6 +1206,27 @@ watch(sequenceId, async (id) => {
         :audio="audioSeries ?? undefined"
       />
 
+      <div class="models-panel-head">
+        <h2>Colors</h2>
+        <div class="models-panel-actions">
+          <button @click="resetColors">Reset defaults</button>
+          <button @click="exportColors">Export</button>
+          <label class="background-pick">
+            Import
+            <input type="file" accept="application/json,.json" @change="importColors" />
+          </label>
+        </div>
+      </div>
+      <p v-if="colorsError" class="export-error">{{ colorsError }}</p>
+      <label v-for="(label, key) in UI_COLOR_LABELS" :key="key" class="blend-row">
+        {{ label }}
+        <input
+          type="color"
+          :value="uiColors[key as keyof typeof uiColors]"
+          @input="patchColor(key as keyof typeof uiColors, ($event.target as HTMLInputElement).value)"
+        />
+      </label>
+
       <div class="models-panel-head"><h2>Settings</h2></div>
       <label class="blend-row">
         Time display
@@ -1387,12 +1457,14 @@ watch(sequenceId, async (id) => {
             @seek="seekTo"
             @scrub="scrubTo"
             @scrub-end="endScrub"
+            :colors="uiColors"
           />
           <SequencerGrid
             :rows="visibleRows"
             :body="store.body"
             :duration-ms="store.sequence?.duration_ms ?? 0"
             :snap-to-timing="prefs.snapToTiming"
+            :colors="uiColors"
             :px-per-ms="pxPerMs"
             :playhead-ms="playheadMs"
             :selected-effect-id="store.selectedEffectId"
