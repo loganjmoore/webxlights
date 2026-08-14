@@ -122,6 +122,17 @@ The phoneme names are **data, not a fixed list**: the manual only shows them in 
 hardcoded set would be a guess that silently mismatched an imported definition. A new face is
 seeded with the standard set and every name is editable.
 
+**VU Meter** now renders 28 of the manual's ~39 types, up from 7. The addition that mattered was
+structural rather than arithmetic: fourteen of its types are driven by a *timing track*, and
+effects could not read one until the State and Piano work added that plumbing — so they became
+routine without anything in the VU Meter itself changing. Also added: On, Color On, Pulse, Level
+Jump, Level Jump 100, Level Pulse Color, Spectrogram Peak and Spectrogram Line. The jump types
+decay from the moment the level crossed the threshold, looked up from the analysed audio rather
+than kept as state, so a scrub and an export agree. Still missing: the Note/Node family (needs a
+note range mapped from the spectrum), Level Shape (needs the shape renderer's shape set), Frame
+Waveform, and the two Dominant Frequency Colour types. The type this app called "Spectrum" is now
+the manual's "Spectrogram"; sequences that say the old name still render.
+
 **State and Piano** are driven by the words on a timing track rather than by their own parameters,
 which is a shape nothing else in the engine had. Both were previously listed here as blocked on
 "definition files"; re-reading their manual pages showed neither is. State's definitions are

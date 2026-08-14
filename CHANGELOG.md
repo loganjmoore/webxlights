@@ -1,5 +1,35 @@
 # Changelog
 
+## VU Meter: 7 types to 28
+
+The manual's VU Meter page lists about thirty-nine types. This app had seven.
+
+The interesting part is *why* the gap closed now rather than earlier. Fourteen of those types are driven by a **timing track** — sweeps and pulses and jumps that happen on the marks — and until recently an effect had no way to read one. The State and Piano work added that plumbing for entirely different reasons, and the whole timing-event family fell out of it without anything in the VU Meter changing.
+
+That's the general shape of it: the types that were missing weren't missing for want of arithmetic.
+
+### What's new
+
+**Timing-driven (14):** Timing Event Bar, Bars, Spike, Sweep, Sweep 2, Timed Sweep, Timed Sweep 2, Alternate Timed Sweep, Alternate Timed Sweep 2, Color, Pulse, Pulse Color, Jump, Jump 100 — plus Pulse.
+
+Two details from the manual that shape them: a *timed* sweep "speed is based on timing mark spacing", so it crosses in exactly one cell and a fast passage sweeps fast; and the *alternate* pair "bounce back and forth", which is the same sweep with its direction taken from whether the mark is odd or even.
+
+**Level and spectrum (8):** On, Color On, Level Jump, Level Jump 100, Level Pulse Color, Spectrogram Peak, Spectrogram Line.
+
+### The jump types don't keep state
+
+"Jump to the audio level when the sensitivity level is crossed" — and then fall back, which is the entire character of them. A decay needs to know when the crossing happened, and an effect that *remembered* that would give a different answer when scrubbed than when exported.
+
+So the frame context now offers the analysed audio at any moment, not just this frame, and the jump types look backwards to find the last crossing. Same input, same output, whichever path renders it.
+
+### One rename, done carefully
+
+What this app called "Spectrum" is the manual's "Spectrogram". The list now offers the manual's name — but the old one is still a valid type and still renders, because sequences already say it and turning a stored effect into an unknown type renders nothing and looks like data loss. It's in the type union, out of the picker, with a test on both halves.
+
+### Where the warning goes
+
+VU Meter is only *sometimes* timing-driven, so the props panel's "this isn't pointed at a timing track" warning follows the selected Type rather than the effect name.
+
 ## The import mapping dialog
 
 Importing a `.xsq` matched donor rows to your models **by exact name**. That is fine for a sequence built on your own layout, and useless for the case the manual is actually about — "importing purchased sequences from different vendors" — where none of the names are yours and the import silently brought in almost nothing.

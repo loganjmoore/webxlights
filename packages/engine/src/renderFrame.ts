@@ -165,6 +165,7 @@ function renderStateless(
     positionInEffect01,
     seed,
     audio: audio ? audioFrameAt(audio, atMs) : undefined,
+    audioAt: audio ? (ms: number) => audioFrameAt(audio, ms) : undefined,
     // The label-driven effects need real time and real nodes; everything else ignores both.
     clock: { atMs, startMs: effect.startMs, endMs: effect.endMs, frameMs: extras.frameMs ?? 50 },
     data: effect.data,

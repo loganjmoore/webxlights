@@ -6,6 +6,7 @@ import {
   BLEND_MODES,
   CANVAS_ONLY_EFFECTS,
   TIMING_TRACK_EFFECTS,
+  TIMING_DRIVEN_VU_METER_TYPES,
   LAYER_TRANSFORMS,
   RENDER_STYLES,
   PATTERNED_TRANSITION_TYPES,
@@ -157,7 +158,11 @@ function optionsFor(p: EffectParamSpec): string[] {
 // silence the canvas warning covers, and worth the same line of UI.
 const missingTimingTrack = computed(() => {
   const effect = props.effect;
-  if (!effect || !TIMING_TRACK_EFFECTS.has(effect.name)) return false;
+  if (!effect) return false;
+  // VU Meter is only sometimes timing-driven: fourteen of its types read the marks and the rest
+  // read the audio, so the warning follows the Type rather than the effect.
+  const drivenByTiming = effect.name === "VU Meter" && TIMING_DRIVEN_VU_METER_TYPES.has(String(effect.params.type ?? ""));
+  if (!TIMING_TRACK_EFFECTS.has(effect.name) && !drivenByTiming) return false;
   // An effect told not to use a track is driven by its own State or Phoneme field instead.
   if ((effect.name === "State" || effect.name === "Faces") && effect.params.useTimingTrack === false) return false;
   if (effect.name === "Piano" && effect.params.notesSource === "Audio") return false;
@@ -309,8 +314,9 @@ function curveable(p: EffectParamSpec): boolean {
           of the effect; -1 is off.
         </p>
         <p v-if="missingTimingTrack" class="hint warn">
-          {{ effect.name }} is driven by the labels on a timing track, and this one isn't pointed
-          at a track this sequence has. Until it is, the effect renders nothing.
+          {{ effect.name === "VU Meter" ? `The ${effect.params.type} type is` : `${effect.name} is` }} driven by a
+          timing track, and this effect isn't pointed at one this sequence has. Until it is, it
+          renders nothing.
         </p>
         <p v-if="needsCanvas" class="hint warn">
           {{ effect.name }} modifies the layer below it rather than drawing its own, so it needs
