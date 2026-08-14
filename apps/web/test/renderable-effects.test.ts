@@ -68,3 +68,28 @@ describe("resolving a row's effects for the renderer", () => {
     expect(resolved!.data?.timing).toEqual([]);
   });
 });
+
+describe("resolving a face definition", () => {
+  const FACE_MODEL = {
+    faces: [
+      { name: "Face1", mouths: [{ name: "AI", nodes: "1-5" }] },
+      { name: "Face2", mouths: [{ name: "AI", nodes: "6-10" }] },
+    ],
+  } as Pick<ModelRecord, "faces">;
+
+  it("picks the face an effect names", () => {
+    const [resolved] = toRenderableEffects([effect({ name: "Faces", params: { faceDefinition: "Face2" } })], { model: FACE_MODEL });
+    expect(resolved!.data?.face?.mouths[0]!.nodes).toBe("6-10");
+  });
+
+  it("uses the model's only face when the effect names none", () => {
+    const single = { faces: [FACE_MODEL.faces![0]!] };
+    const [resolved] = toRenderableEffects([effect({ name: "Faces", params: {} })], { model: single });
+    expect(resolved!.data?.face?.name).toBe("Face1");
+  });
+
+  it("picks nothing when several faces exist and the effect names none", () => {
+    const [resolved] = toRenderableEffects([effect({ name: "Faces", params: {} })], { model: FACE_MODEL });
+    expect(resolved!.data).toBeUndefined();
+  });
+});

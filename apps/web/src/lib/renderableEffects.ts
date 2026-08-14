@@ -1,4 +1,4 @@
-import { labelsFromTrack, toRenderPalette, type EffectData, type StateEntry, type TimingLabel } from "@webxlights/engine";
+import { labelsFromTrack, toRenderPalette, type EffectData, type FaceSpec, type StateEntry, type TimingLabel } from "@webxlights/engine";
 import type { ModelRecord, SequenceEffect, TimingTrack } from "./api";
 
 // Turning this app's stored effects into what the engine renders.
@@ -13,8 +13,8 @@ import type { ModelRecord, SequenceEffect, TimingTrack } from "./api";
 export interface EffectSourceData {
   /** The sequence's timing tracks - an effect names the one that drives it. */
   timingTracks?: TimingTrack[];
-  /** The model this row belongs to, for its own state definitions. */
-  model?: Pick<ModelRecord, "states"> | null;
+  /** The model this row belongs to, for its own state and face definitions. */
+  model?: Pick<ModelRecord, "states" | "faces"> | null;
 }
 
 function labelsByTrackName(tracks: TimingTrack[] | undefined): Map<string, TimingLabel[]> {
@@ -34,6 +34,15 @@ function entriesFor(model: EffectSourceData["model"], definitionName: unknown): 
   return found?.entries;
 }
 
+// The same rule as state definitions, for the same reason: one definition and no name means that
+// one, several and no name means none.
+function faceFor(model: EffectSourceData["model"], definitionName: unknown): FaceSpec | undefined {
+  const definitions = model?.faces ?? [];
+  if (definitions.length === 0) return undefined;
+  const wanted = typeof definitionName === "string" ? definitionName.trim() : "";
+  return wanted ? definitions.find((d) => d.name === wanted) : definitions.length === 1 ? definitions[0] : undefined;
+}
+
 /**
  * Resolves the palette and the label-driven data for a row's effects.
  *
@@ -47,7 +56,8 @@ export function toRenderableEffects(effects: SequenceEffect[], source: EffectSou
     const trackName = effect.params.timingTrack;
     const timing = typeof trackName === "string" && trackName ? labels.get(trackName) : undefined;
     const states = entriesFor(source.model, effect.params.stateDefinition);
-    const data: EffectData | undefined = timing || states ? { timing, states } : undefined;
+    const face = faceFor(source.model, effect.params.faceDefinition);
+    const data: EffectData | undefined = timing || states || face ? { timing, states, face } : undefined;
     return { ...effect, palette: toRenderPalette(effect.palette), ...(data ? { data } : {}) };
   });
 }

@@ -42,7 +42,7 @@ function ctxAt(atMs: number, over: Partial<FrameContext> = {}): FrameContext {
     frameIndexInEffect: 0,
     positionInEffect01: atMs / 1000,
     seed: 1,
-    clock: { atMs, startMs: 0, endMs: 1000 },
+    clock: { atMs, startMs: 0, endMs: 1000, frameMs: 50 },
     data: { states: ENTRIES },
     nodes: nodes(10),
     ...over,
@@ -212,7 +212,7 @@ describe("State countdown modes", () => {
     // units state "0" - plus the colon a clock face needs.
     renderState(buffer, [RED], params, {
       ...ctxAt(3000, { data: { states: digits } }),
-      clock: { atMs: 3000, startMs: 0, endMs: 20000 },
+      clock: { atMs: 3000, startMs: 0, endMs: 20000, frameMs: 50 },
     });
     expect(lit(buffer)).toEqual([3, 4, 5]);
   });

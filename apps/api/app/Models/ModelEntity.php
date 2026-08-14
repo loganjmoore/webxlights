@@ -15,7 +15,7 @@ class ModelEntity extends Model
     protected $fillable = [
         'name', 'type', 'supported', 'params', 'raw_attrs', 'screen',
         'strings', 'nodes_per_string', 'string_type', 'start_channel', 'channel_count', 'order',
-        'controller_id', 'controller_offset', 'sub_models', 'states',
+        'controller_id', 'controller_offset', 'sub_models', 'states', 'faces',
     ];
 
     protected function casts(): array
@@ -25,6 +25,7 @@ class ModelEntity extends Model
             'raw_attrs' => 'array',
             'sub_models' => 'array',
             'states' => 'array',
+            'faces' => 'array',
             'screen' => 'array',
             'supported' => 'boolean',
         ];

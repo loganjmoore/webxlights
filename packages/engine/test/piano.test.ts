@@ -19,7 +19,7 @@ const DEFAULTS: PianoParams = {
 };
 
 function ctxAt(atMs: number, over: Partial<FrameContext> = {}): FrameContext {
-  return { frameIndexInEffect: 0, positionInEffect01: 0, seed: 1, clock: { atMs, startMs: 0, endMs: 1000 }, ...over };
+  return { frameIndexInEffect: 0, positionInEffect01: 0, seed: 1, clock: { atMs, startMs: 0, endMs: 1000, frameMs: 50 }, ...over };
 }
 
 describe("piano key labels", () => {

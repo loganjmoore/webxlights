@@ -54,6 +54,7 @@ import { renderSketch, type SketchParams } from "./effects/sketch";
 import { createTendrilsState, renderTendrils, type TendrilsParams, type TendrilsState } from "./effects/tendrils";
 import { renderState, type StateParams } from "./effects/state";
 import { renderPiano, type PianoParams } from "./effects/piano";
+import { renderFaces, type FacesParams } from "./effects/faces";
 import type { EffectData, FrameContext } from "./effects/types";
 import type { ModelNode } from "./models/types";
 import { resolveParamsAtPosition } from "./valueCurve";
@@ -100,6 +101,14 @@ export interface RenderableRow {
 
 const MAX_LAYERS = 5;
 
+// What a stateless render needs beyond its own params: where the model's nodes sit in the buffer,
+// and how long a frame is. Only the label-driven effects read either, so they travel together in
+// one bag rather than as two more positional arguments on every call.
+interface StatelessExtras {
+  nodes?: readonly ModelNode[];
+  frameMs?: number;
+}
+
 // Effects with per-frame state (heat map / particle list) that must be simulated forward
 // frame-by-frame from the effect's start to reach `atMs` - correct for a scrubbing preview
 // (not a real-time constraint), cheap at typical effect lengths (a few hundred frames).
@@ -144,7 +153,7 @@ function renderStateless(
   atMs: number,
   seed: number,
   audio: AudioSeries | undefined,
-  nodes?: readonly ModelNode[],
+  extras: StatelessExtras = {},
 ): void {
   const palette = rowPalette; // already resolved for this frame and position (colorCurve.ts)
   const positionInEffect01 = positionOf(effect, atMs);
@@ -157,9 +166,9 @@ function renderStateless(
     seed,
     audio: audio ? audioFrameAt(audio, atMs) : undefined,
     // The label-driven effects need real time and real nodes; everything else ignores both.
-    clock: { atMs, startMs: effect.startMs, endMs: effect.endMs },
+    clock: { atMs, startMs: effect.startMs, endMs: effect.endMs, frameMs: extras.frameMs ?? 50 },
     data: effect.data,
-    nodes,
+    nodes: extras.nodes,
   };
   const params = paramsAt(effect, positionInEffect01);
 
@@ -169,6 +178,9 @@ function renderStateless(
       break;
     case "Piano":
       renderPiano(buffer, palette, params as unknown as PianoParams, ctx);
+      break;
+    case "Faces":
+      renderFaces(buffer, palette, params as unknown as FacesParams, ctx);
       break;
     case "Off":
       renderOff(buffer, params as unknown as OffParams);
@@ -374,7 +386,7 @@ function renderPersistent(
   const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
   const cap = Math.min(framesElapsed, MAX_PERSISTENT_FRAMES);
   for (let f = framesElapsed - cap; f <= framesElapsed; f++) {
-    renderStateless(buffer, palette, effect, effect.startMs + f * frameMs, seed, audio, nodes);
+    renderStateless(buffer, palette, effect, effect.startMs + f * frameMs, seed, audio, { nodes, frameMs });
   }
 }
 
@@ -474,7 +486,7 @@ export function renderRowAtMs(
           renderWithColorCurves(target, effect.palette ?? palette, positionOf(effect, shownAt), (paint, colors) => {
             if (STATEFUL_EFFECTS.has(effect.name)) renderStateful(paint, colors, effect, shownAt, frameMs, seed, audio);
             else if (effect.layer?.persistent) renderPersistent(paint, colors, effect, shownAt, frameMs, seed, audio, geometry.nodes);
-            else renderStateless(paint, colors, effect, shownAt, seed, audio, geometry.nodes);
+            else renderStateless(paint, colors, effect, shownAt, seed, audio, { nodes: geometry.nodes, frameMs });
           });
           if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
         });
@@ -544,12 +556,12 @@ export function createRowSequencer(
                   kept = new RenderBuffer(paint.width, paint.height);
                   statefulStates.set(key, kept);
                 }
-                renderStateless(kept, colors, effect, shownAt, seed, audio, geometry.nodes);
+                renderStateless(kept, colors, effect, shownAt, seed, audio, { nodes: geometry.nodes, frameMs });
                 for (let y = 0; y < paint.height; y++) {
                   for (let x = 0; x < paint.width; x++) paint.setPixel(x, y, kept.getPixel(x, y));
                 }
               } else {
-                renderStateless(paint, colors, effect, shownAt, seed, audio, geometry.nodes);
+                renderStateless(paint, colors, effect, shownAt, seed, audio, { nodes: geometry.nodes, frameMs });
               }
             });
             if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);

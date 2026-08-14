@@ -57,12 +57,22 @@ export interface ParsedStateDefinition {
   entries: { name: string; nodes: string; color?: string }[];
 }
 
+// A face definition: which nodes are the mouth in each position, and which are the eyes and
+// outline. Stored as <faceInfo> inside <model>, like sub-models and states.
+export interface ParsedFaceDefinition {
+  name: string;
+  /** Phoneme -> node ranges. */
+  mouths: { name: string; nodes: string; color?: string }[];
+  parts: Record<string, string>;
+}
+
 export interface ParsedModel {
   name: string;
   displayAs: string;
   supported: boolean;
   subModels: ParsedSubModel[];
   states: ParsedStateDefinition[];
+  faces: ParsedFaceDefinition[];
   // Every XML attribute verbatim (typed-prefix attribute bag, matches xLights' own
   // SettingsMap approach and the jsonb `params` column it maps to).
   attrs: Record<string, string>;
@@ -162,6 +172,50 @@ function parseStates(model: Record<string, unknown>): ParsedStateDefinition[] {
   return out;
 }
 
+// xLights writes a face definition's mouths as `mouth-<PHONEME>` attributes and its other parts
+// as `Eyes-Open`, `Eyes-Closed`, `Outline` and their numbered variants.
+//
+// A *Matrix* definition is skipped rather than imported: its values are image file paths, not node
+// ranges, and reading them as ranges would light arbitrary nodes instead of failing. Matrix faces
+// need image storage that doesn't exist here yet, so they are better absent than wrong.
+const FACE_PART_KEYS = [
+  "Eyes-Open",
+  "Eyes-Closed",
+  "Eyes-Open2",
+  "Eyes-Closed2",
+  "Eyes-Open3",
+  "Eyes-Closed3",
+  "Outline",
+  "Outline2",
+];
+
+function parseFaces(model: Record<string, unknown>): ParsedFaceDefinition[] {
+  const raw = asArray<Record<string, string>>(model.faceInfo as never);
+  const out: ParsedFaceDefinition[] = [];
+  for (const info of raw) {
+    if (!info || typeof info !== "object") continue;
+    if (`${info.Type ?? info.type ?? ""}`.toLowerCase().includes("matrix")) continue;
+
+    const mouths: ParsedFaceDefinition["mouths"] = [];
+    for (const [key, value] of Object.entries(info)) {
+      const match = /^mouth-(.+?)(-Color)?$/.exec(key);
+      if (!match || match[2] || value === undefined || `${value}` === "") continue;
+      const color = info[`mouth-${match[1]}-Color`];
+      mouths.push({ name: match[1]!, nodes: `${value}`, ...(color ? { color: `${color}` } : {}) });
+    }
+
+    const parts: Record<string, string> = {};
+    for (const key of FACE_PART_KEYS) {
+      const value = info[key];
+      if (value !== undefined && `${value}` !== "") parts[key] = `${value}`;
+    }
+
+    if (mouths.length === 0 && Object.keys(parts).length === 0) continue;
+    out.push({ name: info.Name ?? info.name ?? "", mouths, parts });
+  }
+  return out;
+}
+
 export function parseRgbEffectsXml(xml: string): ParsedRgbEffects {
   const doc = parser.parse(xml);
   const root = doc.xrgb;
@@ -182,6 +236,7 @@ export function parseRgbEffectsXml(xml: string): ParsedRgbEffects {
       supported,
       subModels: parseSubModels(m),
       states: parseStates(m),
+      faces: parseFaces(m),
       attrs: m,
     });
   }
