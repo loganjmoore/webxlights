@@ -25,6 +25,8 @@ const STORAGE_KEY = "webxlights.keybindings";
 export const RESERVED_KEYS = new Set([" ", "t", "s", "T", "S"]);
 
 export interface ShortcutRow {
+  /** What the row is stored against - not the label, since two rows can place the same effect. */
+  id: string;
   effect: string;
   key: string;
   /** Whether this row differs from the shortcut xLights ships. */
@@ -32,16 +34,33 @@ export interface ShortcutRow {
 }
 
 /** The shortcuts in force: xLights' defaults with any of this browser's changes applied. */
-export function effectShortcuts(overrides: ShortcutOverrides = {}): Array<{ key: string; effect: string }> {
-  return EFFECT_SHORTCUTS.map(({ key, effect }) => ({ effect, key: overrides[effect] ?? key }));
+export function effectShortcuts(overrides: ShortcutOverrides = {}): typeof EFFECT_SHORTCUTS {
+  // Spread rather than rebuild: a shortcut can carry parameters (the fade-up and fade-down keys
+  // are the On effect with its intensities swapped), and rebuilding from key and effect alone
+  // would drop them - leaving two keys that both place a plain On.
+  return EFFECT_SHORTCUTS.map((shortcut) => ({ ...shortcut, key: overrides[bindingKey(shortcut)] ?? shortcut.key }));
+}
+
+/**
+ * What a binding is stored against.
+ *
+ * The effect name alone isn't enough now that three keys place On: rebinding "fade up" would
+ * otherwise move all three.
+ */
+export function bindingKey(shortcut: { effect: string; params?: unknown }): string {
+  return shortcut.params ? `${shortcut.effect}:${JSON.stringify(shortcut.params)}` : shortcut.effect;
 }
 
 export function shortcutRows(overrides: ShortcutOverrides = {}): ShortcutRow[] {
-  return EFFECT_SHORTCUTS.map(({ key, effect }) => ({
-    effect,
-    key: overrides[effect] ?? key,
-    changed: overrides[effect] !== undefined && overrides[effect] !== key,
-  }));
+  return EFFECT_SHORTCUTS.map((shortcut) => {
+    const id = bindingKey(shortcut);
+    return {
+      effect: shortcut.params ? `${shortcut.effect} (${shortcut.key === "u" ? "fade up" : "fade down"})` : shortcut.effect,
+      id,
+      key: overrides[id] ?? shortcut.key,
+      changed: overrides[id] !== undefined && overrides[id] !== shortcut.key,
+    };
+  });
 }
 
 export interface ShortcutProblem {
@@ -56,20 +75,20 @@ export interface ShortcutProblem {
  * key means one of them silently stops working, and the one that stops is whichever the registry
  * happens to list second.
  */
-export function checkShortcut(effect: string, key: string, overrides: ShortcutOverrides): { ok: true } | ShortcutProblem {
+export function checkShortcut(id: string, key: string, overrides: ShortcutOverrides): { ok: true } | ShortcutProblem {
   if (key.length !== 1) return { ok: false, reason: "A shortcut is a single character." };
   if (RESERVED_KEYS.has(key)) return { ok: false, reason: `${key === " " ? "Space" : key} is already the transport or timing key.` };
-  const clash = effectShortcuts(overrides).find((s) => s.key === key && s.effect !== effect);
+  const clash = effectShortcuts(overrides).find((s) => s.key === key && bindingKey(s) !== id);
   if (clash) return { ok: false, reason: `${key} already places ${clash.effect}.` };
   return { ok: true };
 }
 
 /** Sets one shortcut, or clears it back to xLights' own by passing the default key. */
-export function setShortcut(overrides: ShortcutOverrides, effect: string, key: string): ShortcutOverrides {
+export function setShortcut(overrides: ShortcutOverrides, id: string, key: string): ShortcutOverrides {
   const next = { ...overrides };
-  const original = EFFECT_SHORTCUTS.find((s) => s.effect === effect)?.key;
-  if (key === original) delete next[effect];
-  else next[effect] = key;
+  const original = EFFECT_SHORTCUTS.find((s) => bindingKey(s) === id)?.key;
+  if (key === original) delete next[id];
+  else next[id] = key;
   return next;
 }
 
@@ -79,12 +98,12 @@ export function loadShortcuts(storage: Pick<Storage, "getItem"> | null | undefin
     if (!raw) return {};
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") return {};
-    const known = new Set(EFFECT_SHORTCUTS.map((s) => s.effect));
+    const known = new Set(EFFECT_SHORTCUTS.map(bindingKey));
     const out: ShortcutOverrides = {};
-    for (const [effect, key] of Object.entries(parsed as Record<string, unknown>)) {
-      // An effect that no longer has a shortcut, or a key that isn't one character, is dropped
+    for (const [id, key] of Object.entries(parsed as Record<string, unknown>)) {
+      // A binding that no longer matches a shortcut, or a key that isn't one character, is dropped
       // rather than kept: a stored binding nothing can dispatch is a key that quietly does nothing.
-      if (known.has(effect) && typeof key === "string" && key.length === 1 && !RESERVED_KEYS.has(key)) out[effect] = key;
+      if (known.has(id) && typeof key === "string" && key.length === 1 && !RESERVED_KEYS.has(key)) out[id] = key;
     }
     return out;
   } catch {

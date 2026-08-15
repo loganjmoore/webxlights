@@ -25,6 +25,7 @@ function context(): CommandContext & Record<string, ReturnType<typeof vi.fn>> {
     "zoomIn",
     "zoomOut",
     "placeEffect",
+    "placeRandomEffect",
     "openPalette",
     "exportFseq",
     "snapshot",
@@ -174,5 +175,47 @@ describe("searching the palette", () => {
 
   it("finds nothing for a query nothing matches", () => {
     expect(searchCommands(buildCommands(context()), "xyzzy")).toEqual([]);
+  });
+});
+
+// Found by re-reading the manual's shortcuts page against this table: it lists eighteen effect
+// keys and this had fifteen. The two that were missing carry *parameters*, which is a shape the
+// registry didn't have.
+describe("shortcuts the manual lists that were missing", () => {
+  it("u and d place On with its intensities swapped", () => {
+    // "The On and Ramp Up/Down effects also enables the intensity to be defined as a shortcut
+    // key... a start intensity set to zero and and end intensity set to 100%."
+    const placed: Array<[string, Record<string, unknown> | undefined]> = [];
+    const commands = buildCommands({ ...context(), placeEffect: (name, params) => placed.push([name, params]) });
+
+    commandForEvent(commands, { key: "u" })?.run();
+    commandForEvent(commands, { key: "d" })?.run();
+
+    expect(placed[0]).toEqual(["On", { startIntensity: 0, endIntensity: 100 }]);
+    expect(placed[1]).toEqual(["On", { startIntensity: 100, endIntensity: 0 }]);
+  });
+
+  it("a plain o still places On with no parameters of its own", () => {
+    const placed: Array<[string, Record<string, unknown> | undefined]> = [];
+    const commands = buildCommands({ ...context(), placeEffect: (name, params) => placed.push([name, params]) });
+    commandForEvent(commands, { key: "o" })?.run();
+    expect(placed[0]).toEqual(["On", undefined]);
+  });
+
+  it("Shift+R generates a random effect", () => {
+    let called = 0;
+    const commands = buildCommands({ ...context(), placeRandomEffect: () => called++ });
+    commandForEvent(commands, { key: "R" })?.run();
+    expect(called).toBe(1);
+  });
+
+  it("gives two shortcuts for one effect distinct ids", () => {
+    // o, u and d all place On. A shared id would make the command palette show one of them and
+    // silently drop the other two.
+    const ids = buildCommands(context())
+      .filter((c) => c.id.startsWith("effect.On"))
+      .map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.length).toBeGreaterThanOrEqual(3);
   });
 });

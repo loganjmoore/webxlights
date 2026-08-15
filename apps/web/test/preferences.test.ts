@@ -86,7 +86,7 @@ describe("sanitising a hand-edited bag", () => {
     // A settings screen full of switches with nothing behind them is worse than a short one:
     // every control here has to change something observable.
     expect(Object.keys(DEFAULT_PREFERENCES).sort()).toEqual(
-      ["autosaveSeconds", "defaultEffectMs", "layoutSnapshotMinutes", "snapToTiming", "timeFormat"],
+      ["autosaveSeconds", "defaultEffectMs", "layoutSnapshotMinutes", "snapToTiming", "snapshotOnSave", "timeFormat"],
     );
   });
 });
@@ -123,5 +123,16 @@ describe("every preference can be changed as well as read", () => {
     expect(sanitize({ ...DEFAULT_PREFERENCES, layoutSnapshotMinutes: 0 }).layoutSnapshotMinutes).toBe(0);
     expect(sanitize({ ...DEFAULT_PREFERENCES, layoutSnapshotMinutes: -5 }).layoutSnapshotMinutes).toBe(1);
     expect(sanitize({ ...DEFAULT_PREFERENCES, layoutSnapshotMinutes: 9999 }).layoutSnapshotMinutes).toBe(120);
+  });
+});
+
+describe("backup on save", () => {
+  it("is off by default, and stays a boolean", () => {
+    // Off deliberately: a save in xLights is a deliberate act, where every model drag here saves
+    // immediately - on by default would snapshot every few seconds during an afternoon of
+    // arranging props.
+    expect(DEFAULT_PREFERENCES.snapshotOnSave).toBe(false);
+    expect(sanitize({ ...DEFAULT_PREFERENCES, snapshotOnSave: true }).snapshotOnSave).toBe(true);
+    expect(sanitize({ ...DEFAULT_PREFERENCES, snapshotOnSave: "yes" as never }).snapshotOnSave).toBe(false);
   });
 });

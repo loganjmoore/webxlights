@@ -27,6 +27,14 @@ export interface Preferences {
    * xlights_rgbeffects.xml is backed up... This includes the layout as well").
    */
   layoutSnapshotMinutes: number;
+  /**
+   * Snapshot the layout after an edit as well as on the timer.
+   *
+   * xLights' "Backup on Save". Off by default, and that default is the whole design question: a
+   * save there is a deliberate act, where every model drag here saves immediately. On by default
+   * would mean a snapshot every few seconds during an afternoon of arranging props.
+   */
+  snapshotOnSave: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -35,6 +43,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   snapToTiming: true,
   autosaveSeconds: 5,
   layoutSnapshotMinutes: 15,
+  snapshotOnSave: false,
 };
 
 const STORAGE_KEY = "webxlights.preferences";
@@ -81,6 +90,7 @@ export function sanitize(prefs: Preferences): Preferences {
     // layout, so the floor is a minute rather than a second.
     layoutSnapshotMinutes:
       prefs.layoutSnapshotMinutes === 0 ? 0 : clamp(prefs.layoutSnapshotMinutes, 1, 120, DEFAULT_PREFERENCES.layoutSnapshotMinutes),
+    snapshotOnSave: prefs.snapshotOnSave === true,
   };
 }
 

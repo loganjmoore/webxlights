@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import {
   appliedPlacementFor,
@@ -835,6 +835,29 @@ async function restoreVersion(versionId: number): Promise<void> {
   }
 }
 
+// xLights' "Backup on Save": "If you have enabled Backup on Save, it will also take a snapshot
+// after every Save operation."
+//
+// Watched rather than hooked into each save, because there are a dozen paths that write to the
+// layout - dragging a model, editing a state, importing - and hooking each would be a dozen places
+// to forget. Debounced, because dragging a model across the canvas writes continuously and one
+// snapshot per frame of a drag is not a backup, it is a flood.
+let saveSnapshotTimer: ReturnType<typeof setTimeout> | null = null;
+
+watch(
+  () => (layoutPrefs.value.snapshotOnSave ? layoutFingerprint() : ""),
+  (now, before) => {
+    if (!layoutPrefs.value.snapshotOnSave || !now || now === before || before === undefined) return;
+    if (saveSnapshotTimer) clearTimeout(saveSnapshotTimer);
+    saveSnapshotTimer = setTimeout(() => {
+      // The same changed-since-last-snapshot check the timer uses, so a save that changed nothing
+      // in the end - dragging a model and putting it back - doesn't add a duplicate.
+      if (layoutFingerprint() === lastSnapshotFingerprint) return;
+      void snapshotLayout("auto");
+    }, 3000);
+  },
+);
+
 function startSnapshotTimer(): void {
   if (snapshotTimer) clearInterval(snapshotTimer);
   const minutes = layoutPrefs.value.layoutSnapshotMinutes;
@@ -854,6 +877,7 @@ onMounted(async () => {
 });
 onUnmounted(() => {
   if (snapshotTimer) clearInterval(snapshotTimer);
+  if (saveSnapshotTimer) clearTimeout(saveSnapshotTimer);
   window.removeEventListener("keydown", onKeydown);
 });
 </script>
