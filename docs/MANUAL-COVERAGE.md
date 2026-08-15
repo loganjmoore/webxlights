@@ -79,6 +79,8 @@ written down. Status here means:
 | Layer settings — Transformation (rotate/flip) | ✅ | Rotate 90 either way, rotate 180, flip H/V |
 | Layer settings — Blur | ✅ | Alpha-weighted, so a blur softens coverage rather than dragging colour towards black |
 | Layer settings — Sub-buffer | ✅ | The effect is handed a smaller buffer, per the manual's own distinction from a mask |
+| Layer settings — "Reset panel when changing effects" | 🚫 | A checkbox on xLights' Layer Settings panel, and not applicable here. It exists because that panel is *sticky* — it keeps the settings you last used and applies them to the next effect you select, so it needs a way to say "don't". Our panel reads the selected effect's own layer settings and shows those, so there is nothing to reset and a checkbox for it would control nothing |
+| Layer settings — Roto-Zoom | ⚠️ | **This row was missing from the inventory entirely** — the third time that has happened, after the Settings > Colors tab and the Effects Grid tab, and found the same way: by reading the page rather than the list. Rotation in degrees, zoom, and a pivot point on both axes are implemented and have been for a while. What the *Layer Settings* page also names and we don't have: a **Rotation Preset** and a **Zoom Preset** dropdown, which are mutually exclusive with the manual attributes ("the Rotation attribute cannot be used if a Rotation Preset has been selected"), a **Zoom quality** control, and an **Application Order** setting. All three are named without being defined — the page gives no preset list, no quality scale and no explanation of what order is being applied to what — so they are recorded rather than guessed at, the same call as Alt-drag stretching. The page's **Camera dropdown** for the Per Preview render style is also absent, and that one is a real gap rather than an under-specified one: it picks which preview camera a Per Preview buffer is seen from |
 | Layer settings — Persistent | ✅ | The scrub path replays the effect's frames into one buffer (capped at 600); the sequential export path keeps the buffer between frames it is already walking |
 | Roto-Zoom | ✅ | Rotation, zoom and pivot. xLights' preset rotation *sequences* over the effect's life are not separated out — this is the single turn the panel's own sliders describe |
 | Value curves | ✅ | All 16 types + custom point editor |
@@ -272,3 +274,43 @@ fixtures, shaders and video.
 After that, the missing effects are worth taking in batches by how much machinery they share:
 the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Lines) before the
 ones needing new primitives (Shape, Sketch, Warp, Morph).
+
+
+## Pages not yet audited
+
+Three whole sections have now been found missing from this inventory rather than marked
+incomplete in it — Settings > Colors, Settings > Effects Grid, and Layer Settings > Roto-Zoom.
+Each was found by reading a manual page and noticing there was no row for it, which is luck
+dressed up as method: a section nobody reads about stays missing forever.
+
+So this is the manual's own page list, filtered to the pages no row here corresponds to. It makes
+the remaining audit enumerable instead of discovered.
+
+**Settings tabs.** `settings/view.md`, `settings/sequences.md`, `settings/other.md`,
+`settings/output.md`, `settings/services.md`, `settings/backup.md`. An earlier note dismissed the
+remaining Settings tabs as "machinery this app doesn't have", and that judgement was made without
+reading them — which is exactly how Colors and Effects Grid were missed. Read before dismissing.
+
+**Layout tab.** `layout-preview.md`, `editing-layout-preview.md`, `moving-model-objects.md`,
+`download-import-models.md` (the vendor model library, a known gap), `models/model-attribute.md`
+and its `changing-start-chanel.md` child, plus the fourteen per-model-type pages.
+
+**Sequencer.** `windows.md`, `views.md`, `models.md`, `effect-presets.md`, `pixel-editor.md`,
+`value-curves.md`, `timing-tracks.md`, `singing-faces.md` and its
+`adding-word-to-user-dictionary.md` child.
+
+**Tools.** `lua-scripting.md`, `generate-custom-model.md`, `convert.md`.
+
+**Menus.** `edit.md`, `view.md`, `view/windows.md`, `view/perspective-definition.md`, `import.md`,
+`audio.md`.
+
+**Elsewhere.** `chapter-six-advanced-features.md`, `appendicies/keyboard-shortcuts.md` — an
+appendix distinct from the sequencer's own shortcuts page, and worth checking against the
+shortcuts row — and `appendicies/glossary.md`.
+
+**Effect pages** for effects we may not have at all: `adjust.md`, `duplicate.md`, `guitar.md`,
+`kaleidoscope.md`, `moving-head.md`.
+
+A page appearing here means no row cites it, not that the feature is absent — several will turn
+out to be covered by a row named differently. The point is that each has been *looked at* rather
+than assumed.
