@@ -5,6 +5,7 @@ import { parseXsq } from "@webxlights/formats";
 import { describeMapping, mapXsqToBody } from "../lib/xsqConvert";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { api, type ModelGroupRecord, type ModelRecord, type SequenceSummary } from "../lib/api";
+import { loadPreferences } from "../lib/preferences";
 import { decodeAudioFile } from "../lib/audio";
 import {
   applyMapping,
@@ -24,7 +25,10 @@ const projectId = computed(() => Number(route.params.projectId));
 
 const sequences = ref<SequenceSummary[]>([]);
 const name = ref("");
-const frameMs = ref(50);
+// Seeded from the preference (xLights' "Default Sequence Duration and FPS"), which exists so you
+// aren't setting the same two numbers every time.
+const newPrefs = loadPreferences(typeof localStorage === "undefined" ? null : localStorage);
+const frameMs = ref(newPrefs.defaultFrameMs);
 const audioFile = ref<File | null>(null);
 const creating = ref(false);
 const error = ref("");
@@ -57,8 +61,37 @@ async function createSequence(): Promise<void> {
       frame_ms: frameMs.value,
       duration_ms: durationMs,
       audio_filename: audioFile.value.name,
+      blend_between_models: newPrefs.defaultBlendBetweenModels,
     });
     await api.uploadSequenceAudio(record.id, audioFile.value);
+    router.push({ name: "sequencer", params: { projectId: projectId.value, sequenceId: record.id } });
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Could not create sequence";
+  } finally {
+    creating.value = false;
+  }
+}
+
+/**
+ * A sequence with no soundtrack (xLights' "Media or Animated").
+ *
+ * The type has existed since Sequence Settings landed, and nothing could produce one: every path
+ * to a new sequence went through picking an audio file, so "animated" was a setting you could
+ * only reach by changing a sequence that already had a track. Its length comes from the
+ * preference, because there is no audio to take it from - which is what that preference is for.
+ */
+async function createAnimatedSequence(): Promise<void> {
+  if (!name.value.trim()) return;
+  creating.value = true;
+  error.value = "";
+  try {
+    const record = await api.createSequence(projectId.value, {
+      name: name.value.trim(),
+      frame_ms: frameMs.value,
+      duration_ms: newPrefs.defaultSequenceMs,
+      sequence_type: "animated",
+      blend_between_models: newPrefs.defaultBlendBetweenModels,
+    });
     router.push({ name: "sequencer", params: { projectId: projectId.value, sequenceId: record.id } });
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Could not create sequence";
@@ -257,6 +290,14 @@ onMounted(load);
           <option v-for="f in FRAME_OPTIONS" :key="f" :value="f">{{ f }}ms ({{ Math.round(1000 / f) }}fps)</option>
         </select>
       </label>
+      <button
+        class="secondary"
+        :disabled="!name.trim() || creating"
+        :title="`A sequence with no soundtrack, ${Math.round(newPrefs.defaultSequenceMs / 1000)}s long`"
+        @click="createAnimatedSequence"
+      >
+        Animated (no audio)
+      </button>
       <button :disabled="!audioFile || !name.trim() || creating" @click="createSequence">
         {{ creating ? "Decoding audio..." : "Create" }}
       </button>

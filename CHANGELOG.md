@@ -1,5 +1,21 @@
 # Changelog
 
+## A sequence with no soundtrack
+
+Building "Default Sequence Duration and FPS" — a small preference recorded three changes ago — turned up that the preference had nothing to be a default *for*.
+
+**An animated sequence could not be created at all.** The Media/Animated type has existed since Sequence Settings landed, and every path to a new sequence went through picking an audio file. "Animated" was reachable only by creating a sequence with a track and then telling it it didn't have one.
+
+That's the third time this shape has appeared: a setting that describes something the app can't produce. Layer Blending had no second layer to blend, the Mix slider had nothing to mix, and now a sequence type had no way to be born.
+
+So there's a create path with no audio, and *that* is what the duration default is for. A sequence with a track takes its length from the track — the right answer, and not worth a preference to override.
+
+Alongside it: **Default Model Blending for New Sequences**, and the FPS half of the duration setting. The frame-rate preference is restricted to the values the API accepts, because a preference that produced a sequence the server refuses would fail at create time with a validation error rather than anything a person could act on.
+
+### Still missing, and why
+
+**Default View For New Sequences.** Views are a per-layout list here and nothing on a sequence points at one, so there's no field for a default to fill. Recorded rather than approximated.
+
 ## The screen's copy of the compose rules is testable now
 
 Four things can address the same node, and the order they're applied in *is* the feature: the group first, then the model's own rows, then strands, then sub-models.

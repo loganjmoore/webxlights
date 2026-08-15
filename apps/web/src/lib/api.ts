@@ -359,7 +359,17 @@ export const api = {
   bulkUpsertViewObjects: (layoutId: number, objects: ViewObjectUpsertPayload[]) =>
     request<ViewObjectRecord[]>(`/v1/layouts/${layoutId}/view-objects/bulk`, { method: "POST", body: JSON.stringify({ objects }) }),
   listSequences: (projectId: number) => request<SequenceSummary[]>(`/v1/projects/${projectId}/sequences`),
-  createSequence: (projectId: number, data: { name: string; frame_ms: number; duration_ms: number; audio_filename?: string }) =>
+  createSequence: (
+    projectId: number,
+    data: {
+      name: string;
+      frame_ms: number;
+      duration_ms: number;
+      audio_filename?: string;
+      sequence_type?: "media" | "animated";
+      blend_between_models?: boolean;
+    },
+  ) =>
     request<SequenceRecord>(`/v1/projects/${projectId}/sequences`, { method: "POST", body: JSON.stringify(data) }),
   getSequence: (sequenceId: number) => request<SequenceRecord>(`/v1/sequences/${sequenceId}`),
   /** xLights' Sequence Settings dialog. Separate from the body autosave, which carries an etag. */

@@ -90,7 +90,10 @@ describe("sanitising a hand-edited bag", () => {
     // every control here has to change something observable.
     expect(Object.keys(DEFAULT_PREFERENCES).sort()).toEqual([
       "autosaveSeconds",
+      "defaultBlendBetweenModels",
       "defaultEffectMs",
+      "defaultFrameMs",
+      "defaultSequenceMs",
       "doubleClickMode",
       "gridSpacing",
       "layoutSnapshotMinutes",
@@ -101,7 +104,7 @@ describe("sanitising a hand-edited bag", () => {
       "timeFormat",
       "timelineZoomAnchor",
       "versionRetentionDays",
-    ]);
+    ].sort());
   });
 });
 
@@ -152,6 +155,16 @@ describe("the effects grid settings", () => {
     // A hand-edited 1 would delete yesterday's work every time a snapshot was taken.
     expect(sanitize({ ...DEFAULT_PREFERENCES, versionRetentionDays: 1 }).versionRetentionDays).toBe(0);
     expect(sanitize({ ...DEFAULT_PREFERENCES, versionRetentionDays: -5 }).versionRetentionDays).toBe(0);
+  });
+
+  it("defaults a new sequence to something usable, and refuses a frame rate the API would reject", () => {
+    // A preference that produced a sequence the API refuses would fail at create time with a
+    // validation error rather than anything useful.
+    expect(sanitize({ ...DEFAULT_PREFERENCES, defaultFrameMs: 37 }).defaultFrameMs).toBe(DEFAULT_PREFERENCES.defaultFrameMs);
+    expect(sanitize({ ...DEFAULT_PREFERENCES, defaultFrameMs: 25 }).defaultFrameMs).toBe(25);
+    // A zero-length sequence has no grid to put anything on.
+    expect(sanitize({ ...DEFAULT_PREFERENCES, defaultSequenceMs: 0 }).defaultSequenceMs).toBeGreaterThan(0);
+    expect(sanitize({ ...DEFAULT_PREFERENCES, defaultSequenceMs: 99_999_999 }).defaultSequenceMs).toBe(3_600_000);
   });
 
   it("only knows two double-click modes", () => {

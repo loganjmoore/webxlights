@@ -26,6 +26,10 @@ class SequenceController extends Controller
             'frame_ms' => ['required', 'integer', Rule::in([20, 25, 33, 40, 50])],
             'duration_ms' => ['required', 'integer', 'min:0'],
             'audio_filename' => ['nullable', 'string'],
+            // An animated sequence has no soundtrack, which is the whole distinction - so the
+            // type has to be settable at creation, not only afterwards.
+            'sequence_type' => ['sometimes', Rule::in(['media', 'animated'])],
+            'blend_between_models' => ['sometimes', 'boolean'],
         ]);
 
         $sequence = $project->sequences()->create($data + ['body' => ['timingTracks' => [], 'rows' => []]]);
