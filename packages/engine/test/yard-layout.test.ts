@@ -11,7 +11,11 @@ const SPACING = 4;
 // overlapping props - one model covering the whole canvas with the rest crushed into a corner.
 // These are the structural properties that told us it was wrong, as assertions.
 const YARD: Array<[string, Record<string, string>]> = [
-  ["Tree", { NumStrings: "16", NodesPerString: "50", WorldPosX: "-260", WorldPosY: "90", ScaleX: "24", ScaleY: "7" }],
+  // ScaleX and ScaleY within a whisker of each other, which is what sizing a tree naturally
+  // looks like. This fixture used to say ScaleX: "24" against the same ScaleY: "7" - a 3.4:1
+  // stretch that existed only to widen a local cone 3.4x too narrow (models/tree.ts). The world
+  // size the yard is actually asserted on is unchanged: 294 x 343 against the old 288 x 343.
+  ["Tree", { NumStrings: "16", NodesPerString: "50", WorldPosX: "-260", WorldPosY: "90", ScaleX: "8", ScaleY: "7" }],
   ["Matrix", { NumStrings: "40", NodesPerString: "25", WorldPosX: "40", WorldPosY: "120", ScaleX: "2", ScaleY: "2" }],
   ["Single Line", { NumStrings: "1", NodesPerString: "80", WorldPosX: "-60", WorldPosY: "215", X2: "260", Y2: "40" }],
   ["Arches", { NumArches: "5", NodesPerArch: "25", WorldPosX: "-60", WorldPosY: "20", X2: "200", Y2: "0", Height: "0.45" }],

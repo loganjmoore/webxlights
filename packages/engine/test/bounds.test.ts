@@ -29,13 +29,18 @@ describe("geometryScreenBounds", () => {
     expect(bigger.maxX - bigger.minX).toBeCloseTo(200 / Math.PI, 1);
   });
 
-  it("a Tree's real width comes from bottomTopRatio, not the strings count", () => {
+  it("a Tree's real width comes from its shape, not the strings count", () => {
     const geo = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: 6 });
     const b = geometryScreenBounds(geo);
-    // widest row is the base (radius == bottomTopRatio == 6), so the real span is ~12,
-    // nothing like `strings` (16, the buffer width geo.width would report).
-    expect(b.maxX - b.minX).toBeGreaterThan(10);
-    expect(b.maxX - b.minX).toBeLessThan(13);
+    // The widest row is the base, which is sized against the tree's height in node units - so
+    // ~37 for a 50-node string, and nothing like `strings` (16, which is the buffer width
+    // geo.width would report).
+    //
+    // This used to expect ~12: the base radius in raw `bottomTopRatio` units, back when that
+    // ratio was doubling as a length. That was the bug - the height beside it was a real count
+    // of nodes, so the cone came out 51 tall and 12 wide. The number here changed; what the
+    // test is *for* did not.
+    expect(b.maxX - b.minX).toBeCloseTo(36.75, 1);
   });
 
   it("returns a degenerate zero box for an empty geometry, not NaN/Infinity", () => {
