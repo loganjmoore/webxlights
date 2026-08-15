@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { CANVAS_ONLY_EFFECTS, EFFECT_SCHEMAS, defaultParamsFor, detectOnsets, estimateTempo, mouthNames, type AudioSeries, type OnsetBand, type BlendMode, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
+import { CANVAS_ONLY_EFFECTS, EFFECT_SCHEMAS, defaultParamsFor, detectOnsets, estimateTempo, mouthNames, type AudioSeries, type OnsetBand, type BlendMode, type ColorAdjust, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
 import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequencerView, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
@@ -1031,6 +1031,28 @@ function handleFade(effectId: string, edge: "left" | "right", durationMs: number
   const effect = store.findEffect(effectId);
   if (!effect) return;
   store.updateEffectLive(effectId, { transition: withFade(effect.transition, edge, durationMs) });
+}
+
+function handleColorAdjustUpdate(colorAdjust: ColorAdjust): void {
+  if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { colorAdjust });
+}
+
+/**
+ * The Colour panel's Update button: "will apply the current colors palettes to all the selected
+ * effects".
+ *
+ * The palette specifically, not the whole settings bag. A palette means the same thing to every
+ * effect, where a Fire's parameters mean nothing to a Bars - which is why the manual offers this
+ * for colours and nothing else.
+ */
+function applyPaletteToSelection(): void {
+  const source = store.selectedEffectId ? store.findEffect(store.selectedEffectId) : null;
+  if (!source) return;
+  const palette = source.palette;
+  store.updateEffectsPalette(
+    store.selectedEffectIds.filter((id) => id !== source.id),
+    palette,
+  );
 }
 
 function handleTransitionUpdate(transition: TransitionSpec): void {
@@ -2368,6 +2390,9 @@ watch(sequenceId, async (id) => {
           :phoneme-names="phonemeNames"
           @update="handleParamsUpdate"
           @update-palette="handlePaletteUpdate"
+          @update-color-adjust="handleColorAdjustUpdate"
+          @apply-palette-to-selection="applyPaletteToSelection"
+          :selection-size="store.selectedEffectIds.length"
           @update-blend="handleBlendUpdate"
           @update-transition="handleTransitionUpdate"
           @update-layer="handleLayerUpdate"

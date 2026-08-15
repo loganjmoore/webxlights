@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { api, type SequenceBody, type SequenceEffect, type SequenceRecord, type TimingTrack } from "../lib/api";
+import type { StoredSwatch } from "@webxlights/engine";
 import { withLabelSet, withMarkRemoved, withMarksAdded } from "../lib/timingMarks";
 
 const UNDO_LIMIT = 100;
@@ -122,14 +123,14 @@ export const useSequencerStore = defineStore("sequencer", () => {
     ensureRow(elementType, elementId, subName).effects.push(effect);
   }
 
-  function applyEffectPatch(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params" | "palette" | "blendMode" | "mix" | "transition" | "layer">>): void {
+  function applyEffectPatch(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params" | "palette" | "blendMode" | "mix" | "transition" | "layer" | "colorAdjust">>): void {
     for (const row of body.value.rows) {
       const effect = row.effects.find((e) => e.id === effectId);
       if (effect) Object.assign(effect, patch);
     }
   }
 
-  function updateEffect(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params" | "palette" | "blendMode" | "mix" | "transition" | "layer">>): void {
+  function updateEffect(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params" | "palette" | "blendMode" | "mix" | "transition" | "layer" | "colorAdjust">>): void {
     pushUndoSnapshot();
     applyEffectPatch(effectId, patch);
   }
@@ -138,7 +139,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
   // every move event, so snapshotting here fills the 100-entry undo stack with intermediate
   // drag frames (Ctrl+Z nudges by a pixel instead of undoing the drag). The caller snapshots
   // once via snapshot() at drag start instead (see SequencerGrid's dragStart emit).
-  function updateEffectLive(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params" | "palette" | "blendMode" | "mix" | "transition" | "layer">>): void {
+  function updateEffectLive(effectId: string, patch: Partial<Pick<SequenceEffect, "startMs" | "endMs" | "params" | "palette" | "blendMode" | "mix" | "transition" | "layer" | "colorAdjust">>): void {
     applyEffectPatch(effectId, patch);
   }
 
@@ -217,6 +218,18 @@ export const useSequencerStore = defineStore("sequencer", () => {
     for (const row of body.value.rows) row.effects = row.effects.filter((e) => !ids.has(e.id));
     selectedEffectIds.value = [];
     selectedEffectId.value = null;
+  }
+
+  /**
+   * Puts one palette on several effects, under one undo entry.
+   *
+   * The Colour panel's Update button. Only the palette: it means the same thing to every effect,
+   * where an effect's own parameters mean nothing to an effect of another kind.
+   */
+  function updateEffectsPalette(ids: readonly string[], palette: StoredSwatch[] | undefined): void {
+    if (ids.length === 0) return;
+    pushUndoSnapshot();
+    for (const id of ids) applyEffectPatch(id, { palette });
   }
 
   /** Applies a patch to several effects under one undo entry (an alignment moves all of them). */
@@ -397,6 +410,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     setSelection,
     deleteSelected,
     updateEffects,
+    updateEffectsPalette,
     saveStatus,
     conflictRemote,
     keepMine,

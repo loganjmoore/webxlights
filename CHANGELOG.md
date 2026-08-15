@@ -1,5 +1,31 @@
 # Changelog
 
+## Sparkles, brightness and contrast — and a correction
+
+The coverage row read **"Colour settings — palette — Up to 6 swatches"**. Both halves of that were short.
+
+The manual's *Changing Color Settings* page: "Some support just one, some support up to 8." Six was wrong, and low enough to have been hit by anyone building a rainbow. The cap is now eight.
+
+And the panel is not only swatches: "From the Color window, you can change the Colors that apply to the effect, as well as the **Sparkles, Brightness and Contrast** values", with the sparkle colour picked separately. Three controls that apply to every effect, none of which we had.
+
+### Where they run, and why
+
+Between the effect and the model, like the layer settings — they apply to every effect without any effect knowing about them. And *before* the transition, so a fade in fades what the sliders produced rather than the sliders brightening a partly-revealed frame back up.
+
+**Sparkles are deterministic in (x, y, frame).** This is the rule the whole render engine turns on: an effect must render identically when scrubbed and when exported. A sparkle drawn from a random source, or one that remembered a seed between frames, would twinkle differently in the exported file than it did on screen — and nobody would find that out until the show was running. So it's a cheap integer hash of position and frame number, with a test asserting the same pixel on the same frame always answers the same, and another asserting the pattern doesn't fall into rows or columns (a weak hash lights whole lines, which reads as a grid rather than as sparkle).
+
+They land on lit pixels only. A sparkle on an unlit pixel would light one the effect deliberately left dark, turning a chase into a field of static.
+
+### A correction to the last change but one
+
+Two changes ago I removed "multi-effect property editing" from the coverage row, on the grounds that it was our own idea rather than anything the manual asks for — having found nothing about it on the *Changing An Effect* page.
+
+That was half wrong, and this page is where it says so: "The 'Update' button will apply the current colors palettes to all the selected effects."
+
+So applying a **palette** across a selection is real parity, and it's now built — offered whenever more than one effect is selected. Applying an effect's own **parameters** across a block remains our idea and remains a bad one: a Fire's settings mean nothing to a Bars, which is presumably exactly why the manual offers this for colours and nothing else.
+
+The lesson is narrower than "read more". A feature absent from the page you'd expect it on can still be documented one page down, so "the manual describes no such thing" is a claim about one page, not about the manual.
+
 ## Sequence Settings, and a sequence you can change after making it
 
 Back to reading fresh manual pages, choosing rows that looked *settled* rather than rows already marked incomplete — that is where every finding in this run has come from. The row for **New sequence, sequence settings** read `✅` with an empty note, and the emptiness was the tell.
