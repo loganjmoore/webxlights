@@ -840,6 +840,19 @@ function clearPlayRange(): void {
 }
 
 function onTimeUpdate(): void {
+  // Still wired up, because it is the only thing that fires after a seek while paused. During
+  // playback the frame loop below has usually already set the same value.
+  syncPlayheadFromAudio();
+}
+
+/**
+ * Reads the playhead off the audio element.
+ *
+ * Rounded to whole milliseconds - the sequence's own resolution - so a frame that lands mid-
+ * millisecond doesn't make every downstream `renderRowAtMs` recompute for a difference nothing
+ * can display.
+ */
+function syncPlayheadFromAudio(): void {
   const el = audioEl.value;
   if (!el) return;
   playheadMs.value = Math.round(el.currentTime * 1000);
@@ -853,6 +866,47 @@ function onTimeUpdate(): void {
     playheadMs.value = jumpTo;
   }
 }
+
+// The playhead advances on animation frames while the transport is running, not on the audio
+// element's `timeupdate`.
+//
+// `timeupdate` fires about four times a second - the spec leaves the rate to the browser, and
+// every engine picks something in the 4Hz region. Everything downstream of `playheadMs` was
+// therefore animating at 4fps: the playhead line, the house preview, and the popped-out preview
+// window. Effects that are meant to move continuously - Meteors, Ripple, anything with a speed -
+// came out as a slideshow, which is not what they look like when rendered to a file.
+//
+// One frame loop drives all of them, and it also broadcasts, because the popped-out window used
+// to receive a transport message only on play/pause and on a command from its own controls: it
+// sat frozen on the frame play started at until you pressed something.
+let playbackRaf: number | null = null;
+
+function startPlaybackFrames(): void {
+  if (playbackRaf !== null) return;
+  const tick = (): void => {
+    if (!playing.value) {
+      playbackRaf = null;
+      return;
+    }
+    syncPlayheadFromAudio();
+    broadcastTransport();
+    playbackRaf = requestAnimationFrame(tick);
+  };
+  playbackRaf = requestAnimationFrame(tick);
+}
+
+function stopPlaybackFrames(): void {
+  if (playbackRaf !== null) cancelAnimationFrame(playbackRaf);
+  playbackRaf = null;
+  // One last message so a paused preview window agrees with this one about where the playhead
+  // stopped, rather than keeping whatever frame the loop happened to end on.
+  broadcastTransport();
+}
+
+// Driven off `playing` rather than off the play/pause functions, so the loop follows the audio
+// element however it was started - the transport buttons, the space bar, or a command posted
+// from the preview window.
+watch(playing, (isPlaying) => (isPlaying ? startPlaybackFrames() : stopPlaybackFrames()));
 
 function armEffect(name: string): void {
   pendingEffectName.value = pendingEffectName.value === name ? null : name;
@@ -870,11 +924,16 @@ function layerFor(row: GridRow): { layerIndex?: number } {
 
 function handlePlace(row: GridRow, startMs: number, endMs: number): void {
   if (!pendingEffectName.value) return;
+  // Same floor as a drop. Sizing an effect by dragging it out on the grid is the one gesture
+  // that can produce any width at all, including a two-pixel flick that lands something on the
+  // row you then can't get hold of.
+  const width = Math.max(endMs - startMs, minimumEffectMs.value);
+  const end = Math.min(startMs + width, store.sequence?.duration_ms ?? startMs + width);
   store.addEffect(row.elementType, row.elementId, row.subName, {
     id: newEffectId(),
     name: pendingEffectName.value,
-    startMs,
-    endMs,
+    startMs: Math.max(0, Math.min(startMs, end - width)),
+    endMs: end,
     params: defaultParamsFor(pendingEffectName.value),
     ...layerFor(row),
   });
@@ -923,8 +982,26 @@ watch(
  * gave you something that had to be dragged to fit the beat it was dropped on.
  */
 function placementAt(atMs: number): { startMs: number; endMs: number } {
-  return placementFor(activeMarks.value, atMs, store.sequence?.duration_ms ?? 0, prefs.value.defaultEffectMs || DEFAULT_DROPPED_EFFECT_MS);
+  return placementFor(
+    activeMarks.value,
+    atMs,
+    store.sequence?.duration_ms ?? 0,
+    prefs.value.defaultEffectMs || DEFAULT_DROPPED_EFFECT_MS,
+    minimumEffectMs.value,
+  );
 }
+
+/**
+ * The narrowest an effect is allowed to be placed, in milliseconds at the current zoom.
+ *
+ * The rule is a pixel one: nothing gets placed narrower than `MIN_EFFECT_PX` on screen. In
+ * milliseconds it can't be a constant, because the same effect is a pixel wide zoomed out to the
+ * whole song and half the screen zoomed into a bar - and at a pixel wide it can't be clicked, so
+ * it can't be selected, moved or deleted either. Dropping between two closely-spaced timing
+ * marks at a low zoom is exactly how you end up with one.
+ */
+const MIN_EFFECT_PX = 30;
+const minimumEffectMs = computed(() => MIN_EFFECT_PX / Math.max(pxPerMs.value, 1e-9));
 
 // Native drag-and-drop from the palette (SequencerGrid.vue's onDrop). The existing arm+drag-on-grid
 // gesture (which lets you size the effect in one motion) is untouched and still the way to place a
@@ -1376,16 +1453,50 @@ function onPreviewMessage(e: MessageEvent<PreviewMessage>): void {
 
 function openPreviewWindow(): void {
   // A window opened now won't have its listener attached yet; it says hello when it's ready.
-  previewWindow.value = window.open(
+  const opened = window.open(
     previewUrlFor(route.params.projectId as string, sequenceId.value),
     `webxlights-preview-${sequenceId.value}`,
   );
+  previewWindow.value = opened;
+  // A popup blocker returns null, and the docked preview has to stay put in that case - hiding
+  // it would leave no preview anywhere and nothing on screen to explain why.
+  if (!opened) return;
+  previewPoppedOut.value = true;
+  watchPreviewWindow();
 }
 
 // The popped-out preview, so Ctrl+F6 can close the one it opened. Held rather than looked up
 // because there is no asking the browser whether a named window exists: `window.open` with the
 // same name would focus it, which is the opposite of toggling it off.
 const previewWindow = ref<Window | null>(null);
+
+/**
+ * Whether the preview is currently living in its own window.
+ *
+ * While it is, the docked copy is taken out of the sequencer entirely (not hidden - removed) and
+ * the 220px it held goes to the grid. Rendering the same scene twice is the part that actually
+ * costs something: both copies run their own WebGL context and their own per-frame colour pass
+ * over every node, and the one nobody is looking at is pure waste.
+ *
+ * Polled rather than watched. `window.closed` fires no event, so a window the user closed with
+ * its own X would otherwise leave the sequencer permanently missing its preview - the failure
+ * that matters here, since there is no way to ask for the docked one back directly. Half a
+ * second is far below noticing and costs nothing.
+ */
+const previewPoppedOut = ref(false);
+let previewWatchTimer: ReturnType<typeof setInterval> | null = null;
+
+function watchPreviewWindow(): void {
+  if (previewWatchTimer !== null) return;
+  previewWatchTimer = setInterval(() => {
+    const open = previewWindow.value;
+    if (open && !open.closed) return;
+    previewWindow.value = null;
+    previewPoppedOut.value = false;
+    if (previewWatchTimer !== null) clearInterval(previewWatchTimer);
+    previewWatchTimer = null;
+  }, 500);
+}
 
 /**
  * "Toggle House Preview Window On/Off".
@@ -1398,6 +1509,7 @@ function togglePreviewWindow(): void {
   if (open && !open.closed) {
     open.close();
     previewWindow.value = null;
+    previewPoppedOut.value = false;
     return;
   }
   openPreviewWindow();
@@ -1943,6 +2055,8 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
+  if (playbackRaf !== null) cancelAnimationFrame(playbackRaf);
+  if (previewWatchTimer !== null) clearInterval(previewWatchTimer);
   previewChannel?.removeEventListener("message", onPreviewMessage);
   previewChannel?.close();
   if (audioUrl.value) URL.revokeObjectURL(audioUrl.value);
@@ -2765,7 +2879,7 @@ watch(sequenceId, async (id) => {
 
     <div class="editor">
       <div class="timeline">
-        <div class="preview-wrap">
+        <div v-if="!previewPoppedOut" class="preview-wrap">
           <HousePreview
             :models="modelRecords"
             :groups="groupRecords"

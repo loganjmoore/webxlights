@@ -5,12 +5,18 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { computeGeometryFromAttrs, geometryCenter, nodeWorldOffset, transformedHalfExtents, type ModelGeometry, type ScreenTransform } from "@webxlights/engine";
 import type { ModelRecord, ViewObjectRecord } from "../lib/api";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
+import { groundedAnchorY, resizeFromCorner } from "../lib/resizeModel";
 
 const props = defineProps<{ models: ModelRecord[]; viewObjects?: ViewObjectRecord[]; selectedModelId: number | null }>();
 const emit = defineEmits<{
   select: [modelId: number | null];
   move: [modelId: number, x: number, y: number, z: number];
+  create: [type: string, x: number, y: number];
+  resize: [modelId: number, screen: { scale: number; scaleY: number; scaleZ: number; y: number }];
 }>();
+
+// Must match ModelPalette.vue's dragstart payload exactly.
+const MODEL_DRAG_MIME = "application/x-webxlights-model-type";
 
 const NODE_SPACING = 4; // matches LayoutCanvas (2D) and HousePreview's local-unit-to-px scale
 const PICK_DEPTH = 12; // flat 2D models get a thin box for raycasting, not zero-volume
@@ -92,6 +98,8 @@ function buildViewObjects(): void {
 
 interface RowEntry {
   model: ModelRecord;
+  /** Depth scale, which the 2D transform doesn't carry but a resize still has to track. */
+  scaleZ: number;
   geometry: ModelGeometry;
   center: { x: number; y: number };
   transform: ScreenTransform;
@@ -171,7 +179,16 @@ function buildScene(): void {
     mesh.position.set(model.screen.x ?? 0, model.screen.y ?? 0, model.screen.z ?? 0);
     mesh.userData.modelId = model.id;
     setup.scene.add(mesh);
-    rowEntries.push({ model, geometry: geo, center: geometryCenter(geo), transform, offset, pickMesh: mesh, halfHeightWorld: halfH * NODE_SPACING });
+    rowEntries.push({
+      model,
+      scaleZ: model.screen.scaleZ ?? model.screen.scale ?? 1,
+      geometry: geo,
+      center: geometryCenter(geo),
+      transform,
+      offset,
+      pickMesh: mesh,
+      halfHeightWorld: halfH * NODE_SPACING,
+    });
     offset += geo.nodes.length;
   }
 
@@ -198,6 +215,141 @@ function updateSelectionHighlight(): void {
     selectionHelper = new THREE.BoxHelper(entry.pickMesh, 0xe8c468);
     setup.scene.add(selectionHelper);
   }
+  buildHandles();
+}
+
+/**
+ * Keep a prop's feet on the lawn.
+ *
+ * On by default because it is true of almost everything in a yard, and because the failure it
+ * prevents is quiet: a prop sunk halfway into the ground still renders, it just looks wrong in
+ * the preview and nowhere else. Turned off for the things it isn't true of - a star on a roof
+ * peak, lights along a gutter.
+ */
+const keepOnGround = ref(true);
+
+/**
+ * Resize every axis together rather than X and Y separately.
+ *
+ * For anything with a round footprint - a mega tree, a wreath, a sphere - X and Y independently
+ * is the wrong control: making it taller without making it wider turns a cone into a spike, and
+ * the depth would stay behind either way. Off by default, because a matrix or a roofline is
+ * exactly the case where you do want to stretch one axis alone.
+ */
+const uniformScale = ref(false);
+
+// Little square grips at the corners of the selected model's box. Cubes rather than sprites or
+// screen-space quads: a cube is pickable from any camera angle, including the orbits where the
+// model's own plane is edge-on and a flat handle would vanish.
+const HANDLE_MIN_WORLD = 6;
+const HANDLE_FRACTION = 0.1; // of the smaller half-extent, so a big prop gets bigger grips
+let handleMeshes: THREE.Mesh[] = [];
+
+function clearHandles(): void {
+  if (!setup) return;
+  for (const h of handleMeshes) {
+    setup.scene.remove(h);
+    h.geometry.dispose();
+  }
+  handleMaterial?.dispose();
+  handleMaterial = null;
+  handleMeshes = [];
+}
+let handleMaterial: THREE.MeshBasicMaterial | null = null;
+
+/** The four corners of a model's box, as (+/-1, +/-1) signs and world positions. */
+function handleCornersFor(entry: RowEntry): { sx: number; sy: number; pos: THREE.Vector3 }[] {
+  const { halfW, halfH } = worldHalfExtents(entry);
+  const p = entry.pickMesh.position;
+  const corners: { sx: number; sy: number; pos: THREE.Vector3 }[] = [];
+  for (const sy of [-1, 1]) {
+    for (const sx of [-1, 1]) {
+      corners.push({ sx, sy, pos: new THREE.Vector3(p.x + sx * halfW, p.y + sy * halfH, p.z) });
+    }
+  }
+  return corners;
+}
+
+function worldHalfExtents(entry: RowEntry): { halfW: number; halfH: number } {
+  const { halfW, halfH } = transformedHalfExtents(entry.geometry, entry.transform);
+  return { halfW: Math.max(halfW * NODE_SPACING, 8), halfH: Math.max(halfH * NODE_SPACING, 8) };
+}
+
+/** Local half-extents at scale 1, which is what a world size has to be divided by to get a scale. */
+function unitHalfExtents(entry: RowEntry): { halfW: number; halfH: number } {
+  const { halfW, halfH } = transformedHalfExtents(entry.geometry, { scale: 1, scaleY: 1, rotateDeg: entry.transform.rotateDeg });
+  return { halfW: Math.max(halfW, 1e-6), halfH: Math.max(halfH, 1e-6) };
+}
+
+function buildHandles(): void {
+  if (!setup) return;
+  clearHandles();
+  const entry = rowEntries.find((r) => r.model.id === props.selectedModelId);
+  if (!entry) return;
+  const { halfW, halfH } = worldHalfExtents(entry);
+  const size = Math.max(Math.min(halfW, halfH) * HANDLE_FRACTION, HANDLE_MIN_WORLD);
+  handleMaterial = new THREE.MeshBasicMaterial({ color: 0xe8c468, depthTest: false });
+  for (const corner of handleCornersFor(entry)) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), handleMaterial);
+    mesh.position.copy(corner.pos);
+    mesh.renderOrder = 999; // drawn over the model, so a grip inside a dense prop stays visible
+    setup.scene.add(mesh);
+    handleMeshes.push(mesh);
+  }
+}
+
+function moveHandlesTo(entry: RowEntry): void {
+  const corners = handleCornersFor(entry);
+  handleMeshes.forEach((mesh, i) => {
+    const corner = corners[i];
+    if (corner) mesh.position.copy(corner.pos);
+  });
+}
+
+interface ResizeState {
+  entry: RowEntry;
+  unit: { halfW: number; halfH: number };
+  startScaleZ: number;
+  startScale: number;
+  changed: boolean;
+}
+let resizeState: ResizeState | null = null;
+
+/**
+ * Where a resize drag puts the model's scale.
+ *
+ * Measured from the model's centre to the pointer, because the centre is the anchor everything
+ * else is defined against (transform.ts): the model stays put and grows around it, rather than
+ * the opposite corner staying put and the anchor sliding - which would fight the position the
+ * user already set.
+ */
+function applyResize(hit: THREE.Vector3): void {
+  if (!resizeState) return;
+  const { entry, unit, startScale, startScaleZ } = resizeState;
+  const centre = entry.pickMesh.position;
+  const { scale, scaleY, scaleZ } = resizeFromCorner({
+    halfWidthWorld: Math.abs(hit.x - centre.x),
+    halfHeightWorld: Math.abs(hit.y - centre.y),
+    unitHalfWidth: unit.halfW,
+    unitHalfHeight: unit.halfH,
+    unitsPerLocal: NODE_SPACING,
+    startScale,
+    startScaleZ,
+    uniform: uniformScale.value,
+  });
+
+  entry.transform = { ...entry.transform, scale, scaleY };
+  entry.scaleZ = scaleZ;
+  const next = entry.pickMesh.position.clone();
+  if (keepOnGround.value) {
+    // Grown about the centre, so the base drops by half of whatever height was added. Planting
+    // it back on the floor is what makes a resize read as "this prop got bigger" rather than
+    // "this prop got bigger and sank".
+    next.y = groundedAnchorY(groundY(), transformedHalfExtents(entry.geometry, entry.transform).halfH * NODE_SPACING);
+  }
+  resizeState.changed = true;
+  applyDragPosition(entry, next);
+  moveHandlesTo(entry);
 }
 
 function fitCameraToScene(): void {
@@ -262,6 +414,29 @@ function rayOnDepthPlane(ray: THREE.Ray, depth: number): THREE.Vector3 | null {
   const plane = new THREE.Plane(AXIS_Z.clone(), -depth);
   const hit = new THREE.Vector3();
   return ray.intersectPlane(plane, hit) ? hit : null;
+}
+
+/**
+ * A model dragged out of the palette and dropped on the scene.
+ *
+ * Dropped onto the z=0 plane, which is where a new model belongs: it is the plane the grid marks
+ * out and the one every drag-created model has sat in since there was a 2D canvas to create them
+ * on. Depth is something you set afterwards, by dragging with Z held.
+ *
+ * A drop that misses the plane entirely - possible when the camera has been orbited until the
+ * plane is edge-on or behind the viewer - is ignored rather than guessed at, because the guess
+ * would put a model somewhere the user cannot see it.
+ */
+function onDrop(e: DragEvent): void {
+  const type = e.dataTransfer?.getData(MODEL_DRAG_MIME);
+  if (!type || !setup) return;
+  const rect = setup.renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(ndc, setup.camera);
+  const hit = rayOnDepthPlane(raycaster.ray, 0);
+  if (!hit) return;
+  emit("create", type, hit.x, hit.y);
 }
 
 function projectToScreen(p: THREE.Vector3): THREE.Vector2 | null {
@@ -348,6 +523,25 @@ function onPointerDown(e: PointerEvent): void {
   if (!ray) return;
   const raycaster = new THREE.Raycaster();
   raycaster.set(ray.origin, ray.direction);
+
+  // Grips first. They sit on the model's own outline, so a raycast that tested the body first
+  // would swallow every corner drag and turn it into a move.
+  const grip = raycaster.intersectObjects(handleMeshes)[0];
+  const selected = rowEntries.find((r) => r.model.id === props.selectedModelId);
+  if (grip && selected) {
+    // Which corner was grabbed doesn't need recording: the new size is the distance from the
+    // model's centre to the pointer, and that is the same measurement from any of the four.
+    resizeState = {
+      entry: selected,
+      unit: unitHalfExtents(selected),
+      startScale: selected.transform.scale ?? 1,
+      startScaleZ: selected.scaleZ,
+      changed: false,
+    };
+    if (orbit) orbit.enabled = false;
+    return;
+  }
+
   const hit = raycaster.intersectObjects(rowEntries.map((r) => r.pickMesh))[0];
   if (!hit) return;
 
@@ -368,6 +562,13 @@ function onPointerDown(e: PointerEvent): void {
 }
 
 function onPointerMove(e: PointerEvent): void {
+  if (resizeState) {
+    const ray = pointerRay(e);
+    if (!ray) return;
+    const hit = rayOnDepthPlane(ray, resizeState.entry.pickMesh.position.z);
+    if (hit) applyResize(hit);
+    return;
+  }
   if (!dragState) return;
   const ray = pointerRay(e);
   if (!ray) return;
@@ -388,12 +589,27 @@ function onPointerMove(e: PointerEvent): void {
   // A prop can rest on the lawn but never sink into it, whichever axis is being dragged. The
   // floor is never above where the model already was: a show that places something below ground
   // on purpose shouldn't have it yanked upwards the first time it's nudged sideways.
-  next.y = Math.max(next.y, Math.min(floorFor(entry), start.y));
+  if (keepOnGround.value) next.y = Math.max(next.y, Math.min(floorFor(entry), start.y));
   dragState.moved = true;
   applyDragPosition(entry, next);
 }
 
 function onPointerUp(e: PointerEvent): void {
+  if (resizeState) {
+    const { entry, changed } = resizeState;
+    resizeState = null;
+    downPoint = null;
+    if (orbit) orbit.enabled = true;
+    if (changed) {
+      emit("resize", entry.model.id, {
+        scale: entry.transform.scale ?? 1,
+        scaleY: entry.transform.scaleY ?? entry.transform.scale ?? 1,
+        scaleZ: entry.scaleZ,
+        y: entry.pickMesh.position.y,
+      });
+    }
+    return;
+  }
   if (dragState) {
     const { entry, moved } = dragState;
     dragState = null;
@@ -439,7 +655,7 @@ function onWindowBlur(): void {
 onMounted(() => {
   const container = containerRef.value;
   if (!container) return;
-  setup = createScene(container);
+  setup = createScene(container, { transparent: true });
   orbit = new OrbitControls(setup.camera, setup.renderer.domElement);
   orbit.enableDamping = true;
   buildScene();
@@ -488,12 +704,20 @@ watch(() => props.selectedModelId, updateSelectionHighlight);
 </script>
 
 <template>
-  <div class="layout-canvas-3d-wrap">
+  <div class="layout-canvas-3d-wrap" @dragover.prevent @drop.prevent="onDrop">
     <div ref="containerRef" class="layout-canvas-3d"></div>
     <div class="view-hud">
       <span class="axis-hint" :class="{ active: zAxisMode }">
         {{ zAxisMode ? "Dragging depth (Z)" : "Dragging X / Y — hold Z for depth" }}
       </span>
+      <label class="hud-toggle" title="Keep a prop's feet on the lawn when it is moved or resized">
+        <input type="checkbox" v-model="keepOnGround" />
+        Keep on the ground
+      </label>
+      <label class="hud-toggle" title="Resize every axis together - what a tree or a wreath wants">
+        <input type="checkbox" v-model="uniformScale" />
+        Scale all axes
+      </label>
       <button type="button" @click="fitCameraToScene">Reset view</button>
     </div>
   </div>
@@ -517,6 +741,20 @@ watch(() => props.selectedModelId, updateSelectionHighlight);
   align-items: center;
   gap: 0.5rem;
   font-size: 0.75rem;
+}
+.hud-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  background: rgba(20, 20, 26, 0.75);
+  color: #cfcfd8;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hud-toggle input {
+  cursor: pointer;
 }
 .axis-hint {
   padding: 0.2rem 0.45rem;

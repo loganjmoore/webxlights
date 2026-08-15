@@ -36,20 +36,49 @@ export function marksInForce(tracks: readonly { marks: number[] }[], active: num
  * to the end of the sequence: an effect that silently stretched to the end of the song is a much
  * worse surprise than one that came out a second long.
  */
-export function placementFor(marks: readonly number[], atMs: number, durationMs: number, defaultMs: number): Placement {
+export function placementFor(
+  marks: readonly number[],
+  atMs: number,
+  durationMs: number,
+  defaultMs: number,
+  // Defaults to no floor, so a caller that doesn't measure pixels keeps filling an interval
+  // exactly - "release it between two timing marks" means that interval, however short it is.
+  // Only the sequencer, which knows the zoom, asks for a minimum.
+  minimumMs = 0,
+): Placement {
   // Sorted here rather than assumed: a track's marks are kept in order, but a caller passing an
   // unsorted list would silently get the wrong interval rather than an error.
   const sorted = [...marks].sort((a, b) => a - b);
   const before = sorted.filter((m) => m <= atMs).pop();
   const after = sorted.find((m) => m > atMs);
-  if (before !== undefined && after !== undefined) return { startMs: before, endMs: after };
+  if (before !== undefined && after !== undefined) return widened({ startMs: before, endMs: after }, durationMs, minimumMs);
 
   // The fallback still has to land inside the sequence, and still has to be long enough to be
   // selectable - a zero-length effect can't be clicked, so it couldn't be removed either.
-  const startMs = Math.max(0, Math.min(atMs, Math.max(0, durationMs - MINIMUM_MS)));
-  const endMs = Math.min(Math.max(startMs + defaultMs, startMs + MINIMUM_MS), Math.max(durationMs, startMs + MINIMUM_MS));
+  const floor = Math.max(minimumMs, MINIMUM_MS);
+  const startMs = Math.max(0, Math.min(atMs, Math.max(0, durationMs - floor)));
+  const endMs = Math.min(Math.max(startMs + defaultMs, startMs + floor), Math.max(durationMs, startMs + floor));
   return { startMs, endMs };
 }
 
-/** Short enough to be a deliberate choice, long enough to be clickable on the grid. */
+/**
+ * Grows a placement that would come out too small to grab.
+ *
+ * The caller passes the minimum in milliseconds, but the number it cares about is a number of
+ * *pixels* - see `minimumEffectMs` in SequencerPage. A fixed millisecond floor can't express
+ * that, because how wide 200ms looks depends entirely on the zoom: zoomed out to see a whole
+ * song it is under a pixel, and an effect you can't see is one you can't select, move or delete.
+ *
+ * It grows to the right, so the start stays on the mark it was dropped against - that edge is
+ * the one the drop was aimed at. Only when there is no room left does it back up off the end of
+ * the sequence.
+ */
+function widened(p: Placement, durationMs: number, minimumMs: number): Placement {
+  const floor = Math.max(minimumMs, 1);
+  if (p.endMs - p.startMs >= floor) return p;
+  const endMs = Math.min(p.startMs + floor, Math.max(durationMs, floor));
+  return { startMs: Math.max(0, endMs - floor), endMs };
+}
+
+/** Short enough to be a deliberate choice, long enough to be worth storing. */
 const MINIMUM_MS = 200;

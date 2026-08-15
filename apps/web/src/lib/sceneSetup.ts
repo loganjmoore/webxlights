@@ -9,11 +9,16 @@ export interface SceneSetup {
   renderer: THREE.WebGLRenderer;
 }
 
-export function createScene(container: HTMLElement): SceneSetup {
+/**
+ * `transparent` leaves the canvas unpainted where nothing is drawn, so a sibling behind it shows
+ * through - which is how the layout's house photo sits behind the 3D scene. Opaque by default:
+ * the house preview has nothing behind it, and a cleared buffer is marginally cheaper.
+ */
+export function createScene(container: HTMLElement, options: { transparent?: boolean } = {}): SceneSetup {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0a0d);
+  if (!options.transparent) scene.background = new THREE.Color(0x0a0a0d);
   const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 1, 5000);
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: options.transparent === true });
   renderer.setSize(container.clientWidth, container.clientHeight);
   container.appendChild(renderer.domElement);
   return { scene, camera, renderer };
