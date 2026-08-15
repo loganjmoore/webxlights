@@ -19,11 +19,15 @@ const shareError = ref("");
 const packageBusy = ref(false);
 const packageMessage = ref("");
 
+// xLights' Settings > Other > Exclude Presets. A package is often made to hand to someone else,
+// and presets are the personal part of a show - the sequences and the layout are what they want.
+const excludePresets = ref(false);
+
 async function exportProject(p: Project): Promise<void> {
   packageBusy.value = true;
   packageMessage.value = "";
   try {
-    const blob = await exportPackage(p.id, p.name);
+    const blob = await exportPackage(p.id, p.name, { excludePresets: excludePresets.value });
     downloadPackage(blob, p.name);
   } finally {
     packageBusy.value = false;
@@ -136,6 +140,10 @@ async function loadSampleProject(): Promise<void> {
         <router-link :to="`/projects/${p.id}/layout`">{{ p.name }}</router-link>
         <button v-if="p.owner_id === auth.user?.id" class="share-btn" @click="toggleShare(p.id)">Share</button>
         <button class="share-btn" :disabled="packageBusy" @click="exportProject(p)">Export package</button>
+        <label class="package-option" title="Leave effect presets out of the package">
+          <input v-model="excludePresets" type="checkbox" />
+          without presets
+        </label>
         <div v-if="sharingProjectId === p.id" class="share-panel">
           <ul class="members">
             <li v-for="m in members" :key="m.id">

@@ -99,6 +99,7 @@ describe("sanitising a hand-edited bag", () => {
       "snapToTiming",
       "snapshotOnSave",
       "timeFormat",
+      "timelineZoomAnchor",
     ]);
   });
 });
@@ -132,6 +133,14 @@ describe("the effects grid settings", () => {
     // opposite of every other boolean here and the reason it gets its own check.
     expect(sanitize({ ...DEFAULT_PREFERENCES, showTransitionMarks: undefined as never }).showTransitionMarks).toBe(true);
     expect(sanitize({ ...DEFAULT_PREFERENCES, showTransitionMarks: false }).showTransitionMarks).toBe(false);
+  });
+
+  it("zooms around the cursor unless told to use the play marker", () => {
+    // "Zoom in on the Sequencer Timeline based on the Play Marker or the Mouse Cursor Location."
+    // The cursor is the default: a zoom made with the mouse is aimed at something.
+    expect(DEFAULT_PREFERENCES.timelineZoomAnchor).toBe("cursor");
+    expect(sanitize({ ...DEFAULT_PREFERENCES, timelineZoomAnchor: "playhead" }).timelineZoomAnchor).toBe("playhead");
+    expect(sanitize({ ...DEFAULT_PREFERENCES, timelineZoomAnchor: "elsewhere" as never }).timelineZoomAnchor).toBe("cursor");
   });
 
   it("only knows two double-click modes", () => {

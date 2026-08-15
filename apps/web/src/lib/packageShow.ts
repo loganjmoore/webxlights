@@ -72,7 +72,19 @@ function toUpsert(m: ModelRecord): ModelUpsertPayload {
   };
 }
 
-export async function exportPackage(projectId: number, projectName: string): Promise<Blob> {
+export interface PackageOptions {
+  /**
+   * xLights' Settings > Other > Exclude Presets: "when a sequence is packaged with the Package
+   * Sequence option, all effect presets are stripped".
+   *
+   * Worth having because a package is often made to hand to someone else, and presets are the
+   * part of a show that is personal rather than structural - the sequences and the layout are
+   * what the other person wants.
+   */
+  excludePresets?: boolean;
+}
+
+export async function exportPackage(projectId: number, projectName: string, options: PackageOptions = {}): Promise<Blob> {
   const layouts = await api.listLayouts(projectId);
   const layout = layouts[0];
   const [models, groups, sequenceSummaries, controllers, viewObjects, views, presets] = await Promise.all([
@@ -82,7 +94,7 @@ export async function exportPackage(projectId: number, projectName: string): Pro
     api.listControllers(projectId),
     layout ? api.listViewObjects(layout.id) : Promise.resolve([]),
     layout ? api.listViews(layout.id).then((r) => r.views) : Promise.resolve([]),
-    layout ? api.listEffectPresets(layout.id).then((r) => r.presets) : Promise.resolve([]),
+    layout && !options.excludePresets ? api.listEffectPresets(layout.id).then((r) => r.presets) : Promise.resolve([]),
   ]);
 
   const controllerNameById = new Map(controllers.map((c) => [c.id, c.name]));

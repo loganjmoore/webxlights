@@ -334,6 +334,10 @@ const hScrollRef = ref<HTMLDivElement | null>(null);
  * moment you were looking at.
  */
 function zoomBy(direction: 1 | -1, anchor?: { ms: number; clientX: number }): void {
+  // xLights' Settings > View > Timeline Zooming: the cursor, or the play marker. Applied by
+  // dropping the anchor the gesture supplied, which makes the keyboard and the mouse behave
+  // identically when the preference says "playhead" - which is the point of the setting.
+  if (prefs.value.timelineZoomAnchor === "playhead") anchor = undefined;
   const next = direction > 0 ? zoomIndexIn(zoomLevel.value) : zoomIndexOut(zoomLevel.value);
   if (next === zoomLevel.value) return;
   const el = hScrollRef.value;
@@ -2234,6 +2238,16 @@ watch(sequenceId, async (id) => {
           @change="patchPrefs({ showTransitionMarks: ($event.target as HTMLInputElement).checked })"
         />
         Display transition marks
+      </label>
+      <label class="blend-row">
+        Timeline zooming
+        <select
+          :value="prefs.timelineZoomAnchor"
+          @change="patchPrefs({ timelineZoomAnchor: ($event.target as HTMLSelectElement).value as Preferences['timelineZoomAnchor'] })"
+        >
+          <option value="cursor">Around the mouse cursor</option>
+          <option value="playhead">Around the play marker</option>
+        </select>
       </label>
       <label class="blend-row">
         Double click a timing mark

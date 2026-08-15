@@ -1,5 +1,37 @@
 # Changelog
 
+## Three Settings tabs that were dismissed unread
+
+The coverage doc contained a note saying xLights' remaining Settings tabs "configure machinery this app doesn't have". That judgement had been made without reading them — and it was wrong on all three read here.
+
+### Timeline Zooming, which we were already deciding silently
+
+> "Zoom in on the Sequencer Timeline based on the Play Marker (Green Triangle with Red Line) or the Mouse Cursor Location."
+
+The zoom anchoring built a few changes ago holds the moment under the *cursor* still, falling back to the playhead when there's no pointer. That was a design decision made on its merits — and it turns out to be one of two options xLights offers as a setting. It's a setting here now, defaulting to the cursor: a zoom made with the mouse is aimed at something, and holding the playhead instead moves the thing being pointed at out from under the pointer.
+
+### Exclude Presets when packaging
+
+> "If selected, when a sequence is packaged with the Package Sequence option, all effects presets are stripped."
+
+Worth having for a reason the manual doesn't give: a package is usually made to hand to someone else, and presets are the personal part of a show — the sequences and the layout are what the other person wants.
+
+Its companion, **Exclude Audio**, needs nothing. This package has never carried audio and says so in its own row.
+
+### What the three tabs turned up that isn't built
+
+- **Sequences**: default duration, FPS, model blending and view for *new* sequences — four defaults for a dialog we already have. Plus **Low Definition Render**, "models like matrixes and trees can be set to render at a smaller resolution to help lower render times", which is a real technique we don't have.
+- **View**: play controls on the house preview, auto-showing it during playback, hiding the preset preview.
+- **Other**: video codec and bitrate for the house-preview video export.
+
+The rest is genuinely inapplicable and now says why rather than being waved off: render caching and Save-FSEQ-on-save describe a persistent rendered copy that can fall out of date, where this renders on demand; FSEQ and media directories are filesystem paths a browser has no equivalent for; crash-report email and controller ping intervals are desktop machinery.
+
+### A correction
+
+The View tab names an **Effect Assist Window** — Always On, Always Off, Auto Toggle. An earlier row said the manual describes no Effect Assist panel. That was true of the *Changing An Effect* page and wrong about the manual, which is the same mistake made once before with the palette Update button, and the same lesson: "the manual describes no such thing" is a claim about one page.
+
+It exists, we don't have it, and it's a gap rather than an absence.
+
 ## The audit stops relying on luck
 
 Reading `layers/layer-settings.md` — a child of the page that produced the largest finding of this run — turned up a section with **no row in the inventory at all**: Roto-Zoom. Rotation, zoom and a pivot point are implemented and have been for a while. The page also names a Rotation Preset and a Zoom Preset dropdown, a Zoom quality control, and an Application Order setting, none of which we have.
