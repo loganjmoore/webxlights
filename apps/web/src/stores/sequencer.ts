@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { api, type SequenceBody, type SequenceEffect, type SequenceRecord, type TimingTrack } from "../lib/api";
+import { withLabelSet, withMarkRemoved, withMarksAdded } from "../lib/timingMarks";
 
 const UNDO_LIMIT = 100;
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -171,20 +172,44 @@ export const useSequencerStore = defineStore("sequencer", () => {
   }
 
   function addTimingMark(trackIndex: number, ms: number): void {
-    pushUndoSnapshot();
+    addTimingMarks(trackIndex, [ms]);
+  }
+
+  /**
+   * Adds several marks under one undo entry.
+   *
+   * Subdividing a marked region adds dozens at once, and adding them one at a time would mean
+   * dozens of presses of Ctrl+Z to undo one press of `4`.
+   *
+   * The label bookkeeping is in lib/timingMarks.ts - labels are positional, so an insert has to
+   * move them or a lyric track's words come out one phrase late with nothing reporting an error.
+   */
+  function addTimingMarks(trackIndex: number, msList: readonly number[]): void {
     const track = body.value.timingTracks[trackIndex];
     if (!track) return;
-    if (!track.marks.includes(ms)) {
-      track.marks.push(ms);
-      track.marks.sort((a, b) => a - b);
-    }
+    const next = withMarksAdded(track, msList);
+    if (next === track) return; // nothing new - not worth an undo entry
+    pushUndoSnapshot();
+    Object.assign(track, next);
   }
 
   function deleteTimingMark(trackIndex: number, ms: number): void {
-    pushUndoSnapshot();
     const track = body.value.timingTracks[trackIndex];
     if (!track) return;
-    track.marks = track.marks.filter((m) => m !== ms);
+    const next = withMarkRemoved(track, ms);
+    if (next === track) return;
+    pushUndoSnapshot();
+    Object.assign(track, next);
+  }
+
+  /** Sets the label on one mark (xLights' Edit Label dialog). */
+  function setTimingLabel(trackIndex: number, markIndex: number, label: string): void {
+    const track = body.value.timingTracks[trackIndex];
+    if (!track) return;
+    const next = withLabelSet(track, markIndex, label);
+    if (next === track) return;
+    pushUndoSnapshot();
+    Object.assign(track, next);
   }
 
   function ensureDefaultTimingTrack(): void {
@@ -299,7 +324,9 @@ export const useSequencerStore = defineStore("sequencer", () => {
     copyEffect,
     pasteEffectAt,
     addTimingMark,
+    addTimingMarks,
     deleteTimingMark,
+    setTimingLabel,
     ensureDefaultTimingTrack,
     generateTimingMarks,
     addTimingTrack,

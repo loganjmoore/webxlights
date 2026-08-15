@@ -16,6 +16,7 @@ function context(): CommandContext & Record<string, ReturnType<typeof vi.fn>> {
     "nudgePlayhead",
     "addTimingMark",
     "splitTimingMark",
+    "subdivideTiming",
     "deleteSelected",
     "copySelected",
     "pasteAtPlayhead",
@@ -61,6 +62,21 @@ describe("dispatching a key to a command", () => {
     const { ctx } = run({ key: "c", ctrlKey: true });
     expect(ctx.copySelected).toHaveBeenCalled();
     expect(ctx.placeEffect).not.toHaveBeenCalled();
+  });
+
+  it("divides the timing on the number keys", () => {
+    // The manual says only that "keyboard shortcuts are available to divide the selected timing
+    // marks by predefined intervals" - it names neither the keys nor the intervals, so 2/3/4 are
+    // ours. What this holds is that the key and the number it stands for agree.
+    for (const parts of [2, 3, 4]) {
+      const { ctx } = run({ key: String(parts) });
+      expect(ctx.subdivideTiming).toHaveBeenCalledWith(parts);
+    }
+  });
+
+  it("leaves a modified number key alone", () => {
+    // Ctrl+2 is a browser tab switch, not a request to divide a beat in half.
+    expect(commandForEvent(buildCommands(context()), { key: "2", ctrlKey: true })).toBeUndefined();
   });
 
   it("places Curtain on a bare c", () => {

@@ -11,6 +11,31 @@
 
 export type TimeFormat = "seconds" | "mmss" | "frames";
 
+/** xLights' Effects Grid > Spacing: "Extra Small, Small, Medium, Large, Extra Large". */
+export type GridSpacing = "xs" | "s" | "m" | "l" | "xl";
+
+/** What a double-click on a timing mark does (xLights' Effects Grid > Double Click Mode). */
+export type DoubleClickMode = "play-timing" | "edit-text";
+
+/**
+ * Grid row height for each spacing. xLights names the sizes rather than giving pixel counts, so
+ * these are ours - chosen so the smallest still fits an 11px effect label and the largest is
+ * roughly double it, which is the range the setting is for: fitting fifty rows on a laptop, or
+ * hitting the right one with a trackpad.
+ */
+export const GRID_ROW_HEIGHT_PX: Record<GridSpacing, number> = { xs: 18, s: 23, m: 28, l: 36, xl: 46 };
+
+export const GRID_SPACING_LABELS: Record<GridSpacing, string> = {
+  xs: "Extra Small",
+  s: "Small",
+  m: "Medium",
+  l: "Large",
+  xl: "Extra Large",
+};
+
+/** Waveform height, full and small (xLights' Effects Grid > Small Waveform). */
+export const WAVEFORM_HEIGHT_PX = { full: 64, small: 32 } as const;
+
 export interface Preferences {
   /** How the timeline and playhead write a moment. */
   timeFormat: TimeFormat;
@@ -35,6 +60,25 @@ export interface Preferences {
    * would mean a snapshot every few seconds during an afternoon of arranging props.
    */
   snapshotOnSave: boolean;
+  /** Height of a grid row, named rather than measured (xLights' Effects Grid > Spacing). */
+  gridSpacing: GridSpacing;
+  /**
+   * Draw the waveform at half height.
+   *
+   * Worth having for the same reason the spacing setting is: the waveform and the grid share the
+   * vertical space, and on a laptop the choice between seeing the beats and seeing the rows is a
+   * real one.
+   */
+  smallWaveform: boolean;
+  /**
+   * Show where an effect's in and out transitions run.
+   *
+   * On by default: an effect with a two-second reveal looks exactly like one without, which makes
+   * "why is this fading in" a question you can only answer by clicking it.
+   */
+  showTransitionMarks: boolean;
+  /** Whether double-clicking a timing mark plays its interval or edits its label. */
+  doubleClickMode: DoubleClickMode;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -44,6 +88,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autosaveSeconds: 5,
   layoutSnapshotMinutes: 15,
   snapshotOnSave: false,
+  gridSpacing: "m",
+  smallWaveform: false,
+  showTransitionMarks: true,
+  doubleClickMode: "play-timing",
 };
 
 const STORAGE_KEY = "webxlights.preferences";
@@ -91,6 +139,11 @@ export function sanitize(prefs: Preferences): Preferences {
     layoutSnapshotMinutes:
       prefs.layoutSnapshotMinutes === 0 ? 0 : clamp(prefs.layoutSnapshotMinutes, 1, 120, DEFAULT_PREFERENCES.layoutSnapshotMinutes),
     snapshotOnSave: prefs.snapshotOnSave === true,
+    gridSpacing: prefs.gridSpacing in GRID_ROW_HEIGHT_PX ? prefs.gridSpacing : DEFAULT_PREFERENCES.gridSpacing,
+    smallWaveform: prefs.smallWaveform === true,
+    // Defaults on, so an unset value has to become true rather than false.
+    showTransitionMarks: prefs.showTransitionMarks !== false,
+    doubleClickMode: prefs.doubleClickMode === "edit-text" ? "edit-text" : "play-timing",
   };
 }
 

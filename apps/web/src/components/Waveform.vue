@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
 import type { PeakBucket } from "../lib/audio";
 import { rangeFromDrag } from "../lib/playRange";
+import { WAVEFORM_HEIGHT_PX } from "../lib/preferences";
 
 const props = defineProps<{
   peaks: PeakBucket[];
@@ -12,6 +13,8 @@ const props = defineProps<{
   colors?: UiColors;
   /** The section marked for playback, if any (manual: "highlight a range... to play only that"). */
   playRange?: { startMs: number; endMs: number } | null;
+  /** xLights' Effects Grid > Small Waveform: half height, to give the rows the space back. */
+  small?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -148,11 +151,15 @@ onMounted(() => {
   draw();
   window.addEventListener("resize", draw);
 });
-watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs, props.playRange], draw, { deep: true });
+watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs, props.playRange, props.small], draw, { deep: true });
 </script>
 
 <template>
-  <canvas ref="canvasRef" class="waveform" :style="{ width: `${totalWidth}px` }" @click="onClick"
+  <canvas
+    ref="canvasRef"
+    class="waveform"
+    :style="{ width: `${totalWidth}px`, height: `${small ? WAVEFORM_HEIGHT_PX.small : WAVEFORM_HEIGHT_PX.full}px` }"
+    @click="onClick"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
@@ -162,6 +169,8 @@ watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs, pro
 
 <style scoped>
 .waveform {
+  /* The height is set inline from the Small Waveform preference; this is the fallback for
+     anywhere the component is mounted without one. */
   height: 64px;
   display: block;
   cursor: pointer;
