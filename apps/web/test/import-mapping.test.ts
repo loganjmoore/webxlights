@@ -153,3 +153,33 @@ describe("saving and loading a mapping", () => {
     expect(mergeMapping(current, loaded, "add")).toEqual({ a: "one", b: "two", c: "three" });
   });
 });
+
+describe("importing a layered donor", () => {
+  it("keeps each effect on the layer it came from", () => {
+    // The whole reason the parser now reports layers: an xLights sequence uses them freely, and
+    // flattening them stacks every layer at the same instant.
+    const parsed = {
+      frameMs: 50,
+      durationMs: 10_000,
+      mediaFilename: "",
+      unsupportedEffects: [],
+      rows: [
+        {
+          elementType: "model" as const,
+          name: "Tree",
+          effects: [
+            { name: "On", startMs: 0, endMs: 1000, rawSettings: {}, params: {}, translated: true, layerIndex: 0 },
+            { name: "Bars", startMs: 0, endMs: 1000, rawSettings: {}, params: {}, translated: true, layerIndex: 2 },
+          ],
+        },
+      ],
+    };
+    const { body } = applyMapping(
+      parsed,
+      [{ key: "model:1", elementType: "model", elementId: 1, name: "Mega Tree" }],
+      { "model:1": "Tree" },
+      [],
+    );
+    expect(body.rows[0]!.effects.map((e) => e.layerIndex)).toEqual([undefined, 2]);
+  });
+});

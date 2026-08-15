@@ -1,5 +1,25 @@
 # Changelog
 
+## Layers survive an import
+
+Adding a field to an effect means checking every path that carries an effect somewhere else. Two of the three needed work, and both would have failed silently.
+
+### The importer was already reading layers, then throwing them away
+
+The `.xsq` parser walks `<EffectLayer>` elements to find the effects — it always has — and then flattened them, reporting one list with no record of which layer anything came from.
+
+Until layers had an interface that was the best the app could represent. Now it's data loss, and the worst kind: a flattened import still renders. Every layer's effects end up stacked at the same instant, blending in file order, producing *something* that isn't what the author wrote. Document order is read as bottom-to-top, which is the order this engine composites in, so the index carries straight through.
+
+### Presets were about to carry a layer as if it were a setting
+
+A preset is built by cloning the effect and deleting the parts that aren't settings — id, start, end. `layerIndex` would have ridden along, so applying "warm twinkle" would have moved the effect to whichever layer the preset was saved from.
+
+A layer is a **position**, like the times. It says nothing about how an effect looks. The guard test is written as a record of the positional fields rather than a list of assertions, so a new one has to be excluded here too or the test stops compiling.
+
+### Package Show needed nothing
+
+It stores each sequence body whole rather than field by field, so the new field rides along. Worth checking rather than assuming, and worth stating so the next person doesn't check it again.
+
 ## Effect layers get an interface
 
 The last change found that layers were the biggest single gap in the app, and left it named in two coverage rows. This builds it.
