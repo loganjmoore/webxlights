@@ -1,5 +1,29 @@
 # Changelog
 
+## The Guitar effect
+
+The unaudited-pages list named five effect pages for effects we might not have. Checking the registry first, rather than assuming: **Adjust** and **Kaleidoscope** were already there. Of the three that weren't, one was immediately buildable.
+
+> "The Guitar effect turns MIDI note data into an animated stringed-instrument visualization. Using note data from a MIDI timing track it lights up strings and fret positions in time with the music, and can be styled as a guitar, bass guitar, banjo or violin."
+
+The hard part already existed. A MIDI file imports as a timing track whose labels are the keys sounding, and the Piano effect already reads exactly that — this is the same data seen from a different instrument, where a note is a position along a string rather than a key.
+
+### The decision that makes it readable
+
+A note is placed on the **highest** string that can reach it, which is how it's actually fingered: a guitarist plays middle C on the B string at the first fret, not on the low E at the eighth, because that's where the hand already is.
+
+Picking the lowest string instead — the obvious implementation, since you find it first — would send a melody sliding *down* the neck as it rose in pitch. Wrong, and unreadable as a visualisation.
+
+Standard tunings for all four instruments, including the banjo's short fifth string and the violin's fifths. A note the instrument can't reach, or one past the last drawn fret, is dropped rather than rendered at a fret that isn't there.
+
+Sparkles taught the same lesson two changes back, and it applies here: the wave animation runs off the note's own progress through its timing cell, not off a remembered phase, so a frame renders identically scrubbed and exported. There's a test for exactly that.
+
+### The other two
+
+**Duplicate** — "copy effect data from another model", per layer, with four switches deciding whether this effect's palette, colour settings, blending and layer settings override the source's. Every piece it needs now exists, layers and strands included. What makes it its own slice is that it reads *another row's effects at render time*, which nothing else in the engine does.
+
+**Moving Head** — DMX fixture control, a stated non-goal alongside the DMX and Servo effects.
+
 ## Selecting effects by what they are, not where they sit
 
 Two things: a sweep that found nothing, and a panel that came out of reading.

@@ -78,6 +78,7 @@ export * from "./colorCurve";
 export * from "./effects/sketch";
 export * from "./effects/state";
 export * from "./effects/piano";
+export * from "./effects/guitar";
 export * from "./effects/faces";
 export * from "./effects/imageDraw";
 export * from "./timing";

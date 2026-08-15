@@ -298,6 +298,17 @@ has now paid off three times.
 | Jukebox | ⚠️ | Fifty buttons linking effects for real-time playback. The effect-preset library is the same idea without the live-performance half |
 | Perspectives | ✅ | Saved window arrangements, which we have |
 
+## Effects the registry didn't have
+
+The unaudited list named five effect pages for effects we might not have. Checking the registry
+first, rather than assuming: **Adjust** and **Kaleidoscope** were already there. Three weren't.
+
+| Effect | | Notes |
+|---|---|---|
+| **Guitar** | ✅ | "Turns MIDI note data into an animated stringed-instrument visualization... and can be styled as a guitar, bass guitar, banjo or violin." **Now in**, and buildable because the hard part already existed: a MIDI file imports as a timing track whose labels are the keys sounding, and the Piano effect already reads exactly that. A note is placed on the *highest* string that can reach it, which is how it is actually fingered — middle C on the B string at the first fret, not the low E at the eighth. Picking the lowest string instead would send a melody sliding down the neck as it rose in pitch, which is both wrong and unreadable. Standard tunings for all four instruments; a note the instrument can't reach, or one past the last drawn fret, is dropped rather than rendered somewhere it isn't |
+| Duplicate | ⚠️ | "Copy Effect Data from another model. Each Individual Layer has to be 'duplicated'." A source model, submodel or strand and a layer number, plus four switches deciding whether this effect's palette, colour settings, blending and layer settings override the source's. Every piece it needs now exists — layers, strands, and the resolution step that hands an effect its data — but it reads *another row's effects at render time*, which nothing else does; that is the change, and it is worth its own slice |
+| Moving Head | 🚫 | DMX fixture control, which is a stated non-goal alongside the DMX and Servo effects |
+
 ## Pages not yet audited
 
 Three whole sections have now been found missing from this inventory rather than marked
@@ -332,8 +343,8 @@ and its `changing-start-chanel.md` child, plus the fourteen per-model-type pages
 appendix distinct from the sequencer's own shortcuts page, and worth checking against the
 shortcuts row — and `appendicies/glossary.md`.
 
-**Effect pages** for effects we may not have at all: `adjust.md`, `duplicate.md`, `guitar.md`,
-`kaleidoscope.md`, `moving-head.md`.
+~~**Effect pages**~~ — all five checked against the registry: Adjust and Kaleidoscope were already
+there, Guitar is now built, Duplicate is recorded with what it needs, Moving Head is a non-goal.
 
 A page appearing here means no row cites it, not that the feature is absent — several will turn
 out to be covered by a row named differently. The point is that each has been *looked at* rather

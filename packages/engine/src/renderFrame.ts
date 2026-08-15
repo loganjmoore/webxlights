@@ -54,6 +54,7 @@ import { renderSketch, type SketchParams } from "./effects/sketch";
 import { createTendrilsState, renderTendrils, type TendrilsParams, type TendrilsState } from "./effects/tendrils";
 import { renderState, type StateParams } from "./effects/state";
 import { renderPiano, type PianoParams } from "./effects/piano";
+import { renderGuitar, type GuitarParams } from "./effects/guitar";
 import { renderFaces, type FacesParams } from "./effects/faces";
 import type { EffectData, FrameContext } from "./effects/types";
 import type { ModelNode } from "./models/types";
@@ -197,6 +198,9 @@ function renderStateless(
       break;
     case "Piano":
       renderPiano(buffer, palette, params as unknown as PianoParams, ctx);
+      break;
+    case "Guitar":
+      renderGuitar(buffer, palette, params as unknown as GuitarParams, ctx);
       break;
     case "Faces":
       renderFaces(buffer, palette, params as unknown as FacesParams, ctx);
