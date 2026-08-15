@@ -1,0 +1,59 @@
+// What a pointer press on the grid means.
+//
+// Extracted from the handler because the branching had grown six gestures deep and two of them
+// silently collided: shift on an effect picks the alignment reference, and shift on an effect's
+// *edge* authors a fade. They arrived in consecutive changes, and adding the first put an early
+// return in front of the second, so the fade gesture stopped existing. Nothing failed, nothing
+// warned, and no test could have caught it while the decision lived inside a pointer handler.
+//
+// So the decision is a function now, and the gestures are a closed set the tests can enumerate. A
+// gesture that becomes unreachable is a gesture the test for it stops seeing.
+
+export type GridGesture =
+  /** Add a timing mark at the pressed position. */
+  | "add-mark"
+  /** A press on a mark itself - nothing on press; right-click deletes. */
+  | "none"
+  /** Pick the alignment reference out of the block (shift on an effect's body). */
+  | "pick-reference"
+  /** Shift on an effect's edge: drag inwards to set a fade. */
+  | "fade"
+  /** Plain drag on an effect's edge: change when the effect starts or ends. */
+  | "resize"
+  /** Plain drag on an effect's body: move it, and the block it belongs to. */
+  | "move"
+  /** Drag out a new effect from the armed palette entry. */
+  | "place"
+  /** Rubber-band a block selection out of empty grid - or, without movement, seek. */
+  | "band";
+
+export interface GestureHit {
+  kind: "effect" | "mark" | "ruler-empty" | "row-empty" | "none";
+  /** Set when the press landed on an effect's left or right edge. */
+  edge?: "left" | "right" | null;
+}
+
+export interface GestureModifiers {
+  shiftKey: boolean;
+  /** An effect is armed from the palette, so empty grid means "draw it here". */
+  hasPendingEffect: boolean;
+}
+
+export function gestureFor(hit: GestureHit, modifiers: GestureModifiers): GridGesture {
+  if (hit.kind === "ruler-empty") return "add-mark";
+  if (hit.kind === "mark") return "none";
+
+  if (hit.kind === "effect") {
+    // The edge test comes first, and that ordering is the whole fix: shift means "pick the
+    // reference" on the body of an effect and "author a fade" on its edge, so a rule that looks at
+    // shift before it looks at where the pointer is can only ever express one of them.
+    if (hit.edge) return modifiers.shiftKey ? "fade" : "resize";
+    return modifiers.shiftKey ? "pick-reference" : "move";
+  }
+
+  if (hit.kind === "row-empty" && modifiers.hasPendingEffect) return "place";
+  return "band";
+}
+
+/** Every gesture this grid has, so a test can prove each one is still reachable. */
+export const GRID_GESTURES: GridGesture[] = ["add-mark", "none", "pick-reference", "fade", "resize", "move", "place", "band"];

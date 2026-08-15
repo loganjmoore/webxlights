@@ -5,6 +5,7 @@ import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
 import { fadeDurationAt } from "../lib/effectFade";
 import { boxFromDrag, idsInBox, isDrag, selectionAfterClick } from "../lib/blockSelect";
 import { acceptedMoves, previewMoves, type DraggedEffect, type GhostPlacement } from "../lib/dragPreview";
+import { gestureFor } from "../lib/gridGesture";
 
 export interface GridRow {
   elementType: "model" | "group" | "submodel";
@@ -477,35 +478,30 @@ function onPointerDown(e: PointerEvent): void {
   const y = e.clientY - rect.top;
   const hit = hitTest(x, y);
 
-  if (hit.kind === "ruler-empty") {
+  // What the press means is decided in lib/gridGesture.ts rather than by the shape of the
+  // branching here: two gestures that both use shift once collided in this function, and the one
+  // that lost simply stopped existing.
+  const gesture = gestureFor(hit, { shiftKey: e.shiftKey, hasPendingEffect: props.pendingEffectName !== null });
+
+  if (gesture === "add-mark" && hit.kind === "ruler-empty") {
     emit("addMark", hit.trackIndex, hit.ms);
     return;
   }
-  if (hit.kind === "mark") {
-    return; // marks aren't draggable in this milestone; right-click deletes
-  }
+  if (gesture === "none") return; // a mark: right-click deletes, nothing happens on press
 
   if (hit.kind === "effect") {
     // Shift picks the reference out of a block that already exists ("hold down shift and click the
     // effect you want to be the reference"); an ordinary click selects just this one.
     const next = selectionAfterClick(props.selectedEffectIds ?? [], hit.effect.id, e.shiftKey);
     emit("selectMany", next.selected, next.reference);
-    // Shift on the *body* of an effect picks the reference and is not a drag. Shift on an *edge*
-    // is the fade gesture, so it has to get past here - returning on any shift (as this did) made
-    // the fade unreachable the moment reference-picking was added.
-    if (e.shiftKey && !hit.edge) return;
+    if (gesture === "pick-reference") return;
 
     const rowIndex = rowIndexAt(y);
-    if (hit.edge) {
-      // Shift turns the edge drag into a fade. The edge itself stays put, which is what makes the
-      // two gestures tell each other apart: one changes when the effect runs, the other how it
-      // arrives.
-      if (e.shiftKey) {
-        emit("dragStart"); // the fade previews by redrawing its own wedge, so it commits live
-        dragState = { kind: "fade", effect: hit.effect, edge: hit.edge };
-      } else {
-        dragState = { kind: "resize", effect: hit.effect, rowIndex, edge: hit.edge, ghost: null };
-      }
+    if (gesture === "fade" && hit.edge) {
+      emit("dragStart"); // the fade previews by redrawing its own wedge, so it commits live
+      dragState = { kind: "fade", effect: hit.effect, edge: hit.edge };
+    } else if (gesture === "resize" && hit.edge) {
+      dragState = { kind: "resize", effect: hit.effect, rowIndex, edge: hit.edge, ghost: null };
     } else {
       dragState = {
         kind: "move",
@@ -518,7 +514,7 @@ function onPointerDown(e: PointerEvent): void {
     return;
   }
 
-  if (hit.kind === "row-empty" && props.pendingEffectName) {
+  if (gesture === "place" && hit.kind === "row-empty") {
     emit("selectMany", [], null);
     dragState = { kind: "place", row: hit.row, startMs: xToMs(x) };
     return;

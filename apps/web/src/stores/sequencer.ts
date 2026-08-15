@@ -230,6 +230,18 @@ export const useSequencerStore = defineStore("sequencer", () => {
     addEffect(elementType, elementId, subName, { ...clone, id: newEffectId(), startMs: atMs, endMs: atMs + duration });
   }
 
+  /**
+   * Adds several effects under one undo entry.
+   *
+   * Pasting a block of eight is one action, so it has to be one Ctrl+Z - eight presses to undo one
+   * paste is the kind of thing that stops people using paste.
+   */
+  function addEffects(placements: readonly { elementType: "model" | "group" | "submodel"; elementId: number; subName?: string; effect: SequenceEffect }[]): void {
+    if (placements.length === 0) return;
+    pushUndoSnapshot();
+    for (const p of placements) ensureRow(p.elementType, p.elementId, p.subName).effects.push(p.effect);
+  }
+
   function addTimingMark(trackIndex: number, ms: number): void {
     addTimingMarks(trackIndex, [ms]);
   }
@@ -380,6 +392,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     undo,
     redo,
     addEffect,
+    addEffects,
     updateEffect,
     updateEffectLive,
     deleteEffect,
