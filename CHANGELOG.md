@@ -1,5 +1,28 @@
 # Changelog
 
+## A timing track you can delete
+
+Two sequencer pages read. The timing-tracks page turned up something small and obvious in hindsight: **a track could be created and never removed.**
+
+Creating one is a single click — a fixed interval, a metronome and an onset detection each add a track — and there was no rename and no delete. A wrong guess at a BPM left a track in the list forever.
+
+- **Renaming keeps names unique.** That matters more than it looks: the label-driven effects — State, Piano, Guitar, Faces — name their track *by name*, so two tracks called the same thing would leave those effects reading whichever came first.
+- **Deleting is undoable**, like every other body edit, which is what makes deleting a track of hand-placed marks survivable.
+
+### Fixed and variable tracks
+
+"Fixed Timing Tracks are not editable and the timing marks cannot be changed... right click and select Make Timing Track Variable."
+
+What it protects is an imported lyric track. Its marks line up with words somebody synced, and one stray click on the ruler adds a mark that puts every phrase after it out by one — silently, because the labels stay attached to their positions and simply belong to different marks afterwards.
+
+Enforced in the store, where every mark edit passes through, rather than in the pure helpers. There's a test asserting the helpers *don't* enforce it, which sounds odd until you consider the alternative: if both checked, one of the two would eventually look redundant and get removed.
+
+### What the two pages leave open
+
+Timing tracks: exporting a track (`.xtiming`, or PGO for other sequencers), Import Notes onto an existing track, and the Find/Replace and lyric-lookup tools.
+
+Effect presets: the page says a preset can "span layers and models". Ours store a single effect. Everything needed now exists — block selection, and a clipboard that already stores a block as relative offsets and rows, which is exactly the shape a spanning preset wants. It's recorded rather than built because it changes the stored format, and preset files written by the old shape have to keep working.
+
 ## The Guitar effect
 
 The unaudited-pages list named five effect pages for effects we might not have. Checking the registry first, rather than assuming: **Adjust** and **Kaleidoscope** were already there. Of the three that weren't, one was immediately buildable.

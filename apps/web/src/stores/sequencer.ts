@@ -320,7 +320,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
    */
   function addTimingMarks(trackIndex: number, msList: readonly number[]): void {
     const track = body.value.timingTracks[trackIndex];
-    if (!track) return;
+    if (!track || track.fixed) return;
     const next = withMarksAdded(track, msList);
     if (next === track) return; // nothing new - not worth an undo entry
     pushUndoSnapshot();
@@ -329,7 +329,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
 
   function deleteTimingMark(trackIndex: number, ms: number): void {
     const track = body.value.timingTracks[trackIndex];
-    if (!track) return;
+    if (!track || track.fixed) return;
     const next = withMarkRemoved(track, ms);
     if (next === track) return;
     pushUndoSnapshot();
@@ -339,7 +339,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
   /** Sets the label on one mark (xLights' Edit Label dialog). */
   function setTimingLabel(trackIndex: number, markIndex: number, label: string): void {
     const track = body.value.timingTracks[trackIndex];
-    if (!track) return;
+    if (!track || track.fixed) return;
     const next = withLabelSet(track, markIndex, label);
     if (next === track) return;
     pushUndoSnapshot();
@@ -381,6 +381,50 @@ export const useSequencerStore = defineStore("sequencer", () => {
     let n = 2;
     while (body.value.timingTracks.some((t) => t.name === name)) name = `${track.name} ${n++}`;
     body.value.timingTracks.push({ ...track, name });
+  }
+
+  /**
+   * Renames a track, keeping names unique.
+   *
+   * Uniqueness matters more here than it looks: the label-driven effects (State, Piano, Guitar,
+   * Faces) name their track by name, so two tracks called the same thing would leave those
+   * effects reading whichever came first.
+   */
+  function renameTimingTrack(index: number, name: string): void {
+    const track = body.value.timingTracks[index];
+    const trimmed = name.trim();
+    if (!track || !trimmed || trimmed === track.name) return;
+    if (body.value.timingTracks.some((t, i) => i !== index && t.name === trimmed)) return;
+    pushUndoSnapshot();
+    track.name = trimmed;
+  }
+
+  /**
+   * Deletes a track.
+   *
+   * Tracks could be created and never removed, and creating one is a single click - a fixed
+   * interval, a metronome and an onset detection each add one. Undoable like every other body
+   * edit, which is what makes deleting a track of hand-placed marks survivable.
+   */
+  function deleteTimingTrack(index: number): void {
+    if (!body.value.timingTracks[index]) return;
+    pushUndoSnapshot();
+    body.value.timingTracks = body.value.timingTracks.filter((_, i) => i !== index);
+  }
+
+  /**
+   * Fixed or variable (manual: "fixed Timing Tracks are not editable and the timing marks cannot
+   * be changed... right click and select Make Timing Track Variable").
+   *
+   * What it protects is an imported track: a lyric track's marks line up with words somebody
+   * synced, and a stray click on the ruler is all it takes to add a mark that puts every phrase
+   * after it out by one.
+   */
+  function setTimingTrackFixed(index: number, fixed: boolean): void {
+    const track = body.value.timingTracks[index];
+    if (!track || (track.fixed ?? false) === fixed) return;
+    pushUndoSnapshot();
+    track.fixed = fixed;
   }
 
   async function saveNow(): Promise<void> {
@@ -472,6 +516,9 @@ export const useSequencerStore = defineStore("sequencer", () => {
     ensureDefaultTimingTrack,
     generateTimingMarks,
     addTimingTrack,
+    renameTimingTrack,
+    deleteTimingTrack,
+    setTimingTrackFixed,
     moveEffectToRow,
     moveEffectToRowLive,
     setEffectLayerLive,

@@ -57,7 +57,7 @@ written down. Status here means:
 | Audio scrubbing | ✅ | Drag the waveform and the track plays under the pointer, in short bursts. The burst is stopped on a timer rather than left running: a scrub that kept playing would drift away from the pointer within a second, and dragging back would then be seeking against audio that had moved on |
 | Time display format | ✅ | Minutes:seconds, plain seconds, or frames — frames counted against the sequence's own frame rate, since a 20ms sequence and a 50ms one number the same second very differently |
 | Timeline tags | ⚠️ | A region boundary is a named point on the timeline, which is what a tag is; xLights' separate tag list, with its own colours and independent of the section structure, isn't offered |
-| Timing tracks | ✅ | Fixed interval + metronome generation, marks added and deleted on the ruler, split at the playhead, and divided by 2/3/4. A mark's label is editable from the grid (double-click, with Double Click Mode set to Edit Text). Labels are positional — `labels[i]` belongs to `marks[i]` — so every edit to the marks moves the labels with them; inserting one without doing so put every later word on the wrong phrase, silently, which is the bug subdividing a lyric track would have hit first |
+| Timing tracks | ⚠️ | Fixed interval + metronome generation, marks added and deleted on the ruler, split at the playhead, divided by 2/3/4, and a mark's label editable from the grid. Labels are positional — `labels[i]` belongs to `marks[i]` — so every edit to the marks moves the labels with them. **Tracks can now be renamed and deleted**: they could be created and never removed, and creating one is a single click — a fixed interval, a metronome and an onset detection each add one. Renaming keeps names unique, because the label-driven effects (State, Piano, Guitar, Faces) name their track by name and two tracks called the same thing would leave those effects reading whichever came first. **Fixed and variable tracks** are in — "fixed Timing Tracks are not editable and the timing marks cannot be changed" — enforced in the store, where every mark edit passes. What it protects is an imported lyric track, whose marks line up with words somebody synced: one stray click on the ruler puts every phrase after it out by one. Missing: **exporting** a track (.xtiming, or PGO for other sequencers, and several tracks into one file), **Import Notes** from MIDI/Audacity/musicXML onto an existing track, the **Find/Replace** and **Search for Lyrics Online** tools for lyric tracks, and the audio-derived generators this app doesn't have — Audio Chords, and the macOS Speech Recognizer |
 | Audio-generated timing tracks (beats/bars/lyrics) | ⚠️ | Beat detection over the analysed audio: spectral flux against a *local* baseline, so one setting works across a quiet verse and a loud chorus. Sensitivity, a minimum gap (one drum hit is one mark, not a cluster), a spectrum range (low follows the kick, high the hats) and keep-every-Nth, which is roughly how bars come from beats. The estimated tempo is reported but never acted on — it answers "did this find the beat or find noise?", and using it to snap marks would move real ones to wrong places. Still missing: true downbeat/bar detection, and lyric tracks, which need the pronunciation dictionaries |
 | Timing track from a Papagayo file | ✅ | See "Singing faces — Papagayo `.pgo` import" below |
 | Timing track from a MIDI file | ✅ | A `.mid`'s notes become a timing track whose cells are labelled with the keys sounding in them — which is what the Piano effect reads, so this is how its "Midi file" notes source works here. Reads formats 0/1/2, running status, tempo changes (pooled across tracks, since format 1 keeps them in the first one) and SMPTE division. The Track picker and the manual's own Midi Start Time Adjust and Midi Speed Adjust are applied at import, because they describe the file rather than the rendering. Note ends are boundaries as well as note starts, so a held note stays pressed while the melody moves over it |
@@ -309,6 +309,20 @@ first, rather than assuming: **Adjust** and **Kaleidoscope** were already there.
 | Duplicate | ⚠️ | "Copy Effect Data from another model. Each Individual Layer has to be 'duplicated'." A source model, submodel or strand and a layer number, plus four switches deciding whether this effect's palette, colour settings, blending and layer settings override the source's. Every piece it needs now exists — layers, strands, and the resolution step that hands an effect its data — but it reads *another row's effects at render time*, which nothing else does; that is the change, and it is worth its own slice |
 | Moving Head | 🚫 | DMX fixture control, which is a stated non-goal alongside the DMX and Servo effects |
 
+## Effect presets, read
+
+The page describes one thing our presets can't do: **"to save an effect (which can span layers and
+models) as a preset, highlight the effects that you want to save"**. Ours store a single effect.
+
+Everything that makes the multi-effect version possible now exists — block selection, and a
+clipboard that already stores a block as relative offsets and rows, which is exactly the shape a
+spanning preset needs. It is recorded rather than built because it changes the stored preset
+format, and a preset file written by the old shape has to keep working.
+
+Also named and missing: **Update Preset** (re-save a preset from the effect currently selected),
+and **dragging a preset from one group to another**. Present already: saving, applying, groups,
+rename and delete, and `.xpreset` import/export.
+
 ## Pages not yet audited
 
 Three whole sections have now been found missing from this inventory rather than marked
@@ -330,9 +344,9 @@ was wrong about half.
 `download-import-models.md` (the vendor model library, a known gap), `models/model-attribute.md`
 and its `changing-start-chanel.md` child, plus the fourteen per-model-type pages.
 
-**Sequencer.** ~~`windows.md`~~ (and its real content in `view/windows.md`) is read. Still unread:
-`views.md`, `models.md`, `effect-presets.md`, `pixel-editor.md`, `value-curves.md`,
-`timing-tracks.md`, `singing-faces.md` and its `adding-word-to-user-dictionary.md` child.
+**Sequencer.** ~~`windows.md`~~ (and its real content in `view/windows.md`), ~~`timing-tracks.md`~~
+and ~~`effect-presets.md`~~ are read. Still unread: `views.md`, `models.md`, `pixel-editor.md`,
+`value-curves.md`, `singing-faces.md` and its `adding-word-to-user-dictionary.md` child.
 
 **Tools.** `lua-scripting.md`, `generate-custom-model.md`, `convert.md`.
 
