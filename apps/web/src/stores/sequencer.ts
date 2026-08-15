@@ -150,6 +150,30 @@ export const useSequencerStore = defineStore("sequencer", () => {
     ensureRow(elementType, elementId, subName).effects.push(moving);
   }
 
+  /**
+   * Moves an effect to another row without taking a snapshot.
+   *
+   * The caller has already snapshotted for the batch it belongs to - a drag that moved effects
+   * both in time and across rows should be one Ctrl+Z, not two.
+   */
+  function moveEffectToRowLive(
+    effectId: string,
+    elementType: "model" | "group" | "submodel",
+    elementId: number,
+    subName: string | undefined,
+  ): void {
+    let moving: SequenceEffect | undefined;
+    for (const row of body.value.rows) {
+      const found = row.effects.find((e) => e.id === effectId);
+      if (found) moving = found;
+    }
+    if (!moving) return;
+    const target = ensureRow(elementType, elementId, subName);
+    if (target.effects.some((e) => e.id === effectId)) return; // already there
+    for (const row of body.value.rows) row.effects = row.effects.filter((e) => e.id !== effectId);
+    ensureRow(elementType, elementId, subName).effects.push(moving);
+  }
+
   function deleteEffect(effectId: string): void {
     pushUndoSnapshot();
     for (const row of body.value.rows) {
@@ -370,6 +394,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     generateTimingMarks,
     addTimingTrack,
     moveEffectToRow,
+    moveEffectToRowLive,
     snapshot: pushUndoSnapshot,
     saveNow,
   };
