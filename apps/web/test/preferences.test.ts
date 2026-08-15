@@ -115,3 +115,13 @@ describe("writing a moment", () => {
     expect(formatTime(1000, "frames", 0)).toBe("1000"); // a zero frame rate can't divide
   });
 });
+
+describe("every preference can be changed as well as read", () => {
+  it("clamps the layout snapshot interval and lets it be turned off", () => {
+    // 0 is meaningful - it turns the periodic snapshot off - and anything above it is floored at
+    // a minute, since a snapshot copies the whole layout.
+    expect(sanitize({ ...DEFAULT_PREFERENCES, layoutSnapshotMinutes: 0 }).layoutSnapshotMinutes).toBe(0);
+    expect(sanitize({ ...DEFAULT_PREFERENCES, layoutSnapshotMinutes: -5 }).layoutSnapshotMinutes).toBe(1);
+    expect(sanitize({ ...DEFAULT_PREFERENCES, layoutSnapshotMinutes: 9999 }).layoutSnapshotMinutes).toBe(120);
+  });
+});

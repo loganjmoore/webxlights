@@ -1524,6 +1524,28 @@ watch(sequenceId, async (id) => {
           seconds (0 turns it off)
         </span>
       </label>
+      <!-- The layout's own safety net. xLights offers 3, 10, 15 or 30 minutes for the same thing,
+           so those are the choices here rather than a free number: the point is to pick one, and a
+           free field invites 1, which snapshots a layout sixty times an hour. -->
+      <label class="blend-row">
+        Layout snapshots
+        <span>
+          <select
+            :value="prefs.layoutSnapshotMinutes"
+            @change="patchPrefs({ layoutSnapshotMinutes: Number(($event.target as HTMLSelectElement).value) })"
+          >
+            <option :value="0">Off</option>
+            <option :value="3">Every 3 minutes</option>
+            <option :value="10">Every 10 minutes</option>
+            <option :value="15">Every 15 minutes</option>
+            <option :value="30">Every 30 minutes</option>
+          </select>
+        </span>
+      </label>
+      <p class="timing-note">
+        Snapshots of the whole layout, taken on the Layout page when something has changed. They're
+        listed and restored there.
+      </p>
     </div>
 
     <div v-if="showPresetsPanel" class="models-panel">
