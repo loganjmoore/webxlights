@@ -9,6 +9,7 @@
 // be given a key that nothing dispatches.
 
 import { SUBDIVISIONS } from "./timingSubdivide";
+import { boundWindowShortcuts, type WindowTarget } from "./windowShortcuts";
 
 export interface CommandContext {
   togglePlay: () => void;
@@ -26,6 +27,12 @@ export interface CommandContext {
   jumpToTenth: (digit: number) => void;
   /** Select every effect in the sequence. */
   selectAllEffects: () => void;
+  /** Insert a layer above or below the one the selection is on. */
+  insertLayer: (side: "above" | "below") => void;
+  /** Show or hide the selected row's layers (the appendix's Toggle Element Expand). */
+  toggleElementExpand: () => void;
+  /** Open or close one of the appendix's dockable windows (windowShortcuts.ts). */
+  toggleWindow: (target: WindowTarget) => void;
   /** Divides the marked region - or the interval under the playhead - into `parts`. */
   subdivideTiming: (parts: number) => void;
   deleteSelected: () => void;
@@ -80,10 +87,10 @@ export interface KeyEvent {
 // existing file which has a start intensity set to zero and and end intensity set to 100%" - `u`
 // and `d` are the On effect with its two intensities swapped round.
 //
-// One key in the manual's table is deliberately not here: it gives `s` to both Timing Split and
-// Spirals. A structural action beats an effect - splitting a timing mark can't be done any other
-// way from the keyboard - so `s` stays with the split, and Spirals is bindable to any free key
-// now that the bindings are editable (keybindings.ts).
+// The sequencer's own shortcuts page appears to give `s` to both Timing Split and Spirals, and
+// this comment used to explain which of the two won. It was reading one list of two: the appendix
+// distinguishes `s` from `S`, so the split keeps the lower-case key and Spirals has the upper-case
+// one, below.
 export const EFFECT_SHORTCUTS: Array<{ key: string; effect: string; params?: Record<string, number | boolean | string> }> = [
   { key: "o", effect: "On" },
   { key: "O", effect: "Off" },
@@ -108,6 +115,15 @@ export const EFFECT_SHORTCUTS: Array<{ key: string; effect: string; params?: Rec
   // different keys, and case has always been significant here.
   { key: "S", effect: "Spirals" },
 ];
+
+/** What each window is called here, which is not always what the manual calls it. */
+const WINDOW_LABELS: Record<WindowTarget, string> = {
+  models: "Models panel",
+  presets: "Presets panel",
+  select: "Select Effects panel",
+  prefs: "Preferences panel",
+  housePreview: "house preview window",
+};
 
 const mod = (e: KeyEvent): boolean => Boolean(e.ctrlKey || e.metaKey);
 const plain = (e: KeyEvent): boolean => !e.ctrlKey && !e.metaKey && !e.altKey;
@@ -201,14 +217,58 @@ export function buildCommands(ctx: CommandContext): Command[] {
       run: ctx.returnToSpot,
       matches: (e: KeyEvent) => e.key === "/" && mod(e),
     },
+    // Lower-case `a` only, and not with Alt. The appendix spends three keys on this one letter -
+    // `CTRL + a` selects the effects, `CTRL + A` (upper case) inserts a layer below, `CTRL + ALT +a`
+    // selects the effects *and* the timing tracks - so an `a` matcher that shrugged at case or at
+    // Alt would answer for all three. The Alt one we don't have; excluding it here is what makes
+    // that an honest nothing rather than a near-miss that selects the effects and stops there.
     {
       id: "edit.selectAllEffects",
       label: "Select all effects",
       group: "Edit",
       keyLabel: "Ctrl+A",
       run: ctx.selectAllEffects,
-      matches: (e: KeyEvent) => (e.key === "a" || e.key === "A") && mod(e) && !e.shiftKey,
+      matches: (e: KeyEvent) => e.key === "a" && mod(e) && !e.altKey,
     },
+    // "Insert Layer above (on Sequencer Tab)" and "Insert Layer below", both upper case - so both
+    // arrive with Shift held, which is what keeps them clear of the key above.
+    {
+      id: "layer.insertAbove",
+      label: "Insert layer above",
+      group: "Edit",
+      keyLabel: "Ctrl+Shift+I",
+      run: () => ctx.insertLayer("above"),
+      matches: (e: KeyEvent) => e.key === "I" && mod(e) && !e.altKey,
+    },
+    {
+      id: "layer.insertBelow",
+      label: "Insert layer below",
+      group: "Edit",
+      keyLabel: "Ctrl+Shift+A",
+      run: () => ctx.insertLayer("below"),
+      matches: (e: KeyEvent) => e.key === "A" && mod(e) && !e.altKey,
+    },
+    {
+      id: "view.toggleElementExpand",
+      label: "Expand or collapse the row's layers",
+      group: "View",
+      keyLabel: "Ctrl+X",
+      run: ctx.toggleElementExpand,
+      matches: (e: KeyEvent) => (e.key === "x" || e.key === "X") && mod(e) && !e.altKey,
+    },
+    // The dockable windows, from the appendix's own table (windowShortcuts.ts). Only the ones we
+    // have a window for become commands; the rest of the table is the record of why not.
+    ...boundWindowShortcuts().map((shortcut) => ({
+      id: `view.window.${shortcut.target}`,
+      label: `Toggle the ${WINDOW_LABELS[shortcut.target]}`,
+      group: "View",
+      keyLabel: shortcut.keyLabel,
+      run: () => ctx.toggleWindow(shortcut.target),
+      // Alt is checked rather than ignored because F8 is in the table twice - Effect Assist alone,
+      // the Jukebox with Alt - and we have neither, so a loose matcher would bind two keys to
+      // nothing in particular.
+      matches: (e: KeyEvent) => e.key === shortcut.key && mod(e) && Boolean(e.altKey) === shortcut.alt,
+    })),
     // "Jump to 0%-90% through the song." Ten evenly spaced landmarks: the digit *is* the tenth,
     // so 3 is three tenths in however long the song is.
     ...Array.from({ length: 10 }, (_, digit) => ({
