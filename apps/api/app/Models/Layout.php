@@ -37,4 +37,9 @@ class Layout extends Model
     {
         return $this->hasMany(ViewObject::class);
     }
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(LayoutVersion::class);
+    }
 }

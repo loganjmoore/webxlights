@@ -23,9 +23,18 @@ import FaceEditor from "../components/FaceEditor.vue";
 import { allocateStartChannels, controllerLayouts, slotBarStyle, unassignedModels } from "../lib/controllerLayout";
 import { backgroundFrom, clampOpacity, prepareBackground, type BackgroundImage } from "../lib/backgroundImage";
 import { ALL_MODELS, modelsInPreview, previewNames } from "../lib/layoutPreviews";
-import { api, type ControllerRecord, type Layout, type ModelGroupRecord, type ModelRecord, type ViewObjectRecord } from "../lib/api";
+import {
+  api,
+  type ControllerRecord,
+  type Layout,
+  type LayoutVersion,
+  type ModelGroupRecord,
+  type ModelRecord,
+  type ViewObjectRecord,
+} from "../lib/api";
 import { importRgbEffects } from "../lib/import";
 import { confirm } from "../lib/confirm";
+import { loadPreferences } from "../lib/preferences";
 import { buildPlacementReport, copyOrDownloadReport } from "../lib/placementReport";
 import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas from "../components/LayoutCanvas.vue";
@@ -765,11 +774,88 @@ async function handleFileChange(e: Event): Promise<void> {
   }
 }
 
-onMounted(() => {
-  void loadLayout();
+// xLights' periodic backup: "Every x minutes, the xlights_rgbeffects.xml is backed up... This
+// includes the layout as well". Sequences here have had version history for a long time; the
+// layout had none, so a mis-drag or a bad import was unrecoverable.
+//
+// Only taken when something has actually changed since the last one, as xLights does ("This will
+// occur if there have been any changes since the last auto save"). Otherwise leaving the page open
+// overnight would fill the history with twenty identical layouts and push the useful ones out.
+const versions = ref<LayoutVersion[]>([]);
+const versionMessage = ref("");
+const layoutPrefs = ref(loadPreferences(typeof localStorage === "undefined" ? null : localStorage));
+let snapshotTimer: ReturnType<typeof setInterval> | null = null;
+let lastSnapshotFingerprint = "";
+
+/** What the layout looks like right now, cheaply enough to compare every few minutes. */
+function layoutFingerprint(): string {
+  return JSON.stringify({
+    models: models.value.map((m) => [m.name, m.type, m.screen, m.sub_models, m.states, m.faces, m.controller_id, m.controller_offset]),
+    groups: groups.value.map((g) => [g.name, g.buffer_style, g.members.map((x) => x.name)]),
+    settings: layout.value?.settings ?? {},
+  });
+}
+
+async function loadVersions(): Promise<void> {
+  if (!layout.value) return;
+  versions.value = await api.listLayoutVersions(layout.value.id);
+}
+
+async function snapshotLayout(reason: "manual" | "auto" = "manual"): Promise<void> {
+  if (!layout.value) return;
+  versionMessage.value = "";
+  try {
+    await api.snapshotLayout(layout.value.id, reason);
+    lastSnapshotFingerprint = layoutFingerprint();
+    await loadVersions();
+    if (reason === "manual") versionMessage.value = "Snapshot taken.";
+  } catch (err) {
+    versionMessage.value = err instanceof Error ? err.message : "Couldn't take a snapshot.";
+  }
+}
+
+async function restoreVersion(versionId: number): Promise<void> {
+  if (!layout.value) return;
+  const ok = await confirm({
+    title: "Restore this snapshot",
+    // Said plainly because it is the surprising half: a restore is not a merge.
+    message:
+      "The layout goes back to how it was. Models added since the snapshot are removed, and the ones it contains are restored to how they were then.",
+    confirmLabel: "Restore",
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await api.restoreLayoutVersion(layout.value.id, versionId);
+    await loadLayout();
+    await loadVersions();
+    versionMessage.value = "Layout restored.";
+  } catch (err) {
+    versionMessage.value = err instanceof Error ? err.message : "Couldn't restore that snapshot.";
+  }
+}
+
+function startSnapshotTimer(): void {
+  if (snapshotTimer) clearInterval(snapshotTimer);
+  const minutes = layoutPrefs.value.layoutSnapshotMinutes;
+  if (minutes <= 0) return;
+  snapshotTimer = setInterval(() => {
+    if (layoutFingerprint() === lastSnapshotFingerprint) return;
+    void snapshotLayout("auto");
+  }, minutes * 60_000);
+}
+
+onMounted(async () => {
+  await loadLayout();
+  lastSnapshotFingerprint = layoutFingerprint();
+  await loadVersions();
+  startSnapshotTimer();
   window.addEventListener("keydown", onKeydown);
 });
-onUnmounted(() => window.removeEventListener("keydown", onKeydown));
+onUnmounted(() => {
+  if (snapshotTimer) clearInterval(snapshotTimer);
+  window.removeEventListener("keydown", onKeydown);
+});
 </script>
 
 <template>
@@ -1133,6 +1219,27 @@ onUnmounted(() => window.removeEventListener("keydown", onKeydown));
         </div>
 
         </template>
+
+        <div class="properties-panel">
+          <h2>Snapshots</h2>
+          <p class="multi-hint">
+            The whole layout — models with their sub-models, states and faces, groups, view objects,
+            views and presets — kept so a bad import or a mis-drag can be undone. Taken
+            automatically every {{ layoutPrefs.layoutSnapshotMinutes }} minutes when something has
+            changed, and whenever you ask.
+          </p>
+          <div class="models-panel-actions">
+            <button @click="snapshotLayout('manual')">Take a snapshot</button>
+          </div>
+          <p v-if="versionMessage" class="multi-hint">{{ versionMessage }}</p>
+          <ul v-if="versions.length" class="multi-list">
+            <li v-for="v in versions" :key="v.id">
+              <span>#{{ v.number }} {{ v.reason === "auto" ? "(auto)" : "" }}</span>
+              <button @click="restoreVersion(v.id)">Restore</button>
+            </li>
+          </ul>
+          <p v-else class="multi-hint">None yet.</p>
+        </div>
       </aside>
       <div class="canvas-wrap">
         <ModelPalette v-if="viewMode === '2d'" />
