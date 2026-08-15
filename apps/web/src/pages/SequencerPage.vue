@@ -57,6 +57,7 @@ import { marksInForce, placementFor } from "../lib/effectPlacement";
 import { withFade } from "../lib/effectFade";
 import { ALIGN_MODES, alignedTo, type AlignMode } from "../lib/alignEffects";
 import { clipboardFrom, pastedAt, type EffectClipboard } from "../lib/effectClipboard";
+import { addLayer, canAddLayer, layerCount, removeLayer } from "../lib/effectLayers";
 import type { SequenceMetadata } from "../lib/api";
 import { DEFAULT_ZOOM_INDEX, ZOOM_STEPS, clampZoomIndex, scrollLeftHolding, wheelScrollDelta, zoomIndexIn, zoomIndexOut } from "../lib/zoom";
 import {
@@ -409,6 +410,8 @@ const phonemeNames = computed(() => {
 });
 
 function rowKey(row: GridRow): string {
+  // Deliberately without the layer index: a view names rows, and a row that had been expanded
+  // into layers since the view was saved would otherwise stop matching it.
   return `${row.elementType}:${row.elementId}:${row.subName ?? ""}`;
 }
 async function saveViews(next: SequencerView[]): Promise<void> {
@@ -597,8 +600,38 @@ const views = ref<SequencerView[]>([]);
 const activeViewName = ref<string | null>(null);
 const activeView = computed(() => views.value.find((v) => v.name === activeViewName.value) ?? null);
 
+/**
+ * Which rows are showing their effect layers (manual: Sequencer > Layers).
+ *
+ * A display state rather than stored data, which is what "Collapse Layers" is - "collapses the
+ * expanded effect layers back down to a single row". Collapsing hides the layers; it doesn't
+ * merge them, and the effects on layer 3 are still on layer 3 afterwards.
+ */
+const expandedLayerKeys = ref<Set<string>>(new Set());
+
+function effectsForKey(row: GridRow): SequenceEffect[] {
+  const found = store.body.rows.find(
+    (r) => r.elementType === row.elementType && r.elementId === row.elementId && (r.subName ?? undefined) === row.subName,
+  );
+  return found?.effects ?? [];
+}
+
+/** A row expanded into one row per layer, bottom layer last so the stack reads top-down. */
+function withLayerRows(row: GridRow): GridRow[] {
+  void layerRowsTick.value; // adding an empty layer changes no effect, so the count needs a nudge
+  if (!expandedLayerKeys.value.has(rowKey(row))) return [row];
+  const count = layerCount(effectsForKey(row));
+  // Drawn highest-first, because the grid runs top-down and the stack composites bottom-up: the
+  // layer nearest the viewer belongs at the top of the list, the way it is in every other editor.
+  return Array.from({ length: count }, (_, i) => count - 1 - i).map((layerIndex) => ({
+    ...row,
+    layerIndex,
+    name: `${row.name} · L${layerIndex + 1}`,
+  }));
+}
+
 const visibleRows = computed(() => {
-  const shown = rows.value.filter((r) => !hiddenRowKeys.value.has(rowKey(r)));
+  const shown = rows.value.filter((r) => !hiddenRowKeys.value.has(rowKey(r))).flatMap(withLayerRows);
   const view = activeView.value;
   if (!view) return shown;
   // A view names its rows *in order*, so the grid follows the view rather than the layout. Rows
@@ -786,6 +819,16 @@ function armEffect(name: string): void {
   pendingEffectName.value = pendingEffectName.value === name ? null : name;
 }
 
+/**
+ * The layer an effect placed on a row belongs to.
+ *
+ * A collapsed row has no layer of its own, so anything placed there goes on the bottom - which is
+ * where everything went before layers had an interface.
+ */
+function layerFor(row: GridRow): { layerIndex?: number } {
+  return row.layerIndex === undefined ? {} : { layerIndex: row.layerIndex };
+}
+
 function handlePlace(row: GridRow, startMs: number, endMs: number): void {
   if (!pendingEffectName.value) return;
   store.addEffect(row.elementType, row.elementId, row.subName, {
@@ -794,6 +837,7 @@ function handlePlace(row: GridRow, startMs: number, endMs: number): void {
     startMs,
     endMs,
     params: defaultParamsFor(pendingEffectName.value),
+    ...layerFor(row),
   });
   pendingEffectName.value = null;
 }
@@ -854,6 +898,7 @@ function handleDropEffect(row: GridRow, name: string, startMs: number): void {
     startMs: from,
     endMs: to,
     params: defaultParamsFor(name),
+    ...layerFor(row),
   });
 }
 
@@ -872,7 +917,12 @@ function handleMoves(moves: { id: string; startMs: number; endMs: number; rowInd
   // a drag that moved an effect to another row is still a single Ctrl+Z.
   for (const move of moves) {
     const row = visibleRows.value[move.rowIndex];
-    if (row) store.moveEffectToRowLive(move.id, row.elementType, row.elementId, row.subName);
+    if (!row) continue;
+    store.moveEffectToRowLive(move.id, row.elementType, row.elementId, row.subName);
+    // Dragging between two layer rows of the same model changes the layer, not the row - the row
+    // is the same one. Without this the effect would appear to snap back, since the grid draws it
+    // on whichever layer row its index says.
+    if (row.layerIndex !== undefined) store.setEffectLayerLive(move.id, row.layerIndex);
   }
 }
 
@@ -970,9 +1020,60 @@ function handleContextMenu(target: ContextMenuTarget): void {
         ]
       : target.kind === "mark"
         ? [{ label: "Delete Mark", action: "delete-mark" }]
-        : [{ label: "Add Timing Mark Here", action: "add-mark" }];
+        : target.kind === "row-label"
+          ? layerMenuFor(target.row)
+          : [{ label: "Add Timing Mark Here", action: "add-mark" }];
   contextMenu.value = { x: target.x, y: target.y, items, target };
 }
+
+/**
+ * The layer menu on a row's label (manual: "right click the model in the sequencer tab and choose
+ * Add Layer above or below (the current layer)").
+ *
+ * A collapsed row offers only to expand, because "above or below the current layer" needs a
+ * current layer to mean anything - and on a collapsed row every layer is shown at once.
+ */
+function layerMenuFor(row: GridRow): { label: string; action: string }[] {
+  const effects = effectsForKey(row);
+  const count = layerCount(effects);
+  if (row.layerIndex === undefined) {
+    return [{ label: count > 1 ? `Show ${count} Layers` : "Show Layers", action: "layers-expand" }];
+  }
+  const full = !canAddLayer(effects);
+  return [
+    { label: full ? "Add Layer Above (at the 200 limit)" : "Add Layer Above", action: full ? "noop" : "layer-add-above" },
+    { label: full ? "Add Layer Below (at the 200 limit)" : "Add Layer Below", action: full ? "noop" : "layer-add-below" },
+    // Only offered when there is more than one, and it says what it will take with it - deleting
+    // a layer that still has effects on it silently would lose work.
+    ...(count > 1
+      ? [{ label: deleteLayerLabel(row), action: "layer-delete" }]
+      : []),
+    { label: "Collapse Layers", action: "layers-collapse" },
+  ];
+}
+
+function deleteLayerLabel(row: GridRow): string {
+  const n = removeLayer(effectsForKey(row), row.layerIndex ?? 0).deleted.length;
+  return n === 0 ? "Delete Layer" : `Delete Layer (and ${n} effect${n === 1 ? "" : "s"})`;
+}
+
+/** Applies a layer edit: the moves, and any effects the edit deletes, in one undo entry. */
+function applyLayerEdit(row: GridRow, moves: { id: string; layerIndex: number }[], deleted: string[] = []): void {
+  if (moves.length === 0 && deleted.length === 0) {
+    // Nothing to store, but the row still has to redraw: adding a layer above the top moves no
+    // effects at all, and the new empty row is the whole point of having asked.
+    layerRowsTick.value++;
+    return;
+  }
+  store.applyLayerEdit(moves, deleted);
+  layerRowsTick.value++;
+  void row;
+}
+
+// Bumped when a layer edit changes how many rows a model shows. The row list is computed from the
+// effects, and adding an empty layer changes no effect at all - so without this the new row
+// wouldn't appear until something else happened to redraw.
+const layerRowsTick = ref(0);
 
 function handleContextAction(action: string): void {
   const target = contextMenu.value?.target;
@@ -1004,6 +1105,24 @@ function handleContextAction(action: string): void {
       // just the one clicked, which is what right-clicking outside a selection means.
       if (store.selectedEffectIds.includes(effect.id)) store.deleteSelected();
       else store.deleteEffect(effect.id);
+    }
+  } else if (target.kind === "row-label") {
+    const row = target.row;
+    const key = rowKey(row);
+    if (action === "layers-expand") {
+      expandedLayerKeys.value = new Set([...expandedLayerKeys.value, key]);
+    } else if (action === "layers-collapse") {
+      // A display change only: "collapses the expanded effect layers back down to a single row".
+      // The effects stay on the layers they were on.
+      const next = new Set(expandedLayerKeys.value);
+      next.delete(key);
+      expandedLayerKeys.value = next;
+    } else if (action === "layer-add-above" || action === "layer-add-below") {
+      const { moves } = addLayer(effectsForKey(row), row.layerIndex ?? 0, action === "layer-add-above" ? "above" : "below");
+      applyLayerEdit(row, moves);
+    } else if (action === "layer-delete") {
+      const { deleted, moves } = removeLayer(effectsForKey(row), row.layerIndex ?? 0);
+      applyLayerEdit(row, moves, deleted);
     }
   } else if (target.kind === "mark" && action === "delete-mark") {
     store.deleteTimingMark(target.trackIndex, target.ms);
@@ -1255,6 +1374,7 @@ function placeFromWheel(name: string): void {
     name,
     startMs,
     endMs,
+    ...layerFor(at.row),
     params: defaultParamsFor(name),
   });
 }

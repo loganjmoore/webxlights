@@ -190,6 +190,19 @@ export const useSequencerStore = defineStore("sequencer", () => {
     ensureRow(elementType, elementId, subName).effects.push(moving);
   }
 
+  /**
+   * Puts one effect on a layer without taking a snapshot.
+   *
+   * Paired with moveEffectToRowLive: a drag that crossed both rows and layers is one action, so
+   * the snapshot belongs to the batch rather than to each step of it.
+   */
+  function setEffectLayerLive(effectId: string, layerIndex: number): void {
+    for (const row of body.value.rows) {
+      const effect = row.effects.find((e) => e.id === effectId);
+      if (effect) effect.layerIndex = layerIndex;
+    }
+  }
+
   function deleteEffect(effectId: string): void {
     pushUndoSnapshot();
     for (const row of body.value.rows) {
@@ -230,6 +243,28 @@ export const useSequencerStore = defineStore("sequencer", () => {
     if (ids.length === 0) return;
     pushUndoSnapshot();
     for (const id of ids) applyEffectPatch(id, { palette });
+  }
+
+  /**
+   * Moves effects between layers, and deletes any the edit removes, under one undo entry.
+   *
+   * Adding or deleting a layer renumbers everything above it, so it is one action however many
+   * effects it touches - undoing an "add layer" one effect at a time would leave the row in a
+   * state nobody asked for.
+   */
+  function applyLayerEdit(moves: readonly { id: string; layerIndex: number }[], deleted: readonly string[] = []): void {
+    if (moves.length === 0 && deleted.length === 0) return;
+    pushUndoSnapshot();
+    const gone = new Set(deleted);
+    for (const row of body.value.rows) row.effects = row.effects.filter((e) => !gone.has(e.id));
+    for (const move of moves) {
+      for (const row of body.value.rows) {
+        const effect = row.effects.find((e) => e.id === move.id);
+        if (effect) effect.layerIndex = move.layerIndex;
+      }
+    }
+    selectedEffectIds.value = selectedEffectIds.value.filter((id) => !gone.has(id));
+    if (selectedEffectId.value && gone.has(selectedEffectId.value)) selectedEffectId.value = null;
   }
 
   /** Applies a patch to several effects under one undo entry (an alignment moves all of them). */
@@ -411,6 +446,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     deleteSelected,
     updateEffects,
     updateEffectsPalette,
+    applyLayerEdit,
     saveStatus,
     conflictRemote,
     keepMine,
@@ -438,6 +474,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     addTimingTrack,
     moveEffectToRow,
     moveEffectToRowLive,
+    setEffectLayerLive,
     snapshot: pushUndoSnapshot,
     saveNow,
   };

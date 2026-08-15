@@ -74,6 +74,12 @@ export interface RenderableEffect {
   startMs: number;
   endMs: number;
   params: Record<string, unknown>;
+  /**
+   * Which effect layer this sits on, 0 being the bottom. "Each layer can be blended with the
+   * layer below it", so this decides the composite order - not the order the effects happen to
+   * sit in the row's array.
+   */
+  layerIndex?: number;
   transition?: TransitionSpec;
   // Per-effect color override (real xLights' Color tab) - falls back to the row's own palette
   // (the app-wide default, until a model/group-level palette exists) when unset. A swatch may be
@@ -106,6 +112,11 @@ export interface RenderableRow {
 
 // The manual's own cap: "each model may have a up to 200 layers of effects" (layerStack.ts).
 import { MAX_LAYERS } from "./layerStack";
+
+/** Effects in composite order: by layer, bottom first, stable within a layer. */
+function byLayer<T extends { layerIndex?: number }>(effects: T[]): T[] {
+  return [...effects].sort((a, b) => (a.layerIndex ?? 0) - (b.layerIndex ?? 0));
+}
 
 // What a stateless render needs beyond its own params: where the model's nodes sit in the buffer,
 // and how long a frame is. Only the label-driven effects read either, so they travel together in
@@ -473,12 +484,16 @@ export function renderRowAtMs(
   palette: RGBA[],
   audio?: AudioSeries,
 ): RGBA[] {
+  // Ordered by layer, bottom first: "each layer can be blended with the layer below it", so the
+  // composite order is the layer order rather than wherever the effects happen to sit in the
+  // row's array. Stable, so two effects on the same layer keep their authored order.
+  //
   // Over the cap, the *topmost* layers are dropped rather than the bottom ones. Keeping the last
   // N - which is what this did - discards the base everything else blends onto, so a row over the
   // limit rendered as if its background had never been drawn. Dropping from the top at least
   // leaves the picture recognisable, and at 200 the cap is out of reach of anything but an
   // import gone wrong.
-  const active = row.effects.filter((e) => atMs >= e.startMs && atMs < e.endMs).slice(0, MAX_LAYERS);
+  const active = byLayer(row.effects.filter((e) => atMs >= e.startMs && atMs < e.endMs)).slice(0, MAX_LAYERS);
   if (active.length === 0) {
     return row.geometry.nodes.map(() => rgba(0, 0, 0, 0));
   }
@@ -547,8 +562,11 @@ export function createRowSequencer(
     const activeWithIndex = row.effects
       .map((effect, index) => ({ effect, index }))
       .filter(({ effect }) => atMs >= effect.startMs && atMs < effect.endMs)
-      // Same rule as renderRowAtMs, and it has to be: the scrubbing path and this sequential
-      // export path rendering different layers would mean the file didn't match the preview.
+      // Same rules as renderRowAtMs, and they have to be: the scrubbing path and this sequential
+      // export path ordering or dropping layers differently would mean the file didn't match the
+      // preview. `index` stays the effect's position in the row array, because that is what keys
+      // this sweep's per-effect state - only the composite order changes.
+      .sort((a, b) => (a.effect.layerIndex ?? 0) - (b.effect.layerIndex ?? 0))
       .slice(0, MAX_LAYERS);
 
     if (activeWithIndex.length === 0) {

@@ -28,7 +28,7 @@ export type GridGesture =
   | "band";
 
 export interface GestureHit {
-  kind: "effect" | "mark" | "ruler-empty" | "row-empty" | "none";
+  kind: "effect" | "mark" | "ruler-empty" | "row-empty" | "row-label" | "none";
   /** Set when the press landed on an effect's left or right edge. */
   edge?: "left" | "right" | null;
 }
@@ -42,6 +42,9 @@ export interface GestureModifiers {
 export function gestureFor(hit: GestureHit, modifiers: GestureModifiers): GridGesture {
   if (hit.kind === "ruler-empty") return "add-mark";
   if (hit.kind === "mark") return "none";
+  // A row label is the layer menu's target, and right-click is how you reach it - a left press
+  // there should do nothing rather than start a selection box behind the labels.
+  if (hit.kind === "row-label") return "none";
 
   if (hit.kind === "effect") {
     // The edge test comes first, and that ordering is the whole fix: shift means "pick the
