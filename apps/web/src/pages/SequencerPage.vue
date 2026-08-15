@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { CANVAS_ONLY_EFFECTS, EFFECT_SCHEMAS, defaultParamsFor, detectOnsets, estimateTempo, mouthNames, type AudioSeries, type OnsetBand, type BlendMode, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
 import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequencerView, type SequenceEffect, type SequenceVersion } from "../lib/api";
@@ -54,6 +54,7 @@ import {
 } from "../lib/preferences";
 import { intervalAt, subdivisionMarks } from "../lib/timingSubdivide";
 import { marksInForce, placementFor } from "../lib/effectPlacement";
+import { DEFAULT_ZOOM_INDEX, ZOOM_STEPS, clampZoomIndex, scrollLeftHolding, wheelScrollDelta, zoomIndexIn, zoomIndexOut } from "../lib/zoom";
 import {
   loadPerspectives,
   panelsFrom,
@@ -118,8 +119,8 @@ const analyzingAudio = ref(false);
 const playheadMs = ref(0);
 const playing = ref(false);
 const pendingEffectName = ref<string | null>(null);
-const zoomLevel = ref(1); // 1 of 3 zoom levels: 0.5x / 1x / 2x
-const ZOOM_STEPS = [0.5, 1, 2];
+// Index into ZOOM_STEPS (lib/zoom.ts), not a multiplier - the gestures step along the ladder.
+const zoomLevel = ref(DEFAULT_ZOOM_INDEX);
 const clipboard = ref<SequenceEffect | null>(null);
 const versions = ref<SequenceVersion[]>([]);
 const showHistory = ref(false);
@@ -306,8 +307,74 @@ const fppBusy = ref(false);
 const pxPerMs = computed(() => {
   const containerWidth = 1200; // fit-to-width baseline before zoom
   const duration = store.sequence?.duration_ms || 1;
-  return (containerWidth / duration) * ZOOM_STEPS[zoomLevel.value]!;
+  return (containerWidth / duration) * ZOOM_STEPS[clampZoomIndex(zoomLevel.value)]!;
 });
+
+// The row-label gutter both the waveform and the grid start after. Kept in step with their own
+// copies of it - a timeline that scrolls to a moment has to agree with the one that drew it.
+const TIMELINE_LABEL_WIDTH = 140;
+
+// The element that scrolls the waveform and the grid together.
+const hScrollRef = ref<HTMLDivElement | null>(null);
+
+/**
+ * Steps the zoom, holding a moment still under a point on screen.
+ *
+ * The anchor is what makes zooming usable: without it the content grows from its left edge while
+ * the viewport stays put, so zooming in on the second chorus lands you in the first verse. With no
+ * anchor given - the keyboard, or the dropdown - it holds the playhead in the middle, which is the
+ * moment you were looking at.
+ */
+function zoomBy(direction: 1 | -1, anchor?: { ms: number; clientX: number }): void {
+  const next = direction > 0 ? zoomIndexIn(zoomLevel.value) : zoomIndexOut(zoomLevel.value);
+  if (next === zoomLevel.value) return;
+  const el = hScrollRef.value;
+  const anchorMs = anchor?.ms ?? playheadMs.value;
+  const rect = el?.getBoundingClientRect();
+  const offsetPx = anchor && rect ? anchor.clientX - rect.left : (el?.clientWidth ?? 0) / 2;
+
+  zoomLevel.value = next;
+  if (!el) return;
+  // After the tick, because the content is only as wide as the new zoom once Vue has applied it -
+  // reading scrollWidth now would clamp against the old width and land short.
+  void nextTick(() => {
+    const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+    el.scrollLeft = scrollLeftHolding(anchorMs, offsetPx, pxPerMs.value, TIMELINE_LABEL_WIDTH, maxScroll);
+  });
+}
+
+/** "Right-click the timeline to reset the zoom level." */
+function resetZoom(): void {
+  zoomLevel.value = DEFAULT_ZOOM_INDEX;
+}
+
+/**
+ * Ctrl+wheel zooms, shift+wheel scrolls sideways.
+ *
+ * On the shared scroller so both gestures work over the waveform and the grid alike - "use the
+ * mouse scroll wheel to go in or out" is described over an effect edge, and there is no reason for
+ * it to stop working an inch higher up.
+ */
+function onTimelineWheel(e: WheelEvent): void {
+  const el = hScrollRef.value;
+  if (!el) return;
+
+  if (e.ctrlKey || e.metaKey) {
+    // Prevented, or the browser zooms the whole page instead - which is the same gesture and a
+    // very confusing thing to get by accident.
+    e.preventDefault();
+    const rect = el.getBoundingClientRect();
+    const offsetPx = e.clientX - rect.left;
+    const ms = Math.max(0, (el.scrollLeft + offsetPx - TIMELINE_LABEL_WIDTH) / pxPerMs.value);
+    zoomBy(e.deltaY < 0 ? 1 : -1, { ms, clientX: e.clientX });
+    return;
+  }
+
+  if (e.shiftKey) {
+    e.preventDefault();
+    el.scrollLeft += wheelScrollDelta(e.deltaX, e.deltaY);
+  }
+}
 
 const selectedEffect = computed(() => (store.selectedEffectId ? store.findEffect(store.selectedEffectId) : null));
 
@@ -1214,12 +1281,8 @@ const commands = computed(() =>
     },
     undo: () => store.undo(),
     redo: () => store.redo(),
-    zoomIn: () => {
-      zoomLevel.value = Math.min(2, zoomLevel.value + 1);
-    },
-    zoomOut: () => {
-      zoomLevel.value = Math.max(0, zoomLevel.value - 1);
-    },
+    zoomIn: () => zoomBy(1),
+    zoomOut: () => zoomBy(-1),
     placeEffect: (name, params) => {
       const row = keyboardTargetRow();
       if (!row) return;
@@ -1393,10 +1456,8 @@ watch(sequenceId, async (id) => {
         <button @click="store.undo" :disabled="!store.canUndo">Undo</button>
         <button @click="store.redo" :disabled="!store.canRedo">Redo</button>
       </div>
-      <select v-model.number="zoomLevel">
-        <option :value="0">0.5x</option>
-        <option :value="1">1x</option>
-        <option :value="2">2x</option>
+      <select v-model.number="zoomLevel" title="Zoom. Double-click the waveform to zoom in, shift+double-click to zoom out, ctrl+wheel over the grid, right-click the waveform to reset.">
+        <option v-for="(step, i) in ZOOM_STEPS" :key="i" :value="i">{{ step }}x</option>
       </select>
       <button @click="exportFseq" :disabled="!store.sequence">Export .fseq</button>
       <button @click="openPreviewWindow" :disabled="!store.sequence" title="Open the house preview in its own window">
@@ -2026,7 +2087,7 @@ watch(sequenceId, async (id) => {
             :audio="audioSeries ?? undefined"
           />
         </div>
-        <div class="h-scroll">
+        <div ref="hScrollRef" class="h-scroll" @wheel="onTimelineWheel">
           <Waveform
             :peaks="peaks"
             :duration-ms="store.sequence?.duration_ms ?? 0"
@@ -2036,6 +2097,8 @@ watch(sequenceId, async (id) => {
             @scrub="scrubTo"
             @scrub-end="endScrub"
             @play-range="playRange = $event"
+            @zoom="(direction, ms, clientX) => zoomBy(direction, { ms, clientX })"
+            @reset-zoom="resetZoom"
             :play-range="playRange"
             :small="prefs.smallWaveform"
             :colors="uiColors"
