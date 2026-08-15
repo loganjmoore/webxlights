@@ -34,7 +34,12 @@ export function newEffectId(): string {
 export const useSequencerStore = defineStore("sequencer", () => {
   const sequence = ref<SequenceRecord | null>(null);
   const body = ref<SequenceBody>(emptyBody());
+  // The *reference* effect: what the props panel edits, what the keyboard commands act on, and
+  // what an alignment aligns to. Always either null or a member of selectedEffectIds.
   const selectedEffectId = ref<string | null>(null);
+  // The block selection (lib/blockSelect.ts). One selected effect is the ordinary case and is
+  // simply a selection of one, so the two can't drift apart into "which is really selected".
+  const selectedEffectIds = ref<string[]>([]);
   const saveStatus = ref<"idle" | "saving" | "saved" | "error" | "conflict">("idle");
   // Set when a save lost a race (someone else saved since our etag was read) - the UI
   // offers "keep mine" / "take theirs" instead of the store silently picking one.
@@ -59,6 +64,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     undoStack.value = [];
     redoStack.value = [];
     selectedEffectId.value = null;
+    selectedEffectIds.value = [];
     suppressAutosave = false;
   }
 
@@ -150,6 +156,35 @@ export const useSequencerStore = defineStore("sequencer", () => {
       row.effects = row.effects.filter((e) => e.id !== effectId);
     }
     if (selectedEffectId.value === effectId) selectedEffectId.value = null;
+    selectedEffectIds.value = selectedEffectIds.value.filter((id) => id !== effectId);
+  }
+
+  /**
+   * Replaces the selection and its reference together.
+   *
+   * One setter rather than two refs the caller keeps in step: a reference that isn't in the
+   * selection would align effects to something not selected, which is invisible and wrong.
+   */
+  function setSelection(ids: readonly string[], reference: string | null): void {
+    selectedEffectIds.value = [...ids];
+    selectedEffectId.value = reference && ids.includes(reference) ? reference : (ids[0] ?? null);
+  }
+
+  /** Deletes every selected effect under one undo entry. */
+  function deleteSelected(): void {
+    const ids = new Set(selectedEffectIds.value);
+    if (ids.size === 0) return;
+    pushUndoSnapshot();
+    for (const row of body.value.rows) row.effects = row.effects.filter((e) => !ids.has(e.id));
+    selectedEffectIds.value = [];
+    selectedEffectId.value = null;
+  }
+
+  /** Applies a patch to several effects under one undo entry (an alignment moves all of them). */
+  function updateEffects(patches: readonly { id: string; startMs: number; endMs: number }[]): void {
+    if (patches.length === 0) return;
+    pushUndoSnapshot();
+    for (const patch of patches) applyEffectPatch(patch.id, { startMs: patch.startMs, endMs: patch.endMs });
   }
 
   function findEffect(effectId: string): SequenceEffect | null {
@@ -307,6 +342,10 @@ export const useSequencerStore = defineStore("sequencer", () => {
     sequence,
     body,
     selectedEffectId,
+    selectedEffectIds,
+    setSelection,
+    deleteSelected,
+    updateEffects,
     saveStatus,
     conflictRemote,
     keepMine,

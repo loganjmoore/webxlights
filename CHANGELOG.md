@@ -1,5 +1,32 @@
 # Changelog
 
+## Block selection, and the alignment commands it unblocks
+
+The last audit found that three recorded gaps — the align commands, Alt-drag stretching, and the ghost outline — were one gap wearing three hats. All of them need **selecting a block of cells across rows**, which this app had no notion of. This builds it, and then the alignment commands that were the clearest thing waiting on it.
+
+### Selecting a block
+
+Drag a box over empty grid and it selects every effect it touches, across rows. Then, per the manual, "hold down shift and click the effect you want to be the reference".
+
+- **Touching, not enclosing.** Dragging a band across the middle of a row of effects is how you select that row. Requiring the box to contain each effect whole would mean carefully starting before the first and ending after the last.
+- **A drag draws a box; a click still seeks.** Which one it was is decided on release, because it isn't known until the pointer either moves or doesn't — and seeking on the way into a box drag would drag the playhead along with the box.
+- **The reference is drawn differently** from the rest of the block: white outline versus a dimmer one. An alignment moves everything onto the reference, so which effect that is has to be visible before you pick the command, not after it has moved eleven effects.
+- **A single selection is a block of one.** There is one notion of "selected" rather than two that can drift into disagreeing about which effect the props panel is editing.
+
+### Aligning
+
+Four commands on the right-click menu — start times, end times, both, and centrepoints — offered only when there's actually a block to align, since four entries that would each move nothing are worse than four entries that aren't there.
+
+Three of them keep each effect's own length and only move it. **Both** is the one that changes durations, which is exactly why it's a separate option rather than being what "align" quietly means. Nothing is ever moved before zero: a start clamped at the front is a visible result, where a negative start is an effect off the left of the grid with nothing left to grab. The whole alignment is one undo entry — undoing it one effect at a time would be worse than not having the command.
+
+Delete now takes the block too, from the keyboard and from the menu. A selection you can see but can't delete together is a selection that lies about what it is.
+
+### What's still missing, and why
+
+- **Alt-drag stretching.** The manual says it produces "a Chase effect" and never defines the stagger. It stays unbuilt rather than guessed at.
+- **The ghost outline.** Its collision colouring is described for dragging several effects at once, and our drag still commits live on every pointermove — it needs to become preview-then-commit first.
+- **Multi-effect copy, duplicate and property editing.** These still act on the reference alone: the clipboard holds one effect and the props panel edits one. Stated in the row rather than left to be discovered.
+
 ## Shift-drag an effect edge to author a fade
 
 From the *Changing An Effect* page: "Hold the Shift key and drag the left edge of an effect inwards to create a fade in, or drag the right edge inwards to create a fade out."

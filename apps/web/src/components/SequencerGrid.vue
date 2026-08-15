@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import type { SequenceBody, SequenceEffect } from "../lib/api";
 import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
 import { fadeDurationAt } from "../lib/effectFade";
+import { boxFromDrag, idsInBox, isDrag, selectionAfterClick } from "../lib/blockSelect";
 
 export interface GridRow {
   elementType: "model" | "group" | "submodel";
@@ -23,7 +24,10 @@ const props = defineProps<{
   durationMs: number;
   pxPerMs: number;
   playheadMs: number;
-  selectedEffectId: string | null;
+  selectedEffectId: string | null; // the reference effect, drawn distinctly from the rest
+  // The block selection (lib/blockSelect.ts). Optional so the grid still draws anywhere it is
+  // mounted without one; a selection of one behaves exactly as a single selection always did.
+  selectedEffectIds?: string[];
   pendingEffectName: string | null; // armed from the palette; next drag places this
   // xLights' "snap to timing marks" preference. Off, an edge lands exactly where it was dropped,
   // which is what you want when placing against the music by ear rather than against the marks.
@@ -46,7 +50,9 @@ const props = defineProps<{
 const ui = (): UiColors => props.colors ?? DEFAULT_UI_COLORS;
 
 const emit = defineEmits<{
-  select: [effectId: string | null];
+  // Selection is always a block and its reference, even when the block is one effect - two events
+  // would mean two ways to be selected, and the panel reading a different one from the grid.
+  selectMany: [ids: string[], reference: string | null];
   place: [row: GridRow, startMs: number, endMs: number];
   dropEffect: [row: GridRow, name: string, startMs: number];
   move: [effectId: string, startMs: number, endMs: number];
@@ -92,6 +98,8 @@ let dragState:
   // Shift+resize authors a fade instead of moving the edge (manual: "hold the Shift key and drag
   // the left edge of an effect inwards to create a fade in").
   | { kind: "fade"; effect: SequenceEffect; edge: "left" | "right" }
+  // A rubber band over empty grid: "drag a box around all the effects you want to align".
+  | { kind: "band"; fromX: number; fromY: number; toX: number; toY: number; dragging: boolean }
   | null = null;
 
 // Full content width, not container width - at zoom > baseline this is wider than the
@@ -186,11 +194,17 @@ function draw(): void {
     for (const effect of effectsForRow(row)) {
       const x1 = msToX(effect.startMs);
       const x2 = msToX(effect.endMs);
-      const selected = effect.id === props.selectedEffectId;
-      ctx.fillStyle = selected ? ui().effectSelected : ui().effect;
+      const isReference = effect.id === props.selectedEffectId;
+      const inBlock = isReference || (props.selectedEffectIds?.includes(effect.id) ?? false);
+      ctx.fillStyle = inBlock ? ui().effectSelected : ui().effect;
       ctx.fillRect(x1, y + 2, Math.max(2, x2 - x1), height - 4);
-      ctx.strokeStyle = selected ? "#fff" : "#2c3e5c";
+      // The reference gets the white outline and the rest of the block a dimmer one: an alignment
+      // moves everything onto the reference, so which one that is has to be visible before you
+      // pick the command, not after it has moved eleven effects.
+      ctx.strokeStyle = isReference ? "#fff" : inBlock ? "#8fb8e8" : "#2c3e5c";
+      ctx.lineWidth = isReference ? 2 : 1;
       ctx.strokeRect(x1, y + 2, Math.max(2, x2 - x1), height - 4);
+      ctx.lineWidth = 1;
       if (props.showTransitionMarks !== false) drawTransitionMarks(ctx, effect, x1, x2, y, height);
       // The label is drawn last so a transition mark can't sit on top of it. Only when the block
       // is wide enough for the name to be legible at all, which was already the rule.
@@ -252,6 +266,29 @@ function draw(): void {
   ctx.moveTo(px, 0);
   ctx.lineTo(px, rect.height);
   ctx.stroke();
+
+  // The rubber band, over everything - it is a transient thing you are drawing right now, and
+  // having it hide behind an effect would make it look like it had stopped following the pointer.
+  if (dragState?.kind === "band" && dragState.dragging) {
+    const bx = Math.min(dragState.fromX, dragState.toX);
+    const by = Math.min(dragState.fromY, dragState.toY);
+    const bw = Math.abs(dragState.toX - dragState.fromX);
+    const bh = Math.abs(dragState.toY - dragState.fromY);
+    ctx.fillStyle = "rgba(120, 175, 255, 0.15)";
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = "rgba(140, 190, 255, 0.9)";
+    ctx.strokeRect(bx, by, bw, bh);
+  }
+}
+
+/** The row index a y coordinate falls on, whether or not a row is actually there. */
+function rowIndexAt(y: number): number {
+  return Math.floor((y - HEADER_HEIGHT + scrollTop.value) / rowHeight.value);
+}
+
+/** The effects of every visible row, indexed by row, for the band to be tested against. */
+function effectsByRow(): SequenceEffect[][] {
+  return props.rows.map((row) => effectsForRow(row));
 }
 
 // xLights' "Display Transition Marks": the part of an effect that is a reveal rather than the
@@ -323,7 +360,7 @@ function hitTest(x: number, y: number): HitResult {
     return { kind: "ruler-empty", trackIndex: trackForNewMark(), ms };
   }
 
-  const rowIndex = Math.floor((y - HEADER_HEIGHT + scrollTop.value) / rowHeight.value);
+  const rowIndex = rowIndexAt(y);
   const row = props.rows[rowIndex];
   if (!row) return { kind: "none" };
 
@@ -399,7 +436,11 @@ function onPointerDown(e: PointerEvent): void {
   }
 
   if (hit.kind === "effect") {
-    emit("select", hit.effect.id);
+    // Shift picks the reference out of a block that already exists ("hold down shift and click the
+    // effect you want to be the reference"); an ordinary click selects just this one.
+    const next = selectionAfterClick(props.selectedEffectIds ?? [], hit.effect.id, e.shiftKey);
+    emit("selectMany", next.selected, next.reference);
+    if (e.shiftKey) return; // choosing the reference isn't the start of a drag
     emit("dragStart");
     if (hit.edge) {
       // Shift turns the edge drag into a fade. The edge itself stays put, which is what makes the
@@ -412,12 +453,16 @@ function onPointerDown(e: PointerEvent): void {
     return;
   }
 
-  emit("select", null);
   if (hit.kind === "row-empty" && props.pendingEffectName) {
+    emit("selectMany", [], null);
     dragState = { kind: "place", row: hit.row, startMs: xToMs(x) };
-  } else {
-    emit("seek", xToMs(x));
+    return;
   }
+
+  // Empty grid: a *drag* draws a selection box, a click seeks. Decided on pointerup rather than
+  // here, because which one it was isn't known until the pointer either moves or doesn't - and
+  // seeking on the way into a band drag would drag the playhead along with the box.
+  dragState = { kind: "band", fromX: x, fromY: y, toX: x, toY: y, dragging: false };
 }
 
 function updateHoverCursor(x: number, y: number): void {
@@ -436,6 +481,17 @@ function onPointerMove(e: PointerEvent): void {
 
   if (!dragState) {
     updateHoverCursor(x, y);
+    return;
+  }
+
+  if (dragState.kind === "band") {
+    dragState.toX = x;
+    dragState.toY = y;
+    if (!dragState.dragging && isDrag(dragState.fromX, dragState.fromY, x, y)) dragState.dragging = true;
+    if (dragState.dragging) {
+      hoverCursor.value = "crosshair";
+      draw();
+    }
     return;
   }
 
@@ -472,6 +528,23 @@ function onPointerMove(e: PointerEvent): void {
 }
 
 function onPointerUp(e: PointerEvent): void {
+  if (dragState?.kind === "band") {
+    const band = dragState;
+    dragState = null;
+    if (band.dragging) {
+      const box = boxFromDrag(xToMs(band.fromX), rowIndexAt(band.fromY), xToMs(band.toX), rowIndexAt(band.toY));
+      const ids = idsInBox(effectsByRow(), box);
+      // A band that caught nothing still clears the selection - it is the gesture for "none of
+      // these", and leaving the old block selected would make the next alignment act on it.
+      emit("selectMany", ids, ids[0] ?? null);
+    } else {
+      emit("selectMany", [], null);
+      emit("seek", xToMs(band.fromX));
+    }
+    draw();
+    return;
+  }
+
   if (dragState?.kind === "place") {
     const canvas = canvasRef.value;
     if (canvas) {

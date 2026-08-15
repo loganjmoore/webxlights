@@ -55,6 +55,7 @@ import {
 import { intervalAt, subdivisionMarks } from "../lib/timingSubdivide";
 import { marksInForce, placementFor } from "../lib/effectPlacement";
 import { withFade } from "../lib/effectFade";
+import { ALIGN_MODES, alignedTo, type AlignMode } from "../lib/alignEffects";
 import { DEFAULT_ZOOM_INDEX, ZOOM_STEPS, clampZoomIndex, scrollLeftHolding, wheelScrollDelta, zoomIndexIn, zoomIndexOut } from "../lib/zoom";
 import {
   loadPerspectives,
@@ -862,8 +863,26 @@ function handleDragStart(): void {
   store.snapshot();
 }
 
-function handleSelect(effectId: string | null): void {
-  store.selectedEffectId = effectId;
+function handleSelectMany(ids: string[], reference: string | null): void {
+  store.setSelection(ids, reference);
+}
+
+/**
+ * Aligns every selected effect onto the reference one.
+ *
+ * The reference is left alone, and the whole alignment is one undo entry - undoing an alignment
+ * one effect at a time would be worse than not having the command.
+ */
+function alignSelection(mode: AlignMode): void {
+  const reference = store.selectedEffectId ? store.findEffect(store.selectedEffectId) : null;
+  if (!reference) return;
+  const patches = store.selectedEffectIds
+    .filter((id) => id !== store.selectedEffectId)
+    .flatMap((id) => {
+      const effect = store.findEffect(id);
+      return effect ? [{ id, ...alignedTo(reference, effect, mode) }] : [];
+    });
+  store.updateEffects(patches);
 }
 
 function handleAddMark(trackIndex: number, ms: number): void {
@@ -880,6 +899,11 @@ function handleContextMenu(target: ContextMenuTarget): void {
           { label: "Paste", action: "paste" },
           { label: "Duplicate", action: "duplicate" },
           { label: "Delete", action: "delete" },
+          // "Then right click and select Alignment." Only offered with a block to align - four
+          // entries that would each move nothing are worse than four entries that aren't there.
+          ...(store.selectedEffectIds.length > 1
+            ? ALIGN_MODES.map((m) => ({ label: m.label, action: `align:${m.mode}` }))
+            : []),
         ]
       : target.kind === "mark"
         ? [{ label: "Delete Mark", action: "delete-mark" }]
@@ -894,6 +918,10 @@ function handleContextAction(action: string): void {
 
   if (target.kind === "effect") {
     const { row, effect, ms } = target;
+    if (action.startsWith("align:")) {
+      alignSelection(action.slice("align:".length) as AlignMode);
+      return;
+    }
     if (action === "copy") {
       clipboard.value = store.copyEffect(effect.id);
     } else if (action === "cut") {
@@ -905,7 +933,10 @@ function handleContextAction(action: string): void {
       const copy = store.copyEffect(effect.id);
       if (copy) store.pasteEffectAt(row.elementType, row.elementId, row.subName, copy, effect.endMs);
     } else if (action === "delete") {
-      store.deleteEffect(effect.id);
+      // The whole block when the effect right-clicked is in it, matching the keyboard - otherwise
+      // just the one clicked, which is what right-clicking outside a selection means.
+      if (store.selectedEffectIds.includes(effect.id)) store.deleteSelected();
+      else store.deleteEffect(effect.id);
     }
   } else if (target.kind === "mark" && action === "delete-mark") {
     store.deleteTimingMark(target.trackIndex, target.ms);
@@ -1277,9 +1308,9 @@ const commands = computed(() =>
     addTimingMark: addTimingMarkAtPlayhead,
     splitTimingMark: splitTimingMarkAtPlayhead,
     subdivideTiming,
-    deleteSelected: () => {
-      if (store.selectedEffectId) store.deleteEffect(store.selectedEffectId);
-    },
+    // Deletes the whole block, not only the reference: a selection you can see but can't delete
+    // together is a selection that lies about what it is.
+    deleteSelected: () => store.deleteSelected(),
     copySelected: () => {
       if (store.selectedEffectId) clipboard.value = store.copyEffect(store.selectedEffectId);
     },
@@ -2129,7 +2160,8 @@ watch(sequenceId, async (id) => {
             :playhead-ms="playheadMs"
             :selected-effect-id="store.selectedEffectId"
             :pending-effect-name="pendingEffectName"
-            @select="handleSelect"
+            @select-many="handleSelectMany"
+            :selected-effect-ids="store.selectedEffectIds"
             @wheel="openWheel"
             @place="handlePlace"
             @drop-effect="handleDropEffect"
