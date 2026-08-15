@@ -2,6 +2,7 @@ import { ADJUST_MODES } from "./adjust";
 import { KALEIDOSCOPE_TYPES } from "./kaleidoscope";
 import { FACE_EYE_MODES } from "./faces";
 import { PIANO_SOURCES, PIANO_TYPES } from "./piano";
+import { GUITAR_TYPES, STRING_APPEARANCES } from "./guitar";
 import { STATE_COLOR_MODES, STATE_MODES } from "./state";
 import { SHAPE_KINDS } from "./shape";
 import { VU_METER_TYPES } from "./vuMeter";
@@ -597,6 +598,24 @@ export const STATE_EFFECT_SCHEMA: EffectSchema = {
 };
 
 // The Piano effect (piano.ts).
+// The Guitar effect (guitar.ts). Its Track list comes from the sequence's timing tracks, the same
+// source the Piano effect reads - a MIDI file imported as a timing track drives both.
+const GUITAR_SCHEMA: EffectSchema = {
+  name: "Guitar",
+  params: [
+    { key: "type", label: "Type", type: "choice", options: [...GUITAR_TYPES], default: "Guitar" },
+    { key: "timingTrack", label: "Track", type: "choice", optionsFrom: "timingTracks", default: "" },
+    { key: "stringAppearance", label: "String Appearance", type: "choice", options: [...STRING_APPEARANCES], default: "On" },
+    { key: "fretCount", label: "Fret Count", type: "intSlider", min: 8, max: 30, default: 19 },
+    { key: "baseWavelength", label: "Base Wavelength", type: "floatSlider", min: 0.1, max: 10, step: 0.1, default: 4 },
+    { key: "varyWavelengthByString", label: "Vary Wavelength By String", type: "floatSlider", min: 0, max: 10, step: 0.1, default: 0 },
+    { key: "varyWavelengthByFret", label: "Vary Wavelength By Fret", type: "floatSlider", min: 0, max: 10, step: 0.1, default: 0 },
+    { key: "fade", label: "Fade", type: "checkbox", default: true },
+    { key: "collapse", label: "Collapse", type: "checkbox", default: false },
+    { key: "showStrings", label: "Show Strings", type: "checkbox", default: true },
+  ],
+};
+
 export const PIANO_EFFECT_SCHEMA: EffectSchema = {
   name: "Piano",
   params: [
@@ -681,13 +700,14 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Sketch: SKETCH_EFFECT_SCHEMA,
   State: STATE_EFFECT_SCHEMA,
   Piano: PIANO_EFFECT_SCHEMA,
+  Guitar: GUITAR_SCHEMA,
   Faces: FACES_EFFECT_SCHEMA,
 };
 
 // Effects driven by the words on a timing track rather than by their own parameters. The props
 // panel warns when one of these names a track the sequence hasn't got, because the symptom
 // otherwise is an effect that renders nothing for no visible reason.
-export const TIMING_TRACK_EFFECTS = new Set<string>(["State", "Piano", "Faces"]);
+export const TIMING_TRACK_EFFECTS = new Set<string>(["State", "Piano", "Faces", "Guitar"]);
 
 // Effects that read the analysed audio track rather than only their own params - the UI warns
 // when one of these is placed in a sequence with no audio loaded.
