@@ -1,5 +1,30 @@
 # Changelog
 
+## Shift-drag an effect edge to author a fade
+
+From the *Changing An Effect* page: "Hold the Shift key and drag the left edge of an effect inwards to create a fade in, or drag the right edge inwards to create a fade out."
+
+This is a gesture the app could already express and had no way to perform. The transition system has in and out durations, and the grid has drawn them as wedges since the Effects Grid tab landed — but the only way to set one was to type a number into the panel and look at the result. That is a poor way to answer "how long should this fade be", because the answer is "until it stops sounding abrupt", which you find by dragging.
+
+The edge itself stays put during the gesture, which is what tells the two drags apart: a plain edge drag changes *when* the effect runs, the shift one changes *how it arrives*. The distance dragged inwards is the fade, and dragging back out to the edge removes it.
+
+Four rules the gesture needed:
+
+- **Unsnapped, deliberately.** A fade is a length by ear, not a boundary. Snapping it to the nearest timing mark would quantise exactly the thing you are dragging to taste.
+- **It adjusts the reveal already there.** Shift-dragging the edge of an effect someone gave a Circle Explode changes that transition's length rather than silently turning it into a fade. Only an effect with no transition at all gets one made for it.
+- **A fade this gesture created is cleared when dragged back to nothing**, so an undone fade leaves no empty object behind to puzzle over in the panel. One that existed beforehand keeps its type at zero length — that setting was chosen deliberately and this gesture never touched it.
+- **The two fades can't cross.** An in and an out that overlapped would ask the renderer to reveal and hide the same frames at once, and what that looks like is not something anyone chose.
+
+## Three things that turn out to share one prerequisite
+
+The same page describes the align commands, Alt-drag stretching, and the ghost outline drawn while dragging. All three were recorded as separate gaps. Reading them together, they are one gap:
+
+- Aligning: "drag a box around all the effects you want to align and then hold down shift and click the effect you want to be the reference."
+- The ghost outline's collision colouring is described for dragging *several* effects at once.
+- Stretching produces "a Chase effect", which the page never defines — but its own chase recipe is "select a block of cells and hit 'd'... then drag the end line to adjust", so it is block-shaped too.
+
+**Selecting a block of cells across rows** is the thing this app has no notion of, and building a one-effect imitation of each would look like parity while missing what all three are for. The coverage row now names the prerequisite instead of listing three symptoms of it. (The ghost outline needs a second thing besides: our drag commits live on every pointermove, where a preview has to be shown and then committed.)
+
 ## The waveform's zoom and scroll gestures
 
 The *Timeline and Waveform* page lists five gestures for two operations. We had none of them — zoom was a dropdown and three levels wide.
