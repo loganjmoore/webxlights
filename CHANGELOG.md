@@ -1,5 +1,29 @@
 # Changelog
 
+## A Custom value curve can repeat
+
+Two more sequencer pages read. The views page found nothing missing — creating, deleting, adding and removing models, reordering with the arrows, and per-row visibility are all there.
+
+The value-curves page found one thing:
+
+> "A Custom curve has a Cycles control (1 to 10) that repeats the shape you have drawn across the effect."
+
+Ours had cycles for every periodic type and not for Custom, which made a hand-drawn shape usable only as a single slow sweep. The drawn shape is now a **period** rather than the whole span, so a hand-drawn flicker works on a four-second effect.
+
+### The bug my own change introduced, and the rule that fixed it
+
+Adding Custom to the periodic set broke an existing test immediately: a custom curve read **0 at the very end of the effect** instead of holding its last point.
+
+The cycle position is the fractional part of `x * cycles`, so at exactly 1.0 it returns 0 — the start of the next cycle. That's right when there *is* a next cycle and wrong when there isn't: a single-cycle curve should hold its last point past the end, and wrapping sends it back to its first.
+
+So the wrap only applies when the curve actually repeats. A Custom curve at the default one cycle is byte-for-byte what it was before, which is the property the test now pins along with the repeating behaviour.
+
+Worth noting the test caught this on the first run. The failure was a curve ending high reading as its starting value on the final frame of every effect using one — the kind of thing that looks like a rendering glitch rather than a curve bug.
+
+### Still missing
+
+**Saving a curve.** "Value curves can be loaded and exported as a .XVC file", loaded automatically from a `valuecurves` folder in the show. That's the library the Value Curves panel drags from, and it pairs with the Colour Dropper library already recorded.
+
 ## A timing track you can delete
 
 Two sequencer pages read. The timing-tracks page turned up something small and obvious in hindsight: **a track could be created and never removed.**
