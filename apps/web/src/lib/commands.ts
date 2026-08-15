@@ -17,6 +17,15 @@ export interface CommandContext {
   nudgePlayhead: (deltaMs: number) => void;
   addTimingMark: () => void;
   splitTimingMark: () => void;
+  /** Expand the selection's effects to the next or previous timing mark. */
+  expandToMark: (direction: -1 | 1) => void;
+  /** Remember the playhead, and go back to it (the appendix's Mark Spot / Return to Spot). */
+  markSpot: () => void;
+  returnToSpot: () => void;
+  /** Jump a tenth of the way through the sequence, 0-9. */
+  jumpToTenth: (digit: number) => void;
+  /** Select every effect in the sequence. */
+  selectAllEffects: () => void;
   /** Divides the marked region - or the interval under the playhead - into `parts`. */
   subdivideTiming: (parts: number) => void;
   deleteSelected: () => void;
@@ -93,6 +102,11 @@ export const EFFECT_SHORTCUTS: Array<{ key: string; effect: string; params?: Rec
   { key: "n", effect: "Snowflakes" },
   { key: "w", effect: "Color Wash" },
   { key: "x", effect: "Text" },
+  // Capital S, which the appendix distinguishes from lower-case s (split timing mark). An
+  // earlier note here said the manual gave `s` to both and that the structural action won -
+  // true of the sequencer's own shortcuts page, and the appendix settles it: they are
+  // different keys, and case has always been significant here.
+  { key: "S", effect: "Spirals" },
 ];
 
 const mod = (e: KeyEvent): boolean => Boolean(e.ctrlKey || e.metaKey);
@@ -153,6 +167,58 @@ export function buildCommands(ctx: CommandContext): Command[] {
       run: ctx.splitTimingMark,
       matches: (e) => e.key === "s" && plain(e),
     },
+    // "Expand Effect to Next Timing Mark or End of the Sequence", and its mirror. How an effect
+    // gets snapped to a beat without dragging - at a working zoom a 50ms frame is a pixel wide.
+    {
+      id: "effect.expandRight",
+      label: "Expand effect to next timing mark",
+      group: "Edit",
+      keyLabel: "Ctrl+Shift+→",
+      run: () => ctx.expandToMark(1),
+      matches: (e: KeyEvent) => e.key === "ArrowRight" && mod(e) && e.shiftKey === true,
+    },
+    {
+      id: "effect.expandLeft",
+      label: "Expand effect to previous timing mark",
+      group: "Edit",
+      keyLabel: "Ctrl+Shift+←",
+      run: () => ctx.expandToMark(-1),
+      matches: (e: KeyEvent) => e.key === "ArrowLeft" && mod(e) && e.shiftKey === true,
+    },
+    {
+      id: "transport.markSpot",
+      label: "Mark spot",
+      group: "Transport",
+      keyLabel: "Ctrl+.",
+      run: ctx.markSpot,
+      matches: (e: KeyEvent) => e.key === "." && mod(e),
+    },
+    {
+      id: "transport.returnToSpot",
+      label: "Return to spot",
+      group: "Transport",
+      keyLabel: "Ctrl+/",
+      run: ctx.returnToSpot,
+      matches: (e: KeyEvent) => e.key === "/" && mod(e),
+    },
+    {
+      id: "edit.selectAllEffects",
+      label: "Select all effects",
+      group: "Edit",
+      keyLabel: "Ctrl+A",
+      run: ctx.selectAllEffects,
+      matches: (e: KeyEvent) => (e.key === "a" || e.key === "A") && mod(e) && !e.shiftKey,
+    },
+    // "Jump to 0%-90% through the song." Ten evenly spaced landmarks: the digit *is* the tenth,
+    // so 3 is three tenths in however long the song is.
+    ...Array.from({ length: 10 }, (_, digit) => ({
+      id: `transport.jump${digit}`,
+      label: `Jump ${digit * 10}% through the sequence`,
+      group: "Transport",
+      keyLabel: `Ctrl+Shift+${digit}`,
+      run: () => ctx.jumpToTenth(digit),
+      matches: (e: KeyEvent) => e.key === String(digit) && mod(e) && e.shiftKey === true,
+    })),
     // Dividing timings. The manual says only that "keyboard shortcuts are available to divide the
     // selected timing marks by predefined intervals" - it names neither the keys nor the
     // intervals, so both are ours (timingSubdivide.ts explains the choice).

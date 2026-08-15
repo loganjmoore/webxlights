@@ -22,7 +22,10 @@ const STORAGE_KEY = "webxlights.keybindings";
  * A shortcut that shadows the transport or the timing keys wouldn't fail - it would place an
  * effect when someone meant to add a timing mark, which is worse than being refused.
  */
-export const RESERVED_KEYS = new Set([" ", "t", "s", "T", "S", "2", "3", "4"]);
+// Capital S is no longer reserved: the appendix distinguishes `s` (split timing mark) from
+// `S` (Spirals), and case has always been significant here, so reserving both was reserving
+// one key too many.
+export const RESERVED_KEYS = new Set([" ", "t", "s", "T", "2", "3", "4"]);
 
 export interface ShortcutRow {
   /** What the row is stored against - not the label, since two rows can place the same effect. */

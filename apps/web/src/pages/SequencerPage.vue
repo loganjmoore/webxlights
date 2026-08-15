@@ -60,6 +60,7 @@ import { ALIGN_MODES, alignedTo, type AlignMode } from "../lib/alignEffects";
 import { clipboardFrom, pastedAt, type EffectClipboard } from "../lib/effectClipboard";
 import { addLayer, canAddLayer, layerCount, removeLayer } from "../lib/effectLayers";
 import { describeCriteria, matchingEffectIds, type EffectCriteria } from "../lib/selectEffects";
+import { expandToMark, jumpTargetMs } from "../lib/expandEffect";
 import type { SequenceMetadata } from "../lib/api";
 import { DEFAULT_ZOOM_INDEX, ZOOM_STEPS, clampZoomIndex, scrollLeftHolding, wheelScrollDelta, zoomIndexIn, zoomIndexOut } from "../lib/zoom";
 import {
@@ -1645,6 +1646,21 @@ const commands = computed(() =>
     moveSelectedEffectVertically: (direction) => moveSelectedEffectToAdjacentRow(direction),
     addTimingMark: addTimingMarkAtPlayhead,
     splitTimingMark: splitTimingMarkAtPlayhead,
+    expandToMark: expandSelectionToMark,
+    markSpot: () => {
+      markedSpotMs.value = playheadMs.value;
+      timingNotice.value = `Spot marked at ${formatTime(playheadMs.value, prefs.value.timeFormat, store.sequence?.frame_ms)}.`;
+    },
+    returnToSpot: () => {
+      if (markedSpotMs.value !== null) seekTo(markedSpotMs.value);
+    },
+    jumpToTenth: (digit) => seekTo(jumpTargetMs(digit, store.sequence?.duration_ms ?? 0)),
+    selectAllEffects: () => {
+      // "Select All effects but no timing tracks" - which is what this selects anyway, since a
+      // timing mark isn't an effect and can't be in the block.
+      const ids = store.body.rows.flatMap((r) => r.effects.map((e) => e.id));
+      store.setSelection(ids, ids[0] ?? null);
+    },
     subdivideTiming,
     // Deletes the whole block, not only the reference: a selection you can see but can't delete
     // together is a selection that lies about what it is.
@@ -1716,6 +1732,28 @@ function onKeydown(e: KeyboardEvent): void {
 
 // xLights' "s": splits the timing mark the playhead is inside, which is how a beat gets halved
 // without counting. Falls back to simply adding a mark when the playhead isn't inside one.
+/** The playhead position remembered by Mark Spot, or null before anything has been marked. */
+const markedSpotMs = ref<number | null>(null);
+
+/**
+ * Expands every selected effect to the next or previous timing mark.
+ *
+ * The whole block, not just the reference: "expand effect" reads as singular, but a selection is
+ * the unit every other bulk command here works on, and expanding twelve effects onto the same beat
+ * is precisely what the key is for. One undo entry covers the lot.
+ */
+function expandSelectionToMark(direction: -1 | 1): void {
+  const durationMs = store.sequence?.duration_ms ?? 0;
+  const marks = activeMarks.value;
+  const patches = store.selectedEffectIds.flatMap((id) => {
+    const effect = store.findEffect(id);
+    if (!effect) return [];
+    const expanded = expandToMark(effect, marks, direction, durationMs);
+    return expanded ? [{ id, ...expanded }] : [];
+  });
+  store.updateEffects(patches);
+}
+
 function splitTimingMarkAtPlayhead(): void {
   store.ensureDefaultTimingTrack();
   const index = timingTargetIndex();
