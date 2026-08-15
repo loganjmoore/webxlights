@@ -20,6 +20,13 @@ export interface Preferences {
   snapToTiming: boolean;
   /** Seconds between autosaves. 0 turns autosave off. */
   autosaveSeconds: number;
+  /**
+   * Minutes between automatic layout snapshots. 0 turns them off.
+   *
+   * xLights offers 3, 10, 15 or 30 for the same thing ("Every x (3,10,15,30) minutes... the
+   * xlights_rgbeffects.xml is backed up... This includes the layout as well").
+   */
+  layoutSnapshotMinutes: number;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -27,6 +34,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   defaultEffectMs: 1000,
   snapToTiming: true,
   autosaveSeconds: 5,
+  layoutSnapshotMinutes: 15,
 };
 
 const STORAGE_KEY = "webxlights.preferences";
@@ -69,6 +77,10 @@ export function sanitize(prefs: Preferences): Preferences {
     // 0 is meaningful here: it turns autosave off. Anything above 0 is floored at a second, since
     // a sub-second autosave would save on every keystroke of a rename.
     autosaveSeconds: prefs.autosaveSeconds === 0 ? 0 : clamp(prefs.autosaveSeconds, 1, 600, DEFAULT_PREFERENCES.autosaveSeconds),
+    // 0 is meaningful here too: it turns the periodic snapshot off. A snapshot copies the whole
+    // layout, so the floor is a minute rather than a second.
+    layoutSnapshotMinutes:
+      prefs.layoutSnapshotMinutes === 0 ? 0 : clamp(prefs.layoutSnapshotMinutes, 1, 120, DEFAULT_PREFERENCES.layoutSnapshotMinutes),
   };
 }
 

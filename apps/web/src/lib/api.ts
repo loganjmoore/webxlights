@@ -248,6 +248,22 @@ export interface SequenceVersion {
   creator?: { id: number; name: string };
 }
 
+/**
+ * A snapshot of a whole layout, the way SequenceVersion snapshots a sequence.
+ *
+ * The list never carries the snapshot itself - twenty layouts' worth of JSON would be megabytes,
+ * and the list is only ever used to choose one.
+ */
+export interface LayoutVersion {
+  id: number;
+  number: number;
+  /** "manual" or "auto" - the periodic ones are pruned and the deliberate ones are not. */
+  reason: "manual" | "auto";
+  created_by: number;
+  created_at: string;
+  creator?: { id: number; name: string };
+}
+
 export type AccessLevel = "owner" | "editor" | "viewer";
 
 export interface ProjectMember {
@@ -340,6 +356,11 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, JSON.stringify(json));
     return { ok: true, data: json };
   },
+  listLayoutVersions: (layoutId: number) => request<LayoutVersion[]>(`/v1/layouts/${layoutId}/versions`),
+  snapshotLayout: (layoutId: number, reason: "manual" | "auto" = "manual") =>
+    request<LayoutVersion>(`/v1/layouts/${layoutId}/versions`, { method: "POST", body: JSON.stringify({ reason }) }),
+  restoreLayoutVersion: (layoutId: number, versionId: number) =>
+    request<Layout>(`/v1/layouts/${layoutId}/versions/${versionId}/restore`, { method: "POST" }),
   listVersions: (sequenceId: number) => request<SequenceVersion[]>(`/v1/sequences/${sequenceId}/versions`),
   snapshotVersion: (sequenceId: number) => request<SequenceVersion>(`/v1/sequences/${sequenceId}/versions`, { method: "POST" }),
   restoreVersion: (sequenceId: number, versionId: number) =>

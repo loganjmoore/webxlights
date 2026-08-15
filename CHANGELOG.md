@@ -1,5 +1,30 @@
 # Changelog
 
+## The layout had no history at all
+
+Sequences have had version snapshots for a long time, and autosave on top of that. The *layout* — every model, its sub-models, states and faces, the groups, the view objects, the views and presets — had nothing. A mis-drag that moved forty props, or an import that read someone's show wrong, was unrecoverable.
+
+xLights covers this in its periodic backup: "Every x minutes, the xlights\_rgbeffects.xml is backed up... **This includes the layout as well**."
+
+So layouts now snapshot the way sequences do: automatically every few minutes when something has changed, on demand, and restorable. Deliberately the same shape as the sequence-version code rather than a second mechanism to learn.
+
+### Restoring matches by name, not by id
+
+This is the part that would have gone wrong quietly. A model's id is what every sequence body points at (`elementId`). Restoring by recreating models wholesale would give them fresh ids and leave every sequence in the project addressing rows that no longer exist — the layout would look restored and the sequences would be empty.
+
+Matching by name keeps the ids for everything that existed when the snapshot was taken, which is exactly the case a restore is for. There's a test that asserts the id survives.
+
+### A restore is not a merge
+
+Models added since the snapshot are **removed**. That's the surprising half, so the confirmation says it in those words rather than "this can't be undone". A restore that kept them wouldn't be the layout that was snapshotted; it would be some third thing nobody asked for.
+
+### Two things that keep the history useful
+
+- **A snapshot is only taken when something changed**, which is what xLights does too ("if there have been any changes since the last auto save"). Leaving the page open overnight would otherwise fill the history with identical layouts and push the useful ones out.
+- **Automatic snapshots are pruned to the last twenty; manual ones never are.** The periodic ones are a safety net and the deliberate ones are a decision, and the retention should follow that difference.
+
+The list endpoint doesn't return the snapshots themselves, only their numbers and times — twenty layouts' worth of JSON is megabytes, and the list exists to choose one.
+
 ## Level Shape — and the shapes the Shape effect was missing
 
 The VU Meter's last non-blocked type is "Level Shape": *"display the selected shape with a size that adjusts based on the audio level"*, from a list of ten shapes, filled or unfilled.

@@ -10,6 +10,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMemberController;
 use App\Http\Controllers\SequencerViewController;
 use App\Http\Controllers\SequenceController;
+use App\Http\Controllers\LayoutVersionController;
 use App\Http\Controllers\SequenceVersionController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +50,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('sequences/{sequence}/audio', [SequenceController::class, 'uploadAudio']);
         Route::get('sequences/{sequence}/audio', [SequenceController::class, 'audio']);
 
+        Route::get('layouts/{layout}/versions', [LayoutVersionController::class, 'index']);
+        Route::post('layouts/{layout}/versions', [LayoutVersionController::class, 'store']);
+        Route::post('layouts/{layout}/versions/{version}/restore', [LayoutVersionController::class, 'restore']);
         Route::get('sequences/{sequence}/versions', [SequenceVersionController::class, 'index']);
         Route::post('sequences/{sequence}/versions', [SequenceVersionController::class, 'store']);
         Route::post('sequences/{sequence}/versions/{version}/restore', [SequenceVersionController::class, 'restore']);

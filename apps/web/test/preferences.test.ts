@@ -86,7 +86,7 @@ describe("sanitising a hand-edited bag", () => {
     // A settings screen full of switches with nothing behind them is worse than a short one:
     // every control here has to change something observable.
     expect(Object.keys(DEFAULT_PREFERENCES).sort()).toEqual(
-      ["autosaveSeconds", "defaultEffectMs", "snapToTiming", "timeFormat"],
+      ["autosaveSeconds", "defaultEffectMs", "layoutSnapshotMinutes", "snapToTiming", "timeFormat"],
     );
   });
 });
