@@ -23,6 +23,7 @@ import {
 } from "../lib/effectPresets";
 import { buildCommands, commandForEvent, isTypingTarget } from "../lib/commands";
 import { fitsOnRow, moveEffectInTime, moveEffectToRow } from "../lib/moveEffects";
+import { loopWithin, startOfPlay, type PlayRange } from "../lib/playRange";
 import {
   checkShortcut,
   effectShortcuts,
@@ -614,8 +615,18 @@ async function loadStoredAudio(): Promise<boolean> {
 function togglePlay(): void {
   const el = audioEl.value;
   if (!el) return;
-  if (playing.value) el.pause();
-  else void el.play();
+  if (playing.value) {
+    el.pause();
+    return;
+  }
+  // "Highlighting a portion of the waveform will cause only that section to be played. Pressing
+  // the spacebar will replay that section."
+  const start = startOfPlay(playRange.value, playheadMs.value);
+  if (start !== null) {
+    el.currentTime = start / 1000;
+    playheadMs.value = start;
+  }
+  void el.play();
 }
 
 function stop(): void {
@@ -660,8 +671,31 @@ function endScrub(): void {
   if (!playing.value) audioEl.value?.pause();
 }
 
+// xLights' play range: "You can highlight a range on the waveform to play only that section...
+// The 'Replay' button will replay the highlighted section... when it reaches the end of the area,
+// will loop back to play from the beginning of that area."
+//
+// Which is the point of it: you work on one chorus by hearing it over and over, and without a
+// loop that means reaching for the mouse every eight seconds.
+const playRange = ref<PlayRange | null>(null);
+
+function clearPlayRange(): void {
+  playRange.value = null;
+}
+
 function onTimeUpdate(): void {
-  if (audioEl.value) playheadMs.value = Math.round(audioEl.value.currentTime * 1000);
+  const el = audioEl.value;
+  if (!el) return;
+  playheadMs.value = Math.round(el.currentTime * 1000);
+
+  // Looped rather than stopped at the end: the manual's Replay button loops, and a range you have
+  // to restart by hand is barely better than no range. The rule lives in playRange.ts so the two
+  // callers - starting play, and every time update - can't disagree about it.
+  const jumpTo = loopWithin(playRange.value, playheadMs.value, playing.value);
+  if (jumpTo !== null) {
+    el.currentTime = jumpTo / 1000;
+    playheadMs.value = jumpTo;
+  }
 }
 
 function armEffect(name: string): void {
@@ -1272,6 +1306,14 @@ watch(sequenceId, async (id) => {
       </button>
       <button :class="{ active: showTimingPanel }" @click="showTimingPanel = !showTimingPanel" :disabled="!store.sequence">Timing</button>
       <button v-if="FPP_CONNECT_ENABLED" @click="showFppPanel = !showFppPanel" :disabled="!store.sequence">FPP Connect</button>
+      <!-- A range you can't see the edges of is a range you can't get rid of, and shift-dragging
+           a new one over it isn't obvious enough to be the only way out. -->
+      <span v-if="playRange" class="play-range">
+        Looping {{ formatTime(playRange.startMs, prefs.timeFormat, store.sequence?.frame_ms) }}–{{
+          formatTime(playRange.endMs, prefs.timeFormat, store.sequence?.frame_ms)
+        }}
+        <button title="Play the whole sequence again" @click="clearPlayRange">×</button>
+      </span>
       <span class="save-status">{{ store.saveStatus }}</span>
     </header>
 
@@ -1801,6 +1843,8 @@ watch(sequenceId, async (id) => {
             @seek="seekTo"
             @scrub="scrubTo"
             @scrub-end="endScrub"
+            @play-range="playRange = $event"
+            :play-range="playRange"
             :colors="uiColors"
           />
           <SequencerGrid
@@ -1920,6 +1964,13 @@ header select {
 .time {
   font-variant-numeric: tabular-nums;
   color: #888;
+}
+.play-range {
+  font-size: 0.7rem;
+  color: #6a9fd8;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 .save-status {
   margin-left: auto;

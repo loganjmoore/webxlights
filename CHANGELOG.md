@@ -1,5 +1,28 @@
 # Changelog
 
+## A play range on the waveform
+
+The coverage row for the timeline and waveform read "✅ — 3 zoom levels", which is the kind of note that stops anyone looking again. Reading the manual's *Timeline and Waveform* page against it turned up a page of behaviour, of which the most useful piece was missing entirely.
+
+Shift-drag the waveform to mark a section, and it plays on its own — looping. The manual: "when it reaches the end of the area, will loop back to play from the beginning of that area."
+
+The loop is the point. You work on one chorus by hearing it over and over, and a range you have to restart by hand is barely better than no range at all.
+
+### Two rules that follow from "play means play *that*"
+
+- **Pressing play jumps into the range** when the playhead is outside it, rather than ignoring the highlight and playing from wherever it happens to be.
+- **It carries on from where it is when already inside**, because otherwise pausing mid-phrase and pressing play would always throw you back to the start of the range.
+
+Both live in a small module with the loop rule rather than in the component, because two callers — starting play, and every time update — have to agree about them, and "where should the playhead be" is arithmetic that shouldn't need an audio element to check.
+
+### Why shift-drag, not a plain drag
+
+xLights marks the range with a plain drag on the waveform. Here a plain drag already **scrubs** — plays the track under the pointer, which is how you find a beat by ear. xLights' waveform doesn't do that at all, so its plain drag was free to mean "select".
+
+Taking scrubbing away to match the gesture exactly would trade a better feature for a more familiar one. Shift is the modifier the manual already uses on the waveform, for zooming out.
+
+The range shows in the toolbar with its own clear button: a range you can't see the edges of is a range you can't get rid of, and shift-dragging a new one over the top isn't obvious enough to be the only way out.
+
 ## Arrow keys move effects, not just the playhead
 
 The coverage row for changing effects said "Move and resize; no align commands", which was true and hid something larger. Reading the manual's *Changing An Effect* page against it: "You can also select the effect and use the Left or Right arrow keys to move it left or right... an effect can also be moved vertically from one model to another. Use the Up or Down arrow keys."

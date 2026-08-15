@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
 import type { PeakBucket } from "../lib/audio";
+import { rangeFromDrag } from "../lib/playRange";
 
 const props = defineProps<{
   peaks: PeakBucket[];
@@ -9,9 +10,16 @@ const props = defineProps<{
   pxPerMs: number;
   playheadMs: number;
   colors?: UiColors;
+  /** The section marked for playback, if any (manual: "highlight a range... to play only that"). */
+  playRange?: { startMs: number; endMs: number } | null;
 }>();
 
-const emit = defineEmits<{ seek: [ms: number]; scrub: [ms: number]; scrubEnd: [] }>();
+const emit = defineEmits<{
+  seek: [ms: number];
+  scrub: [ms: number];
+  scrubEnd: [];
+  playRange: [range: { startMs: number; endMs: number } | null];
+}>();
 
 const ui = (): UiColors => props.colors ?? DEFAULT_UI_COLORS;
 
@@ -47,6 +55,26 @@ function draw(): void {
   });
   ctx.stroke();
 
+  // The play range, drawn under the playhead so the line stays readable over it.
+  const range = props.playRange;
+  if (range && range.endMs > range.startMs) {
+    ctx.fillStyle = "rgba(90, 160, 255, 0.22)";
+    ctx.fillRect(
+      ROW_LABEL_WIDTH + range.startMs * props.pxPerMs,
+      0,
+      (range.endMs - range.startMs) * props.pxPerMs,
+      rect.height,
+    );
+    ctx.strokeStyle = "rgba(90, 160, 255, 0.8)";
+    for (const edge of [range.startMs, range.endMs]) {
+      const x = ROW_LABEL_WIDTH + edge * props.pxPerMs;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, rect.height);
+      ctx.stroke();
+    }
+  }
+
   const px = ROW_LABEL_WIDTH + props.playheadMs * props.pxPerMs;
   ctx.strokeStyle = "#e74c3c";
   ctx.beginPath();
@@ -75,22 +103,44 @@ function onClick(e: MouseEvent): void {
 // the thing that makes finding a downbeat so slow without this.
 let scrubbing = false;
 
+// Marking a play range is Shift+drag, not a plain drag.
+//
+// xLights has no audio scrubbing on the waveform, so a plain drag there is free to mean "select".
+// Here a plain drag already plays the track under the pointer, which is how you find a beat by
+// ear - taking that away to match the gesture exactly would trade a better feature for a more
+// familiar one. Shift is the modifier the manual already uses on the waveform for zooming out.
+let marking: number | null = null;
+
 function onPointerDown(e: PointerEvent): void {
   const ms = msAt(e);
   if (ms === null) return;
-  scrubbing = true;
   (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+
+  if (e.shiftKey) {
+    marking = ms;
+    // A shift-click with no drag clears the range, which is how you get rid of one.
+    emit("playRange", null);
+    return;
+  }
+  scrubbing = true;
   emit("scrub", ms);
 }
 function onPointerMove(e: PointerEvent): void {
-  if (!scrubbing) return;
   const ms = msAt(e);
-  if (ms !== null) emit("scrub", ms);
+  if (ms === null) return;
+  if (marking !== null) {
+    // A few pixels of jitter shouldn't become a range nothing can be played from (playRange.ts).
+    const range = rangeFromDrag(marking, ms);
+    if (range) emit("playRange", range);
+    return;
+  }
+  if (scrubbing) emit("scrub", ms);
 }
 function onPointerUp(e: PointerEvent): void {
+  (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+  marking = null;
   if (!scrubbing) return;
   scrubbing = false;
-  (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
   emit("scrubEnd");
 }
 
@@ -98,7 +148,7 @@ onMounted(() => {
   draw();
   window.addEventListener("resize", draw);
 });
-watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs], draw);
+watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs, props.playRange], draw, { deep: true });
 </script>
 
 <template>
