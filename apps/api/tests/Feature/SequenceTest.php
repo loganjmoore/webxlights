@@ -116,6 +116,25 @@ class SequenceTest extends TestCase
             ->assertForbidden();
     }
 
+    // The "animated" type has existed since Sequence Settings landed and nothing could produce
+    // one: every path to a new sequence went through picking an audio file.
+    public function test_a_sequence_can_be_created_without_audio(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+
+        $this->actingAs($user)->postJson("/api/v1/projects/{$project->id}/sequences", [
+            'name' => 'Animated',
+            'frame_ms' => 50,
+            'duration_ms' => 60000,
+            'sequence_type' => 'animated',
+            'blend_between_models' => true,
+        ])->assertCreated()
+            ->assertJsonPath('sequence_type', 'animated')
+            ->assertJsonPath('blend_between_models', true)
+            ->assertJsonPath('audio_filename', null);
+    }
+
     public function test_frame_ms_must_be_one_of_the_spec_values(): void
     {
         $user = User::factory()->create();

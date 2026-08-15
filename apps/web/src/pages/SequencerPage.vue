@@ -44,6 +44,7 @@ import {
   type UiColors,
 } from "../lib/uiColors";
 import {
+  FRAME_MS_CHOICES,
   GRID_ROW_HEIGHT_PX,
   GRID_SPACING_LABELS,
   formatTime,
@@ -2252,6 +2253,37 @@ watch(sequenceId, async (id) => {
         />
         Display transition marks
       </label>
+      <!-- xLights' Settings > Sequences: "Default Sequence Duration and FPS" and "Default Model
+           Blending for New Sequences". The duration is only used by a sequence with no
+           soundtrack - one with audio takes its length from the track. -->
+      <label class="blend-row">
+        New animated sequence
+        <span>
+          <input
+            type="number"
+            min="1"
+            max="3600"
+            :value="Math.round(prefs.defaultSequenceMs / 1000)"
+            @change="patchPrefs({ defaultSequenceMs: Number(($event.target as HTMLInputElement).value) * 1000 })"
+          />
+          seconds
+        </span>
+      </label>
+      <label class="blend-row">
+        New sequence timing
+        <select :value="prefs.defaultFrameMs" @change="patchPrefs({ defaultFrameMs: Number(($event.target as HTMLSelectElement).value) })">
+          <option v-for="ms in FRAME_MS_CHOICES" :key="ms" :value="ms">{{ ms }} ms ({{ Math.round(1000 / ms) }} fps)</option>
+        </select>
+      </label>
+      <label class="blend-row">
+        <input
+          type="checkbox"
+          :checked="prefs.defaultBlendBetweenModels"
+          @change="patchPrefs({ defaultBlendBetweenModels: ($event.target as HTMLInputElement).checked })"
+        />
+        New sequences allow blending between models
+      </label>
+
       <!-- xLights' Backup tab offers Never / 365 / 90 / 31 / 7 for the same thing. Fixed choices
            rather than a free field: a hand-typed 1 would delete yesterday's work. -->
       <label class="blend-row">

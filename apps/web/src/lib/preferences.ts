@@ -42,6 +42,9 @@ export const GRID_SPACING_LABELS: Record<GridSpacing, string> = {
   xl: "Extra Large",
 };
 
+/** The frame lengths the API accepts, so a preference can't produce a sequence it will refuse. */
+export const FRAME_MS_CHOICES = [20, 25, 33, 40, 50];
+
 /** The retention windows xLights offers, with 0 standing for its "Never". */
 export const RETENTION_CHOICES = [0, 7, 31, 90, 365];
 
@@ -105,6 +108,18 @@ export interface Preferences {
    * finally matters.
    */
   versionRetentionDays: number;
+  /**
+   * Length of a new sequence with no soundtrack, in milliseconds.
+   *
+   * xLights' Settings > Sequences > "Default Sequence Duration and FPS", which exists so you
+   * aren't setting the same two numbers every time. Only an animated sequence uses it: one with
+   * audio takes its length from the track, which is the right answer and not worth overriding.
+   */
+  defaultSequenceMs: number;
+  /** Frame length for a new sequence (the FPS half of the same setting). */
+  defaultFrameMs: number;
+  /** xLights' "Default Model Blending for New Sequences". */
+  defaultBlendBetweenModels: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -122,6 +137,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // the playhead instead would move the thing being pointed at out from under the pointer.
   timelineZoomAnchor: "cursor",
   versionRetentionDays: 0,
+  defaultSequenceMs: 60_000,
+  defaultFrameMs: 50,
+  defaultBlendBetweenModels: false,
 };
 
 const STORAGE_KEY = "webxlights.preferences";
@@ -178,6 +196,13 @@ export function sanitize(prefs: Preferences): Preferences {
     // Only the offered windows, and 0 for "never". A hand-edited 1 would delete yesterday's work
     // every time a snapshot was taken, which is not a setting anyone means to choose.
     versionRetentionDays: RETENTION_CHOICES.includes(Number(prefs.versionRetentionDays)) ? Number(prefs.versionRetentionDays) : 0,
+    // A minute at the short end and an hour at the long: a zero-length sequence has no grid to
+    // put anything on, and nobody means to open a ten-hour one by mistyping.
+    defaultSequenceMs: clamp(prefs.defaultSequenceMs, 1000, 3_600_000, DEFAULT_PREFERENCES.defaultSequenceMs),
+    // The same frame rates the API accepts; anything else would be refused on create with a
+    // validation error rather than a useful message.
+    defaultFrameMs: FRAME_MS_CHOICES.includes(Number(prefs.defaultFrameMs)) ? Number(prefs.defaultFrameMs) : DEFAULT_PREFERENCES.defaultFrameMs,
+    defaultBlendBetweenModels: prefs.defaultBlendBetweenModels === true,
   };
 }
 
