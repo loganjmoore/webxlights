@@ -117,3 +117,42 @@ describe("Value curve types (SPEC ch9)", () => {
     expect(resolveParamsAtPosition(params, 0.5)).toBe(params); // same reference, no copy
   });
 });
+
+describe("a Custom curve's Cycles control", () => {
+  // "A Custom curve has a Cycles control (1 to 10) that repeats the shape you have drawn across
+  // the effect." Without it a hand-drawn flicker is only usable as a very slow one.
+  const points = [
+    { x: 0, y: 0 },
+    { x: 0.5, y: 1 },
+    { x: 1, y: 0 },
+  ];
+
+  it("repeats the drawn shape when asked", () => {
+    const once: ValueCurve = { type: "Custom", points, min: 0, max: 100 };
+    const twice: ValueCurve = { type: "Custom", points, min: 0, max: 100, cycles: 2 };
+    // The peak of the drawn shape is halfway. With two cycles it falls at a quarter and
+    // three-quarters instead, and the halfway point becomes a trough.
+    expect(valueCurveShape01(twice, 0.25)).toBeCloseTo(1);
+    expect(valueCurveShape01(twice, 0.5)).toBeCloseTo(0);
+    expect(valueCurveShape01(once, 0.5)).toBeCloseTo(1);
+  });
+
+  it("is unchanged at one cycle, which is the default", () => {
+    const curve: ValueCurve = { type: "Custom", points, min: 0, max: 100 };
+    for (const x of [0, 0.25, 0.5, 0.75, 1]) {
+      expect(valueCurveShape01({ ...curve, cycles: 1 }, x)).toBeCloseTo(valueCurveShape01(curve, x));
+    }
+  });
+
+  it("still holds its last point at the very end of a single cycle", () => {
+    // The bug this rule exists for: taking the fractional part sends position 1.0 back to 0, so a
+    // curve ending high would read as its starting value on the final frame.
+    const ramp: ValueCurve = { type: "Custom", points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], min: 0, max: 100 };
+    expect(valueCurveShape01(ramp, 1)).toBeCloseTo(1);
+  });
+
+  it("wraps to the start of the next cycle at the end when it does repeat", () => {
+    const ramp: ValueCurve = { type: "Custom", points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], min: 0, max: 100, cycles: 2 };
+    expect(valueCurveShape01(ramp, 0.5)).toBeCloseTo(0);
+  });
+});

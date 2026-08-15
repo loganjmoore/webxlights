@@ -51,7 +51,14 @@ export const PERIODIC_VALUE_CURVE_TYPES = new Set<ValueCurveType>([
   "Sine",
   "Abs Sine",
   "Square",
+  // Custom is periodic too: "a Custom curve has a Cycles control (1 to 10) that repeats the shape
+  // you have drawn across the effect". A cycles of 1 - the default - is the whole span, so this
+  // changes nothing for a curve nobody has asked to repeat.
+  "Custom",
 ]);
+
+/** The manual's own ceiling for the Custom curve's Cycles control. */
+export const MAX_VALUE_CURVE_CYCLES = 10;
 
 export interface ValueCurvePoint {
   x: number; // 0..1 across the effect
@@ -135,8 +142,18 @@ export function valueCurveShape01(curve: ValueCurve, position01: number): number
       return (Math.pow(10, x) - 1) / 9;
     case "Exponential Down":
       return 1 - (Math.pow(10, x) - 1) / 9;
-    case "Custom":
-      return customShape01(curve.points ?? [], x);
+    case "Custom": {
+      // "A Custom curve has a Cycles control (1 to 10) that repeats the shape you have drawn
+      // across the effect." So the drawn shape is a *period* rather than the whole span, which is
+      // what makes a hand-drawn flicker usable on a four-second effect instead of only a slow one.
+      //
+      // Only wrapped when it actually repeats. cyclePosition takes the fractional part, so at
+      // exactly the end of the effect it returns 0 - the start of the next cycle, which is right
+      // when there is a next cycle and wrong when there isn't: a single-cycle custom curve holds
+      // its last point past the end, and wrapping would send it back to its first.
+      const cycles = curve.cycles ?? 1;
+      return customShape01(curve.points ?? [], cycles > 1 ? cyclePosition(curve, x) : x);
+    }
     default:
       return 0;
   }
