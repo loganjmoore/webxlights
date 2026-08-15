@@ -1,5 +1,29 @@
 # Changelog
 
+## A dropped effect fills the timing interval it lands in
+
+The coverage row read `| Adding effects (drag, double-click, drop) | ✅ | |` — a tick with an empty note. Reading the *Adding An Effect* page against it turned up that we had the central rule backwards.
+
+The manual: "Click on the effect from the effects toolbar and drag the effect to the grid and release it **between two timing marks** on the row of the model you wish the effect to play on." And then, separately: "If no timing track is selected then you can drag and drop even if you have no timing marks but the effect **defaults to 1 second long**."
+
+The fixed length is the fallback. We only ever implemented the fallback — every dropped effect came out at the default length, so dropping one on a beat gave you something that then had to be dragged to fit the beat it was dropped on. Now a drop between two marks fills that interval.
+
+Strictly between two marks: a drop before the first or after the last still gets the default length, rather than running to the end of the song. An effect that silently stretched across four minutes is a far worse surprise than one that came out a second long.
+
+The radial wheel places the same way. It is the manual's other route to the same act — "click to drop it at that location" — and an effect placed from the wheel shouldn't come out a different length from one dragged to the same spot.
+
+## The selected timing track
+
+The manual's fallback sentence depends on something we had no notion of: a timing track being *selected*. Without it, "the marks" meant every track's merged together, so a show with a Beats track and a Lyrics track would have placed effects into the intersection of the two — finer than either and belonging to neither.
+
+There is now a track selector in the toolbar. It decides where a dropped effect lands, what snapping snaps to, and which track a new mark, a split or a division goes on. **All tracks** is still there and still does what the app did before, which is the right setting for anyone who only ever has one.
+
+Every track's marks are still *drawn* — hiding them would be a worse trade — but the ones in force get the full-strength line and the flag. An effect snapping to a mark that looks identical to one it ignores reads as the snapping being broken.
+
+### A silent bug it turned up
+
+The grid reported every mark under the pointer as belonging to track 0, whichever track it was actually on. Right-clicking a mark on a second track and choosing Delete Mark filtered track 0 for a millisecond it didn't have, and did nothing at all — no error, no deletion. Marks now report their own track.
+
 ## Dividing timings, and the Effects Grid settings tab
 
 Two pages read against the app. The first was the *Dividing Timings* section of the shortcuts page, recorded as missing. The second was *File > Settings > Effects Grid* — a whole Settings tab we didn't have, which is the same thing that happened with the Colors tab two audits ago, found the same way and by nobody noticing until the page was read.
