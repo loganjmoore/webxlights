@@ -1,5 +1,33 @@
 # Changelog
 
+## Sequence Settings, and a sequence you can change after making it
+
+Back to reading fresh manual pages, choosing rows that looked *settled* rather than rows already marked incomplete — that is where every finding in this run has come from. The row for **New sequence, sequence settings** read `✅` with an empty note, and the emptiness was the tell.
+
+There was no way to change a sequence at all after creating it. Not its name, not its length, not its frame rate. The API had create, save-body, and upload-audio, and nothing else. You picked a duration in the new-sequence dialog and lived with it.
+
+### The Info/Media tab
+
+Name, **Sequence Type** ("Media or Animated"), duration, timing, and **Allow Blending Between Models**.
+
+That last one turned out to name behaviour the renderer already had half of. The manual: "decides whether effects from the model groups blend with model level effects". What we did was the *off* case — a model's own effects replace the group wherever they draw at all, and the group shows through only where the model has nothing to say. On, they composite over it, so a half-lit model lets half the group through.
+
+Off stays the default, because it's the more predictable of the two: what you put on the model is what you see.
+
+### The Metadata tab, whole
+
+Author, email, website, song, artist, album, music URL, comment. One column rather than eight, because nothing queries them — they travel with the sequence and are read back whole.
+
+### Saved apart from the body
+
+The body autosaves on every drag of every effect and carries an optimistic-locking etag. These are deliberate changes made in a dialog. Sharing an endpoint would mean every autosave had to resend the settings, and a stale copy would then quietly overwrite someone else's change to them. Keeping them off the undo stack matters for the same reason in reverse: Ctrl+Z after an hour's work should not be able to change the frame rate.
+
+### What the page has that we still don't
+
+- **Timings tab** — its VAMP plugins. The rest of the tab (generating and importing timing marks) is the Timing panel here.
+- **Data Layers** — importing another sequencer's rendered output as a layer, with Erase/Canvas render modes and layer precedence.
+- **Images** — managing the images embedded for effects like Pictures.
+
 ## Copy and paste a block, and a guard for the gesture that vanished
 
 Two things, one of which exists because of a mistake in the last change but one.

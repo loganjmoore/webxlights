@@ -31,6 +31,9 @@ const props = defineProps<{
   // The analysed track. Undefined means "no audio loaded", which audio-reactive effects render
   // differently from a silent frame of a loaded one (renderFrame.ts).
   audio?: AudioSeries;
+  // xLights' Sequence Settings > "Allow Blending Between Models". Off, a model's own effects
+  // replace the group wherever they draw; on, they composite over it.
+  blendBetweenModels?: boolean;
 }>();
 
 const SEED = 12345;
@@ -132,7 +135,7 @@ function updateColors(): void {
       props.audio,
     );
 
-    applyGroupBase(nodeColors, groupBase.get(entry.model.id));
+    applyGroupBase(nodeColors, groupBase.get(entry.model.id), props.blendBetweenModels === true);
 
     // A sub-model borrows its parent's lights, so whatever it renders is written back onto the
     // parent's nodes. Drawn after the parent's own rows, which is the order xLights uses: a

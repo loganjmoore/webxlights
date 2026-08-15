@@ -230,6 +230,22 @@ export interface SequenceRecord {
   body: SequenceBody;
   revision: number;
   etag?: string;
+  // xLights' Sequence Settings dialog (File > Sequence Settings).
+  sequence_type?: "media" | "animated";
+  blend_between_models?: boolean;
+  metadata?: SequenceMetadata | null;
+}
+
+/** The Metadata tab: free text about the song, carried with the sequence and read back whole. */
+export interface SequenceMetadata {
+  author?: string;
+  email?: string;
+  website?: string;
+  song?: string;
+  artist?: string;
+  album?: string;
+  music_url?: string;
+  comment?: string;
 }
 
 export interface SequenceSummary {
@@ -328,6 +344,11 @@ export const api = {
   createSequence: (projectId: number, data: { name: string; frame_ms: number; duration_ms: number; audio_filename?: string }) =>
     request<SequenceRecord>(`/v1/projects/${projectId}/sequences`, { method: "POST", body: JSON.stringify(data) }),
   getSequence: (sequenceId: number) => request<SequenceRecord>(`/v1/sequences/${sequenceId}`),
+  /** xLights' Sequence Settings dialog. Separate from the body autosave, which carries an etag. */
+  updateSequenceSettings: (
+    sequenceId: number,
+    patch: Partial<Pick<SequenceRecord, "name" | "frame_ms" | "duration_ms" | "sequence_type" | "blend_between_models" | "metadata">>,
+  ) => request<SequenceRecord>(`/v1/sequences/${sequenceId}`, { method: "PATCH", body: JSON.stringify(patch) }),
   sequenceAudioUrl: (sequenceId: number) => `/api/v1/sequences/${sequenceId}/audio`,
   async uploadSequenceAudio(sequenceId: number, file: File): Promise<SequenceRecord> {
     const form = new FormData();

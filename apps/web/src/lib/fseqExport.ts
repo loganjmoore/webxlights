@@ -168,7 +168,7 @@ export function exportSequenceToFseq(
       const nodeColors = sequencer.renderFrameAt(atMs);
       // A group is the less specific statement about a prop, so the model's own rows sit on top
       // of it and its sub-models on top of those - the same order the preview uses.
-      applyGroupBase(nodeColors, groupBase.get(model.id));
+      applyGroupBase(nodeColors, groupBase.get(model.id), sequence.blend_between_models === true);
       for (const sub of subSequencers[i] ?? []) {
         const subColors = sub.sequencer.renderFrameAt(atMs);
         subColors.forEach((c, n) => {

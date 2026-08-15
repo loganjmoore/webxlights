@@ -36,6 +36,86 @@ class SequenceTest extends TestCase
         $list->assertOk()->assertJsonCount(1);
     }
 
+    // xLights' Sequence Settings dialog (File > Sequence Settings). Before this there was no way
+    // to change a sequence at all after creating it - not its name, not its length, not its frame
+    // rate.
+    public function test_sequence_settings_can_be_changed_after_creation(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+        $sequence = $project->sequences()->create([
+            'name' => 'Draft', 'frame_ms' => 50, 'duration_ms' => 1000, 'body' => ['timingTracks' => [], 'rows' => []],
+        ]);
+
+        $response = $this->actingAs($user)->patchJson("/api/v1/sequences/{$sequence->id}", [
+            'name' => 'Carol of the Bells',
+            'duration_ms' => 180000,
+            'sequence_type' => 'animated',
+            'blend_between_models' => true,
+            'metadata' => ['author' => 'Someone', 'song' => 'Carol of the Bells'],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('name', 'Carol of the Bells')
+            ->assertJsonPath('sequence_type', 'animated')
+            ->assertJsonPath('blend_between_models', true)
+            ->assertJsonPath('metadata.author', 'Someone');
+    }
+
+    public function test_settings_left_out_of_the_patch_are_left_alone(): void
+    {
+        // A dialog that saves one field shouldn't blank the rest, and the frame rate in particular
+        // changes what renders.
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+        $sequence = $project->sequences()->create([
+            'name' => 'Keep me', 'frame_ms' => 25, 'duration_ms' => 5000, 'body' => ['timingTracks' => [], 'rows' => []],
+        ]);
+
+        $this->actingAs($user)->patchJson("/api/v1/sequences/{$sequence->id}", ['duration_ms' => 9000])->assertOk();
+
+        $sequence->refresh();
+        $this->assertSame('Keep me', $sequence->name);
+        $this->assertSame(25, $sequence->frame_ms);
+        $this->assertSame(9000, $sequence->duration_ms);
+    }
+
+    public function test_settings_reject_a_frame_rate_the_exporter_cannot_write(): void
+    {
+        // The same rule the create endpoint has: a sequence rendered at an unknown rate would
+        // produce an .fseq nothing can play.
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+        $sequence = $project->sequences()->create([
+            'name' => 'S', 'frame_ms' => 50, 'duration_ms' => 1000, 'body' => ['timingTracks' => [], 'rows' => []],
+        ]);
+
+        $this->actingAs($user)
+            ->patchJson("/api/v1/sequences/{$sequence->id}", ['frame_ms' => 37])
+            ->assertStatus(422);
+
+        $this->actingAs($user)
+            ->patchJson("/api/v1/sequences/{$sequence->id}", ['sequence_type' => 'interpretive dance'])
+            ->assertStatus(422);
+    }
+
+    public function test_a_viewer_cannot_change_sequence_settings(): void
+    {
+        $owner = User::factory()->create();
+        $viewer = User::factory()->create();
+        $project = Project::factory()->for($owner, 'owner')->create();
+        $this->actingAs($owner)->postJson("/api/v1/projects/{$project->id}/members", [
+            'email' => $viewer->email, 'role' => 'viewer',
+        ])->assertCreated();
+        $sequence = $project->sequences()->create([
+            'name' => 'S', 'frame_ms' => 50, 'duration_ms' => 1000, 'body' => ['timingTracks' => [], 'rows' => []],
+        ]);
+
+        $this->actingAs($viewer)
+            ->patchJson("/api/v1/sequences/{$sequence->id}", ['name' => 'Mine now'])
+            ->assertForbidden();
+    }
+
     public function test_frame_ms_must_be_one_of_the_spec_values(): void
     {
         $user = User::factory()->create();

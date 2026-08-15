@@ -11,11 +11,11 @@ class Sequence extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'frame_ms', 'duration_ms', 'audio_filename', 'audio_path', 'body', 'revision'];
+    protected $fillable = ['name', 'frame_ms', 'duration_ms', 'audio_filename', 'audio_path', 'body', 'revision', 'sequence_type', 'blend_between_models', 'metadata'];
 
     protected function casts(): array
     {
-        return ['body' => 'array'];
+        return ['body' => 'array', 'metadata' => 'array', 'blend_between_models' => 'boolean'];
     }
 
     public function project(): BelongsTo

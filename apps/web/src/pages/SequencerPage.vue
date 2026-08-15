@@ -57,6 +57,7 @@ import { marksInForce, placementFor } from "../lib/effectPlacement";
 import { withFade } from "../lib/effectFade";
 import { ALIGN_MODES, alignedTo, type AlignMode } from "../lib/alignEffects";
 import { clipboardFrom, pastedAt, type EffectClipboard } from "../lib/effectClipboard";
+import type { SequenceMetadata } from "../lib/api";
 import { DEFAULT_ZOOM_INDEX, ZOOM_STEPS, clampZoomIndex, scrollLeftHolding, wheelScrollDelta, zoomIndexIn, zoomIndexOut } from "../lib/zoom";
 import {
   loadPerspectives,
@@ -1280,6 +1281,63 @@ async function importColors(e: Event): Promise<void> {
   saveUiColors(typeof localStorage === "undefined" ? null : localStorage, imported);
 }
 const showPrefsPanel = ref(false);
+
+// xLights' Sequence Settings dialog (File > Sequence Settings). A panel rather than a modal, like
+// every other panel here - the settings are worth seeing while looking at the sequence they
+// describe, and a modal would hide it.
+const showSettingsPanel = ref(false);
+const settingsStatus = ref("");
+
+/** A local copy, so a half-typed name isn't saved on every keystroke. */
+const settingsDraft = ref({
+  name: "",
+  frame_ms: 50,
+  duration_ms: 0,
+  sequence_type: "media" as "media" | "animated",
+  blend_between_models: false,
+  metadata: {} as SequenceMetadata,
+});
+
+function loadSettingsDraft(): void {
+  const record = store.sequence;
+  if (!record) return;
+  settingsDraft.value = {
+    name: record.name,
+    frame_ms: record.frame_ms,
+    duration_ms: record.duration_ms,
+    sequence_type: record.sequence_type ?? "media",
+    blend_between_models: record.blend_between_models === true,
+    metadata: { ...(record.metadata ?? {}) },
+  };
+}
+
+watch(showSettingsPanel, (open) => {
+  if (open) loadSettingsDraft();
+});
+
+async function saveSettings(): Promise<void> {
+  settingsStatus.value = "Saving…";
+  try {
+    await store.saveSettings({ ...settingsDraft.value });
+    settingsStatus.value = "Saved";
+  } catch (e) {
+    // Said out loud rather than swallowed: the frame rate and duration change what renders, and a
+    // silent failure would leave the panel showing something the sequence isn't.
+    settingsStatus.value = e instanceof Error ? e.message : "Could not save";
+  }
+}
+
+// The metadata fields, in the manual's own order.
+const METADATA_FIELDS: { key: keyof SequenceMetadata; label: string }[] = [
+  { key: "author", label: "Author" },
+  { key: "email", label: "Email" },
+  { key: "website", label: "Website" },
+  { key: "song", label: "Song" },
+  { key: "artist", label: "Artist" },
+  { key: "album", label: "Album" },
+  { key: "music_url", label: "Music URL" },
+  { key: "comment", label: "Comment" },
+];
 function patchPrefs(changes: Partial<Preferences>): void {
   prefs.value = sanitize({ ...prefs.value, ...changes });
   savePreferences(typeof localStorage === "undefined" ? null : localStorage, prefs.value);
@@ -1585,6 +1643,9 @@ watch(sequenceId, async (id) => {
         <option v-for="v in views" :key="v.name" :value="v.name">{{ v.name }}</option>
       </select>
       <button title="Command palette (Ctrl+Shift+K)" @click="paletteOpen = true">⌘K</button>
+      <button :class="{ active: showSettingsPanel }" @click="showSettingsPanel = !showSettingsPanel" :disabled="!store.sequence">
+        Sequence settings
+      </button>
       <button :class="{ active: showPrefsPanel }" @click="showPrefsPanel = !showPrefsPanel">Preferences</button>
       <button :class="{ active: showRegionsPanel }" @click="showRegionsPanel = !showRegionsPanel">
         Regions{{ currentRegion ? `: ${currentRegion.name}` : "" }}
@@ -2021,6 +2082,63 @@ watch(sequenceId, async (id) => {
       </p>
     </div>
 
+    <!-- xLights' Sequence Settings dialog. The Info/Media and Metadata tabs; its Timings tab is
+         the Timing panel here, and Data Layers and Images have nothing behind them yet. -->
+    <div v-if="showSettingsPanel" class="models-panel">
+      <div class="models-panel-head">
+        <h2>Sequence settings</h2>
+        <div class="models-panel-actions">
+          <button @click="saveSettings">Save</button>
+          <span class="save-status">{{ settingsStatus }}</span>
+        </div>
+      </div>
+
+      <label class="blend-row">
+        Name
+        <input v-model="settingsDraft.name" type="text" />
+      </label>
+      <label class="blend-row">
+        Type
+        <select v-model="settingsDraft.sequence_type">
+          <option value="media">Media</option>
+          <option value="animated">Animated</option>
+        </select>
+      </label>
+      <label class="blend-row">
+        Duration
+        <span><input v-model.number="settingsDraft.duration_ms" type="number" min="0" step="1000" /> ms</span>
+      </label>
+      <label class="blend-row">
+        Timing
+        <select v-model.number="settingsDraft.frame_ms">
+          <option :value="20">20 ms (50 fps)</option>
+          <option :value="25">25 ms (40 fps)</option>
+          <option :value="33">33 ms (30 fps)</option>
+          <option :value="40">40 ms (25 fps)</option>
+          <option :value="50">50 ms (20 fps)</option>
+        </select>
+      </label>
+      <label class="blend-row">
+        <input v-model="settingsDraft.blend_between_models" type="checkbox" />
+        Allow blending between models
+      </label>
+      <p class="timing-note">
+        Off, a model's own effects replace whatever its group is doing wherever they draw. On, they
+        blend over it, so a half-lit model lets half the group through. Off is the default because
+        it's the more predictable of the two: what you put on the model is what you see.
+      </p>
+
+      <div class="models-panel-head"><h2>Metadata</h2></div>
+      <label v-for="field in METADATA_FIELDS" :key="field.key" class="blend-row">
+        {{ field.label }}
+        <input v-model="settingsDraft.metadata[field.key]" type="text" />
+      </label>
+      <p class="timing-note">
+        Travels with the sequence. xLights writes these into the sequence file and some sharing
+        sites read them, which is the whole reason they're separate fields rather than one note.
+      </p>
+    </div>
+
     <div v-if="showPresetsPanel" class="models-panel">
       <div class="models-panel-head">
         <h2>Effect presets</h2>
@@ -2194,6 +2312,7 @@ watch(sequenceId, async (id) => {
             :playhead-ms="playheadMs"
             :frame-ms="store.sequence?.frame_ms ?? 50"
             :audio="audioSeries ?? undefined"
+            :blend-between-models="store.sequence?.blend_between_models === true"
           />
         </div>
         <div ref="hScrollRef" class="h-scroll" @wheel="onTimelineWheel">

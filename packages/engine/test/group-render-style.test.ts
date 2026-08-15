@@ -363,6 +363,49 @@ describe("planning and scattering a group's render", () => {
     applyGroupBase(own, undefined);
     expect(own).toEqual([rgba(0, 0, 0, 0)]);
   });
+
+  // xLights' Sequence Settings > "Allow Blending Between Models": "decides whether effects from
+  // the model groups blend with model level effects".
+  describe("with blending allowed", () => {
+    it("lets the group through in proportion to what the model isn't covering", () => {
+      // A half-lit model over a red group: half the model's blue, half the group's red.
+      const base = [rgba(255, 0, 0, 255)];
+      const own = [rgba(0, 0, 255, 128)];
+      applyGroupBase(own, base, true);
+      expect(own[0]!.r).toBeCloseTo(128, -1);
+      expect(own[0]!.b).toBeCloseTo(128, -1);
+    });
+
+    it("changes nothing where the model is fully opaque", () => {
+      // A solid model pixel hides the group either way, so there is nothing to blend.
+      const base = [rgba(255, 0, 0, 255)];
+      const own = [rgba(0, 0, 255, 255)];
+      applyGroupBase(own, base, true);
+      expect(own[0]).toEqual(rgba(0, 0, 255, 255));
+    });
+
+    it("still fills a gap with the group, exactly as it does without blending", () => {
+      const base = [rgba(255, 0, 0, 255)];
+      const own = [rgba(0, 0, 0, 0)];
+      applyGroupBase(own, base, true);
+      expect(own[0]).toEqual(rgba(255, 0, 0, 255));
+    });
+
+    it("never comes out dimmer than the group alone was", () => {
+      // Blending a barely-lit model over a lit group should not put out a light that was on.
+      const base = [rgba(255, 255, 255, 255)];
+      const own = [rgba(0, 0, 0, 10)];
+      applyGroupBase(own, base, true);
+      expect(own[0]!.a).toBe(255);
+    });
+
+    it("is off by default, which is what this did before the setting existed", () => {
+      const base = [rgba(255, 0, 0, 255)];
+      const own = [rgba(0, 0, 255, 128)];
+      applyGroupBase(own, base);
+      expect(own[0]).toEqual(rgba(0, 0, 255, 128));
+    });
+  });
 });
 
 describe("a group row, rendered end to end", () => {
