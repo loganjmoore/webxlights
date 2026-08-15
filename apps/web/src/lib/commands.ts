@@ -8,6 +8,8 @@
 // A command carries its own key, so a shortcut can't exist without a command and a command can't
 // be given a key that nothing dispatches.
 
+import { SUBDIVISIONS } from "./timingSubdivide";
+
 export interface CommandContext {
   togglePlay: () => void;
   seekStart: () => void;
@@ -15,6 +17,8 @@ export interface CommandContext {
   nudgePlayhead: (deltaMs: number) => void;
   addTimingMark: () => void;
   splitTimingMark: () => void;
+  /** Divides the marked region - or the interval under the playhead - into `parts`. */
+  subdivideTiming: (parts: number) => void;
   deleteSelected: () => void;
   copySelected: () => void;
   pasteAtPlayhead: () => void;
@@ -149,6 +153,17 @@ export function buildCommands(ctx: CommandContext): Command[] {
       run: ctx.splitTimingMark,
       matches: (e) => e.key === "s" && plain(e),
     },
+    // Dividing timings. The manual says only that "keyboard shortcuts are available to divide the
+    // selected timing marks by predefined intervals" - it names neither the keys nor the
+    // intervals, so both are ours (timingSubdivide.ts explains the choice).
+    ...SUBDIVISIONS.map((parts) => ({
+      id: `timing.divide.${parts}`,
+      label: `Divide timing into ${parts}`,
+      group: "Timing",
+      keyLabel: String(parts),
+      run: () => ctx.subdivideTiming(parts),
+      matches: (e: KeyEvent) => e.key === String(parts) && plain(e),
+    })),
 
     {
       id: "edit.delete",

@@ -30,6 +30,11 @@ const props = defineProps<{
   // The user's chosen chrome colours (lib/uiColors.ts). Optional so the grid still draws with
   // sensible defaults anywhere it is mounted without them.
   colors?: UiColors;
+  // xLights' Effects Grid > Spacing, as the pixel height it resolves to. Optional so the grid
+  // still draws at a sensible size anywhere it is mounted without a preference to hand.
+  rowHeight?: number;
+  // xLights' Effects Grid > Display Transition Marks.
+  showTransitionMarks?: boolean;
 }>();
 
 const ui = (): UiColors => props.colors ?? DEFAULT_UI_COLORS;
@@ -47,9 +52,16 @@ const emit = defineEmits<{
   // effect wheel for quick effect placement". Only on empty grid - double-clicking an effect is
   // how you would open it, not how you would place another on top of it.
   wheel: [row: GridRow, ms: number, x: number, y: number];
+  // Double-click on a timing mark. What it means is a preference (Play Timing / Edit Text), so
+  // the grid reports the gesture and the page decides.
+  markDoubleClick: [trackIndex: number, ms: number];
 }>();
 
-const ROW_HEIGHT = 28;
+const DEFAULT_ROW_HEIGHT = 28;
+// A computed rather than a constant, because the Spacing preference changes it: every place that
+// turns a y coordinate into a row - drawing, hit testing, and the scroll spacer - has to use the
+// same number or clicking a row selects the one above it.
+const rowHeight = computed(() => Math.max(8, Math.round(props.rowHeight ?? DEFAULT_ROW_HEIGHT)));
 const ROW_LABEL_WIDTH = 140;
 const HEADER_HEIGHT = 24; // pinned timing-track ruler, drawn every frame regardless of scrollTop
 const VIEWPORT_HEIGHT = 420; // fixed canvas height - only visible rows are drawn (M9 perf budget: 100 rows / 5k effects)
@@ -122,32 +134,36 @@ function draw(): void {
   ctx.fillStyle = "#16161b";
   ctx.fillRect(0, 0, rect.width, rect.height);
 
+  const height = rowHeight.value;
   const rowsAreaHeight = rect.height - HEADER_HEIGHT;
-  const firstRow = Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT));
-  const lastRow = Math.min(props.rows.length, Math.ceil((scrollTop.value + rowsAreaHeight) / ROW_HEIGHT));
+  const firstRow = Math.max(0, Math.floor(scrollTop.value / height));
+  const lastRow = Math.min(props.rows.length, Math.ceil((scrollTop.value + rowsAreaHeight) / height));
 
   for (let i = firstRow; i < lastRow; i++) {
     const row = props.rows[i]!;
-    const y = HEADER_HEIGHT + i * ROW_HEIGHT - scrollTop.value;
+    const y = HEADER_HEIGHT + i * height - scrollTop.value;
     ctx.fillStyle = i % 2 === 0 ? ui().rowHeading : ui().rowHeadingSelected;
-    ctx.fillRect(0, y, rect.width, ROW_HEIGHT);
+    ctx.fillRect(0, y, rect.width, height);
 
     ctx.fillStyle = ui().rowHeadingText;
     ctx.font = "11px system-ui";
-    ctx.fillText(row.name, 8, y + ROW_HEIGHT / 2 + 4, ROW_LABEL_WIDTH - 12);
+    ctx.fillText(row.name, 8, y + height / 2 + 4, ROW_LABEL_WIDTH - 12);
 
     for (const effect of effectsForRow(row)) {
       const x1 = msToX(effect.startMs);
       const x2 = msToX(effect.endMs);
       const selected = effect.id === props.selectedEffectId;
       ctx.fillStyle = selected ? ui().effectSelected : ui().effect;
-      ctx.fillRect(x1, y + 2, Math.max(2, x2 - x1), ROW_HEIGHT - 4);
+      ctx.fillRect(x1, y + 2, Math.max(2, x2 - x1), height - 4);
       ctx.strokeStyle = selected ? "#fff" : "#2c3e5c";
-      ctx.strokeRect(x1, y + 2, Math.max(2, x2 - x1), ROW_HEIGHT - 4);
+      ctx.strokeRect(x1, y + 2, Math.max(2, x2 - x1), height - 4);
+      if (props.showTransitionMarks !== false) drawTransitionMarks(ctx, effect, x1, x2, y, height);
+      // The label is drawn last so a transition mark can't sit on top of it. Only when the block
+      // is wide enough for the name to be legible at all, which was already the rule.
       if (x2 - x1 > 24) {
         ctx.fillStyle = "#0c0c0f";
         ctx.font = "10px system-ui";
-        ctx.fillText(effect.name, x1 + 3, y + ROW_HEIGHT / 2 + 3, x2 - x1 - 6);
+        ctx.fillText(effect.name, x1 + 3, y + height / 2 + 3, x2 - x1 - 6);
       }
     }
   }
@@ -195,6 +211,54 @@ function draw(): void {
   ctx.stroke();
 }
 
+// xLights' "Display Transition Marks": the part of an effect that is a reveal rather than the
+// effect itself, drawn as a wedge at each end. Without it an effect with a two-second fade in
+// looks exactly like one without, and "why does this start dark" can only be answered by clicking
+// it and reading the panel.
+//
+// A wedge rather than a line, because the shape says which way it runs: the thin end is where
+// nothing is showing yet.
+function drawTransitionMarks(
+  ctx: CanvasRenderingContext2D,
+  effect: SequenceEffect,
+  x1: number,
+  x2: number,
+  y: number,
+  height: number,
+): void {
+  const transition = effect.transition;
+  // Zero is the engine's own default for a missing duration, so an effect carrying only a
+  // transition *type* has no reveal to draw and shouldn't be marked as if it had.
+  const inMs = transition?.inDurationMs ?? 0;
+  const outMs = transition?.outDurationMs ?? 0;
+  if (inMs <= 0 && outMs <= 0) return;
+
+  const top = y + 2;
+  const bottom = y + height - 2;
+  ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+
+  if (inMs > 0) {
+    // Clamped to the block: a reveal longer than the effect is a real thing to author by
+    // accident, and a wedge drawn past the end would land on the next effect along.
+    const w = Math.min(inMs * props.pxPerMs, x2 - x1);
+    ctx.beginPath();
+    ctx.moveTo(x1, bottom);
+    ctx.lineTo(x1 + w, bottom);
+    ctx.lineTo(x1, top);
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (outMs > 0) {
+    const w = Math.min(outMs * props.pxPerMs, x2 - x1);
+    ctx.beginPath();
+    ctx.moveTo(x2, bottom);
+    ctx.lineTo(x2 - w, bottom);
+    ctx.lineTo(x2, top);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
 type HitResult =
   | { kind: "effect"; row: GridRow; effect: SequenceEffect; edge: "left" | "right" | null }
   | { kind: "mark"; trackIndex: number; ms: number }
@@ -213,7 +277,7 @@ function hitTest(x: number, y: number): HitResult {
     return { kind: "ruler-empty", trackIndex: 0, ms };
   }
 
-  const rowIndex = Math.floor((y - HEADER_HEIGHT + scrollTop.value) / ROW_HEIGHT);
+  const rowIndex = Math.floor((y - HEADER_HEIGHT + scrollTop.value) / rowHeight.value);
   const row = props.rows[rowIndex];
   if (!row) return { kind: "none" };
 
@@ -241,6 +305,13 @@ function onDoubleClick(e: MouseEvent): void {
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   const hit = hitTest(x, y);
+  // xLights' Effects Grid > Double Click Mode: a double-click on a timing mark either plays that
+  // mark's interval or opens its label for editing. Which of the two is the page's business - the
+  // grid only says that it happened, and on which mark.
+  if (hit.kind === "mark") {
+    emit("markDoubleClick", hit.trackIndex, hit.ms);
+    return;
+  }
   if (hit.kind !== "row-empty") return;
   emit("wheel", hit.row, snapMs(xToMs(x)), e.clientX, e.clientY);
 }
@@ -389,12 +460,16 @@ onMounted(() => {
 // flush: "post" - draw() reads getBoundingClientRect(), which must run after Vue applies
 // any template-derived inline sizing, not before (pre-flush default risks a stale 0px read
 // on the same tick rows go from empty to populated - see DECISIONS.md M2 bug note).
-watch(() => [props.rows, props.body, props.playheadMs, props.selectedEffectId, props.pxPerMs, props.durationMs], draw, { deep: true, flush: "post" });
+watch(
+  () => [props.rows, props.body, props.playheadMs, props.selectedEffectId, props.pxPerMs, props.durationMs, props.rowHeight, props.showTransitionMarks],
+  draw,
+  { deep: true, flush: "post" },
+);
 </script>
 
 <template>
   <div ref="scrollRef" class="grid-scroll-viewport" :style="{ height: `${VIEWPORT_HEIGHT}px` }" @scroll="onScroll">
-    <div class="grid-spacer" :style="{ height: `${rows.length * ROW_HEIGHT}px` }">
+    <div class="grid-spacer" :style="{ height: `${rows.length * rowHeight}px` }">
       <canvas
         ref="canvasRef"
         class="grid-canvas"

@@ -43,7 +43,16 @@ import {
   saveUiColors,
   type UiColors,
 } from "../lib/uiColors";
-import { formatTime, loadPreferences, sanitize, savePreferences, type Preferences } from "../lib/preferences";
+import {
+  GRID_ROW_HEIGHT_PX,
+  GRID_SPACING_LABELS,
+  formatTime,
+  loadPreferences,
+  sanitize,
+  savePreferences,
+  type Preferences,
+} from "../lib/preferences";
+import { intervalAt, subdivisionMarks } from "../lib/timingSubdivide";
 import {
   loadPerspectives,
   panelsFrom,
@@ -1144,6 +1153,7 @@ const commands = computed(() =>
     moveSelectedEffectVertically: (direction) => moveSelectedEffectToAdjacentRow(direction),
     addTimingMark: addTimingMarkAtPlayhead,
     splitTimingMark: splitTimingMarkAtPlayhead,
+    subdivideTiming,
     deleteSelected: () => {
       if (store.selectedEffectId) store.deleteEffect(store.selectedEffectId);
     },
@@ -1233,6 +1243,73 @@ function splitTimingMarkAtPlayhead(): void {
   store.addTimingMark(0, Math.round((before + after) / 2));
 }
 
+// Dividing timings (manual: "Keyboard shortcuts are available to divide the selected timing marks
+// by predefined intervals, making it quick to build up subdivided timing tracks").
+//
+// A marked play range stands in for "the selected timing marks", since our ruler has no selection
+// of its own but the waveform already has a highlighted region - see timingSubdivide.ts. With no
+// range marked it divides the one interval the playhead sits in, which is what `s` does for two.
+function subdivideTiming(parts: number): void {
+  store.ensureDefaultTimingTrack();
+  const track = store.body.timingTracks[0];
+  const durationMs = store.sequence?.duration_ms ?? 0;
+  if (!track || durationMs <= 0) return;
+
+  const region = playRange.value ?? intervalAt(track.marks, playheadMs.value, durationMs);
+  if (!region) return;
+  // The frame length as the floor: a mark between two frames can never be played against, and
+  // dividing an already-fine track by four is exactly how a dozen of them get made.
+  const added = subdivisionMarks(track.marks, region, parts, store.sequence?.frame_ms ?? 50);
+  if (added.length === 0) {
+    timingNotice.value = `Nothing to divide into ${parts} — the interval is already as fine as the frame rate allows.`;
+    return;
+  }
+  store.addTimingMarks(0, added);
+  timingNotice.value = `Divided into ${parts}: ${added.length} mark${added.length === 1 ? "" : "s"} added.`;
+}
+
+// Said out loud rather than left silent, because both outcomes look identical on a dense ruler at
+// a low zoom: forty new marks and none at all are the same handful of pixels.
+const timingNotice = ref<string | null>(null);
+watch(timingNotice, (value) => {
+  if (value === null) return;
+  setTimeout(() => (timingNotice.value = null), 4000);
+});
+
+// xLights' Effects Grid > Double Click Mode. "When 'Play Timing' is selected, if you Double Click
+// a timing mark, xLights will play the sequence for that timing mark interval. If 'Edit Text' is
+// selected, the Edit Label Dialog will appear."
+function handleMarkDoubleClick(trackIndex: number, ms: number): void {
+  const track = store.body.timingTracks[trackIndex];
+  if (!track) return;
+  const index = track.marks.indexOf(ms);
+  if (index < 0) return;
+
+  if (prefs.value.doubleClickMode === "edit-text") {
+    labelEdit.value = { trackIndex, index, ms, value: track.labels?.[index] ?? "" };
+    return;
+  }
+
+  // Play Timing: the interval this mark starts, which runs to the next mark - or to the end of
+  // the sequence for the last one. Reusing the play range rather than a one-off playback means it
+  // loops, which is what you want when checking a phrase against the music.
+  const endMs = track.marks.find((m) => m > ms) ?? store.sequence?.duration_ms ?? 0;
+  if (endMs <= ms) return;
+  playRange.value = { startMs: ms, endMs };
+  seekTo(ms);
+  if (!playing.value) togglePlay();
+}
+
+// The Edit Label dialog. A mark's label is what the lyric and phrase tracks are made of, and what
+// the State and Piano effects read, so it has to be editable somewhere other than an import.
+const labelEdit = ref<{ trackIndex: number; index: number; ms: number; value: string } | null>(null);
+
+function commitLabelEdit(): void {
+  const edit = labelEdit.value;
+  labelEdit.value = null;
+  if (edit) store.setTimingLabel(edit.trackIndex, edit.index, edit.value.trim());
+}
+
 onMounted(async () => {
   await Promise.all([store.load(sequenceId.value), loadRows()]);
   const demoAudio = takePendingDemoAudio(sequenceId.value);
@@ -1314,8 +1391,25 @@ watch(sequenceId, async (id) => {
         }}
         <button title="Play the whole sequence again" @click="clearPlayRange">×</button>
       </span>
+      <!-- Forty new marks and none at all look identical on a dense ruler, so dividing says which
+           it was rather than leaving you to count. -->
+      <span v-if="timingNotice" class="play-range">{{ timingNotice }}</span>
       <span class="save-status">{{ store.saveStatus }}</span>
     </header>
+
+    <!-- xLights' Edit Label dialog, reached by double-clicking a mark with Double Click Mode set
+         to Edit Text. Labels are what the lyric tracks are made of and what the State and Piano
+         effects read, so they need an editor that isn't an import. -->
+    <div v-if="labelEdit" class="timing-panel">
+      <div class="timing-row">
+        <label class="midi-field">
+          Label at {{ formatTime(labelEdit.ms, prefs.timeFormat, store.sequence?.frame_ms) }}
+          <input v-model="labelEdit.value" type="text" autofocus @keyup.enter="commitLabelEdit" @keyup.esc="labelEdit = null" />
+        </label>
+        <button @click="commitLabelEdit">Save</button>
+        <button @click="labelEdit = null">Cancel</button>
+      </div>
+    </div>
 
     <div v-if="showTimingPanel" class="timing-panel">
       <p class="timing-note">Adds a new timing track of evenly-spaced marks across the sequence (matches real xLights' New Timing generator).</p>
@@ -1606,14 +1700,6 @@ watch(sequenceId, async (id) => {
         </span>
       </label>
       <label class="blend-row">
-        <input
-          type="checkbox"
-          :checked="prefs.snapToTiming"
-          @change="patchPrefs({ snapToTiming: ($event.target as HTMLInputElement).checked })"
-        />
-        Snap effect edges to timing marks
-      </label>
-      <label class="blend-row">
         Autosave
         <span>
           <input
@@ -1656,6 +1742,57 @@ watch(sequenceId, async (id) => {
         Snapshots of the whole layout, taken on the Layout page when something has changed. They're
         listed and restored there. "After an edit" is off by default: every model drag saves
         immediately here, where a save in xLights is a deliberate act.
+      </p>
+
+      <!-- xLights' File > Settings > Effects Grid tab. Its own heading rather than more rows under
+           Settings, because that is how the manual groups them and because they are all about the
+           same thing: how much of the sequence fits on the screen at once. -->
+      <div class="models-panel-head"><h2>Effects grid</h2></div>
+      <label class="blend-row">
+        Spacing
+        <select :value="prefs.gridSpacing" @change="patchPrefs({ gridSpacing: ($event.target as HTMLSelectElement).value as Preferences['gridSpacing'] })">
+          <option v-for="(label, key) in GRID_SPACING_LABELS" :key="key" :value="key">{{ label }}</option>
+        </select>
+      </label>
+      <label class="blend-row">
+        <input
+          type="checkbox"
+          :checked="prefs.snapToTiming"
+          @change="patchPrefs({ snapToTiming: ($event.target as HTMLInputElement).checked })"
+        />
+        Snap effect edges to timing marks
+      </label>
+      <label class="blend-row">
+        <input
+          type="checkbox"
+          :checked="prefs.smallWaveform"
+          @change="patchPrefs({ smallWaveform: ($event.target as HTMLInputElement).checked })"
+        />
+        Small waveform
+      </label>
+      <label class="blend-row">
+        <input
+          type="checkbox"
+          :checked="prefs.showTransitionMarks"
+          @change="patchPrefs({ showTransitionMarks: ($event.target as HTMLInputElement).checked })"
+        />
+        Display transition marks
+      </label>
+      <label class="blend-row">
+        Double click a timing mark
+        <select
+          :value="prefs.doubleClickMode"
+          @change="patchPrefs({ doubleClickMode: ($event.target as HTMLSelectElement).value as Preferences['doubleClickMode'] })"
+        >
+          <option value="play-timing">Plays that interval</option>
+          <option value="edit-text">Edits its label</option>
+        </select>
+      </label>
+      <p class="timing-note">
+        Four of xLights' Effects Grid settings are missing here on purpose: Icon Backgrounds and
+        Node Values describe drawing this grid doesn't do, the completion bell belongs to a render
+        that happens on a server rather than at your desk, and Hide Colour Update Warning hides a
+        warning we don't show.
       </p>
     </div>
 
@@ -1845,6 +1982,7 @@ watch(sequenceId, async (id) => {
             @scrub-end="endScrub"
             @play-range="playRange = $event"
             :play-range="playRange"
+            :small="prefs.smallWaveform"
             :colors="uiColors"
           />
           <SequencerGrid
@@ -1852,6 +1990,8 @@ watch(sequenceId, async (id) => {
             :body="store.body"
             :duration-ms="store.sequence?.duration_ms ?? 0"
             :snap-to-timing="prefs.snapToTiming"
+            :row-height="GRID_ROW_HEIGHT_PX[prefs.gridSpacing]"
+            :show-transition-marks="prefs.showTransitionMarks"
             :colors="uiColors"
             :px-per-ms="pxPerMs"
             :playhead-ms="playheadMs"
@@ -1865,6 +2005,7 @@ watch(sequenceId, async (id) => {
             @seek="seekTo"
             @drag-start="handleDragStart"
             @add-mark="handleAddMark"
+            @mark-double-click="handleMarkDoubleClick"
             @contextmenu="handleContextMenu"
           />
         </div>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EFFECT_SHORTCUTS, buildCommands, commandForEvent, type CommandContext } from "../src/lib/commands";
+
 import {
   RESERVED_KEYS,
   bindingKey,
@@ -76,6 +77,45 @@ describe("what a shortcut is allowed to be", () => {
     }
   });
 
+  it("reserves every bare key a command already dispatches on", () => {
+    // The registry is what actually runs, so a key it claims and this list doesn't is a key an
+    // effect can be bound to and then never fire on - which looks like the binding not saving.
+    const bare = buildCommands({
+      togglePlay: () => {},
+      seekStart: () => {},
+      seekEnd: () => {},
+      nudgePlayhead: () => {},
+      addTimingMark: () => {},
+      splitTimingMark: () => {},
+      subdivideTiming: () => {},
+      deleteSelected: () => {},
+      copySelected: () => {},
+      pasteAtPlayhead: () => {},
+      duplicateSelected: () => {},
+      undo: () => {},
+      redo: () => {},
+      zoomIn: () => {},
+      zoomOut: () => {},
+      placeEffect: () => {},
+      placeRandomEffect: () => {},
+      moveSelectedEffectVertically: () => {},
+      openPalette: () => {},
+      exportFseq: () => {},
+      snapshot: () => {},
+    } satisfies CommandContext);
+
+    const effectKeys = new Set(EFFECT_SHORTCUTS.map((s) => s.key));
+    // Only the commands that aren't effect shortcuts themselves: those are the bindable ones, and
+    // a shortcut clashing with another shortcut is the separate check above.
+    const structural = bare.filter((c) => !c.id.startsWith("effect."));
+    for (const command of structural) {
+      for (const key of "0123456789abcdefghijklmnopqrstuvwxyz") {
+        if (effectKeys.has(key)) continue;
+        if (command.matches?.({ key })) expect(RESERVED_KEYS.has(key), `${key} runs ${command.id}`).toBe(true);
+      }
+    }
+  });
+
   it("refuses anything that isn't one character", () => {
     expect(checkShortcut("Fire", "", {}).ok).toBe(false);
     expect(checkShortcut("Fire", "ab", {}).ok).toBe(false);
@@ -133,6 +173,7 @@ describe("the keyboard actually dispatches the changed binding", () => {
       nudgePlayhead: () => {},
       addTimingMark: () => {},
       splitTimingMark: () => {},
+      subdivideTiming: () => {},
       deleteSelected: () => {},
       copySelected: () => {},
       pasteAtPlayhead: () => {},

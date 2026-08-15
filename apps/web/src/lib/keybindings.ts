@@ -22,7 +22,7 @@ const STORAGE_KEY = "webxlights.keybindings";
  * A shortcut that shadows the transport or the timing keys wouldn't fail - it would place an
  * effect when someone meant to add a timing mark, which is worse than being refused.
  */
-export const RESERVED_KEYS = new Set([" ", "t", "s", "T", "S"]);
+export const RESERVED_KEYS = new Set([" ", "t", "s", "T", "S", "2", "3", "4"]);
 
 export interface ShortcutRow {
   /** What the row is stored against - not the label, since two rows can place the same effect. */
@@ -77,7 +77,7 @@ export interface ShortcutProblem {
  */
 export function checkShortcut(id: string, key: string, overrides: ShortcutOverrides): { ok: true } | ShortcutProblem {
   if (key.length !== 1) return { ok: false, reason: "A shortcut is a single character." };
-  if (RESERVED_KEYS.has(key)) return { ok: false, reason: `${key === " " ? "Space" : key} is already the transport or timing key.` };
+  if (RESERVED_KEYS.has(key)) return { ok: false, reason: `${key === " " ? "Space" : key} is already a transport or timing key.` };
   const clash = effectShortcuts(overrides).find((s) => s.key === key && bindingKey(s) !== id);
   if (clash) return { ok: false, reason: `${key} already places ${clash.effect}.` };
   return { ok: true };

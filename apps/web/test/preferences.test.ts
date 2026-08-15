@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PREFERENCES,
+  GRID_ROW_HEIGHT_PX,
+  GRID_SPACING_LABELS,
+  WAVEFORM_HEIGHT_PX,
   formatTime,
   loadPreferences,
   sanitize,
@@ -85,9 +88,55 @@ describe("sanitising a hand-edited bag", () => {
   it("offers no preference that nothing reads", () => {
     // A settings screen full of switches with nothing behind them is worse than a short one:
     // every control here has to change something observable.
-    expect(Object.keys(DEFAULT_PREFERENCES).sort()).toEqual(
-      ["autosaveSeconds", "defaultEffectMs", "layoutSnapshotMinutes", "snapToTiming", "snapshotOnSave", "timeFormat"],
-    );
+    expect(Object.keys(DEFAULT_PREFERENCES).sort()).toEqual([
+      "autosaveSeconds",
+      "defaultEffectMs",
+      "doubleClickMode",
+      "gridSpacing",
+      "layoutSnapshotMinutes",
+      "showTransitionMarks",
+      "smallWaveform",
+      "snapToTiming",
+      "snapshotOnSave",
+      "timeFormat",
+    ]);
+  });
+});
+
+describe("the effects grid settings", () => {
+  it("resolves every spacing to a height, smallest to largest", () => {
+    // A named size with no height behind it would be a control that changes nothing, and two
+    // sizes resolving to the same height would be two controls that do the same thing.
+    const heights = (["xs", "s", "m", "l", "xl"] as const).map((key) => GRID_ROW_HEIGHT_PX[key]);
+    expect(heights).toEqual([...heights].sort((a, b) => a - b));
+    expect(new Set(heights).size).toBe(heights.length);
+    // The smallest still has to fit the 11px row label the grid draws.
+    expect(Math.min(...heights)).toBeGreaterThan(11);
+  });
+
+  it("names every spacing, in xLights' own words", () => {
+    expect(Object.keys(GRID_SPACING_LABELS).sort()).toEqual(Object.keys(GRID_ROW_HEIGHT_PX).sort());
+    expect(GRID_SPACING_LABELS.xs).toBe("Extra Small");
+  });
+
+  it("makes the small waveform smaller", () => {
+    expect(WAVEFORM_HEIGHT_PX.small).toBeLessThan(WAVEFORM_HEIGHT_PX.full);
+  });
+
+  it("rejects a spacing it doesn't know", () => {
+    expect(sanitize({ ...DEFAULT_PREFERENCES, gridSpacing: "huge" as never }).gridSpacing).toBe(DEFAULT_PREFERENCES.gridSpacing);
+  });
+
+  it("keeps transition marks on unless they were turned off", () => {
+    // This one defaults on, so an unset value has to become true rather than false - which is the
+    // opposite of every other boolean here and the reason it gets its own check.
+    expect(sanitize({ ...DEFAULT_PREFERENCES, showTransitionMarks: undefined as never }).showTransitionMarks).toBe(true);
+    expect(sanitize({ ...DEFAULT_PREFERENCES, showTransitionMarks: false }).showTransitionMarks).toBe(false);
+  });
+
+  it("only knows two double-click modes", () => {
+    expect(sanitize({ ...DEFAULT_PREFERENCES, doubleClickMode: "edit-text" }).doubleClickMode).toBe("edit-text");
+    expect(sanitize({ ...DEFAULT_PREFERENCES, doubleClickMode: "open-dialog" as never }).doubleClickMode).toBe("play-timing");
   });
 });
 

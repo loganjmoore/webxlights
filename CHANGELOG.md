@@ -1,5 +1,36 @@
 # Changelog
 
+## Dividing timings, and the Effects Grid settings tab
+
+Two pages read against the app. The first was the *Dividing Timings* section of the shortcuts page, recorded as missing. The second was *File > Settings > Effects Grid* — a whole Settings tab we didn't have, which is the same thing that happened with the Colors tab two audits ago, found the same way and by nobody noticing until the page was read.
+
+### Dividing timings
+
+The manual gives this one sentence: "Keyboard shortcuts are available to divide the selected timing marks by predefined intervals, making it quick to build up subdivided timing tracks." It names neither the keys nor the intervals, so both are ours — **2**, **3** and **4**, on the number keys of the same name. Halving is the common case (a beat track becomes an eighth-note track), thirds are what a waltz or a triplet fill needs, and quarters save doing the halving twice.
+
+"The selected timing marks" needed translating, because our ruler has no selection. But the waveform already has a highlighted region — the play range added last time — and it is exactly the "this bit, here" gesture this wants. So with a range marked, every interval inside it is divided at once; with nothing marked, the single interval the playhead sits in is, which is what `s` already does for two.
+
+Two decisions inside it:
+
+- **An interval too short to divide is skipped whole**, rather than divided as far as it will go. Asking for quarters and getting one mark somewhere in the middle is a worse answer than getting nothing, because it looks like it worked. The floor is the sequence's frame length: a mark between two frames can never be played against.
+- **It says what it did.** Forty new marks and none at all are the same handful of pixels on a dense ruler at a low zoom, so dividing reports which it was instead of leaving you to count.
+
+### The bug underneath it
+
+A timing track's labels are positional — `labels[i]` belongs to `marks[i]` — which is how a Papagayo import arrives and what the State and Piano effects read. Inserting a mark sorted it into the marks and left the labels alone, so every label after the insert slid onto the wrong mark. Nothing reported it; the words simply came out a phrase late.
+
+Subdividing a lyric track is exactly the operation that would have hit this, forty times in one keystroke. The bookkeeping is now a small pure module the store calls for every mark edit — insert, delete and label — so the three can't disagree about it.
+
+### File > Settings > Effects Grid
+
+- **Spacing** — Extra Small to Extra Large, which was a hardcoded 28px row height. xLights names the sizes without giving pixel counts, so the heights are ours; the smallest still fits the row label, the largest is roughly double it. Every place that turns a y coordinate into a row — drawing, hit testing, and the scroll spacer — reads the same number, or clicking a row would select the one above it.
+- **Small Waveform** — half height. The waveform and the grid share the vertical space, and on a laptop the choice between seeing the beats and seeing the rows is a real one.
+- **Display Transition Marks** — each effect's in and out reveals, drawn as wedges at its ends. On by default: an effect with a two-second fade in looks exactly like one without, which makes "why does this start dark" a question you can only answer by clicking it. A wedge rather than a line because the shape says which way it runs.
+- **Double Click Mode** — "if you Double Click a timing mark, xLights will play the sequence for that timing mark interval. If 'Edit Text' is selected, the Edit Label Dialog will appear." Play Timing sets the play range to that interval, so it loops, which is what you want when checking a phrase against the music. Edit Text opens the label — which is also the label editor we didn't have anywhere outside an import.
+- **Snap to Timing Marks** moved into this tab, where the manual has it.
+
+Four of the tab's settings are deliberately absent, and the panel says so rather than leaving you to wonder: Icon Backgrounds and Node Values describe drawing this grid doesn't do, the render-completion bell belongs to a render that happens on a server rather than at your desk, and Hide Colour Update Warning hides a warning we don't show.
+
 ## A play range on the waveform
 
 The coverage row for the timeline and waveform read "✅ — 3 zoom levels", which is the kind of note that stops anyone looking again. Reading the manual's *Timeline and Waveform* page against it turned up a page of behaviour, of which the most useful piece was missing entirely.
