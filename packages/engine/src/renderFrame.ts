@@ -104,7 +104,8 @@ export interface RenderableRow {
   effects: RenderableEffect[];
 }
 
-const MAX_LAYERS = 5;
+// The manual's own cap: "each model may have a up to 200 layers of effects" (layerStack.ts).
+import { MAX_LAYERS } from "./layerStack";
 
 // What a stateless render needs beyond its own params: where the model's nodes sit in the buffer,
 // and how long a frame is. Only the label-driven effects read either, so they travel together in
@@ -472,7 +473,12 @@ export function renderRowAtMs(
   palette: RGBA[],
   audio?: AudioSeries,
 ): RGBA[] {
-  const active = row.effects.filter((e) => atMs >= e.startMs && atMs < e.endMs).slice(-MAX_LAYERS);
+  // Over the cap, the *topmost* layers are dropped rather than the bottom ones. Keeping the last
+  // N - which is what this did - discards the base everything else blends onto, so a row over the
+  // limit rendered as if its background had never been drawn. Dropping from the top at least
+  // leaves the picture recognisable, and at 200 the cap is out of reach of anything but an
+  // import gone wrong.
+  const active = row.effects.filter((e) => atMs >= e.startMs && atMs < e.endMs).slice(0, MAX_LAYERS);
   if (active.length === 0) {
     return row.geometry.nodes.map(() => rgba(0, 0, 0, 0));
   }
@@ -541,7 +547,9 @@ export function createRowSequencer(
     const activeWithIndex = row.effects
       .map((effect, index) => ({ effect, index }))
       .filter(({ effect }) => atMs >= effect.startMs && atMs < effect.endMs)
-      .slice(-MAX_LAYERS);
+      // Same rule as renderRowAtMs, and it has to be: the scrubbing path and this sequential
+      // export path rendering different layers would mean the file didn't match the preview.
+      .slice(0, MAX_LAYERS);
 
     if (activeWithIndex.length === 0) {
       return row.geometry.nodes.map(() => rgba(0, 0, 0, 0));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { rgba, type RGBA } from "../src/color";
-import { renderLayerStack, renderLayerStackToNodes } from "../src/layerStack";
+import { MAX_LAYERS, renderLayerStack, renderLayerStackToNodes } from "../src/layerStack";
 import type { ModelGeometry } from "../src/models/types";
 
 describe("Layer stack (SPEC ch9 §5, bottom-to-top composite)", () => {
@@ -19,8 +19,21 @@ describe("Layer stack (SPEC ch9 §5, bottom-to-top composite)", () => {
     expect(result.getPixel(0, 0)).toEqual(rgba(150, 0, 0, 255));
   });
 
-  it("throws when given more than the M3 cap of 5 layers", () => {
-    const layers = Array.from({ length: 6 }, () => ({
+  it("stacks well past the five layers this once capped at", () => {
+    // The manual: "each model may have a up to 200 layers of effects." Five was the original
+    // milestone's number, and low enough to be reached by an imported sequence rather than only
+    // by someone being unreasonable.
+    const layers = Array.from({ length: 60 }, () => ({
+      render: (buf: import("../src/renderBuffer").RenderBuffer) => buf.fill(rgba(1, 1, 1)),
+      blendMode: "Additive" as const,
+      effectMixThreshold: 0,
+    }));
+    expect(() => renderLayerStack(1, 1, layers)).not.toThrow();
+    expect(renderLayerStack(1, 1, layers).getPixel(0, 0).r).toBe(60);
+  });
+
+  it("still refuses more layers than the manual allows", () => {
+    const layers = Array.from({ length: MAX_LAYERS + 1 }, () => ({
       render: (buf: import("../src/renderBuffer").RenderBuffer) => buf.fill(rgba(1, 1, 1)),
       blendMode: "Normal" as const,
       effectMixThreshold: 0,

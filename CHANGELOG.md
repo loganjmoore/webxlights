@@ -1,5 +1,25 @@
 # Changelog
 
+## 200 layers, not 5 — and the bug that was hiding behind the number
+
+The *Layers* page: **"Each model may have a up to 200 layers of effects."** Our cap was 5, a number from the original milestone's scope that had never been checked against the manual. Five is low enough to be reached by an imported sequence, not only by someone being unreasonable.
+
+Raising it turned up a real bug that the low cap had been keeping quiet.
+
+### Over the cap, the wrong end was being dropped
+
+The renderer kept the **last** N active layers. The last N is the *top* of the stack — so a row over the limit discarded the base that everything else blends onto, and rendered as if its background had never been drawn. It now drops from the top instead, which at least leaves the picture recognisable.
+
+Both render paths do the same thing. That matters more here than the fix itself: scrubbing and the sequential export sweep are separate code paths in this engine, and a file that doesn't match the preview is the worst kind of bug it can have — it only shows up when the show is running. There's now a test rendering the same over-cap row through both and asserting they agree.
+
+### The bigger half is still missing, and two rows now say so
+
+Simultaneous effects on a row **are** the layers, and the engine blends them correctly. But the grid prevents overlapping effects, so the only way to get a second layer into a sequence is to import one. The manual's own gestures don't exist here: "right click the model in the sequencer tab and choose Add Layer above or below", the same at strand level, and "Collapse Layers" to fold them back to a single row.
+
+Which has a consequence worth stating plainly rather than leaving implied: **Layer Blending and the Mix slider are both implemented, correct, and unreachable.** They work on rows with two or more layers, and nothing in the interface can create one.
+
+The Mix slider's row has been downgraded from ✅ to ⚠️ for that reason. A control that works on data you cannot author is not the same as a control that works, and a tick beside it was the kind of note that stops anyone looking — which is exactly how the last eleven findings got missed in the first place.
+
 ## Sparkles, brightness and contrast — and a correction
 
 The coverage row read **"Colour settings — palette — Up to 6 swatches"**. Both halves of that were short.

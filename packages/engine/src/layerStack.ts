@@ -10,12 +10,15 @@ export interface LayerSpec {
   effectMixThreshold: number; // 0..1, "Mix" slider / Morph position
 }
 
-const MAX_LAYERS = 5; // SPEC ch9 / goal prompt M3 scope
+// The manual: "Each model may have a up to 200 layers of effects." This was 5, from the original
+// milestone scope, and 5 is low enough to be reached by an imported sequence rather than only by
+// someone being unreasonable.
+export const MAX_LAYERS = 200;
 
 // SPEC ch9 §5.2: bottom-to-top layer composite. Each layer renders into its own scratch
 // buffer, then blends onto the accumulated result (bg) using its Layer Method.
 export function renderLayerStack(width: number, height: number, layers: LayerSpec[]): RenderBuffer {
-  if (layers.length > MAX_LAYERS) throw new Error(`renderLayerStack: ${layers.length} layers exceeds the M3 cap of ${MAX_LAYERS}`);
+  if (layers.length > MAX_LAYERS) throw new Error(`renderLayerStack: ${layers.length} layers exceeds the cap of ${MAX_LAYERS}`);
 
   const result = new RenderBuffer(width, height);
   for (const layer of layers) {
@@ -65,7 +68,7 @@ function positionForBlend(mode: BlendMode, geo: ModelGeometry, index: number): n
 // per-pixel and the mapping is per-node, so blending before or after the mapping gives the same
 // answer when the mapping is shared.
 export function renderLayerStackToNodes(nodeCount: number, layers: NodeLayerSpec[]): RGBA[] {
-  if (layers.length > MAX_LAYERS) throw new Error(`renderLayerStackToNodes: ${layers.length} layers exceeds the M3 cap of ${MAX_LAYERS}`);
+  if (layers.length > MAX_LAYERS) throw new Error(`renderLayerStackToNodes: ${layers.length} layers exceeds the cap of ${MAX_LAYERS}`);
 
   const result: RGBA[] = new Array(nodeCount).fill(null).map(() => rgba(0, 0, 0, 0));
   for (const layer of layers) {
