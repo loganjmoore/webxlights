@@ -35,6 +35,11 @@ const props = defineProps<{
   rowHeight?: number;
   // xLights' Effects Grid > Display Transition Marks.
   showTransitionMarks?: boolean;
+  // Which timing track is selected: an index, or -1 for "all tracks" (lib/effectPlacement.ts).
+  // Its marks are what snapping and placement act on, and what a new mark is added to. Every
+  // track's marks are still *drawn*, with the ones in force emphasised, so which set is acting is
+  // visible rather than something to infer.
+  activeTrackIndex?: number;
 }>();
 
 const ui = (): UiColors => props.colors ?? DEFAULT_UI_COLORS;
@@ -97,12 +102,35 @@ function allMarks(): number[] {
   return props.body.timingTracks.flatMap((t) => t.marks);
 }
 
+/**
+ * The marks that snapping acts on.
+ *
+ * Falls back to every track's when no track is selected, which is what this component did before
+ * there was a selection - so mounting it without the prop still behaves.
+ */
+function activeMarks(): number[] {
+  const index = props.activeTrackIndex ?? -1;
+  return index >= 0 ? (props.body.timingTracks[index]?.marks ?? []) : allMarks();
+}
+
+/** The track a mark belongs to, so deleting the one under the pointer deletes *that* one. */
+function trackOfMark(ms: number): number {
+  const index = props.body.timingTracks.findIndex((t) => t.marks.includes(ms));
+  return index >= 0 ? index : 0;
+}
+
+/** The track a new mark goes on: the selected one, or the first when none is selected. */
+function trackForNewMark(): number {
+  const index = props.activeTrackIndex ?? -1;
+  return index >= 0 ? index : 0;
+}
+
 function snapMs(ms: number): number {
   if (props.snapToTiming === false) return ms;
   const toleranceMs = SNAP_PX / props.pxPerMs;
   let closest = ms;
   let closestDist = toleranceMs;
-  for (const mark of allMarks()) {
+  for (const mark of activeMarks()) {
     const dist = Math.abs(mark - ms);
     if (dist <= closestDist) {
       closest = mark;
@@ -174,20 +202,29 @@ function draw(): void {
   ctx.fillStyle = "#777";
   ctx.font = "10px system-ui";
   ctx.fillText("Marks", 8, HEADER_HEIGHT / 2 + 3);
+  // Every track's marks are drawn, but the ones in force get the full-strength line and the
+  // flag: an effect snapping to a mark that looks the same as one it ignores is the kind of
+  // thing you would blame on the snapping being broken.
+  const inForce = new Set(activeMarks());
   for (const ms of allMarks()) {
     const x = msToX(ms);
+    const active = inForce.has(ms);
+    ctx.globalAlpha = active ? 1 : 0.35;
     ctx.strokeStyle = ui().timingMark;
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, HEADER_HEIGHT);
     ctx.stroke();
-    ctx.fillStyle = ui().timingMark;
-    ctx.beginPath();
-    ctx.moveTo(x - 4, 0);
-    ctx.lineTo(x + 4, 0);
-    ctx.lineTo(x, 6);
-    ctx.closePath();
-    ctx.fill();
+    if (active) {
+      ctx.fillStyle = ui().timingMark;
+      ctx.beginPath();
+      ctx.moveTo(x - 4, 0);
+      ctx.lineTo(x + 4, 0);
+      ctx.lineTo(x, 6);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   }
   ctx.strokeStyle = ui().gridlines;
   ctx.beginPath();
@@ -272,9 +309,12 @@ function hitTest(x: number, y: number): HitResult {
   if (y < HEADER_HEIGHT) {
     const ms = xToMs(x);
     for (const mark of allMarks()) {
-      if (Math.abs(msToX(mark) - x) < EDGE_PX) return { kind: "mark", trackIndex: 0, ms: mark };
+      // The mark's own track, not track 0: with more than one track, deleting a mark that lives on
+      // the second one used to filter track 0 for a millisecond it doesn't have and quietly do
+      // nothing at all.
+      if (Math.abs(msToX(mark) - x) < EDGE_PX) return { kind: "mark", trackIndex: trackOfMark(mark), ms: mark };
     }
-    return { kind: "ruler-empty", trackIndex: 0, ms };
+    return { kind: "ruler-empty", trackIndex: trackForNewMark(), ms };
   }
 
   const rowIndex = Math.floor((y - HEADER_HEIGHT + scrollTop.value) / rowHeight.value);
@@ -461,7 +501,17 @@ onMounted(() => {
 // any template-derived inline sizing, not before (pre-flush default risks a stale 0px read
 // on the same tick rows go from empty to populated - see DECISIONS.md M2 bug note).
 watch(
-  () => [props.rows, props.body, props.playheadMs, props.selectedEffectId, props.pxPerMs, props.durationMs, props.rowHeight, props.showTransitionMarks],
+  () => [
+    props.rows,
+    props.body,
+    props.playheadMs,
+    props.selectedEffectId,
+    props.pxPerMs,
+    props.durationMs,
+    props.rowHeight,
+    props.showTransitionMarks,
+    props.activeTrackIndex,
+  ],
   draw,
   { deep: true, flush: "post" },
 );

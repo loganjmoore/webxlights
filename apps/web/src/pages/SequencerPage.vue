@@ -53,6 +53,7 @@ import {
   type Preferences,
 } from "../lib/preferences";
 import { intervalAt, subdivisionMarks } from "../lib/timingSubdivide";
+import { marksInForce, placementFor } from "../lib/effectPlacement";
 import {
   loadPerspectives,
   panelsFrom,
@@ -734,18 +735,50 @@ function onEffectDragStart(e: DragEvent, name: string): void {
 // actually drives a drop (see prefs.defaultEffectMs).
 const DEFAULT_DROPPED_EFFECT_MS = 1000;
 
-// Native drag-and-drop from the palette (SequencerGrid.vue's onDrop), matching ModelPalette.vue's
-// convention on the Layout page - dropped at a default duration, same "place with defaults,
-// resize after" pattern as a dropped model. The existing arm+drag-on-grid gesture (which lets
-// you size the effect in one motion) is untouched and still the way to place a specific length.
+/**
+ * Which timing track's marks are in force: an index, or -1 for all of them.
+ *
+ * xLights' notion of a *selected* timing track, which the manual leans on when it says "if no
+ * timing track is selected then you can drag and drop even if you have no timing marks". It drives
+ * snapping and where a dropped effect lands. -1 keeps the old behaviour of treating every track's
+ * marks as one set, which is right for someone who only ever has one.
+ */
+const activeTrackIndex = ref(0);
+
+const activeMarks = computed(() => marksInForce(store.body.timingTracks, activeTrackIndex.value < 0 ? "all" : activeTrackIndex.value));
+
+// A track can be deleted or the sequence reloaded under a selection that no longer exists; falling
+// back to "all" rather than an empty set means placement keeps working instead of silently
+// reverting to fixed-length drops with no visible reason.
+watch(
+  () => store.body.timingTracks.length,
+  (count) => {
+    if (activeTrackIndex.value >= count) activeTrackIndex.value = count > 0 ? 0 : -1;
+  },
+);
+
+/**
+ * Where a dropped effect lands.
+ *
+ * "Release it between two timing marks" - so it fills that interval. The default length is the
+ * fallback the manual gives for having no marks to land between ("the effect defaults to 1 second
+ * long"), not the rule; we had it the other way round, which meant dropping an effect on a beat
+ * gave you something that had to be dragged to fit the beat it was dropped on.
+ */
+function placementAt(atMs: number): { startMs: number; endMs: number } {
+  return placementFor(activeMarks.value, atMs, store.sequence?.duration_ms ?? 0, prefs.value.defaultEffectMs || DEFAULT_DROPPED_EFFECT_MS);
+}
+
+// Native drag-and-drop from the palette (SequencerGrid.vue's onDrop). The existing arm+drag-on-grid
+// gesture (which lets you size the effect in one motion) is untouched and still the way to place a
+// specific length.
 function handleDropEffect(row: GridRow, name: string, startMs: number): void {
-  const length = prefs.value.defaultEffectMs || DEFAULT_DROPPED_EFFECT_MS;
-  const endMs = Math.min(startMs + length, store.sequence?.duration_ms ?? startMs + length);
+  const { startMs: from, endMs: to } = placementAt(startMs);
   store.addEffect(row.elementType, row.elementId, row.subName, {
     id: newEffectId(),
     name,
-    startMs,
-    endMs: Math.max(endMs, startMs + 200),
+    startMs: from,
+    endMs: to,
     params: defaultParamsFor(name),
   });
 }
@@ -829,9 +862,15 @@ function handleLayerUpdate(layer: LayerSettings): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { layer });
 }
 
+// The track the keyboard timing commands act on: the selected one, or the first when "all tracks"
+// is chosen - "all" is a viewing choice, and there is no such thing as adding a mark to all of them.
+function timingTargetIndex(): number {
+  return activeTrackIndex.value >= 0 ? activeTrackIndex.value : 0;
+}
+
 function addTimingMarkAtPlayhead(): void {
   store.ensureDefaultTimingTrack();
-  store.addTimingMark(0, playheadMs.value);
+  store.addTimingMark(timingTargetIndex(), playheadMs.value);
 }
 
 function exportFseq(): void {
@@ -1007,11 +1046,15 @@ function placeFromWheel(name: string): void {
   const at = wheel.value;
   wheel.value = null;
   if (!at) return;
+  // The same placement rule as a drop: the wheel is the manual's other way of doing the same act
+  // ("click to drop it at that location"), so an effect placed from it shouldn't come out a
+  // different length from one dragged to the same spot.
+  const { startMs, endMs } = placementAt(at.ms);
   store.addEffect(at.row.elementType, at.row.elementId, at.row.subName, {
     id: newEffectId(),
     name,
-    startMs: at.ms,
-    endMs: at.ms + prefs.value.defaultEffectMs,
+    startMs,
+    endMs,
     params: defaultParamsFor(name),
   });
 }
@@ -1231,7 +1274,8 @@ function onKeydown(e: KeyboardEvent): void {
 // without counting. Falls back to simply adding a mark when the playhead isn't inside one.
 function splitTimingMarkAtPlayhead(): void {
   store.ensureDefaultTimingTrack();
-  const track = store.body.timingTracks[0];
+  const index = timingTargetIndex();
+  const track = store.body.timingTracks[index];
   if (!track) return;
   const marks = [...track.marks].sort((a, b) => a - b);
   const before = [...marks].reverse().find((m) => m < playheadMs.value);
@@ -1240,7 +1284,7 @@ function splitTimingMarkAtPlayhead(): void {
     addTimingMarkAtPlayhead();
     return;
   }
-  store.addTimingMark(0, Math.round((before + after) / 2));
+  store.addTimingMark(index, Math.round((before + after) / 2));
 }
 
 // Dividing timings (manual: "Keyboard shortcuts are available to divide the selected timing marks
@@ -1251,7 +1295,8 @@ function splitTimingMarkAtPlayhead(): void {
 // range marked it divides the one interval the playhead sits in, which is what `s` does for two.
 function subdivideTiming(parts: number): void {
   store.ensureDefaultTimingTrack();
-  const track = store.body.timingTracks[0];
+  const index = timingTargetIndex();
+  const track = store.body.timingTracks[index];
   const durationMs = store.sequence?.duration_ms ?? 0;
   if (!track || durationMs <= 0) return;
 
@@ -1264,7 +1309,7 @@ function subdivideTiming(parts: number): void {
     timingNotice.value = `Nothing to divide into ${parts} — the interval is already as fine as the frame rate allows.`;
     return;
   }
-  store.addTimingMarks(0, added);
+  store.addTimingMarks(index, added);
   timingNotice.value = `Divided into ${parts}: ${added.length} mark${added.length === 1 ? "" : "s"} added.`;
 }
 
@@ -1391,6 +1436,16 @@ watch(sequenceId, async (id) => {
         }}
         <button title="Play the whole sequence again" @click="clearPlayRange">×</button>
       </span>
+      <!-- Which timing track is in force. xLights' manual leans on this being a choice ("if no
+           timing track is selected..."), and it decides where a dropped effect lands, what
+           snapping snaps to, and which track a new mark goes on. -->
+      <label v-if="store.body.timingTracks.length" class="active-track">
+        Timing
+        <select :value="activeTrackIndex" @change="activeTrackIndex = Number(($event.target as HTMLSelectElement).value)">
+          <option v-for="(track, i) in store.body.timingTracks" :key="i" :value="i">{{ track.name }}</option>
+          <option :value="-1">All tracks</option>
+        </select>
+      </label>
       <!-- Forty new marks and none at all look identical on a dense ruler, so dividing says which
            it was rather than leaving you to count. -->
       <span v-if="timingNotice" class="play-range">{{ timingNotice }}</span>
@@ -1992,6 +2047,7 @@ watch(sequenceId, async (id) => {
             :snap-to-timing="prefs.snapToTiming"
             :row-height="GRID_ROW_HEIGHT_PX[prefs.gridSpacing]"
             :show-transition-marks="prefs.showTransitionMarks"
+            :active-track-index="activeTrackIndex"
             :colors="uiColors"
             :px-per-ms="pxPerMs"
             :playhead-ms="playheadMs"
@@ -2109,6 +2165,13 @@ header select {
 .play-range {
   font-size: 0.7rem;
   color: #6a9fd8;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.active-track {
+  font-size: 0.7rem;
+  color: #999;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
