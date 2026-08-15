@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { CANVAS_ONLY_EFFECTS, EFFECT_SCHEMAS, defaultParamsFor, detectOnsets, estimateTempo, mouthNames, type AudioSeries, type OnsetBand, type BlendMode, type ColorAdjust, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
+import { CANVAS_ONLY_EFFECTS, EFFECT_SCHEMAS, computeGeometryFromAttrs, defaultParamsFor, detectOnsets, estimateTempo, mouthNames, strandCount, strandSpecs, type AudioSeries, type OnsetBand, type BlendMode, type ColorAdjust, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
 import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequencerView, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
@@ -647,6 +647,32 @@ function effectCountFor(row: GridRow): number {
   return found?.effects.length ?? 0;
 }
 
+/**
+ * A model's strand rows.
+ *
+ * Only offered when there is more than one: a prop wired as a single run has one strand, and a
+ * strand row identical to the model row would be a row that does nothing but take space.
+ */
+function strandRowsFor(model: ModelRecord): GridRow[] {
+  if (!model.supported) return [];
+  let geometry: ReturnType<typeof computeGeometryFromAttrs>;
+  try {
+    geometry = computeGeometryFromAttrs(model.type, model.raw_attrs);
+  } catch {
+    return []; // a model whose geometry won't compute has no strands to show
+  }
+  // computeGeometryFromAttrs returns null for a model type it can't lay out; no geometry means no
+  // strands to show, which is the same answer as a model with one run.
+  if (!geometry || strandCount(geometry) < 2) return [];
+  const geo = geometry;
+  return strandSpecs(geo).map((spec) => ({
+    elementType: "strand" as const,
+    elementId: model.id,
+    subName: spec.name,
+    name: `${model.name} / ${spec.name}`,
+  }));
+}
+
 async function loadRows(): Promise<void> {
   // The sequencer needs a project's layout; fetch it via the sequence's project.
   const layouts = await api.listLayouts(Number(route.params.projectId));
@@ -661,6 +687,9 @@ async function loadRows(): Promise<void> {
   rows.value = [
     ...models.flatMap((m) => [
       { elementType: "model" as const, elementId: m.id, name: m.name },
+      // "Click on the Model name in the sequencer to display the Strand names." Derived from the
+      // model's wiring rather than stored, so they can't go stale (engine/models/strands.ts).
+      ...strandRowsFor(m),
       ...(m.sub_models ?? []).map((sm) => ({
         elementType: "submodel" as const,
         elementId: m.id,

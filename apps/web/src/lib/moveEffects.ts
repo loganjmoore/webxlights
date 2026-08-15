@@ -1,4 +1,4 @@
-import type { SequenceEffect } from "./api";
+import type { RowElementType, SequenceEffect } from "./api";
 
 // Moving effects with the arrow keys (manual: Sequencer > Changing An Effect).
 //
@@ -51,7 +51,7 @@ export function moveEffectInTime(
 }
 
 export interface RowRef {
-  elementType: "model" | "group" | "submodel";
+  elementType: RowElementType;
   elementId: number;
   subName?: string;
 }

@@ -3,6 +3,7 @@ import {
   applyGroupBase,
   computeGeometryFromAttrs,
   computeSubModel,
+  strandSpecs,
   createRowSequencer,
   DEFAULT_PALETTE,
   channelBlockBytes,
@@ -120,13 +121,20 @@ export function exportSequenceToFseq(
   const subSequencers = supported.map((model, i) => {
     const geo = geometries[i];
     if (!geo) return [];
-    return (model.sub_models ?? [])
-      .map((spec) => {
+    // Strands first, then sub-models: "the strands blend onto the model level effects", and a
+    // sub-model - the thing somebody drew - sits on top of both. Same order as the preview, or a
+    // show looks right on screen and plays wrong in the yard.
+    const specs = [
+      ...strandSpecs(geo).map((spec) => ({ spec, elementType: "strand" as const })),
+      ...(model.sub_models ?? []).map((spec) => ({ spec, elementType: "submodel" as const })),
+    ];
+    return specs
+      .map(({ spec, elementType }) => {
         const sub = computeSubModel(geo, spec);
         if (!sub) return null;
         const rowEffects = toRenderableEffects(
           body.rows
-            .filter((r) => r.elementType === "submodel" && r.elementId === model.id && r.subName === spec.name)
+            .filter((r) => r.elementType === elementType && r.elementId === model.id && r.subName === spec.name)
             .flatMap((r) => r.effects),
           { timingTracks: body.timingTracks },
         );

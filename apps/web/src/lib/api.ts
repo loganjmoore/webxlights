@@ -199,10 +199,19 @@ export interface SequenceEffect {
   layer?: LayerSettings;
 }
 
+/**
+ * What a sequencer row is attached to.
+ *
+ * "strand" is one string of a multi-string prop - the physical run of lights, derived from the
+ * model's wiring rather than drawn by anyone (engine/models/strands.ts). Its `subName` is the
+ * strand's name, so it keys exactly the way a sub-model row does.
+ */
+export type RowElementType = "model" | "group" | "submodel" | "strand";
+
 export interface SequenceRow {
   // "submodel" rows carry their parent model's id in elementId and name the sub-model in
   // subName, because a sub-model has no id of its own - it lives on its parent's record.
-  elementType: "model" | "group" | "submodel";
+  elementType: RowElementType;
   subName?: string;
   elementId: number;
   effects: SequenceEffect[];

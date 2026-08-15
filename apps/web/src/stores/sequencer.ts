@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
-import { api, type SequenceBody, type SequenceEffect, type SequenceRecord, type TimingTrack } from "../lib/api";
+import { api, type RowElementType, type SequenceBody, type SequenceEffect, type SequenceRecord, type TimingTrack } from "../lib/api";
 import type { StoredSwatch } from "@webxlights/engine";
 import { withLabelSet, withMarkRemoved, withMarksAdded } from "../lib/timingMarks";
 
@@ -104,7 +104,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     body.value = next;
   }
 
-  function ensureRow(elementType: "model" | "group" | "submodel", elementId: number, subName: string | undefined) {
+  function ensureRow(elementType: RowElementType, elementId: number, subName: string | undefined) {
     // A sub-model row is identified by its parent's id *and* its own name: several sub-models
     // share one parent id, so matching on the id alone would collapse them into one row and
     // silently merge everyone's effects.
@@ -118,7 +118,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     return row;
   }
 
-  function addEffect(elementType: "model" | "group" | "submodel", elementId: number, subName: string | undefined, effect: SequenceEffect): void {
+  function addEffect(elementType: RowElementType, elementId: number, subName: string | undefined, effect: SequenceEffect): void {
     pushUndoSnapshot();
     ensureRow(elementType, elementId, subName).effects.push(effect);
   }
@@ -151,7 +151,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
    */
   function moveEffectToRow(
     effectId: string,
-    elementType: "model" | "group" | "submodel",
+    elementType: RowElementType,
     elementId: number,
     subName: string | undefined,
   ): void {
@@ -174,7 +174,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
    */
   function moveEffectToRowLive(
     effectId: string,
-    elementType: "model" | "group" | "submodel",
+    elementType: RowElementType,
     elementId: number,
     subName: string | undefined,
   ): void {
@@ -287,7 +287,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     return effect ? (JSON.parse(JSON.stringify(effect)) as SequenceEffect) : null;
   }
 
-  function pasteEffectAt(elementType: "model" | "group" | "submodel", elementId: number, subName: string | undefined, copied: SequenceEffect, atMs: number): void {
+  function pasteEffectAt(elementType: RowElementType, elementId: number, subName: string | undefined, copied: SequenceEffect, atMs: number): void {
     const duration = copied.endMs - copied.startMs;
     const clone = JSON.parse(JSON.stringify(copied)) as SequenceEffect;
     addEffect(elementType, elementId, subName, { ...clone, id: newEffectId(), startMs: atMs, endMs: atMs + duration });
@@ -299,7 +299,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
    * Pasting a block of eight is one action, so it has to be one Ctrl+Z - eight presses to undo one
    * paste is the kind of thing that stops people using paste.
    */
-  function addEffects(placements: readonly { elementType: "model" | "group" | "submodel"; elementId: number; subName?: string; effect: SequenceEffect }[]): void {
+  function addEffects(placements: readonly { elementType: RowElementType; elementId: number; subName?: string; effect: SequenceEffect }[]): void {
     if (placements.length === 0) return;
     pushUndoSnapshot();
     for (const p of placements) ensureRow(p.elementType, p.elementId, p.subName).effects.push(p.effect);
