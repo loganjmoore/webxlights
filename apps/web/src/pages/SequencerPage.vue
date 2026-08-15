@@ -59,6 +59,7 @@ import { withFade } from "../lib/effectFade";
 import { ALIGN_MODES, alignedTo, type AlignMode } from "../lib/alignEffects";
 import { clipboardFrom, pastedAt, type EffectClipboard } from "../lib/effectClipboard";
 import { addLayer, canAddLayer, layerCount, removeLayer } from "../lib/effectLayers";
+import { describeCriteria, matchingEffectIds, type EffectCriteria } from "../lib/selectEffects";
 import type { SequenceMetadata } from "../lib/api";
 import { DEFAULT_ZOOM_INDEX, ZOOM_STEPS, clampZoomIndex, scrollLeftHolding, wheelScrollDelta, zoomIndexIn, zoomIndexOut } from "../lib/zoom";
 import {
@@ -966,6 +967,30 @@ function handleDragStart(): void {
   store.snapshot();
 }
 
+// The Select Effect panel (manual: View > Windows) - "select effects based on type, model, and
+// time" for bulk editing. Block selection can draw a box; only a criterion can reach every Fire in
+// the show, or everything on the mega tree.
+const showSelectPanel = ref(false);
+const selectName = ref("");
+const selectRowKey = ref("");
+const selectInRange = ref(true);
+
+const selectCriteria = computed<EffectCriteria>(() => ({
+  name: selectName.value,
+  rowKeys: selectRowKey.value ? [selectRowKey.value] : [],
+  // The marked play range is the "time" criterion: it is the region already highlighted, so the
+  // panel doesn't ask for two numbers that have to be typed to match something on screen.
+  ...(selectInRange.value && playRange.value ? { fromMs: playRange.value.startMs, toMs: playRange.value.endMs } : {}),
+}));
+
+const selectSummary = computed(() => describeCriteria(selectCriteria.value, rows.value.length));
+
+function runSelect(): void {
+  const candidates = rows.value.map((row) => ({ key: rowKey(row), effects: effectsForKey(row) }));
+  const ids = matchingEffectIds(candidates, selectCriteria.value);
+  store.setSelection(ids, ids[0] ?? null);
+}
+
 function handleSelectMany(ids: string[], reference: string | null): void {
   store.setSelection(ids, reference);
 }
@@ -1832,6 +1857,9 @@ watch(sequenceId, async (id) => {
         <option v-for="v in views" :key="v.name" :value="v.name">{{ v.name }}</option>
       </select>
       <button title="Command palette (Ctrl+Shift+K)" @click="paletteOpen = true">⌘K</button>
+      <button :class="{ active: showSelectPanel }" @click="showSelectPanel = !showSelectPanel" :disabled="!store.sequence">
+        Select effects
+      </button>
       <button :class="{ active: showSettingsPanel }" @click="showSettingsPanel = !showSettingsPanel" :disabled="!store.sequence">
         Sequence settings
       </button>
@@ -2325,6 +2353,38 @@ watch(sequenceId, async (id) => {
         that happens on a server rather than at your desk, and Hide Colour Update Warning hides a
         warning we don't show.
       </p>
+    </div>
+
+    <!-- xLights' Select Effect window: "select effects based on type, model, and time". -->
+    <div v-if="showSelectPanel" class="models-panel">
+      <div class="models-panel-head"><h2>Select effects</h2></div>
+      <label class="blend-row">
+        Type
+        <select v-model="selectName">
+          <option value="">Any effect</option>
+          <option v-for="name in Object.keys(EFFECT_SCHEMAS)" :key="name" :value="name">{{ name }}</option>
+        </select>
+      </label>
+      <label class="blend-row">
+        Row
+        <select v-model="selectRowKey">
+          <option value="">Every row</option>
+          <option v-for="row in rows" :key="rowKey(row)" :value="rowKey(row)">{{ row.name }}</option>
+        </select>
+      </label>
+      <label class="blend-row">
+        <input v-model="selectInRange" type="checkbox" :disabled="!playRange" />
+        Only within the marked range
+      </label>
+      <p class="timing-note">
+        Selects {{ selectSummary }}. Said out loud because the risk here is selecting more than you
+        meant and then aligning or recolouring it in one go — shift-drag the waveform first to mark
+        a range if you want one.
+      </p>
+      <div class="models-panel-actions">
+        <button @click="runSelect">Select</button>
+        <span class="save-status">{{ store.selectedEffectIds.length }} selected</span>
+      </div>
     </div>
 
     <!-- xLights' Sequence Settings dialog. The Info/Media and Metadata tabs; its Timings tab is

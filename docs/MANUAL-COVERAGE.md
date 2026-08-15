@@ -282,6 +282,22 @@ the simple per-pixel ones (Off, Shimmer, Fill, Snow Storm, Life, Lightning, Line
 ones needing new primitives (Shape, Sketch, Warp, Morph).
 
 
+## Sequencer windows (View > Windows)
+
+The `windows.md` page turned out to be a pointer — "the Windows are described in the View, Windows
+section" — and the child page lists fifteen panels. Read via the sitemap, which is the habit that
+has now paid off three times.
+
+| Panel | | Notes |
+|---|---|---|
+| Display Elements, Model Preview, House Preview, Effect Settings, Color, Layer Blending, Layer Settings, Effect Dropper | ✅ | All present, under different names in places — the Effect Dropper is our effect palette |
+| **Select Effect** | ✅ | "Select effects based on type, model, and time" for bulk editing. **Now in.** Block selection could already draw a box, and a box only finds what happens to be adjacent on screen; a criterion reaches every Fire in the show, or everything on the mega tree. Criteria combine with AND because that is the only combination anyone can hold in their head. Time is the marked play range rather than two typed numbers, since the range is already the highlighted region. The time test is *overlap*, not containment: an effect running through the chorus is part of the chorus, and requiring it to start and end inside would miss the long pad that is usually what you were after. The panel says what it will select in a sentence, because the risk is selecting more than you meant and then aligning or recolouring it in one go |
+| Value Curves, Color Dropper | ⚠️ | We have value-curve and colour-curve *editors* per effect, but not the saved libraries these panels drag from — "drag and drop their saved values curves onto the desired effect setting" |
+| Effect Assist | ⚠️ | "Helps you determine how an effect is being drawn via a panel view", with grid coordinates for precise adjustment. Our Pixel Editor and Sketch editor are this for the two effects that most need it; what is missing is the general panel and its coordinate read-out |
+| Video Preview | 🚫 | Previewing the video file being sequenced against — the Video effect is a deliberate non-goal |
+| Jukebox | ⚠️ | Fifty buttons linking effects for real-time playback. The effect-preset library is the same idea without the live-performance half |
+| Perspectives | ✅ | Saved window arrangements, which we have |
+
 ## Pages not yet audited
 
 Three whole sections have now been found missing from this inventory rather than marked
@@ -303,9 +319,9 @@ was wrong about half.
 `download-import-models.md` (the vendor model library, a known gap), `models/model-attribute.md`
 and its `changing-start-chanel.md` child, plus the fourteen per-model-type pages.
 
-**Sequencer.** `windows.md`, `views.md`, `models.md`, `effect-presets.md`, `pixel-editor.md`,
-`value-curves.md`, `timing-tracks.md`, `singing-faces.md` and its
-`adding-word-to-user-dictionary.md` child.
+**Sequencer.** ~~`windows.md`~~ (and its real content in `view/windows.md`) is read. Still unread:
+`views.md`, `models.md`, `effect-presets.md`, `pixel-editor.md`, `value-curves.md`,
+`timing-tracks.md`, `singing-faces.md` and its `adding-word-to-user-dictionary.md` child.
 
 **Tools.** `lua-scripting.md`, `generate-custom-model.md`, `convert.md`.
 

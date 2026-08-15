@@ -1,5 +1,32 @@
 # Changelog
 
+## Selecting effects by what they are, not where they sit
+
+Two things: a sweep that found nothing, and a panel that came out of reading.
+
+### The sweep
+
+Three changes have now turned up a setting describing something the app couldn't produce — Layer Blending with no second layer to blend, the Mix slider with nothing to mix, and the Media/Animated sequence type with no way to create an animated sequence. Each was found by accident while building something adjacent, which is not a mechanism.
+
+So: a deliberate pass asking "what produces the data this reads?" of every layer setting, every effect in the schema registry, and the four candidates most likely to be orphaned. Every layer setting has a control. Every effect the engine dispatches has a schema, and every schema'd effect is in the palette — no orphans in either direction. Faces, states, sub-models and controller assignments all have editors.
+
+**It found nothing**, which is worth saying plainly rather than quietly moving on. The pattern was real three times and appears to be exhausted.
+
+### Select Effect
+
+`windows.md` turned out to be a pointer — "the Windows are described in the View, Windows section" — and the child page lists fifteen panels. Reading it via the sitemap is the habit that has now paid off three times.
+
+Most are present. One was worth building immediately: **"allows the user to select effects based on type, model, and time" for bulk editing.**
+
+Block selection can already draw a box, and once effects are selected they can be aligned, recoloured together, copied as a block or deleted at once. What a box can't do is reach what a *criterion* describes: every Fire in the show, everything on the mega tree, everything in the chorus. Those are the selections a bulk edit is actually for, and a box only finds them when they happen to be adjacent on screen.
+
+- **Criteria combine with AND**, because that is the only combination anyone can hold in their head. "Fire, on the tree, in the chorus" reads as one sentence; a mixture of ANDs and ORs would need explaining in the panel itself.
+- **Time is the marked play range**, not two typed numbers. The range is already the highlighted region on screen, so there is nothing to type and nothing to get subtly wrong.
+- **Overlap, not containment.** An effect running through the chorus is part of the chorus; requiring it to start and end inside would miss the long pad that is usually the thing you were after.
+- **The panel says what it will select, in a sentence.** The risk here is selecting more than you meant and then aligning or recolouring it in one go — "every effect, on every row, in the whole sequence" gives someone pause where three half-filled fields don't.
+
+The other panels are recorded: the Value Curves and Colour Dropper libraries we have editors for but no saved library to drag from, the Effect Assist coordinate panel that our Pixel and Sketch editors cover for the two effects needing it most, and the Jukebox, which is the preset library without the live-performance half.
+
 ## A sequence with no soundtrack
 
 Building "Default Sequence Duration and FPS" — a small preference recorded three changes ago — turned up that the preference had nothing to be a default *for*.
