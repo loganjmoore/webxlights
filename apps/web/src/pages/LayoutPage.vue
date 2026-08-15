@@ -1687,5 +1687,9 @@ header h1 {
   /* The backdrop is absolutely positioned inside this box, so it has to be the containing block -
      otherwise the photo would size itself against the page rather than the canvas. */
   position: relative;
+  /* The 3D scene renders transparent so the house photo behind it shows through, which means
+     this is now what's behind the scene when there is no photo. Same colour the renderer used
+     to clear to, so a layout without a backdrop looks exactly as it did. */
+  background: #0a0a0d;
 }
 </style>
