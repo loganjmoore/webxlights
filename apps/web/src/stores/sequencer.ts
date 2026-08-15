@@ -68,6 +68,21 @@ export const useSequencerStore = defineStore("sequencer", () => {
     suppressAutosave = false;
   }
 
+  /**
+   * Saves the Sequence Settings dialog's fields.
+   *
+   * Not part of the body, so not undoable and not autosaved: these are deliberate changes made in
+   * a dialog, where the body is every drag of every effect. Putting them on the undo stack would
+   * mean Ctrl+Z after an hour's work could silently change the frame rate.
+   */
+  async function saveSettings(patch: Partial<SequenceRecord>): Promise<void> {
+    if (!sequence.value) return;
+    const updated = await api.updateSequenceSettings(sequence.value.id, patch);
+    // Only the settings are taken back, not the body: a save that returned the server's body would
+    // discard whatever has been edited since the request went out.
+    sequence.value = { ...sequence.value, ...updated, body: sequence.value.body };
+  }
+
   function pushUndoSnapshot(): void {
     undoStack.value.push(cloneBody(body.value));
     if (undoStack.value.length > UNDO_LIMIT) undoStack.value.shift();
@@ -391,6 +406,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     load,
     undo,
     redo,
+    saveSettings,
     addEffect,
     addEffects,
     updateEffect,

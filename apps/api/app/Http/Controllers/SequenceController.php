@@ -40,6 +40,42 @@ class SequenceController extends Controller
         return $this->withEtag($sequence);
     }
 
+    /**
+     * xLights' Sequence Settings dialog (File > Sequence Settings).
+     *
+     * Separate from updateBody deliberately: the body is autosaved on every edit and carries an
+     * optimistic-locking etag, where these are deliberate changes made in a dialog. Sharing an
+     * endpoint would mean every autosave had to resend the settings, and a stale settings copy
+     * would then quietly overwrite someone else's change to them.
+     */
+    public function updateSettings(Request $request, Sequence $sequence)
+    {
+        $this->authorizeSequence($request, $sequence, 'editor');
+
+        $data = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            // The same frame rates the create endpoint allows - a sequence rendered at a rate the
+            // exporter doesn't know about would produce an .fseq nothing can play.
+            'frame_ms' => ['sometimes', 'required', 'integer', Rule::in([20, 25, 33, 40, 50])],
+            'duration_ms' => ['sometimes', 'required', 'integer', 'min:0'],
+            'sequence_type' => ['sometimes', 'required', Rule::in(['media', 'animated'])],
+            'blend_between_models' => ['sometimes', 'boolean'],
+            'metadata' => ['sometimes', 'nullable', 'array'],
+            'metadata.author' => ['nullable', 'string', 'max:255'],
+            'metadata.email' => ['nullable', 'string', 'max:255'],
+            'metadata.website' => ['nullable', 'string', 'max:255'],
+            'metadata.song' => ['nullable', 'string', 'max:255'],
+            'metadata.artist' => ['nullable', 'string', 'max:255'],
+            'metadata.album' => ['nullable', 'string', 'max:255'],
+            'metadata.music_url' => ['nullable', 'string', 'max:255'],
+            'metadata.comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $sequence->update($data);
+
+        return $this->withEtag($sequence->fresh());
+    }
+
     // Autosave target: PUT the whole body document. Optimistic-locking via
     // If-Match: the client must send back the etag it last read; a stale etag
     // means someone else saved since, so we 409 with the current state instead

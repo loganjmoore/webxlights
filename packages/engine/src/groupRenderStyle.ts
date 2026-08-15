@@ -511,11 +511,34 @@ export function scatterGroupColors(job: GroupRenderJob, colors: RGBA[], into: Ma
  * A group is the *less* specific statement about a prop - it says what a whole set of props is
  * doing - so the model's own effects sit on top of it, and its sub-models on top of those. Where
  * the model has nothing to say, the group shows through.
+ *
+ * `blend` is xLights' Sequence Settings > "Allow Blending Between Models": "decides whether effects
+ * from the model groups blend with model level effects". Off - the default, and what this did
+ * before the setting existed - a model's own effects replace the group wherever they draw at all.
+ * On, they composite over it, so a half-lit model lets half the group through rather than hiding
+ * it. Off is the right default because it is the more predictable of the two: what you put on the
+ * model is what you see.
  */
-export function applyGroupBase(nodeColors: RGBA[], base: RGBA[] | undefined): void {
+export function applyGroupBase(nodeColors: RGBA[], base: RGBA[] | undefined, blend = false): void {
   if (!base) return;
   for (let i = 0; i < nodeColors.length; i++) {
     const under = base[i];
-    if (under && nodeColors[i]!.a === 0) nodeColors[i] = under;
+    if (!under) continue;
+    const over = nodeColors[i]!;
+    if (over.a === 0) {
+      nodeColors[i] = under;
+      continue;
+    }
+    // A fully opaque model pixel hides the group either way, so there is nothing to blend.
+    if (!blend || over.a >= 255) continue;
+    const a = over.a / 255;
+    nodeColors[i] = {
+      r: Math.round(over.r * a + under.r * (1 - a)),
+      g: Math.round(over.g * a + under.g * (1 - a)),
+      b: Math.round(over.b * a + under.b * (1 - a)),
+      // The result is at least as opaque as either side: blending shouldn't make a lit pixel
+      // dimmer than the group alone was.
+      a: Math.max(over.a, under.a),
+    };
   }
 }
