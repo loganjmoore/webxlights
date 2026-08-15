@@ -1915,6 +1915,30 @@ watch(sequenceId, async (id) => {
     </div>
 
     <div v-if="showTimingPanel" class="timing-panel">
+      <!-- Tracks could be created and never removed, and creating one is a single click: a fixed
+           interval, a metronome and an onset detection each add one. -->
+      <div v-if="store.body.timingTracks.length" class="timing-tracks">
+        <div v-for="(track, i) in store.body.timingTracks" :key="i" class="timing-row">
+          <input
+            :value="track.name"
+            :disabled="track.fixed"
+            type="text"
+            @change="store.renameTimingTrack(i, ($event.target as HTMLInputElement).value)"
+          />
+          <label class="midi-field" :title="track.fixed ? 'Fixed: its marks can\'t be changed' : 'Fix it to protect its marks'">
+            <input type="checkbox" :checked="track.fixed === true" @change="store.setTimingTrackFixed(i, ($event.target as HTMLInputElement).checked)" />
+            Fixed
+          </label>
+          <span class="meta">{{ track.marks.length }} marks</span>
+          <button title="Delete this timing track" @click="store.deleteTimingTrack(i)">×</button>
+        </div>
+        <p class="timing-note">
+          A <strong>fixed</strong> track's marks can't be changed — "fixed Timing Tracks are not
+          editable and the timing marks cannot be changed". Worth setting on an imported lyric
+          track, where the marks line up with words somebody synced and one stray click on the
+          ruler puts every phrase after it out by one. Deleting is undoable, like every other edit.
+        </p>
+      </div>
       <p class="timing-note">Adds a new timing track of evenly-spaced marks across the sequence (matches real xLights' New Timing generator).</p>
       <div class="timing-row">
         <select v-model="timingGenerateMode">

@@ -225,6 +225,14 @@ export interface TimingTrack {
    * "Create Song Regions from Timing Track" uses them as the region names.
    */
   labels?: string[];
+  /**
+   * A fixed track's marks can't be changed (manual: "fixed Timing Tracks are not editable and the
+   * timing marks cannot be changed").
+   *
+   * What it protects is an imported track: a lyric track's marks line up with words somebody
+   * synced, and one stray click on the ruler puts every phrase after it out by one.
+   */
+  fixed?: boolean;
 }
 
 export interface SequenceBody {
