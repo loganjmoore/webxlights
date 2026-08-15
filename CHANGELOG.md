@@ -1,5 +1,28 @@
 # Changelog
 
+## The waveform's zoom and scroll gestures
+
+The *Timeline and Waveform* page lists five gestures for two operations. We had none of them — zoom was a dropdown and three levels wide.
+
+- **Double-click the waveform** to zoom in; **shift+double-click** to zoom out.
+- **Ctrl+wheel** to zoom. The manual describes it over an effect edge; it works over the waveform and the grid alike, since there's no reason for it to stop an inch higher up. Prevented from reaching the browser, which would otherwise zoom the whole page on the same gesture.
+- **Right-click to reset the zoom.** The manual puts this on the timeline bar. We don't have one, and the grid's ruler right-click is already the timing-mark menu, so it lands on the waveform — a substitution the coverage row states rather than glosses over.
+- **Shift+wheel** to move the waveform and grid sideways. It takes whichever wheel axis actually moved: a mouse reports the shift-modified scroll on deltaX on some platforms and deltaY on others, and a trackpad reports both.
+
+### The ladder, and the anchor
+
+Three levels topping out at 2x is nowhere near enough to place an effect against a 50ms frame in a four-minute song, and nothing below 0.5x showed you the whole thing. It's now seven steps from 0.25x to 16x, powers of two so a step is always the same visual jump.
+
+The part that had to be right is the anchoring. Zoom that doesn't hold a point still throws you somewhere else in the song every time, which makes the gesture useless exactly when it matters — working on one bar. Zooming now keeps the moment under the pointer where it is; from the keyboard or the dropdown, where there's no pointer, it holds the playhead.
+
+### Draggable play-range edges
+
+The range added two changes ago could only be replaced, not adjusted — and adjusting one end is most of what you do with a range once it roughly covers the chorus. Its edges now drag. An edge takes precedence over the scrub, since the pointer is only ever on one when a range already exists. Each drag is built from the opposite edge through the same rule as a fresh mark, so dragging one end past the other flips the range rather than inverting it, and a drag that would collapse it leaves the old one alone instead of producing a range that loops without advancing.
+
+### Still missing, and why
+
+xLights' separate **timeline selection** — a second region, distinct from the waveform's, that plays *once* rather than looping. Play-once versus loop is the entire point of having both, and it needs a timeline bar this app doesn't have yet, so the row says so rather than treating the play range as covering it.
+
 ## A dropped effect fills the timing interval it lands in
 
 The coverage row read `| Adding effects (drag, double-click, drop) | ✅ | |` — a tick with an empty note. Reading the *Adding An Effect* page against it turned up that we had the central rule backwards.

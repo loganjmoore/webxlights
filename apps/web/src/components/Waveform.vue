@@ -22,6 +22,13 @@ const emit = defineEmits<{
   scrub: [ms: number];
   scrubEnd: [];
   playRange: [range: { startMs: number; endMs: number } | null];
+  // "Zoom in on the waveform by double clicking on the waveform... To zoom out, hold the shift key
+  // and double click." The moment under the pointer goes with it so the page can hold it still.
+  zoom: [direction: -1 | 1, ms: number, clientX: number];
+  // "Right-click the timeline to reset the zoom level." The waveform stands in for xLights'
+  // separate timeline bar, which this app doesn't have - and the grid's own ruler is already
+  // spoken for by the timing-mark menu, so putting it there would cost a gesture we use.
+  resetZoom: [];
 }>();
 
 const ui = (): UiColors => props.colors ?? DEFAULT_UI_COLORS;
@@ -100,6 +107,17 @@ function onClick(e: MouseEvent): void {
   if (ms !== null) emit("seek", ms);
 }
 
+function onDoubleClick(e: MouseEvent): void {
+  const ms = msAt(e);
+  if (ms === null) return;
+  emit("zoom", e.shiftKey ? -1 : 1, ms, e.clientX);
+}
+
+function onContextMenu(e: MouseEvent): void {
+  e.preventDefault();
+  emit("resetZoom");
+}
+
 // Audio scrubbing: xLights plays the track under the pointer as you drag across the waveform,
 // which is how you find a beat by ear rather than by counting. The drag emits `scrub` rather than
 // `seek` so the page can play a short burst - a plain seek moves the playhead silently, which is
@@ -114,10 +132,38 @@ let scrubbing = false;
 // familiar one. Shift is the modifier the manual already uses on the waveform for zooming out.
 let marking: number | null = null;
 
+// Dragging an existing range's edge, rather than re-marking the whole thing.
+//
+// Adjusting a range by shift-dragging a new one from scratch means finding both ends again to move
+// one of them, which is most of what you do with a range once it roughly covers the chorus.
+let draggingEdge: "start" | "end" | null = null;
+
+const EDGE_PX = 5;
+
+/** Which edge of the range the pointer is on, if either. */
+function edgeAt(ms: number): "start" | "end" | null {
+  const range = props.playRange;
+  if (!range) return null;
+  const toleranceMs = EDGE_PX / props.pxPerMs;
+  if (Math.abs(ms - range.startMs) <= toleranceMs) return "start";
+  if (Math.abs(ms - range.endMs) <= toleranceMs) return "end";
+  return null;
+}
+
+const cursor = ref("pointer");
+
 function onPointerDown(e: PointerEvent): void {
   const ms = msAt(e);
   if (ms === null) return;
   (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+
+  // An edge takes precedence over both the scrub and the shift-mark: the pointer is only ever on
+  // one when a range already exists, and grabbing it is unambiguously what was meant.
+  const edge = edgeAt(ms);
+  if (edge) {
+    draggingEdge = edge;
+    return;
+  }
 
   if (e.shiftKey) {
     marking = ms;
@@ -131,17 +177,32 @@ function onPointerDown(e: PointerEvent): void {
 function onPointerMove(e: PointerEvent): void {
   const ms = msAt(e);
   if (ms === null) return;
+
+  if (draggingEdge) {
+    const range = props.playRange;
+    if (!range) return;
+    // Built through rangeFromDrag so a dragged edge obeys the same minimum length as a marked one -
+    // dragging one edge past the other would otherwise leave a range that loops without advancing.
+    const next = rangeFromDrag(draggingEdge === "start" ? range.endMs : range.startMs, ms);
+    if (next) emit("playRange", next);
+    return;
+  }
   if (marking !== null) {
     // A few pixels of jitter shouldn't become a range nothing can be played from (playRange.ts).
     const range = rangeFromDrag(marking, ms);
     if (range) emit("playRange", range);
     return;
   }
-  if (scrubbing) emit("scrub", ms);
+  if (scrubbing) {
+    emit("scrub", ms);
+    return;
+  }
+  cursor.value = edgeAt(ms) ? "col-resize" : "pointer";
 }
 function onPointerUp(e: PointerEvent): void {
   (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
   marking = null;
+  draggingEdge = null;
   if (!scrubbing) return;
   scrubbing = false;
   emit("scrubEnd");
@@ -158,8 +219,14 @@ watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs, pro
   <canvas
     ref="canvasRef"
     class="waveform"
-    :style="{ width: `${totalWidth}px`, height: `${small ? WAVEFORM_HEIGHT_PX.small : WAVEFORM_HEIGHT_PX.full}px` }"
+    :style="{
+      width: `${totalWidth}px`,
+      height: `${small ? WAVEFORM_HEIGHT_PX.small : WAVEFORM_HEIGHT_PX.full}px`,
+      cursor,
+    }"
     @click="onClick"
+    @dblclick="onDoubleClick"
+    @contextmenu="onContextMenu"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"

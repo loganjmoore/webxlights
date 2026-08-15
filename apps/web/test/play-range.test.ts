@@ -65,4 +65,13 @@ describe("marking a range by dragging", () => {
   it("never starts before the beginning of the sequence", () => {
     expect(rangeFromDrag(-500, 4000)?.startMs).toBe(0);
   });
+
+  it("is what dragging one edge of an existing range is built from", () => {
+    // Dragging an edge anchors on the *other* edge, so the same rules apply: dragged past it the
+    // range flips rather than inverting, and a drag that collapses it returns null, so the caller
+    // keeps the range it had instead of ending up with one that loops without advancing.
+    expect(rangeFromDrag(RANGE.endMs, 6000)).toEqual({ startMs: 6000, endMs: 8000 });
+    expect(rangeFromDrag(RANGE.endMs, 9000)).toEqual({ startMs: 8000, endMs: 9000 });
+    expect(rangeFromDrag(RANGE.endMs, RANGE.endMs)).toBeNull();
+  });
 });
