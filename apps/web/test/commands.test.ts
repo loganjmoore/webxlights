@@ -26,6 +26,7 @@ function context(): CommandContext & Record<string, ReturnType<typeof vi.fn>> {
     "zoomOut",
     "placeEffect",
     "placeRandomEffect",
+    "moveSelectedEffectVertically",
     "openPalette",
     "exportFseq",
     "snapshot",
@@ -217,5 +218,26 @@ describe("shortcuts the manual lists that were missing", () => {
       .map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("arrow keys move the selected effect", () => {
+  it("Up and Down move it between rows", () => {
+    // The manual: "an effect can also be moved vertically from one model to another. Use the Up or
+    // Down arrow keys to move it up or down."
+    const moves: number[] = [];
+    const commands = buildCommands({ ...context(), moveSelectedEffectVertically: (d) => moves.push(d) });
+    commandForEvent(commands, { key: "ArrowUp" })?.run();
+    commandForEvent(commands, { key: "ArrowDown" })?.run();
+    expect(moves).toEqual([-1, 1]);
+  });
+
+  it("Left and Right still reach the transport, which decides what to move", () => {
+    // The fallback lives in the page rather than here: the key is the same whether an effect is
+    // selected or not, and only the page knows which.
+    const ctx = context();
+    const commands = buildCommands(ctx);
+    commandForEvent(commands, { key: "ArrowLeft" })?.run();
+    expect(ctx.nudgePlayhead).toHaveBeenCalled();
   });
 });
