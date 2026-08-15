@@ -290,14 +290,32 @@ export function renderVuMeter(buffer: RenderBuffer, palette: RGBA[], params: VuM
     }
 
     case "Frame Waveform": {
-      // "Displays the audio waveform only using the current frame of audio." The analysis keeps a
-      // level and a spectrum per frame, not the samples, so this is that frame's level drawn as a
-      // centred band - a true sample-accurate waveform would need audio this app doesn't retain.
+      // "Displays the audio waveform only using the current frame of audio" - the wave itself,
+      // from the envelope the analysis keeps per frame (audio.ts), rather than the frame's level
+      // drawn as a symmetrical band. A wave is asymmetric, and that asymmetry is most of what
+      // makes it look like audio rather than a bar.
+      const envelope = audio.waveform;
       const mid = (H - 1) / 2;
-      const half = level * mid;
-      const color = multiColorBlend(palette, level, false);
+      if (!envelope || envelope.length < 2) {
+        // No envelope (a hand-built series, or audio analysed before this was kept): the level is
+        // the honest fallback, and it still moves with the track.
+        const half = level * mid;
+        const color = multiColorBlend(palette, level, false);
+        for (let x = 0; x < W; x++) {
+          for (let y = Math.round(mid - half); y <= Math.round(mid + half); y++) buffer.setPixel(x, y, color);
+        }
+        break;
+      }
+
+      const buckets = Math.floor(envelope.length / 2);
       for (let x = 0; x < W; x++) {
-        for (let y = Math.round(mid - half); y <= Math.round(mid + half); y++) buffer.setPixel(x, y, color);
+        const b = Math.min(buckets - 1, Math.floor((x / Math.max(1, W)) * buckets));
+        const lo = Math.max(-1, Math.min(1, (envelope[b * 2] ?? 0) * gain));
+        const hi = Math.max(-1, Math.min(1, (envelope[b * 2 + 1] ?? 0) * gain));
+        const yLo = Math.round(mid + lo * mid);
+        const yHi = Math.round(mid + hi * mid);
+        const color = multiColorBlend(palette, Math.min(1, Math.max(Math.abs(lo), Math.abs(hi))), false);
+        for (let y = Math.min(yLo, yHi); y <= Math.max(yLo, yHi); y++) buffer.setPixel(x, y, color);
       }
       break;
     }

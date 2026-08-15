@@ -136,9 +136,10 @@ means resolving notes to the frequencies the analysis actually banded — so the
 where its bands sit in hertz, and a series that doesn't say renders nothing rather than quietly
 widening to the whole spectrum. **Level Shape** is in as well, drawing the Shape effect's own geometry at a size the audio decides
 — one set of shapes rather than two that could disagree about what a candy cane looks like, filled
-or unfilled as the manual offers. That leaves one type: a sample-accurate **Frame Waveform**. What
-is there draws the frame's own level as a centred band, because the analysis keeps a level and a
-spectrum per frame rather than the samples.
+or unfilled as the manual offers. **Frame Waveform** now draws the frame's actual wave: the
+analysis keeps a sixteen-bucket min/max envelope per frame, which is the shape of the wave rather
+than a summary of it, so it is asymmetric the way audio is. **All of the manual's VU Meter types
+are implemented.**
 The type this app called "Spectrum" is now the manual's "Spectrogram"; sequences that say the old
 name still render.
 
@@ -172,10 +173,10 @@ nothing about what a sketch renders.
 **Missing, needs a definition file (1):** Guitar (a tab/track).
 
 (Shape now draws all eleven of the manual's geometric shapes — Circle, Square, Triangle, Diamond,
-Star, Polygon, Heart, Tree, Candy Cane, Snow Flake, Crucifix and Present — plus its Points and
-Rotation settings. Emoji and the system-font glyphs are still absent: this engine has no font
-beyond its own 5x7 bitmap, and a circle standing in for an emoji would be a worse answer than
-none. Also still missing from Shape: Random Location, Random movement and Fade Away.)
+Star, Polygon, Heart, Tree, Candy Cane, Snow Flake, Crucifix and Present — and every setting on its
+page except one: Points, Rotation, Random Location, Random movement and Fade Away are all in.
+Emoji and the system-font glyphs are the exception: this engine has no font beyond its own 5x7
+bitmap, and a circle standing in for an emoji would be a worse answer than none.)
 
 **Missing, needs infrastructure we don't have (3):**
 Duplicate (renders another model's layer), Moving Head + Servo (DMX fixtures).

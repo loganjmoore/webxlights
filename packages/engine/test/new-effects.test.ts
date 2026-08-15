@@ -420,7 +420,50 @@ describe("Shape", () => {
     centerY: 50,
     points: 5,
     rotation: 0,
+    randomLocation: false,
+    randomMovement: false,
+    fadeAway: false,
   };
+
+  const litCount = (b: RenderBuffer): number => {
+    let n = 0;
+    for (let y = 0; y < b.height; y++) for (let x = 0; x < b.width; x++) if (b.getPixel(x, y).a > 0) n++;
+    return n;
+  };
+
+  it("fades a shape over its life when asked", () => {
+    // "Fade shape over its lifetime" - what stops a short lifetime looking like shapes blinking
+    // out. One shape so the comparison is about the fade rather than about which shape is where.
+    const fading = { ...params, count: 1, fadeAway: true, lifetime: 100 };
+    const early = new RenderBuffer(21, 21);
+    renderShape(early, PALETTE, fading, ctx(0.05));
+    const late = new RenderBuffer(21, 21);
+    renderShape(late, PALETTE, fading, ctx(0.95));
+
+    const alphaAt = (b: RenderBuffer): number => {
+      let most = 0;
+      for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++) most = Math.max(most, b.getPixel(x, y).a);
+      return most;
+    };
+    expect(alphaAt(early)).toBeGreaterThan(alphaAt(late));
+  });
+
+  it("scatters shapes when random location is on, without moving them every frame", () => {
+    // Per-shape and seeded, so they are scattered rather than random *per frame* - a shape that
+    // jumped every frame would be noise, not motion.
+    const scattered = { ...params, count: 6, randomLocation: true };
+    const a = new RenderBuffer(31, 31);
+    renderShape(a, PALETTE, scattered, ctx(0.3));
+    const b = new RenderBuffer(31, 31);
+    renderShape(b, PALETTE, scattered, ctx(0.3));
+    // Same moment, same seed: identical. A per-frame random would differ.
+    expect(litCount(a)).toBe(litCount(b));
+
+    const centred = new RenderBuffer(31, 31);
+    renderShape(centred, PALETTE, { ...params, count: 6 }, ctx(0.3));
+    // Six shapes stacked on one centre cover less than six scattered ones.
+    expect(litCount(a)).toBeGreaterThan(litCount(centred));
+  });
 
   it("draws each shape as an outline", () => {
     for (const shape of SHAPE_KINDS) {
