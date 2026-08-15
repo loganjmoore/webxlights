@@ -1,5 +1,25 @@
 # Changelog
 
+## Snapshots were kept forever
+
+Reading Settings > Backup for its "Purge Backups Older Than" setting turned up something bigger than the setting: **nothing purged snapshot history at all.** Not in the app, not in the API — there was no delete endpoint for a version and no retention rule anywhere.
+
+Autosave drives snapshots, so a season's editing accumulates a full copy of the sequence body every few minutes, forever. Retention simply had no expression.
+
+The manual's own windows are offered — Never, 365, 90, 31, 7 — with three decisions around them:
+
+- **Forever is the default.** Deleting someone's history is not a thing to start doing because a setting was added, and the whole value of a backup is that it's there when it finally matters.
+- **The most recent snapshot is always kept, whatever its age.** A retention rule that can empty the history turns "keep less" into "keep nothing", and a backup has to survive not being used for a while.
+- **Purging runs when a snapshot is taken**, which is the only moment the history grows and so the only moment retention needs deciding. A purge that fails is swallowed: it leaves *more* history than asked for, which is the safe direction and not worth interrupting an edit over.
+
+The API gained a purge endpoint and a single-version delete — the manual half of the same job — both editor-only, with a test that a viewer can do neither.
+
+## Output, read rather than assumed
+
+Settings > Output is genuinely all live-output machinery: ArtNET and E1.31 frame sync, forcing a local IP, duplicate-frame suppression to cut network traffic, the xFade/xSchedule instance picker. Marked 🚫.
+
+That is what the previous blanket dismissal of these tabs *claimed* about all of them, and it was right about this one and wrong about three others. The difference is that this row was written after reading the page.
+
 ## Three Settings tabs that were dismissed unread
 
 The coverage doc contained a note saying xLights' remaining Settings tabs "configure machinery this app doesn't have". That judgement had been made without reading them — and it was wrong on all three read here.

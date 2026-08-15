@@ -57,6 +57,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('sequences/{sequence}/versions', [SequenceVersionController::class, 'index']);
         Route::post('sequences/{sequence}/versions', [SequenceVersionController::class, 'store']);
         Route::post('sequences/{sequence}/versions/{version}/restore', [SequenceVersionController::class, 'restore']);
+        Route::post('sequences/{sequence}/versions/purge', [SequenceVersionController::class, 'purge']);
+        Route::delete('sequences/{sequence}/versions/{version}', [SequenceVersionController::class, 'destroy']);
 
         Route::get('projects/{project}/members', [ProjectMemberController::class, 'index']);
         Route::post('projects/{project}/members', [ProjectMemberController::class, 'store']);

@@ -1245,6 +1245,19 @@ async function snapshotNow(): Promise<void> {
   if (!store.sequence) return;
   const v = await api.snapshotVersion(store.sequence.id);
   versions.value = [v, ...versions.value];
+
+  // xLights' "Purge Backups Older Than", applied when a new snapshot is taken - which is the only
+  // moment the history grows, and so the only moment retention needs deciding. Off by default;
+  // deleting someone's history is not a thing to start doing because a setting exists.
+  const days = prefs.value.versionRetentionDays;
+  if (days <= 0) return;
+  try {
+    const { deleted } = await api.purgeVersions(store.sequence.id, days);
+    if (deleted > 0) versions.value = await api.listVersions(store.sequence.id);
+  } catch {
+    // A purge that fails leaves more history than asked for, which is the safe direction and not
+    // worth interrupting an edit over.
+  }
 }
 
 async function restoreVersion(versionId: number): Promise<void> {
@@ -2238,6 +2251,21 @@ watch(sequenceId, async (id) => {
           @change="patchPrefs({ showTransitionMarks: ($event.target as HTMLInputElement).checked })"
         />
         Display transition marks
+      </label>
+      <!-- xLights' Backup tab offers Never / 365 / 90 / 31 / 7 for the same thing. Fixed choices
+           rather than a free field: a hand-typed 1 would delete yesterday's work. -->
+      <label class="blend-row">
+        Keep snapshots for
+        <select
+          :value="prefs.versionRetentionDays"
+          @change="patchPrefs({ versionRetentionDays: Number(($event.target as HTMLSelectElement).value) })"
+        >
+          <option :value="0">Forever</option>
+          <option :value="365">365 days</option>
+          <option :value="90">90 days</option>
+          <option :value="31">31 days</option>
+          <option :value="7">7 days</option>
+        </select>
       </label>
       <label class="blend-row">
         Timeline zooming
