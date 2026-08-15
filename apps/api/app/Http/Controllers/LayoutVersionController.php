@@ -132,6 +132,35 @@ class LayoutVersionController extends Controller
     }
 
     /** Keeps the most recent automatic snapshots and drops the rest. Manual ones are untouched. */
+    /**
+     * Deletes snapshots older than a number of days (xLights' "Purge Backups Older Than").
+     *
+     * Distinct from pruneAuto, which caps the *automatic* snapshots by count and has always run.
+     * That left the manual ones - the ones somebody took deliberately before a big change -
+     * growing without limit, and more importantly it meant the retention preference applied to
+     * sequence history and not to layout history. A setting that silently governs one of two
+     * things is worse than one that governs neither, because it reads as though it worked.
+     *
+     * The most recent snapshot survives whatever its age, for the same reason it does on the
+     * sequence side: a rule that can empty the history turns "keep less" into "keep nothing".
+     */
+    public function purge(Request $request, Layout $layout)
+    {
+        $layout->project->authorize($request->user(), 'editor');
+
+        $data = $request->validate([
+            'older_than_days' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $newest = $layout->versions()->max('number');
+        $deleted = $layout->versions()
+            ->where('created_at', '<', now()->subDays($data['older_than_days']))
+            ->where('number', '!=', $newest)
+            ->delete();
+
+        return response()->json(['deleted' => $deleted]);
+    }
+
     private function pruneAuto(Layout $layout): void
     {
         $ids = $layout->versions()

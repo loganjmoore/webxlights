@@ -54,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('layouts/{layout}/versions', [LayoutVersionController::class, 'index']);
         Route::post('layouts/{layout}/versions', [LayoutVersionController::class, 'store']);
         Route::post('layouts/{layout}/versions/{version}/restore', [LayoutVersionController::class, 'restore']);
+        Route::post('layouts/{layout}/versions/purge', [LayoutVersionController::class, 'purge']);
         Route::get('sequences/{sequence}/versions', [SequenceVersionController::class, 'index']);
         Route::post('sequences/{sequence}/versions', [SequenceVersionController::class, 'store']);
         Route::post('sequences/{sequence}/versions/{version}/restore', [SequenceVersionController::class, 'restore']);

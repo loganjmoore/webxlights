@@ -807,6 +807,17 @@ async function snapshotLayout(reason: "manual" | "auto" = "manual"): Promise<voi
   try {
     await api.snapshotLayout(layout.value.id, reason);
     lastSnapshotFingerprint = layoutFingerprint();
+    // The retention preference governs this history too. It applied only to sequence snapshots
+    // before, which is worse than governing neither: a setting that silently covers one of two
+    // things reads as though it worked.
+    const days = layoutPrefs.value.versionRetentionDays;
+    if (days > 0) {
+      try {
+        await api.purgeLayoutVersions(layout.value.id, days);
+      } catch {
+        // Leaves more history than asked for, which is the safe direction.
+      }
+    }
     await loadVersions();
     if (reason === "manual") versionMessage.value = "Snapshot taken.";
   } catch (err) {
