@@ -23,6 +23,9 @@ describe("what a press on the grid means", () => {
   it("adds a mark on the ruler and does nothing on a mark itself", () => {
     expect(gestureFor({ kind: "ruler-empty" }, plain)).toBe("add-mark");
     expect(gestureFor({ kind: "mark" }, plain)).toBe("none");
+    // A left press on a row label does nothing: right-click there is the layer menu, and a
+    // selection box starting behind the labels would be invisible.
+    expect(gestureFor({ kind: "row-label" }, plain)).toBe("none");
     // Shift doesn't change either of them - there is no shift gesture up there to confuse.
     expect(gestureFor({ kind: "ruler-empty" }, shift)).toBe("add-mark");
   });

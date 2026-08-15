@@ -1,5 +1,33 @@
 # Changelog
 
+## Effect layers get an interface
+
+The last change found that layers were the biggest single gap in the app, and left it named in two coverage rows. This builds it.
+
+The engine has blended simultaneous effects on a row since the beginning. What that meant, once the *Layers* page was read against it, is that **Layer Blending and the Mix slider had been implemented, correct and unreachable** for as long as they had existed — the grid refuses to place one effect on top of another, so nothing could author a second layer for them to act on.
+
+### A layer is a number on the effect
+
+Not a row of its own. Layers are a property of the effects, not a container holding them: an effect moved between layers is the same effect, and an empty layer is a row to draw rather than a thing to store. It also means every sequence written before this reads as a single-layer one, which is what it is.
+
+The composite order is now the **layer** order in both render paths, rather than wherever the effects happen to sit in the row's array. "Each layer can be blended with the layer below it", so which one is below has to be the layer number.
+
+### The gestures
+
+Right-click a row label to show its layers, then **Add Layer Above**, **Add Layer Below**, **Delete Layer**, **Collapse Layers** — per "right click the model in the sequencer tab and choose Add Layer above or below (the current layer)".
+
+- **Layers draw highest-first**, because the grid runs top-down while the stack composites bottom-up. The layer nearest the viewer belongs at the top of the list, the way it is in every other editor.
+- **Delete Layer says what it will take with it** — "Delete Layer (and 3 effects)". Deleting a layer that still has effects on it silently would lose work.
+- **Collapse is a display change only.** "Collapses the expanded effect layers back down to a single row" — the effects stay on the layers they were on.
+- **Effects land on the layer they were dropped on**, whether placed, dragged from the palette, or picked from the radial wheel. And dragging an effect between two layer rows changes its layer, since the row is the same row.
+- Adding a layer, deleting one, or renumbering everything above one is a **single undo entry**. Undoing an "add layer" one effect at a time would leave the row in a state nobody asked for.
+
+A collapsed row still shows every layer at once and places onto the bottom one, which is exactly what every row did before this existed.
+
+### Two rows I owed from last time
+
+`rendering.md` and `render-all.md` were read during the previous pass and never got coverage rows, because the layers finding took the slice over. They have them now. Rendering describes the render buffer per model/group/submodel, which is this engine's model exactly. **Render All is marked 🚫 rather than missing**: xLights keeps a rendered copy of the sequence that can fall out of date with the effects that produced it, where this renders on demand from the effects themselves. There is nothing to force, and a button that re-did what is already current would be a button that does nothing.
+
 ## 200 layers, not 5 — and the bug that was hiding behind the number
 
 The *Layers* page: **"Each model may have a up to 200 layers of effects."** Our cap was 5, a number from the original milestone's scope that had never been checked against the manual. Five is low enough to be reached by an imported sequence, not only by someone being unreasonable.

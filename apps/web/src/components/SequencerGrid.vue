@@ -13,10 +13,19 @@ export interface GridRow {
   name: string;
   /** Set only for sub-model rows; names which sub-model of `elementId` this is. */
   subName?: string;
+  /**
+   * Set only when a row is showing its effect layers: which layer this row is.
+   *
+   * Unset means "all of them on one row", which is how every row looked before layers had an
+   * interface and is what Collapse Layers goes back to.
+   */
+  layerIndex?: number;
 }
 
 export type ContextMenuTarget =
   | { kind: "effect"; row: GridRow; effect: SequenceEffect; ms: number; x: number; y: number }
+  // "Right click the model in the sequencer tab and choose Add Layer above or below."
+  | { kind: "row-label"; row: GridRow; x: number; y: number }
   | { kind: "mark"; trackIndex: number; ms: number; x: number; y: number }
   | { kind: "ruler-empty"; trackIndex: number; ms: number; x: number; y: number };
 
@@ -116,7 +125,11 @@ const totalWidth = computed(() => ROW_LABEL_WIDTH + props.durationMs * props.pxP
 
 function effectsForRow(row: GridRow): SequenceEffect[] {
   const found = props.body.rows.find((r) => r.elementType === row.elementType && r.elementId === row.elementId);
-  return found?.effects ?? [];
+  const effects = found?.effects ?? [];
+  // A collapsed row shows every layer at once, which is what it always did. An expanded one shows
+  // only its own, so the layers can be told apart and dragged separately.
+  if (row.layerIndex === undefined) return effects;
+  return effects.filter((e) => (e.layerIndex ?? 0) === row.layerIndex);
 }
 
 function allMarks(): number[] {
@@ -395,10 +408,15 @@ type HitResult =
   | { kind: "mark"; trackIndex: number; ms: number }
   | { kind: "ruler-empty"; trackIndex: number; ms: number }
   | { kind: "row-empty"; row: GridRow }
+  | { kind: "row-label"; row: GridRow }
   | { kind: "none" };
 
 function hitTest(x: number, y: number): HitResult {
-  if (x < ROW_LABEL_WIDTH) return { kind: "none" };
+  if (x < ROW_LABEL_WIDTH) {
+    if (y < HEADER_HEIGHT) return { kind: "none" };
+    const row = props.rows[rowIndexAt(y)];
+    return row ? { kind: "row-label", row } : { kind: "none" };
+  }
 
   if (y < HEADER_HEIGHT) {
     const ms = xToMs(x);
@@ -465,6 +483,8 @@ function onContextMenu(e: MouseEvent): void {
     emit("contextmenu", { kind: "mark", trackIndex: hit.trackIndex, ms: hit.ms, x: e.clientX, y: e.clientY });
   } else if (hit.kind === "ruler-empty") {
     emit("contextmenu", { kind: "ruler-empty", trackIndex: hit.trackIndex, ms: hit.ms, x: e.clientX, y: e.clientY });
+  } else if (hit.kind === "row-label") {
+    emit("contextmenu", { kind: "row-label", row: hit.row, x: e.clientX, y: e.clientY });
   }
   // row-empty / none: no menu (placement already has its own gesture - armed palette + drag)
 }

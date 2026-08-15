@@ -175,6 +175,13 @@ export interface SequenceEffect {
   startMs: number;
   endMs: number;
   params: Record<string, EffectParamValue>;
+  /**
+   * Which effect layer this sits on, 0 being the bottom (manual: Sequencer > Layers).
+   *
+   * Absent means layer 0, so every sequence written before layers existed reads as a
+   * single-layer one - which is what it is.
+   */
+  layerIndex?: number;
   // Per-effect color override (real xLights' Color tab), hex strings. Unset = inherit the
   // row's default palette.
   // A swatch is a hex colour, or a colour curve that changes over the effect or across the

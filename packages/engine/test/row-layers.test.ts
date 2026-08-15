@@ -67,3 +67,35 @@ describe("layers well past the old cap of five", () => {
     expect(bright[0]!.r).toBeGreaterThan(dim[0]!.r);
   });
 });
+
+describe("layer order decides the composite, not array order", () => {
+  it("puts a higher layer on top however the effects are ordered in the row", () => {
+    // "Each layer can be blended with the layer below it." Which layer is below is the layer
+    // *number* - an effect added later sits wherever its layer says, not automatically on top.
+    const green = on(0, 1000, { palette: [rgba(0, 255, 0, 255)], layerIndex: 1 });
+    const red = on(0, 1000, { palette: [rgba(255, 0, 0, 255)], layerIndex: 0 });
+
+    // Array order green-then-red; layer order says red is below, so green wins.
+    const colors = renderRowAtMs({ geometry, effects: [green, red] }, 500, 50, 1, [RED]);
+    expect(colors[0]!.g).toBe(255);
+    expect(colors[0]!.r).toBe(0);
+  });
+
+  it("keeps two effects on the same layer in their authored order", () => {
+    const first = on(0, 1000, { palette: [rgba(255, 0, 0, 255)], layerIndex: 0 });
+    const second = on(0, 1000, { palette: [rgba(0, 0, 255, 255)], layerIndex: 0 });
+    const colors = renderRowAtMs({ geometry, effects: [first, second] }, 500, 50, 1, [RED]);
+    expect(colors[0]!.b).toBe(255);
+  });
+
+  it("renders the same through both paths", () => {
+    // The standing hazard: scrubbing and the sequential export sweep are separate code paths.
+    const stack = [
+      on(0, 1000, { palette: [rgba(0, 255, 0, 255)], layerIndex: 2 }),
+      on(0, 1000, { palette: [rgba(255, 0, 0, 255)], layerIndex: 0 }),
+    ];
+    const scrubbed = renderRowAtMs({ geometry, effects: stack }, 0, 50, 1, [RED]);
+    const swept = createRowSequencer({ geometry, effects: stack }, 50, 1, [RED]).renderFrameAt(0);
+    expect(swept).toEqual(scrubbed);
+  });
+});
