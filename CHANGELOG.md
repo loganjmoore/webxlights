@@ -1,5 +1,23 @@
 # Changelog
 
+## Retention reaches the other history, and the last Settings tab
+
+### A correction to the last change
+
+The previous change added snapshot retention and I said the same unbounded growth applied to layout snapshots. **That was too strong.** Layout snapshots have always pruned their *automatic* ones by count — only the manual ones, taken deliberately before a big change, grew without limit.
+
+But there was a real problem underneath the overstatement, and a worse-shaped one: the retention preference said "keep snapshots for N days" and reached **sequence history only**. A setting that silently governs one of two things is worse than a setting that governs neither, because it reads as though it worked.
+
+So layouts get the same time-based purge, driven by the same preference, with the same rule that the most recent snapshot survives whatever its age.
+
+### Settings > Services, and the end of that group
+
+The last unread Settings tab configures xLights' own AI integrations: an API key for a hosted model, a base URL for an OpenAI-compatible endpoint, model and image-model pickers, per-feature enables for Colour Palette, Images and Mapping.
+
+Marked 🚫, and worth being precise about why: this isn't a settings gap, it's a *feature* gap wearing a settings tab. If those features are ever wanted here they're their own project, and the configuration would follow them rather than lead.
+
+**All six Settings tabs are now audited.** The blanket note that dismissed them as "machinery this app doesn't have" was wrong about half of them — Colors, Effects Grid, Sequences, View, Other and Backup all held applicable behaviour, two of them whole tabs' worth, and one named a choice the app was already making silently.
+
 ## Snapshots were kept forever
 
 Reading Settings > Backup for its "Purge Backups Older Than" setting turned up something bigger than the setting: **nothing purged snapshot history at all.** Not in the app, not in the API — there was no delete endpoint for a version and no retention rule anywhere.

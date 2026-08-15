@@ -395,6 +395,12 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, JSON.stringify(json));
     return { ok: true, data: json };
   },
+  /** The same retention rule as sequence snapshots, applied to the layout's own history. */
+  purgeLayoutVersions: (layoutId: number, olderThanDays: number) =>
+    request<{ deleted: number }>(`/v1/layouts/${layoutId}/versions/purge`, {
+      method: "POST",
+      body: JSON.stringify({ older_than_days: olderThanDays }),
+    }),
   listLayoutVersions: (layoutId: number) => request<LayoutVersion[]>(`/v1/layouts/${layoutId}/versions`),
   snapshotLayout: (layoutId: number, reason: "manual" | "auto" = "manual") =>
     request<LayoutVersion>(`/v1/layouts/${layoutId}/versions`, { method: "POST", body: JSON.stringify({ reason }) }),

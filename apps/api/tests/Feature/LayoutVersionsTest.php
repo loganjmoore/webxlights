@@ -132,4 +132,50 @@ class LayoutVersionsTest extends TestCase
         $this->actingAs($stranger)->postJson("/api/v1/layouts/{$layout->id}/versions")->assertForbidden();
         $this->actingAs($stranger)->getJson("/api/v1/layouts/{$layout->id}/versions")->assertForbidden();
     }
+
+    // pruneAuto has always capped the *automatic* snapshots by count. The manual ones - taken
+    // deliberately before a big change - grew without limit, and the retention preference applied
+    // to sequence history and not to layout history. A setting that silently governs one of two
+    // things reads as though it worked.
+    public function test_purging_removes_old_layout_snapshots_but_never_the_newest(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+        $layout = $project->layouts()->create(['name' => 'Yard']);
+
+        foreach ([1, 2, 3] as $n) {
+            $version = $layout->versions()->create([
+                'number' => $n,
+                'snapshot' => ['models' => []],
+                'reason' => 'manual',
+                'created_by' => $user->id,
+            ]);
+            // created_at isn't fillable, so it has to be aged after the fact or every snapshot
+            // looks new and the purge finds nothing.
+            $version->forceFill(['created_at' => now()->subDays(120)])->saveQuietly();
+        }
+
+        $this->actingAs($user)
+            ->postJson("/api/v1/layouts/{$layout->id}/versions/purge", ['older_than_days' => 90])
+            ->assertOk()
+            ->assertJsonPath('deleted', 2);
+
+        $this->assertSame(1, $layout->versions()->count());
+        $this->assertSame(3, $layout->versions()->first()->number);
+    }
+
+    public function test_a_viewer_cannot_purge_layout_snapshots(): void
+    {
+        $owner = User::factory()->create();
+        $viewer = User::factory()->create();
+        $project = Project::factory()->for($owner, 'owner')->create();
+        $this->actingAs($owner)->postJson("/api/v1/projects/{$project->id}/members", [
+            'email' => $viewer->email, 'role' => 'viewer',
+        ])->assertCreated();
+        $layout = $project->layouts()->create(['name' => 'Yard']);
+
+        $this->actingAs($viewer)
+            ->postJson("/api/v1/layouts/{$layout->id}/versions/purge", ['older_than_days' => 7])
+            ->assertForbidden();
+    }
 }
