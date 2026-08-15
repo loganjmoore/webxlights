@@ -1,5 +1,25 @@
 # Changelog
 
+## The audit stops relying on luck
+
+Reading `layers/layer-settings.md` — a child of the page that produced the largest finding of this run — turned up a section with **no row in the inventory at all**: Roto-Zoom. Rotation, zoom and a pivot point are implemented and have been for a while. The page also names a Rotation Preset and a Zoom Preset dropdown, a Zoom quality control, and an Application Order setting, none of which we have.
+
+Those three are named without being defined. The page gives no preset list, no quality scale, and no explanation of what order is being applied to what — so they're recorded rather than guessed at, the same call as Alt-drag stretching. The **Camera dropdown** for the Per Preview render style is a different case: a real gap rather than an under-specified one, since it picks which preview camera a Per Preview buffer is seen from.
+
+One control is marked 🚫. "Reset panel when changing effects" exists because xLights' Layer Settings panel is *sticky* — it keeps the settings you last used and applies them to the next effect you select, so it needs a way to say "don't". Our panel reads the selected effect's own settings, so there's nothing to reset and a checkbox for it would control nothing.
+
+### The part that matters more than the row
+
+That's now **three whole sections found missing from the inventory rather than marked incomplete in it** — Settings > Colors, Settings > Effects Grid, and now Roto-Zoom. Every one was found by reading a page and noticing no row existed for it.
+
+That's luck dressed up as method. A section nobody happens to read about stays missing forever, and "twelve findings in twelve passes" is not reassuring when the finding mechanism can't see what it hasn't looked at.
+
+So the coverage doc now ends with the manual's own page list, filtered to the pages no row corresponds to. Six unread Settings tabs, most of the Layout tab's pages, nine sequencer pages, Lua scripting, the keyboard-shortcuts appendix (distinct from the sequencer's shortcuts page), and five effect pages for effects we may not have at all.
+
+It also records a judgement that should be revisited: an earlier note dismissed the remaining Settings tabs as "machinery this app doesn't have" — a call made *without reading them*, which is exactly how Colors and Effects Grid were missed.
+
+The remaining audit is now enumerable instead of discovered.
+
 ## What ends up in the file
 
 Three changes in a row landed on the `.fseq` export path — the layer cap and its drop order, the layer *ordering* that decides which effect wins, and strand rows — and that path had **no test at the web level at all**.
