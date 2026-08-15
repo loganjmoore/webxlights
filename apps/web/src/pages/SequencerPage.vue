@@ -56,6 +56,7 @@ import { intervalAt, subdivisionMarks } from "../lib/timingSubdivide";
 import { marksInForce, placementFor } from "../lib/effectPlacement";
 import { withFade } from "../lib/effectFade";
 import { ALIGN_MODES, alignedTo, type AlignMode } from "../lib/alignEffects";
+import { clipboardFrom, pastedAt, type EffectClipboard } from "../lib/effectClipboard";
 import { DEFAULT_ZOOM_INDEX, ZOOM_STEPS, clampZoomIndex, scrollLeftHolding, wheelScrollDelta, zoomIndexIn, zoomIndexOut } from "../lib/zoom";
 import {
   loadPerspectives,
@@ -123,7 +124,10 @@ const playing = ref(false);
 const pendingEffectName = ref<string | null>(null);
 // Index into ZOOM_STEPS (lib/zoom.ts), not a multiplier - the gestures step along the ladder.
 const zoomLevel = ref(DEFAULT_ZOOM_INDEX);
-const clipboard = ref<SequenceEffect | null>(null);
+// The clipboard holds a *block*, as relative offsets (lib/effectClipboard.ts) - copying eight
+// effects across three props and dropping them on the second chorus is the bulk edit block
+// selection was built for, and it was still one effect at a time.
+const clipboard = ref<EffectClipboard | null>(null);
 const versions = ref<SequenceVersion[]>([]);
 const showHistory = ref(false);
 const contextMenu = ref<{ x: number; y: number; items: { label: string; action: string }[]; target: ContextMenuTarget } | null>(null);
@@ -887,6 +891,50 @@ function handleSelectMany(ids: string[], reference: string | null): void {
  * The reference is left alone, and the whole alignment is one undo entry - undoing an alignment
  * one effect at a time would be worse than not having the command.
  */
+/** The selected effects with the row each one is on, which is what the clipboard needs. */
+function selectedWithRows(): { effect: SequenceEffect; rowIndex: number }[] {
+  const ids = new Set(store.selectedEffectIds);
+  const out: { effect: SequenceEffect; rowIndex: number }[] = [];
+  visibleRows.value.forEach((row, rowIndex) => {
+    for (const effect of effectsForRowRef(row)) if (ids.has(effect.id)) out.push({ effect, rowIndex });
+  });
+  return out;
+}
+
+function effectsForRowRef(row: GridRow): SequenceEffect[] {
+  const found = store.body.rows.find((r) => r.elementType === row.elementType && r.elementId === row.elementId);
+  return found?.effects ?? [];
+}
+
+/** Copies the whole selection, keeping its shape. */
+function copySelection(): void {
+  clipboard.value = clipboardFrom(selectedWithRows());
+}
+
+/**
+ * Pastes the block with its top-left corner at a moment on a row.
+ *
+ * One undo entry for the whole paste, and the pasted effects become the new selection - which is
+ * what lets you paste and then immediately drag or align the thing you just pasted.
+ */
+function pasteBlockAt(rowIndex: number, atMs: number): void {
+  if (!clipboard.value) return;
+  const placements = pastedAt(clipboard.value, atMs, rowIndex, visibleRows.value.length, newEffectId).flatMap((p) => {
+    const row = visibleRows.value[p.rowIndex];
+    return row ? [{ elementType: row.elementType, elementId: row.elementId, subName: row.subName, effect: p.effect }] : [];
+  });
+  store.addEffects(placements);
+  store.setSelection(placements.map((p) => p.effect.id), placements[0]?.effect.id ?? null);
+}
+
+/** The row index a GridRow sits at, for pasting relative to where you clicked. */
+function rowIndexOf(row: GridRow): number {
+  const index = visibleRows.value.findIndex(
+    (r) => r.elementType === row.elementType && r.elementId === row.elementId && (r.subName ?? "") === (row.subName ?? ""),
+  );
+  return index < 0 ? 0 : index;
+}
+
 function alignSelection(mode: AlignMode): void {
   const reference = store.selectedEffectId ? store.findEffect(store.selectedEffectId) : null;
   if (!reference) return;
@@ -937,15 +985,19 @@ function handleContextAction(action: string): void {
       return;
     }
     if (action === "copy") {
-      clipboard.value = store.copyEffect(effect.id);
+      copySelection();
     } else if (action === "cut") {
-      clipboard.value = store.copyEffect(effect.id);
-      store.deleteEffect(effect.id);
+      copySelection();
+      store.deleteSelected();
     } else if (action === "paste") {
-      if (clipboard.value) store.pasteEffectAt(row.elementType, row.elementId, row.subName, clipboard.value, ms);
+      pasteBlockAt(rowIndexOf(row), ms);
     } else if (action === "duplicate") {
-      const copy = store.copyEffect(effect.id);
-      if (copy) store.pasteEffectAt(row.elementType, row.elementId, row.subName, copy, effect.endMs);
+      // Duplicated just past the end of the block, so the copy sits beside the original rather
+      // than on top of it - the same "place it where you can see it" rule as before, for a block.
+      copySelection();
+      const latest = Math.max(effect.endMs, ...selectedWithRows().map((s) => s.effect.endMs));
+      const topRow = Math.min(rowIndexOf(row), ...selectedWithRows().map((s) => s.rowIndex));
+      pasteBlockAt(topRow, latest);
     } else if (action === "delete") {
       // The whole block when the effect right-clicked is in it, matching the keyboard - otherwise
       // just the one clicked, which is what right-clicking outside a selection means.
@@ -1325,17 +1377,16 @@ const commands = computed(() =>
     // Deletes the whole block, not only the reference: a selection you can see but can't delete
     // together is a selection that lies about what it is.
     deleteSelected: () => store.deleteSelected(),
-    copySelected: () => {
-      if (store.selectedEffectId) clipboard.value = store.copyEffect(store.selectedEffectId);
-    },
+    copySelected: copySelection,
     pasteAtPlayhead: () => {
       const row = keyboardTargetRow();
-      if (clipboard.value && row) store.pasteEffectAt(row.elementType, row.elementId, row.subName, clipboard.value, playheadMs.value);
+      if (row) pasteBlockAt(rowIndexOf(row), playheadMs.value);
     },
     duplicateSelected: () => {
-      const copy = store.selectedEffectId ? store.copyEffect(store.selectedEffectId) : null;
-      const row = keyboardTargetRow();
-      if (copy && row) store.pasteEffectAt(row.elementType, row.elementId, row.subName, copy, copy.endMs);
+      const selected = selectedWithRows();
+      if (selected.length === 0) return;
+      copySelection();
+      pasteBlockAt(Math.min(...selected.map((s) => s.rowIndex)), Math.max(...selected.map((s) => s.effect.endMs)));
     },
     undo: () => store.undo(),
     redo: () => store.redo(),

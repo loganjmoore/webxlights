@@ -1,5 +1,33 @@
 # Changelog
 
+## Copy and paste a block, and a guard for the gesture that vanished
+
+Two things, one of which exists because of a mistake in the last change but one.
+
+### A clipboard that holds a block
+
+Block selection made the alignment commands possible. This is the other thing it makes possible, and the more useful of the two day to day: copying eight effects across three props and dropping them on the second chorus is the bulk edit a sequencer exists for, and it was still one effect at a time.
+
+The clipboard holds **relative** positions — how far apart the effects are, and which rows they sit on relative to the topmost — so a block can land anywhere and on any prop. Absolute times would only ever paste back where they came from.
+
+- **It anchors on the earliest effect**, not the reference. Anchoring on the reference would make pasting jump backwards whenever the reference wasn't the first effect selected.
+- **A paste is one undo entry**, and the pasted effects become the new selection, which is what lets you paste and then immediately drag or align the thing you just pasted.
+- **A block pasted lower than it fits piles onto the last row** rather than half-vanishing. Silently dropping the overflow looks like the paste having partly failed; effects piled on the last row can at least be seen and moved.
+
+Cut, duplicate and the keyboard commands follow the same rules.
+
+### The guard the regression needed
+
+The last change fixed a gesture that had stopped existing: shift on an effect's edge authors a fade, shift on its body picks the alignment reference, and adding the second put an early return in front of the first. Nothing failed and nothing warned. It was found by re-reading the handler, which is not a repeatable way to find things.
+
+The decision is now a function — what a press means, given where it landed and which modifiers are down — and the gestures are a **closed set**. One test enumerates them and asserts every one is still reachable from some press. A gesture nothing can produce is a feature that has silently stopped existing, and that is now a failing test rather than something to notice by accident.
+
+The ordering inside it is the fix, stated once where it can be read: the edge test comes before the shift test, because a rule that checks shift first can only ever express one of the two shift gestures.
+
+### A correction
+
+Multi-effect **property editing** has been sitting in the coverage row as a missing feature. Re-reading, it was our own idea rather than anything the manual asks for — the page describes no such thing. Applying every parameter to a block of differently-typed effects is wrong more often than right (a Fire's settings mean nothing to a Bars), so the row now says it needs deciding on its merits rather than implying parity work left undone.
+
 ## The ghost outline, and a drag that is a proposal
 
 "While you drag, a 'ghost' outline follows the cursor to show where the effect (or effects) will land when you release the mouse button." And: "when dragging several effects at once, only the ghost outlines that would collide with an existing effect turn red, so you can see exactly which effects are blocked while the rest are free to drop."
