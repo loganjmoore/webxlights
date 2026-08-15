@@ -1,5 +1,29 @@
 # Changelog
 
+## Backup on Save, and three shortcuts the manual has that we didn't
+
+### Backup on Save
+
+"If you have enabled Backup on Save, it will also take a snapshot after every Save operation." Layout snapshots already ran on a timer; this adds the other half.
+
+**Off by default**, and that default is the whole design question. A save in xLights is a deliberate act; here every model drag saves immediately, so on-by-default would mean a snapshot every few seconds through an afternoon of arranging props.
+
+It watches the layout rather than hooking each save, because there are a dozen paths that write to it — dragging a model, editing a state, importing a show — and hooking each is a dozen places to forget one. Debounced, and it reuses the same changed-since-last-snapshot check the timer uses, so dragging a model and putting it back doesn't add a duplicate.
+
+### The shortcuts row said fifteen; the manual lists eighteen
+
+Re-reading the shortcuts page against our table — the audit pass I'd queued — turned up three keys we didn't have and one feature behind them.
+
+**`u` and `d`** are the On effect with its intensities swapped: fade up and fade down. They matter beyond themselves because they're the manual's example of a shortcut *carrying parameters* — "the On and Ramp Up/Down effects also enables the intensity to be defined as a shortcut key". The registry had no way to express that.
+
+**`Shift+R`** generates a random effect. It draws from the effects that draw something on their own — a random canvas effect would land on a layer with nothing underneath and render nothing, which reads as the shortcut being broken rather than as a canvas effect behaving correctly.
+
+**`s`** the manual gives to *both* Timing Split and Spirals, in the same table. A structural action beats an effect — splitting a timing mark can't be done any other way from the keyboard — so the split keeps it, and Spirals can be bound to any free key now that bindings are editable. Recorded rather than silently resolved.
+
+### A knock-on the parameters caused
+
+Three keys now place On, so a binding can't be stored against the effect's name any more: rebinding "fade up" would have moved all three. Bindings are stored against the shortcut's own identity instead, and the editor lists them as "On (fade up)" rather than three identical rows.
+
 ## Two effect rows finished
 
 ### Frame Waveform, properly this time

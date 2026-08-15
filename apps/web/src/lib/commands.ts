@@ -23,7 +23,9 @@ export interface CommandContext {
   redo: () => void;
   zoomIn: () => void;
   zoomOut: () => void;
-  placeEffect: (name: string) => void;
+  placeEffect: (name: string, params?: Record<string, number | boolean | string>) => void;
+  /** xLights' `R`: "Generate Random effects". */
+  placeRandomEffect: () => void;
   openPalette: () => void;
   exportFseq: () => void;
   snapshot: () => void;
@@ -31,7 +33,7 @@ export interface CommandContext {
    * The effect shortcuts in force. Absent means xLights' own, which is what they were before they
    * could be changed (keybindings.ts).
    */
-  effectShortcuts?: Array<{ key: string; effect: string }>;
+  effectShortcuts?: Array<{ key: string; effect: string; params?: Record<string, number | boolean | string> }>;
 }
 
 export interface Command {
@@ -57,9 +59,21 @@ export interface KeyEvent {
 
 // xLights' effect shortcuts: a single letter drops that effect at the selection. Case matters -
 // `o` is On and `O` is Off - which is why these match on `key` rather than on a lowercased code.
-export const EFFECT_SHORTCUTS: Array<{ key: string; effect: string }> = [
+//
+// A shortcut can carry parameters, which is what the manual means by "The On and Ramp Up/Down
+// effects also enables the intensity to be defined as a shortcut key. Look at examples in the
+// existing file which has a start intensity set to zero and and end intensity set to 100%" - `u`
+// and `d` are the On effect with its two intensities swapped round.
+//
+// One key in the manual's table is deliberately not here: it gives `s` to both Timing Split and
+// Spirals. A structural action beats an effect - splitting a timing mark can't be done any other
+// way from the keyboard - so `s` stays with the split, and Spirals is bindable to any free key
+// now that the bindings are editable (keybindings.ts).
+export const EFFECT_SHORTCUTS: Array<{ key: string; effect: string; params?: Record<string, number | boolean | string> }> = [
   { key: "o", effect: "On" },
   { key: "O", effect: "Off" },
+  { key: "u", effect: "On", params: { startIntensity: 0, endIntensity: 100 } },
+  { key: "d", effect: "On", params: { startIntensity: 100, endIntensity: 0 } },
   { key: "b", effect: "Bars" },
   { key: "y", effect: "Butterfly" },
   { key: "c", effect: "Curtain" },
@@ -171,15 +185,28 @@ export function buildCommands(ctx: CommandContext): Command[] {
     { id: "file.snapshot", label: "Save a snapshot", group: "File", run: ctx.snapshot },
   ];
 
-  for (const { key, effect } of ctx.effectShortcuts ?? EFFECT_SHORTCUTS) {
+  commands.push({
+    id: "effect.random",
+    label: "Place a random effect",
+    group: "Effects",
+    keyLabel: "Shift+R",
+    run: ctx.placeRandomEffect,
+    matches: (e) => e.key === "R" && plain(e),
+  });
+
+  for (const { key, effect, params } of ctx.effectShortcuts ?? EFFECT_SHORTCUTS) {
     commands.push({
-      id: `effect.${effect}`,
-      label: `Place ${effect}`,
+      // Two shortcuts can place the same effect with different parameters - `o`, `u` and `d` are
+      // all On - so the id has to carry the key rather than only the effect name.
+      id: `effect.${effect}.${key}`,
+      label: params ? `Place ${effect} (${key === "u" ? "fade up" : "fade down"})` : `Place ${effect}`,
       group: "Effects",
       // Upper-case letters are a distinct shortcut in xLights, not a variant - `o` is On and `O`
       // is Off - so the label has to say which.
       keyLabel: key === key.toUpperCase() && key !== key.toLowerCase() ? `Shift+${key}` : key.toUpperCase(),
-      run: () => ctx.placeEffect(effect),
+      // Only passed when there are any: a shortcut without parameters should call this the way
+      // it always has, rather than with an explicit undefined.
+      run: () => (params ? ctx.placeEffect(effect, params) : ctx.placeEffect(effect)),
       matches: (e) => e.key === key && plain(e),
     });
   }

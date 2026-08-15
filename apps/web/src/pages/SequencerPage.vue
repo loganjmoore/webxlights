@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { EFFECT_SCHEMAS, defaultParamsFor, detectOnsets, estimateTempo, mouthNames, type AudioSeries, type OnsetBand, type BlendMode, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
+import { CANVAS_ONLY_EFFECTS, EFFECT_SCHEMAS, defaultParamsFor, detectOnsets, estimateTempo, mouthNames, type AudioSeries, type OnsetBand, type BlendMode, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
 import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequencerView, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
@@ -1043,8 +1043,8 @@ const shortcutsInForce = computed(() => effectShortcuts(shortcutOverrides.value)
 const shortcutError = ref("");
 const shortcutRowsInForce = computed(() => shortcutRows(shortcutOverrides.value));
 
-function assignShortcut(effect: string, key: string): void {
-  const check = checkShortcut(effect, key, shortcutOverrides.value);
+function assignShortcut(id: string, key: string): void {
+  const check = checkShortcut(id, key, shortcutOverrides.value);
   if (!check.ok) {
     // Refused rather than warned: two effects on one key means one of them silently stops
     // working, and which one is an accident of list order.
@@ -1052,7 +1052,7 @@ function assignShortcut(effect: string, key: string): void {
     return;
   }
   shortcutError.value = "";
-  updateShortcuts(setShortcut(shortcutOverrides.value, effect, key));
+  updateShortcuts(setShortcut(shortcutOverrides.value, id, key));
 }
 
 function updateShortcuts(next: ShortcutOverrides): void {
@@ -1092,9 +1092,28 @@ const commands = computed(() =>
     zoomOut: () => {
       zoomLevel.value = Math.max(0, zoomLevel.value - 1);
     },
-    placeEffect: (name) => {
+    placeEffect: (name, params) => {
       const row = keyboardTargetRow();
       if (!row) return;
+      store.addEffect(row.elementType, row.elementId, row.subName, {
+        id: newEffectId(),
+        name,
+        startMs: playheadMs.value,
+        endMs: playheadMs.value + prefs.value.defaultEffectMs,
+        // A shortcut can carry parameters - the manual's fade-up and fade-down keys are the On
+        // effect with its intensities swapped - so they go over the schema's defaults rather
+        // than replacing them, which would leave every other field undefined.
+        params: { ...defaultParamsFor(name), ...(params ?? {}) },
+      });
+    },
+    placeRandomEffect: () => {
+      const row = keyboardTargetRow();
+      if (!row) return;
+      // "Generate Random effects". Drawn from the effects that draw something on their own: a
+      // random canvas effect would land on a layer with nothing underneath and render nothing,
+      // which reads as the shortcut being broken.
+      const candidates = Object.keys(EFFECT_SCHEMAS).filter((n) => !CANVAS_ONLY_EFFECTS.has(n) && n !== "Off");
+      const name = candidates[Math.floor(Math.random() * candidates.length)] ?? "On";
       store.addEffect(row.elementType, row.elementId, row.subName, {
         id: newEffectId(),
         name,
@@ -1406,7 +1425,7 @@ watch(sequenceId, async (id) => {
       </p>
       <p v-if="shortcutError" class="export-error">{{ shortcutError }}</p>
       <ul class="shortcut-list">
-        <li v-for="row in shortcutRowsInForce" :key="row.effect">
+        <li v-for="row in shortcutRowsInForce" :key="row.id">
           <label :class="{ changed: row.changed }">{{ row.effect }}</label>
           <span class="models-panel-actions">
             <input
@@ -1414,7 +1433,7 @@ watch(sequenceId, async (id) => {
               :value="row.key"
               maxlength="1"
               type="text"
-              @change="assignShortcut(row.effect, ($event.target as HTMLInputElement).value)"
+              @change="assignShortcut(row.id, ($event.target as HTMLInputElement).value)"
             />
           </span>
         </li>
@@ -1542,9 +1561,18 @@ watch(sequenceId, async (id) => {
           </select>
         </span>
       </label>
+      <label class="blend-row">
+        <input
+          type="checkbox"
+          :checked="prefs.snapshotOnSave"
+          @change="patchPrefs({ snapshotOnSave: ($event.target as HTMLInputElement).checked })"
+        />
+        Also snapshot the layout after an edit
+      </label>
       <p class="timing-note">
         Snapshots of the whole layout, taken on the Layout page when something has changed. They're
-        listed and restored there.
+        listed and restored there. "After an edit" is off by default: every model drag saves
+        immediately here, where a save in xLights is a deliberate act.
       </p>
     </div>
 

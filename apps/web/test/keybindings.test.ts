@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { EFFECT_SHORTCUTS, buildCommands, commandForEvent, type CommandContext } from "../src/lib/commands";
 import {
   RESERVED_KEYS,
+  bindingKey,
   checkShortcut,
   effectShortcuts,
   loadShortcuts,
@@ -24,7 +25,24 @@ function fakeStorage(): Pick<Storage, "getItem" | "setItem"> & { value: string |
 
 describe("effect shortcuts in force", () => {
   it("is xLights' own set until something is changed", () => {
-    expect(effectShortcuts()).toEqual(EFFECT_SHORTCUTS.map(({ key, effect }) => ({ effect, key })));
+    expect(effectShortcuts()).toEqual(EFFECT_SHORTCUTS);
+  });
+
+  it("keeps a shortcut's parameters when another one is rebound", () => {
+    // The fade-up and fade-down keys are the On effect with its intensities swapped. Rebuilding
+    // the list from key and effect alone would drop them and leave three keys placing a plain On.
+    const rebound = effectShortcuts(setShortcut({}, "Fire", "z"));
+    const fadeUp = rebound.find((s) => s.key === "u");
+    expect(fadeUp?.params).toEqual({ startIntensity: 0, endIntensity: 100 });
+  });
+
+  it("rebinds one of the three On keys without moving the others", () => {
+    // Stored against the shortcut rather than the effect name: three keys place On, and keying on
+    // the name would move all three at once.
+    const fadeUpId = bindingKey({ effect: "On", params: { startIntensity: 0, endIntensity: 100 } });
+    const rebound = effectShortcuts(setShortcut({}, fadeUpId, "z"));
+    expect(rebound.find((s) => s.params?.startIntensity === 0)?.key).toBe("z");
+    expect(rebound.find((s) => s.effect === "On" && !s.params)?.key).toBe("o");
   });
 
   it("applies a change and marks it as one", () => {
