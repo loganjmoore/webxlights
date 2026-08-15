@@ -1,5 +1,27 @@
 # Changelog
 
+## Two effect rows finished
+
+### Frame Waveform, properly this time
+
+When the note-range types shipped, Frame Waveform went in as the frame's *level* drawn as a centred band — and the coverage doc said so rather than claiming it was done, because "displays the audio waveform only using the current frame of audio" means the wave, not a summary of it.
+
+The analysis now keeps a sixteen-bucket min/max envelope per frame, and the effect draws that. The difference is asymmetry: a real wave sits above and below the centre line by different amounts, and that asymmetry is most of what makes it look like audio rather than a bar.
+
+Sixteen buckets, not the samples. A frame at 44.1kHz is a couple of thousand samples; this is thirty-two numbers, which is more than a buffer a few dozen pixels wide can show. And a series without an envelope — analysed before this existed, or hand-built in a test — still falls back to the level rather than drawing nothing.
+
+**Every VU Meter type in the manual is now implemented.**
+
+### The Shape effect's last three settings
+
+Random Location, Random movement and Fade Away, all listed on its page.
+
+The randomness is **per shape and seeded**, not per frame. A shape that picked a new position every frame would be noise rather than motion — the point of "random location" is that six shapes are scattered instead of stacked, and they then move the way shapes move. A test pins that: the same moment rendered twice is identical.
+
+Fade Away fades a shape across its own lifetime rather than the effect's, which is what stops a short lifetime looking like shapes blinking out of existence.
+
+That leaves Emoji and system-font glyphs as the only things on Shape's page still absent, and those need a font this engine doesn't have.
+
 ## The layout had no history at all
 
 Sequences have had version snapshots for a long time, and autosave on top of that. The *layout* — every model, its sub-models, states and faces, the groups, the view objects, the views and presets — had nothing. A mis-drag that moved forty props, or an import that read someone's show wrong, was unrecoverable.

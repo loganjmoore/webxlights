@@ -438,6 +438,9 @@ export const SHAPE_EFFECT_SCHEMA: EffectSchema = {
     { key: "centerY", label: "Y Center", type: "intSlider", min: 0, max: 100, default: 50 },
     { key: "points", label: "Points", type: "intSlider", min: 3, max: 12, default: 5 },
     { key: "rotation", label: "Rotation", type: "intSlider", min: 0, max: 360, default: 0, valueCurve: true },
+    { key: "randomLocation", label: "Random Location", type: "checkbox", default: false },
+    { key: "randomMovement", label: "Random movement", type: "checkbox", default: false },
+    { key: "fadeAway", label: "Fade Away", type: "checkbox", default: false },
   ],
 };
 

@@ -11,7 +11,20 @@
 export interface AudioFrame {
   level: number; // 0..1 overall loudness (normalised RMS)
   bands: number[]; // 0..1 per frequency band, low to high
+  /**
+   * The shape of the wave inside this frame: `WAVEFORM_BUCKETS` pairs of [min, max], each -1..1.
+   *
+   * A level says how loud a frame is; it doesn't say what it looked like. The VU Meter's "Frame
+   * Waveform" type draws the audio waveform "only using the current frame of audio", which needs
+   * the wave and not a summary of it. Kept as an envelope rather than the samples themselves: a
+   * frame at 44.1kHz is a couple of thousand samples and this is thirty-two numbers, which is all
+   * a buffer a few dozen pixels wide can show anyway.
+   */
+  waveform?: number[];
 }
+
+/** How finely a frame's wave is kept. Wider than any real prop, narrow enough to be free. */
+export const WAVEFORM_BUCKETS = 16;
 
 export interface AudioSeries {
   frameMs: number;
@@ -109,6 +122,7 @@ export function analyzeAudio(
 
   const rawLevels: number[] = new Array(frameCount);
   const rawBands: number[][] = new Array(frameCount);
+  const waveforms: number[][] = new Array(frameCount);
 
   const window = new Float64Array(WINDOW_SIZE);
   const bandEdges = logBandEdges(WINDOW_SIZE / 2, bandCount);
@@ -128,6 +142,25 @@ export function analyzeAudio(
     }
     rawLevels[f] = count > 0 ? Math.sqrt(sumSq / count) : 0;
 
+    // The frame's own wave, as a min/max envelope per bucket. Taken from the frame's samples
+    // rather than the FFT window, which is longer than a frame and would smear one frame's shape
+    // into its neighbours'.
+    const perBucket = Math.max(1, Math.floor(samplesPerFrame / WAVEFORM_BUCKETS));
+    const envelope: number[] = new Array(WAVEFORM_BUCKETS * 2);
+    for (let b = 0; b < WAVEFORM_BUCKETS; b++) {
+      let lo = 0;
+      let hi = 0;
+      for (let i = 0; i < perBucket; i++) {
+        const idx = start + b * perBucket + i;
+        const v = idx < channelData.length ? channelData[idx]! : 0;
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      envelope[b * 2] = lo;
+      envelope[b * 2 + 1] = hi;
+    }
+    waveforms[f] = envelope;
+
     const mags = fftMagnitudes(window);
     const bands: number[] = new Array(bandCount);
     for (let b = 0; b < bandCount; b++) {
@@ -146,6 +179,7 @@ export function analyzeAudio(
   const frames: AudioFrame[] = rawLevels.map((level, f) => ({
     level: Math.min(1, level / maxLevel),
     bands: rawBands[f]!.map((v) => Math.min(1, v / maxBand)),
+    waveform: waveforms[f]!,
   }));
 
   return {

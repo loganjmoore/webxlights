@@ -48,6 +48,12 @@ export interface ShapeParams {
   points: number;
   /** "Rotation of the shape, If supported", in degrees. */
   rotation: number;
+  /** "Use random start location for the shape." */
+  randomLocation: boolean;
+  /** "Use random movement for for the shape." */
+  randomMovement: boolean;
+  /** "Fade shape over its lifetime." */
+  fadeAway: boolean;
 }
 
 // Manual "Shape": draws geometric shapes that move, grow and expire. The manual's list is
@@ -85,10 +91,20 @@ export function renderShape(buffer: RenderBuffer, palette: RGBA[], params: Shape
     if (size <= 0) continue;
 
     const travel = speed * age * smaller;
-    const cx = (params.centerX / 100) * (W - 1) + Math.cos(rad) * travel;
-    const cy = (params.centerY / 100) * (H - 1) + Math.sin(rad) * travel;
+    // Random location and movement are per-shape and drawn from that shape's own seeded RNG, so
+    // they are scattered rather than random *per frame* - a shape that jumped every frame would
+    // be noise, not motion.
+    const originX = params.randomLocation ? rng() * (W - 1) : (params.centerX / 100) * (W - 1);
+    const originY = params.randomLocation ? rng() * (H - 1) : (params.centerY / 100) * (H - 1);
+    const heading = params.randomMovement ? rng() * Math.PI * 2 : rad;
+    const cx = originX + Math.cos(heading) * travel;
+    const cy = originY + Math.sin(heading) * travel;
 
-    const color = palette[i % Math.max(palette.length, 1)] ?? rgba(255, 255, 255, 255);
+    const base = palette[i % Math.max(palette.length, 1)] ?? rgba(255, 255, 255, 255);
+    // "Fade shape over its lifetime" - fully lit when it appears and gone as it expires, which is
+    // what stops a short lifetime looking like shapes blinking out.
+    const color = params.fadeAway ? { ...base, a: Math.round(base.a * (1 - life)) } : base;
+    if (color.a <= 0) continue;
     drawShape(buffer, params.shape, cx, cy, size, Math.max(1, params.thickness), color, {
       points: params.points,
       rotation: params.rotation,

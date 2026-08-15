@@ -406,3 +406,40 @@ describe("VU Meter Level Shape", () => {
     expect(litCount(render({ type: "Level Shape" }, frame(0, [0]), 21, 21))).toBe(0);
   });
 });
+
+describe("Frame Waveform", () => {
+  function frameWith(wave: number[]): AudioFrame {
+    return { level: 1, bands: [1], waveform: wave };
+  }
+
+  it("draws the frame's own wave, not a symmetrical band", () => {
+    // Left half: the wave is entirely above centre. Right half: entirely below. A level-driven
+    // band would be symmetrical and identical on both sides.
+    const wave: number[] = [];
+    for (let b = 0; b < 4; b++) wave.push(0, 1);
+    for (let b = 0; b < 4; b++) wave.push(-1, 0);
+    const buf = render({ type: "Frame Waveform" }, frameWith(wave), 8, 9);
+
+    const litRows = (x: number): number[] => {
+      const rows: number[] = [];
+      for (let y = 0; y < 9; y++) if (buf.getPixel(x, y).a > 0) rows.push(y);
+      return rows;
+    };
+    // The buffer's origin is bottom-left, so a positive sample is a high row.
+    expect(Math.max(...litRows(0))).toBeGreaterThan(4);
+    expect(Math.min(...litRows(7))).toBeLessThan(4);
+  });
+
+  it("falls back to the level when a series has no envelope", () => {
+    // Audio analysed before the envelope was kept, or a hand-built series in a test.
+    const quiet = render({ type: "Frame Waveform" }, frame(0.2, [0.2]), 8, 9);
+    const loud = render({ type: "Frame Waveform" }, frame(1, [1]), 8, 9);
+    expect(litCount(loud)).toBeGreaterThan(litCount(quiet));
+  });
+
+  it("draws a flat line for a silent frame rather than nothing", () => {
+    // Silence is a wave too, and a Frame Waveform that vanished would read as broken.
+    const buf = render({ type: "Frame Waveform" }, frameWith(new Array(32).fill(0)), 8, 9);
+    expect(litCount(buf)).toBe(8);
+  });
+});
