@@ -4,9 +4,10 @@ import { rgba } from "../src/color";
 import type { AudioFrame } from "../src/audio";
 import { VU_METER_TYPES, renderVuMeter, type VuMeterParams } from "../src/effects/vuMeter";
 import { labelsFromTrack } from "../src/timing";
+import { SHAPE_KINDS } from "../src/effects/shape";
 
 const PALETTE = [rgba(255, 0, 0), rgba(0, 255, 0), rgba(0, 0, 255)];
-const BASE: VuMeterParams = { type: "Spectrogram", bars: 4, gainPct: 100, sensitivityPct: 50, timingTrack: "", startNote: 48, endNote: 84 };
+const BASE: VuMeterParams = { type: "Spectrogram", bars: 4, gainPct: 100, sensitivityPct: 50, timingTrack: "", startNote: 48, endNote: 84, shape: "Circle", shapeFilled: false };
 
 function frame(level: number, bands: number[]): AudioFrame {
   return { level, bands };
@@ -377,5 +378,31 @@ describe("VU Meter note-range types", () => {
     const quiet = render({ type: "Frame Waveform" }, frame(0.1, [0.1]), 8, 8);
     const loud = render({ type: "Frame Waveform" }, frame(1, [1]), 8, 8);
     expect(litCount(loud)).toBeGreaterThan(litCount(quiet));
+  });
+});
+
+describe("VU Meter Level Shape", () => {
+  it("grows the shape with the audio level", () => {
+    const quiet = render({ type: "Level Shape", shape: "Circle" }, frame(0.3, [0.3]), 21, 21);
+    const loud = render({ type: "Level Shape", shape: "Circle" }, frame(1, [1]), 21, 21);
+    expect(litCount(loud)).toBeGreaterThan(litCount(quiet));
+  });
+
+  it("fills the shape when asked, and outlines it when not", () => {
+    const outline = render({ type: "Level Shape", shape: "Square" }, frame(1, [1]), 21, 21);
+    const filled = render({ type: "Level Shape", shape: "Square", shapeFilled: true }, frame(1, [1]), 21, 21);
+    expect(litCount(filled)).toBeGreaterThan(litCount(outline));
+  });
+
+  it("draws every shape the Shape effect knows", () => {
+    // The two effects share one set of geometry, so a shape that draws in one draws in the other.
+    for (const shape of SHAPE_KINDS) {
+      const buf = render({ type: "Level Shape", shape }, frame(1, [1]), 25, 25);
+      expect(litCount(buf), `${shape} drew nothing`).toBeGreaterThan(0);
+    }
+  });
+
+  it("draws nothing when the track is silent", () => {
+    expect(litCount(render({ type: "Level Shape" }, frame(0, [0]), 21, 21))).toBe(0);
   });
 });

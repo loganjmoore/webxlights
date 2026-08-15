@@ -3,6 +3,7 @@ import { KALEIDOSCOPE_TYPES } from "./kaleidoscope";
 import { FACE_EYE_MODES } from "./faces";
 import { PIANO_SOURCES, PIANO_TYPES } from "./piano";
 import { STATE_COLOR_MODES, STATE_MODES } from "./state";
+import { SHAPE_KINDS } from "./shape";
 import { VU_METER_TYPES } from "./vuMeter";
 import { TENDRIL_MOVEMENTS } from "./tendrils";
 import { WARP_TREATMENTS, WARP_TYPES } from "./warp";
@@ -320,6 +321,9 @@ export const VU_METER_EFFECT_SCHEMA: EffectSchema = {
     // Only the note and dominant-frequency types read them.
     { key: "startNote", label: "Start Note (MIDI: 60 = C4)", type: "intSlider", min: 0, max: 127, default: 48 },
     { key: "endNote", label: "End Note (MIDI: 60 = C4)", type: "intSlider", min: 0, max: 127, default: 84 },
+    // Level Shape only, and the same shapes the Shape effect draws.
+    { key: "shape", label: "Shape", type: "choice", options: [...SHAPE_KINDS], default: "Circle" },
+    { key: "shapeFilled", label: "Shape Filled", type: "checkbox", default: false },
     { key: "bars", label: "Bars", type: "intSlider", min: 1, max: 32, default: 12, valueCurve: true },
     { key: "gainPct", label: "Gain", type: "intSlider", min: 0, max: 300, default: 100, valueCurve: true },
     { key: "sensitivityPct", label: "Sensitivity", type: "intSlider", min: 0, max: 100, default: 50, valueCurve: true },
@@ -421,7 +425,7 @@ export const SPIROGRAPH_EFFECT_SCHEMA: EffectSchema = {
 export const SHAPE_EFFECT_SCHEMA: EffectSchema = {
   name: "Shape",
   params: [
-    { key: "shape", label: "Object to Draw", type: "choice", options: ["Circle", "Square", "Triangle", "Star", "Heart"], default: "Circle" },
+    { key: "shape", label: "Object to Draw", type: "choice", options: [...SHAPE_KINDS], default: "Circle" },
     { key: "thickness", label: "Thickness", type: "intSlider", min: 1, max: 10, default: 1 },
     { key: "count", label: "Count", type: "intSlider", min: 1, max: 20, default: 3 },
     { key: "startSize", label: "Start Size", type: "intSlider", min: 1, max: 100, default: 30 },
@@ -432,6 +436,8 @@ export const SHAPE_EFFECT_SCHEMA: EffectSchema = {
     { key: "growth", label: "Growth", type: "intSlider", min: -100, max: 100, default: 0 },
     { key: "centerX", label: "X Center", type: "intSlider", min: 0, max: 100, default: 50 },
     { key: "centerY", label: "Y Center", type: "intSlider", min: 0, max: 100, default: 50 },
+    { key: "points", label: "Points", type: "intSlider", min: 3, max: 12, default: 5 },
+    { key: "rotation", label: "Rotation", type: "intSlider", min: 0, max: 360, default: 0, valueCurve: true },
   ],
 };
 
