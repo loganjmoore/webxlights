@@ -10,7 +10,7 @@ import { renderLightning } from "../src/effects/lightning";
 import { renderCandle } from "../src/effects/candle";
 import { renderLines } from "../src/effects/lines";
 import { renderSpirograph } from "../src/effects/spirograph";
-import { renderShape } from "../src/effects/shape";
+import { SHAPE_KINDS, renderShape } from "../src/effects/shape";
 import { renderMusic } from "../src/effects/music";
 import { renderFireworks } from "../src/effects/fireworks";
 import { renderTreeEffect } from "../src/effects/treeEffect";
@@ -418,10 +418,12 @@ describe("Shape", () => {
     growth: 0,
     centerX: 50,
     centerY: 50,
+    points: 5,
+    rotation: 0,
   };
 
   it("draws each shape as an outline", () => {
-    for (const shape of ["Circle", "Square", "Triangle", "Star", "Heart"] as const) {
+    for (const shape of SHAPE_KINDS) {
       const b = new RenderBuffer(21, 21);
       renderShape(b, PALETTE, { ...params, shape }, ctx(0.2));
       expect(lit(b), shape).toBeGreaterThan(4);

@@ -2,6 +2,7 @@ import type { RGBA } from "../color";
 import { multiColorBlend, rgba } from "../color";
 import type { RenderBuffer } from "../renderBuffer";
 import { bandsForNoteRange } from "../audio";
+import { drawShape, type ShapeKind } from "./shape";
 import { labelAt, type TimingLabel } from "../timing";
 import { audioOf, type FrameContext } from "./types";
 
@@ -63,7 +64,8 @@ export type VuMeterType =
   | "Node Level Jump 100"
   | "Frame Waveform"
   | "Dominant Frequency Colour"
-  | "Dominant Frequency Colour Gradient";
+  | "Dominant Frequency Colour Gradient"
+  | "Level Shape";
 
 export const VU_METER_TYPES: VuMeterType[] = [
   "Spectrogram",
@@ -103,6 +105,7 @@ export const VU_METER_TYPES: VuMeterType[] = [
   "Frame Waveform",
   "Dominant Frequency Colour",
   "Dominant Frequency Colour Gradient",
+  "Level Shape",
 ];
 
 /** Types that read a note range rather than the whole spectrum. */
@@ -134,6 +137,10 @@ export interface VuMeterParams {
    */
   startNote: number;
   endNote: number;
+  /** "Enabled when the Type attribute is 'Level Shape'." The Shape effect's own shapes. */
+  shape: ShapeKind;
+  /** "Filled or Unfilled." */
+  shapeFilled: boolean;
 }
 
 /** How long a jump or pulse takes to fade back to nothing. */
@@ -267,6 +274,18 @@ export function renderVuMeter(buffer: RenderBuffer, palette: RGBA[], params: VuM
         const color = multiColorBlend(palette, v, false);
         for (let y = Math.round(mid - half); y <= Math.round(mid + half); y++) buffer.setPixel(x, y, color);
       }
+      break;
+    }
+
+    case "Level Shape": {
+      // "display the selected shape with a size that adjusts based on the audio level" - drawn
+      // by the Shape effect's own geometry rather than a second set, so the two can't disagree
+      // about what a candy cane looks like.
+      const size = (Math.min(W, H) / 2) * level;
+      if (size < 1) return;
+      drawShape(buffer, params.shape, (W - 1) / 2, (H - 1) / 2, size, 1, swatch(0), {
+        filled: params.shapeFilled,
+      });
       break;
     }
 

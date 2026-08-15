@@ -1,5 +1,31 @@
 # Changelog
 
+## Level Shape — and the shapes the Shape effect was missing
+
+The VU Meter's last non-blocked type is "Level Shape": *"display the selected shape with a size that adjusts based on the audio level"*, from a list of ten shapes, filled or unfilled.
+
+The Shape effect drew five of them. So this wasn't really a VU Meter job — it was a Shape job that two effects needed. Both now draw the manual's full geometric set: **Circle, Square, Triangle, Diamond, Star, Polygon, Heart, Tree, Candy Cane, Snow Flake, Crucifix, Present**.
+
+One set of geometry, shared. A second copy would be two places for a candy cane to be defined, and they would drift.
+
+### Why they were cheap to add
+
+Every shape here is a *signed distance function* — how far a point is from the shape's edge, negative inside. That was already true of the five, and it is what makes Thickness mean one thing across all of them. Three things fall out of it for free:
+
+- **Composite shapes are unions**, and a union of distance fields is simply the smaller of the two. A tree is a canopy over a trunk; a present is a box under a ribbon; a snowflake is three crossed spokes with branches.
+- **Filled or unfilled is one comparison**, not a second drawing path: outline tests `|d| ≤ thickness`, filled tests `d ≤ thickness`.
+- **Rotation rotates the sample point, not the shape**, so one implementation serves every shape and the distance functions stay axis-aligned.
+
+The Shape effect also gains the **Points** and **Rotation** settings its manual page lists — Points is what makes Polygon a polygon rather than a fixed pentagon.
+
+### A tree is three triangles
+
+Worth saying because it's a judgement rather than geometry: one triangle over a trunk is technically a tree and reads as a triangle. Three stacked tiers read as a Christmas tree at the size a prop actually is, which is the whole point of the shape.
+
+### What's left
+
+Emoji and system-font glyphs, which need a font this engine doesn't have — a circle standing in for an emoji would be a worse answer than none. Shape's Random Location, Random movement and Fade Away. And the VU Meter's sample-accurate Frame Waveform.
+
 ## Re-audited the coverage doc, and found the shortcuts were a one-way street
 
 The coverage doc is only worth what its last audit was worth, and a lot has changed since the last one. So: all 176 manual pages fetched again (88,653 words), every page title checked against the doc, and the doc's own counts checked against the code.
