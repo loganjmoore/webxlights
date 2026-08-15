@@ -1,5 +1,20 @@
 # Changelog
 
+## What ends up in the file
+
+Three changes in a row landed on the `.fseq` export path — the layer cap and its drop order, the layer *ordering* that decides which effect wins, and strand rows — and that path had **no test at the web level at all**.
+
+Each of those is a case where the export and the live preview are separate implementations of the same rule. That's the failure this codebase guards hardest against, because a show that looks right on screen and plays wrong in the yard isn't discovered until it's dark outside.
+
+So: four tests that read the actual bytes back out of an exported file.
+
+- **A model row lights every one of its channels.** The baseline, and the thing every other assertion is measured against.
+- **A strand row lights that strand and nothing else** — the property that makes strand rows safe to render: no light belongs to two strands and none is left out.
+- **A strand sits on top of the model's own effects**, per "the strands blend onto the model level effects". Checked node by node: the strand's colour on its own nodes, the model's colour everywhere else.
+- **The higher layer wins in the file**, whatever order the effects are stored in. The scrubbing path was fixed to composite by layer rather than by array position; this is the same rule holding in a separate implementation of it.
+
+None of these can pass vacuously — each asserts a specific channel is *lit*, so an export that produced nothing would fail rather than quietly agree.
+
 ## Strand rows
 
 The geometry landed last time; this is the half that makes it reachable. Expanding a model in the sequencer now shows its strands — "click on the Model name in the sequencer to display the Strand names" — and each strand takes effects of its own.
