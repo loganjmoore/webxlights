@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import type { SequenceBody, SequenceEffect } from "../lib/api";
+import type { RowElementType, SequenceBody, SequenceEffect } from "../lib/api";
 import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
 import { fadeDurationAt } from "../lib/effectFade";
 import { boxFromDrag, idsInBox, isDrag, selectionAfterClick } from "../lib/blockSelect";
@@ -8,7 +8,7 @@ import { acceptedMoves, previewMoves, type DraggedEffect, type GhostPlacement } 
 import { gestureFor } from "../lib/gridGesture";
 
 export interface GridRow {
-  elementType: "model" | "group" | "submodel";
+  elementType: RowElementType;
   elementId: number;
   name: string;
   /** Set only for sub-model rows; names which sub-model of `elementId` this is. */

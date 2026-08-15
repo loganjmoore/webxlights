@@ -1,5 +1,22 @@
 # Changelog
 
+## Strand rows
+
+The geometry landed last time; this is the half that makes it reachable. Expanding a model in the sequencer now shows its strands — "click on the Model name in the sequencer to display the Strand names" — and each strand takes effects of its own.
+
+The layer menu needed no strand-specific code at all. It hangs off row labels, so "then right click on the strand name and choose Add Layer above or below the selected strand" works the moment strand rows exist. That's the payoff for having built layers as a property of effects rather than as a container: a strand row is just another row, and layers came along for free.
+
+### Precedence, and why both render paths care
+
+"The strands blend onto the model level effects." So a strand sits on top of the model's own rows — and a sub-model on top of *that*, being the thing somebody drew deliberately rather than a fact about the wiring.
+
+Both render paths compose them in that order: the live preview and the `.fseq` export. That agreement is the thing this codebase guards hardest, because the failure it prevents is a show that looks right on screen and plays wrong in the yard, which nobody discovers until it's dark outside.
+
+### Two smaller decisions
+
+- **Strands are offered only when a model has more than one.** A single-run prop's strand row would be identical to its model row — a row that does nothing but take space.
+- **The row kinds are one named type now**, rather than the union `"model" | "group" | "submodel"` repeated in nine places. Adding this fourth kind should have been one edit and was nine; the last time a rule was spread across a file like that, a gesture went missing and no test could see it.
+
 ## Strands, derived from the wiring
 
 "To add layers at the strand level, click on the Model name in the sequencer to display the Strand names. Then right click on the strand name and choose Add Layer above or below the selected strand."

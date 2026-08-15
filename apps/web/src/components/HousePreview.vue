@@ -5,6 +5,7 @@ import {
   applyGroupBase,
   computeGeometryFromAttrs,
   computeSubModel,
+  strandSpecs,
   DEFAULT_PALETTE,
   geometryCenter,
   nodeWorldOffset,
@@ -136,6 +137,33 @@ function updateColors(): void {
     );
 
     applyGroupBase(nodeColors, groupBase.get(entry.model.id), props.blendBetweenModels === true);
+
+    // Strands, then sub-models. "The strands blend onto the model level effects", so a strand sits
+    // on top of the model's own rows - and a sub-model sits on top of that, being the thing
+    // somebody drew deliberately rather than a fact about the wiring.
+    for (const spec of strandSpecs(entry.geometry)) {
+      const strandEffects = toRenderableEffects(
+        props.body.rows
+          .filter((r) => r.elementType === "strand" && r.elementId === entry.model.id && r.subName === spec.name)
+          .flatMap((r) => r.effects),
+        { timingTracks: props.body.timingTracks },
+      );
+      if (strandEffects.length === 0) continue;
+      const strand = computeSubModel(entry.geometry, spec);
+      if (!strand) continue;
+      const strandColors = renderRowAtMs(
+        { geometry: strand.geometry, effects: strandEffects },
+        props.playheadMs,
+        props.frameMs,
+        SEED,
+        DEFAULT_PALETTE,
+        props.audio,
+      );
+      strandColors.forEach((c, i) => {
+        const parentIndex = strand.parentIndices[i];
+        if (parentIndex !== undefined && c.a > 0) nodeColors[parentIndex] = c;
+      });
+    }
 
     // A sub-model borrows its parent's lights, so whatever it renders is written back onto the
     // parent's nodes. Drawn after the parent's own rows, which is the order xLights uses: a
