@@ -58,10 +58,11 @@ import { marksInForce, placementFor } from "../lib/effectPlacement";
 import { withFade } from "../lib/effectFade";
 import { ALIGN_MODES, alignedTo, type AlignMode } from "../lib/alignEffects";
 import { clipboardFrom, pastedAt, type EffectClipboard } from "../lib/effectClipboard";
-import { addLayer, canAddLayer, layerCount, removeLayer } from "../lib/effectLayers";
+import { MAX_LAYERS, addLayer, canAddLayer, layerCount, layerOf, removeLayer } from "../lib/effectLayers";
+import type { WindowTarget } from "../lib/windowShortcuts";
 import { describeCriteria, matchingEffectIds, type EffectCriteria } from "../lib/selectEffects";
 import { expandToMark, jumpTargetMs } from "../lib/expandEffect";
-import type { SequenceMetadata } from "../lib/api";
+import type { SequenceMetadata, SequenceRow } from "../lib/api";
 import { DEFAULT_ZOOM_INDEX, ZOOM_STEPS, clampZoomIndex, scrollLeftHolding, wheelScrollDelta, zoomIndexIn, zoomIndexOut } from "../lib/zoom";
 import {
   loadPerspectives,
@@ -416,7 +417,9 @@ const phonemeNames = computed(() => {
   return face ? mouthNames(face) : [];
 });
 
-function rowKey(row: GridRow): string {
+// Takes only the three fields it uses, so a stored row and a grid row can both be keyed - they
+// are the same row, and only one of them carries a display name.
+function rowKey(row: Pick<GridRow, "elementType" | "elementId" | "subName">): string {
   // Deliberately without the layer index: a view names rows, and a row that had been expanded
   // into layers since the view was saved would otherwise stop matching it.
   return `${row.elementType}:${row.elementId}:${row.subName ?? ""}`;
@@ -1118,7 +1121,7 @@ function deleteLayerLabel(row: GridRow): string {
 }
 
 /** Applies a layer edit: the moves, and any effects the edit deletes, in one undo entry. */
-function applyLayerEdit(row: GridRow, moves: { id: string; layerIndex: number }[], deleted: string[] = []): void {
+function applyLayerEdit(moves: { id: string; layerIndex: number }[], deleted: string[] = []): void {
   if (moves.length === 0 && deleted.length === 0) {
     // Nothing to store, but the row still has to redraw: adding a layer above the top moves no
     // effects at all, and the new empty row is the whole point of having asked.
@@ -1127,7 +1130,6 @@ function applyLayerEdit(row: GridRow, moves: { id: string; layerIndex: number }[
   }
   store.applyLayerEdit(moves, deleted);
   layerRowsTick.value++;
-  void row;
 }
 
 // Bumped when a layer edit changes how many rows a model shows. The row list is computed from the
@@ -1179,10 +1181,10 @@ function handleContextAction(action: string): void {
       expandedLayerKeys.value = next;
     } else if (action === "layer-add-above" || action === "layer-add-below") {
       const { moves } = addLayer(effectsForKey(row), row.layerIndex ?? 0, action === "layer-add-above" ? "above" : "below");
-      applyLayerEdit(row, moves);
+      applyLayerEdit(moves);
     } else if (action === "layer-delete") {
       const { deleted, moves } = removeLayer(effectsForKey(row), row.layerIndex ?? 0);
-      applyLayerEdit(row, moves, deleted);
+      applyLayerEdit(moves, deleted);
     }
   } else if (target.kind === "mark" && action === "delete-mark") {
     store.deleteTimingMark(target.trackIndex, target.ms);
@@ -1373,8 +1375,32 @@ function onPreviewMessage(e: MessageEvent<PreviewMessage>): void {
 }
 
 function openPreviewWindow(): void {
-  window.open(previewUrlFor(route.params.projectId as string, sequenceId.value), `webxlights-preview-${sequenceId.value}`);
   // A window opened now won't have its listener attached yet; it says hello when it's ready.
+  previewWindow.value = window.open(
+    previewUrlFor(route.params.projectId as string, sequenceId.value),
+    `webxlights-preview-${sequenceId.value}`,
+  );
+}
+
+// The popped-out preview, so Ctrl+F6 can close the one it opened. Held rather than looked up
+// because there is no asking the browser whether a named window exists: `window.open` with the
+// same name would focus it, which is the opposite of toggling it off.
+const previewWindow = ref<Window | null>(null);
+
+/**
+ * "Toggle House Preview Window On/Off".
+ *
+ * A window the user closed themselves reports `closed`, so the next press opens a new one rather
+ * than doing nothing while holding a dead handle.
+ */
+function togglePreviewWindow(): void {
+  const open = previewWindow.value;
+  if (open && !open.closed) {
+    open.close();
+    previewWindow.value = null;
+    return;
+  }
+  openPreviewWindow();
 }
 
 // Every keyboard shortcut and every palette entry comes from one registry (lib/commands.ts).
@@ -1661,6 +1687,9 @@ const commands = computed(() =>
       const ids = store.body.rows.flatMap((r) => r.effects.map((e) => e.id));
       store.setSelection(ids, ids[0] ?? null);
     },
+    insertLayer: insertLayerAtSelection,
+    toggleElementExpand,
+    toggleWindow,
     subdivideTiming,
     // Deletes the whole block, not only the reference: a selection you can see but can't delete
     // together is a selection that lies about what it is.
@@ -1752,6 +1781,71 @@ function expandSelectionToMark(direction: -1 | 1): void {
     return expanded ? [{ id, ...expanded }] : [];
   });
   store.updateEffects(patches);
+}
+
+/**
+ * The row the selection sits on, for the commands that act on a row rather than on effects.
+ *
+ * There is no such thing as a focused row here - the grid's unit of attention is the selected
+ * effect - so the row is wherever the reference effect is. Nothing selected means no row, and the
+ * key does nothing rather than guessing at the first one: inserting a layer into a row you weren't
+ * looking at is worse than a key that appears not to work.
+ */
+function selectedBodyRow(): SequenceRow | null {
+  const id = store.selectedEffectId;
+  if (!id) return null;
+  return store.body.rows.find((r) => r.effects.some((e) => e.id === id)) ?? null;
+}
+
+/**
+ * Inserts a layer above or below the one the selection is on (appendix: CTRL+I / CTRL+A).
+ *
+ * The right-click menu refuses this on a collapsed row, because "above or below the current layer"
+ * needs a current layer and a collapsed row shows them all at once. From the keyboard there is
+ * always one: the selected effect is *on* a layer, whether or not the row is drawn split. So this
+ * works on a collapsed row, and then expands it - the new layer is empty, and an empty layer you
+ * can't see is indistinguishable from the key having done nothing.
+ */
+function insertLayerAtSelection(side: "above" | "below"): void {
+  const row = selectedBodyRow();
+  const effect = store.selectedEffectId ? store.findEffect(store.selectedEffectId) : null;
+  if (!row || !effect) return;
+  if (!canAddLayer(row.effects)) {
+    timingNotice.value = `That row is at the ${MAX_LAYERS} layer limit.`;
+    return;
+  }
+  const { moves } = addLayer(row.effects, layerOf(effect), side);
+  applyLayerEdit(moves);
+  expandedLayerKeys.value = new Set([...expandedLayerKeys.value, rowKey(row)]);
+}
+
+/**
+ * Shows or hides the selected row's layers (appendix: CTRL+X, "Toggle Element Expand").
+ *
+ * The manual's parenthesis is "to show models in group, strands, nodes, etc", and those aren't
+ * hidden here: a group's models, a model's strands and its sub-models are all rows of their own,
+ * listed together, shown or hidden from the Models panel. What a row here expands *into* is its
+ * layers, so that is what this toggles.
+ */
+function toggleElementExpand(): void {
+  const row = selectedBodyRow();
+  if (!row) return;
+  const key = rowKey(row);
+  const next = new Set(expandedLayerKeys.value);
+  if (!next.delete(key)) next.add(key);
+  expandedLayerKeys.value = next;
+}
+
+/**
+ * The appendix's window keys (windowShortcuts.ts holds the table, including the eight we can't
+ * bind and why).
+ */
+function toggleWindow(target: WindowTarget): void {
+  if (target === "models") showModelsPanel.value = !showModelsPanel.value;
+  else if (target === "presets") showPresetsPanel.value = !showPresetsPanel.value;
+  else if (target === "select") showSelectPanel.value = !showSelectPanel.value;
+  else if (target === "prefs") showPrefsPanel.value = !showPrefsPanel.value;
+  else togglePreviewWindow();
 }
 
 function splitTimingMarkAtPlayhead(): void {

@@ -1,5 +1,33 @@
 # Changelog
 
+## The rest of the appendix: windows, layers, and eight absences worth writing down
+
+The keys the appendix's last read left on the table, finished — and one of them turned out to be mostly a list of things we don't have, which is the interesting part.
+
+### Thirteen windows, five of which exist
+
+`CTRL + F1` to `CTRL + F12`, plus `CTRL + ALT + F8`, each toggling one of xLights' dockable windows. We have five: the house preview (its popped-out copy, since the docked one is always there and the pop-out is the one that behaves like a dockable panel), the Models panel — which is what xLights calls Display Elements, the window that decides which rows the sequencer shows — Presets, Select Effects, and Preferences, where the perspectives list lives.
+
+The other eight are in the same table in `windowShortcuts.ts`, each with its reason: an effect's settings, the colour selector and layer blending are a panel beside the grid here rather than windows that close; the effect palette is a fixed strip, and closing it would leave nothing to drag from; there's no layer settings window, no single-model preview, no Effect Assist panel, and no Jukebox.
+
+Keeping the absences in the table rather than leaving eight lines out is the point. An absence that is data can be tested — one test holds that every unbound entry says *why* — and an absence that is a missing line reads as an oversight. When one of those windows does get built, its key is already written down next to it.
+
+`CTRL + ALT + F8` is the reason the matchers check Alt rather than ignoring it: F8 appears in the table twice, and we have neither of the two, so a loose matcher would bind one key to the wrong nothing.
+
+### The letter `a`, three times
+
+The appendix spends three keys on one letter: `CTRL + a` selects the effects, `CTRL + A` (upper case) inserts a layer below, and `CTRL + ALT + a` selects the effects *and* the timing tracks.
+
+The `a` matcher shipped last time answered to two of those — it took either case. Now it takes lower-case `a` without Alt, and `CTRL + A` inserts a layer below while `CTRL + I` inserts one above.
+
+`CTRL + ALT + a` we don't have, because selecting a timing track means having a selected timing mark and there is no such state here. It deliberately matches *nothing* rather than falling through to the plain select-all — which would select the effects, skip the timing tracks, and look like it had worked. A near-miss is worse than a dead key, because only one of the two gets reported.
+
+### Two more from the same set
+
+**`CTRL + I` / `CTRL + A` insert a layer above and below.** The right-click menu refuses this on a collapsed row, on the grounds that "above or below the current layer" needs a current layer and a collapsed row shows them all at once. From the keyboard there always is one — the selected effect is *on* a layer whether or not the row is drawn split — so the keys work on a collapsed row and then expand it. The new layer is empty, and an empty layer you can't see is indistinguishable from a key that did nothing.
+
+**`CTRL + X` toggles element expand.** The manual's parenthesis is "to show models in group, strands, nodes, etc", and none of that is hidden here: a group's models, a model's strands and its sub-models are all rows of their own, listed together. What a row expands *into* here is its layers, so that's what the key toggles — and the entry says so, rather than claiming parity it doesn't have.
+
 ## The shortcuts appendix, which is a different list
 
 `appendicies/keyboard-shortcuts.md` is not the sequencer's shortcuts page with a different cover. It's a second, longer list, and reading it corrected a decision made on the shorter one.

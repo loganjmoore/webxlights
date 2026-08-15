@@ -22,6 +22,9 @@ function context(): CommandContext & Record<string, ReturnType<typeof vi.fn>> {
     "returnToSpot",
     "jumpToTenth",
     "selectAllEffects",
+    "insertLayer",
+    "toggleElementExpand",
+    "toggleWindow",
     "deleteSelected",
     "copySelected",
     "pasteAtPlayhead",
@@ -98,6 +101,56 @@ describe("dispatching a key to a command", () => {
 
   it("selects every effect on ctrl+a", () => {
     expect(run({ key: "a", ctrlKey: true }).ctx.selectAllEffects).toHaveBeenCalled();
+  });
+
+  it("keeps the three things the appendix spends the letter a on apart", () => {
+    // `CTRL + a` selects the effects, `CTRL + A` inserts a layer below, and `CTRL + ALT +a` selects
+    // the effects *and* the timing tracks - which we don't have, so it does nothing at all rather
+    // than doing the first one and looking like it worked.
+    const below = run({ key: "A", ctrlKey: true, shiftKey: true });
+    expect(below.ctx.insertLayer).toHaveBeenCalledWith("below");
+    expect(below.ctx.selectAllEffects).not.toHaveBeenCalled();
+
+    const withAlt = run({ key: "a", ctrlKey: true, altKey: true });
+    expect(withAlt.command).toBeUndefined();
+    expect(withAlt.ctx.selectAllEffects).not.toHaveBeenCalled();
+  });
+
+  it("inserts a layer above on ctrl+shift+i", () => {
+    expect(run({ key: "I", ctrlKey: true, shiftKey: true }).ctx.insertLayer).toHaveBeenCalledWith("above");
+  });
+
+  it("toggles the row's layers on ctrl+x", () => {
+    expect(run({ key: "x", ctrlKey: true }).ctx.toggleElementExpand).toHaveBeenCalled();
+    // And not the bare key, which is Text.
+    const { ctx } = run({ key: "x" });
+    expect(ctx.toggleElementExpand).not.toHaveBeenCalled();
+    expect(ctx.placeEffect).toHaveBeenCalledWith("Text");
+  });
+
+  it("toggles the windows the appendix names and we have", () => {
+    expect(run({ key: "F7", ctrlKey: true }).ctx.toggleWindow).toHaveBeenCalledWith("models");
+    expect(run({ key: "F10", ctrlKey: true }).ctx.toggleWindow).toHaveBeenCalledWith("presets");
+    expect(run({ key: "F11", ctrlKey: true }).ctx.toggleWindow).toHaveBeenCalledWith("select");
+    expect(run({ key: "F12", ctrlKey: true }).ctx.toggleWindow).toHaveBeenCalledWith("prefs");
+    expect(run({ key: "F6", ctrlKey: true }).ctx.toggleWindow).toHaveBeenCalledWith("housePreview");
+  });
+
+  it("leaves the windows we don't have unbound", () => {
+    // Ctrl+F8 is Effect Assist and Ctrl+Alt+F8 is the Jukebox. We have neither, and the Alt one
+    // must not fall through to the other.
+    const commands = buildCommands(context());
+    for (const key of ["F1", "F2", "F3", "F4", "F5", "F9"]) {
+      expect(commandForEvent(commands, { key, ctrlKey: true }), key).toBeUndefined();
+    }
+    expect(commandForEvent(commands, { key: "F8", ctrlKey: true })).toBeUndefined();
+    expect(commandForEvent(commands, { key: "F8", ctrlKey: true, altKey: true })).toBeUndefined();
+  });
+
+  it("leaves a bare function key to the browser", () => {
+    // F11 alone is full screen and F12 alone is the developer tools; the appendix's keys all carry
+    // Ctrl, and taking the unmodified ones would be taking keys the appendix never asked for.
+    expect(commandForEvent(buildCommands(context()), { key: "F11" })).toBeUndefined();
   });
 
   it("places Spirals on capital S, which is not the split key", () => {
