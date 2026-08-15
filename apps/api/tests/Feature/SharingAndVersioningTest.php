@@ -90,4 +90,72 @@ class SharingAndVersioningTest extends TestCase
         ]);
         $conflict->assertStatus(409)->assertJsonPath('current.body.rows.0', 'from tab A');
     }
+
+    // xLights' Settings > Backup > "Purge Backups Older Than". Nothing purged history before
+    // this: every snapshot ever taken was kept, and autosave drives them.
+    public function test_purging_removes_old_snapshots_but_never_the_newest(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+        $seq = $project->sequences()->create([
+            'name' => 'S', 'frame_ms' => 50, 'duration_ms' => 1000, 'body' => ['timingTracks' => [], 'rows' => []],
+        ]);
+
+        foreach ([1, 2, 3] as $n) {
+            $version = $seq->versions()->create([
+                'number' => $n,
+                'body' => ['timingTracks' => [], 'rows' => []],
+                'created_by' => $user->id,
+            ]);
+            // Aged after the fact: created_at isn't fillable, so passing it to create() is
+            // silently ignored and every snapshot would look new.
+            $version->forceFill(['created_at' => now()->subDays(60)])->saveQuietly();
+        }
+
+        $this->actingAs($user)
+            ->postJson("/api/v1/sequences/{$seq->id}/versions/purge", ['older_than_days' => 31])
+            ->assertOk()
+            ->assertJsonPath('deleted', 2);
+
+        // The newest survives whatever its age: a retention rule that can empty the history turns
+        // "keep less" into "keep nothing", and a backup has to survive not being used for a while.
+        $this->assertSame(1, $seq->versions()->count());
+        $this->assertSame(3, $seq->versions()->first()->number);
+    }
+
+    public function test_purging_leaves_snapshots_inside_the_window(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+        $seq = $project->sequences()->create([
+            'name' => 'S', 'frame_ms' => 50, 'duration_ms' => 1000, 'body' => ['timingTracks' => [], 'rows' => []],
+        ]);
+        $seq->versions()->create(['number' => 1, 'body' => [], 'created_by' => $user->id]);
+
+        $this->actingAs($user)
+            ->postJson("/api/v1/sequences/{$seq->id}/versions/purge", ['older_than_days' => 31])
+            ->assertOk()
+            ->assertJsonPath('deleted', 0);
+    }
+
+    public function test_a_viewer_cannot_purge_or_delete_snapshots(): void
+    {
+        $owner = User::factory()->create();
+        $viewer = User::factory()->create();
+        $project = Project::factory()->for($owner, 'owner')->create();
+        $this->actingAs($owner)->postJson("/api/v1/projects/{$project->id}/members", [
+            'email' => $viewer->email, 'role' => 'viewer',
+        ])->assertCreated();
+        $seq = $project->sequences()->create([
+            'name' => 'S', 'frame_ms' => 50, 'duration_ms' => 1000, 'body' => ['timingTracks' => [], 'rows' => []],
+        ]);
+        $seq->versions()->create(['number' => 1, 'body' => [], 'created_by' => $owner->id]);
+
+        $this->actingAs($viewer)
+            ->postJson("/api/v1/sequences/{$seq->id}/versions/purge", ['older_than_days' => 7])
+            ->assertForbidden();
+        $this->actingAs($viewer)
+            ->deleteJson("/api/v1/sequences/{$seq->id}/versions/1")
+            ->assertForbidden();
+    }
 }

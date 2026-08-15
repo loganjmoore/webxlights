@@ -42,6 +42,9 @@ export const GRID_SPACING_LABELS: Record<GridSpacing, string> = {
   xl: "Extra Large",
 };
 
+/** The retention windows xLights offers, with 0 standing for its "Never". */
+export const RETENTION_CHOICES = [0, 7, 31, 90, 365];
+
 /** Waveform height, full and small (xLights' Effects Grid > Small Waveform). */
 export const WAVEFORM_HEIGHT_PX = { full: 64, small: 32 } as const;
 
@@ -90,6 +93,18 @@ export interface Preferences {
   doubleClickMode: DoubleClickMode;
   /** What the timeline zooms around: the mouse cursor, or the playhead. */
   timelineZoomAnchor: TimelineZoomAnchor;
+  /**
+   * Days to keep sequence snapshots for. 0 means forever.
+   *
+   * xLights' Settings > Backup > "Purge Backups Older Than", which offers Never / 365 / 90 / 31 /
+   * 7. Nothing purged history here at all before: every snapshot ever taken was kept, and autosave
+   * drives them, so a season's editing accumulates a full copy of the body every few minutes.
+   *
+   * Forever is the default, and deliberately. Deleting someone's history is not a thing to start
+   * doing because a setting was added, and the whole value of a backup is that it is there when it
+   * finally matters.
+   */
+  versionRetentionDays: number;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -106,6 +121,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   // The cursor by default: a zoom gesture made with the mouse is aimed at something, and holding
   // the playhead instead would move the thing being pointed at out from under the pointer.
   timelineZoomAnchor: "cursor",
+  versionRetentionDays: 0,
 };
 
 const STORAGE_KEY = "webxlights.preferences";
@@ -159,6 +175,9 @@ export function sanitize(prefs: Preferences): Preferences {
     showTransitionMarks: prefs.showTransitionMarks !== false,
     doubleClickMode: prefs.doubleClickMode === "edit-text" ? "edit-text" : "play-timing",
     timelineZoomAnchor: prefs.timelineZoomAnchor === "playhead" ? "playhead" : "cursor",
+    // Only the offered windows, and 0 for "never". A hand-edited 1 would delete yesterday's work
+    // every time a snapshot was taken, which is not a setting anyone means to choose.
+    versionRetentionDays: RETENTION_CHOICES.includes(Number(prefs.versionRetentionDays)) ? Number(prefs.versionRetentionDays) : 0,
   };
 }
 

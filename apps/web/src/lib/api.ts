@@ -400,6 +400,14 @@ export const api = {
     request<LayoutVersion>(`/v1/layouts/${layoutId}/versions`, { method: "POST", body: JSON.stringify({ reason }) }),
   restoreLayoutVersion: (layoutId: number, versionId: number) =>
     request<Layout>(`/v1/layouts/${layoutId}/versions/${versionId}/restore`, { method: "POST" }),
+  /** xLights' "Purge Backups Older Than". Returns how many snapshots went. */
+  purgeVersions: (sequenceId: number, olderThanDays: number) =>
+    request<{ deleted: number }>(`/v1/sequences/${sequenceId}/versions/purge`, {
+      method: "POST",
+      body: JSON.stringify({ older_than_days: olderThanDays }),
+    }),
+  deleteVersion: (sequenceId: number, versionNumber: number) =>
+    request<{ deleted: number }>(`/v1/sequences/${sequenceId}/versions/${versionNumber}`, { method: "DELETE" }),
   listVersions: (sequenceId: number) => request<SequenceVersion[]>(`/v1/sequences/${sequenceId}/versions`),
   snapshotVersion: (sequenceId: number) => request<SequenceVersion>(`/v1/sequences/${sequenceId}/versions`, { method: "POST" }),
   restoreVersion: (sequenceId: number, versionId: number) =>

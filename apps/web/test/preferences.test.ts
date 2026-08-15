@@ -100,6 +100,7 @@ describe("sanitising a hand-edited bag", () => {
       "snapshotOnSave",
       "timeFormat",
       "timelineZoomAnchor",
+      "versionRetentionDays",
     ]);
   });
 });
@@ -141,6 +142,16 @@ describe("the effects grid settings", () => {
     expect(DEFAULT_PREFERENCES.timelineZoomAnchor).toBe("cursor");
     expect(sanitize({ ...DEFAULT_PREFERENCES, timelineZoomAnchor: "playhead" }).timelineZoomAnchor).toBe("playhead");
     expect(sanitize({ ...DEFAULT_PREFERENCES, timelineZoomAnchor: "elsewhere" as never }).timelineZoomAnchor).toBe("cursor");
+  });
+
+  it("keeps snapshots forever unless told otherwise, and only for a window it offers", () => {
+    // Deleting someone's history is not a thing to start doing because a setting was added, and
+    // the whole value of a backup is that it is there when it finally matters.
+    expect(DEFAULT_PREFERENCES.versionRetentionDays).toBe(0);
+    expect(sanitize({ ...DEFAULT_PREFERENCES, versionRetentionDays: 31 }).versionRetentionDays).toBe(31);
+    // A hand-edited 1 would delete yesterday's work every time a snapshot was taken.
+    expect(sanitize({ ...DEFAULT_PREFERENCES, versionRetentionDays: 1 }).versionRetentionDays).toBe(0);
+    expect(sanitize({ ...DEFAULT_PREFERENCES, versionRetentionDays: -5 }).versionRetentionDays).toBe(0);
   });
 
   it("only knows two double-click modes", () => {
