@@ -23,6 +23,15 @@ import {
 } from "../lib/effectPresets";
 import { buildCommands, commandForEvent, isTypingTarget } from "../lib/commands";
 import {
+  checkShortcut,
+  effectShortcuts,
+  loadShortcuts,
+  saveShortcuts,
+  setShortcut,
+  shortcutRows,
+  type ShortcutOverrides,
+} from "../lib/keybindings";
+import {
   UI_COLOR_LABELS,
   exportUiColors,
   importUiColors,
@@ -1026,8 +1035,34 @@ function keyboardTargetRow(): GridRow | undefined {
   return presetTargetRow.value;
 }
 
+// xLights' keybindings file, as a per-browser preference: which letter drops which effect is
+// muscle memory, and it belongs to the person at the keyboard (keybindings.ts).
+const shortcutOverrides = ref<ShortcutOverrides>(loadShortcuts(typeof localStorage === "undefined" ? null : localStorage));
+const shortcutsInForce = computed(() => effectShortcuts(shortcutOverrides.value));
+
+const shortcutError = ref("");
+const shortcutRowsInForce = computed(() => shortcutRows(shortcutOverrides.value));
+
+function assignShortcut(effect: string, key: string): void {
+  const check = checkShortcut(effect, key, shortcutOverrides.value);
+  if (!check.ok) {
+    // Refused rather than warned: two effects on one key means one of them silently stops
+    // working, and which one is an accident of list order.
+    shortcutError.value = check.reason;
+    return;
+  }
+  shortcutError.value = "";
+  updateShortcuts(setShortcut(shortcutOverrides.value, effect, key));
+}
+
+function updateShortcuts(next: ShortcutOverrides): void {
+  shortcutOverrides.value = next;
+  saveShortcuts(typeof localStorage === "undefined" ? null : localStorage, next);
+}
+
 const commands = computed(() =>
   buildCommands({
+    effectShortcuts: shortcutsInForce.value,
     togglePlay,
     seekStart: () => seekTo(0),
     seekEnd: () => seekTo(store.sequence?.duration_ms ?? 0),
@@ -1297,7 +1332,8 @@ watch(sequenceId, async (id) => {
     </div>
 
     <CommandPalette :open="paletteOpen" :commands="commands" @close="paletteOpen = false" />
-    <EffectWheel v-if="wheel" :x="wheel.x" :y="wheel.y" @pick="placeFromWheel" @close="wheel = null" />
+    <EffectWheel
+      :shortcuts="shortcutsInForce" v-if="wheel" :x="wheel.x" :y="wheel.y" @pick="placeFromWheel" @close="wheel = null" />
 
     <div v-if="showRegionsPanel" class="models-panel">
       <div class="models-panel-head">
@@ -1361,6 +1397,34 @@ watch(sequenceId, async (id) => {
         These are yours, not the show's — they're kept in this browser rather than saved with the
         project, so two people editing the same sequence don't change each other's settings.
       </p>
+      <div class="models-panel-head"><h2>Effect shortcuts</h2></div>
+      <p class="timing-note">
+        The single letter that drops each effect. xLights keeps these in a file you edit by hand;
+        here they're a preference. Case matters, as it does there — <code>o</code> is On and
+        <code>O</code> is Off. Space, <code>t</code> and <code>s</code> are the transport and
+        timing keys and can't be reassigned.
+      </p>
+      <p v-if="shortcutError" class="export-error">{{ shortcutError }}</p>
+      <ul class="shortcut-list">
+        <li v-for="row in shortcutRowsInForce" :key="row.effect">
+          <label :class="{ changed: row.changed }">{{ row.effect }}</label>
+          <span class="models-panel-actions">
+            <input
+              class="shortcut-key"
+              :value="row.key"
+              maxlength="1"
+              type="text"
+              @change="assignShortcut(row.effect, ($event.target as HTMLInputElement).value)"
+            />
+          </span>
+        </li>
+      </ul>
+      <div class="models-panel-actions">
+        <button :disabled="Object.keys(shortcutOverrides).length === 0" @click="updateShortcuts({})">
+          Back to xLights' own
+        </button>
+      </div>
+
       <div class="models-panel-head"><h2>Perspectives</h2></div>
       <p class="timing-note">
         A saved arrangement of which panels are showing. Applying one closes what it didn't have
@@ -1908,6 +1972,27 @@ header button.active {
   margin: 0 0 0.5rem;
   color: #888;
   font-size: 0.8rem;
+}
+.shortcut-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 12rem;
+  overflow: auto;
+}
+.shortcut-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+}
+/* A changed binding is worth seeing at a glance - it is the one that won't match the manual. */
+.shortcut-list label.changed {
+  color: #e8c468;
+}
+.shortcut-key {
+  width: 2.2rem;
+  text-align: center;
 }
 .midi-field {
   display: inline-flex;
