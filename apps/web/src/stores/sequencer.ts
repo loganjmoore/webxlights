@@ -120,6 +120,29 @@ export const useSequencerStore = defineStore("sequencer", () => {
     applyEffectPatch(effectId, patch);
   }
 
+  /**
+   * Moves an effect to another row, keeping its timing and its id.
+   *
+   * Same id deliberately: the effect the user is looking at should still be the selected one
+   * after it moves, and a new id would deselect it mid-gesture.
+   */
+  function moveEffectToRow(
+    effectId: string,
+    elementType: "model" | "group" | "submodel",
+    elementId: number,
+    subName: string | undefined,
+  ): void {
+    let moving: SequenceEffect | undefined;
+    for (const row of body.value.rows) {
+      const found = row.effects.find((e) => e.id === effectId);
+      if (found) moving = found;
+    }
+    if (!moving) return;
+    pushUndoSnapshot();
+    for (const row of body.value.rows) row.effects = row.effects.filter((e) => e.id !== effectId);
+    ensureRow(elementType, elementId, subName).effects.push(moving);
+  }
+
   function deleteEffect(effectId: string): void {
     pushUndoSnapshot();
     for (const row of body.value.rows) {
@@ -280,6 +303,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     ensureDefaultTimingTrack,
     generateTimingMarks,
     addTimingTrack,
+    moveEffectToRow,
     snapshot: pushUndoSnapshot,
     saveNow,
   };

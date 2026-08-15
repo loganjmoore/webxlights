@@ -1,5 +1,27 @@
 # Changelog
 
+## Arrow keys move effects, not just the playhead
+
+The coverage row for changing effects said "Move and resize; no align commands", which was true and hid something larger. Reading the manual's *Changing An Effect* page against it: "You can also select the effect and use the Left or Right arrow keys to move it left or right... an effect can also be moved vertically from one model to another. Use the Up or Down arrow keys."
+
+Here the arrow keys moved the playhead and there was no keyboard way to move an effect at all.
+
+### The jump rule is the feature
+
+"When the effect encounters or is blocked by another effect, if you keep going, it will **jump over** the effect/effects and continue past."
+
+That sentence is the whole reason this is worth having. The obvious implementation stops dead at a neighbour — which makes the keyboard useless exactly where it is most wanted, because a row packed with effects is where dragging with a mouse is hardest. Several effects packed together are jumped as a group, and it works backwards too.
+
+Only a *blocked* step jumps. A step that lands short of a neighbour just lands there, which is what makes the arrow keys usable for nudging two effects flush together.
+
+### What a vertical move does instead
+
+A horizontal move can jump because there is somewhere to jump to. A vertical move onto an occupied slot has nowhere, so it is refused rather than left overlapping. The effect keeps its id when it changes rows, so it stays selected — a new id would deselect it mid-gesture.
+
+### And when nothing is selected
+
+The arrows go back to nudging the playhead, which is what they did before and what they should do most of the time. The fallback lives in the page rather than in the command registry, because the key is the same either way and only the page knows whether anything is selected.
+
 ## Backup on Save, and three shortcuts the manual has that we didn't
 
 ### Backup on Save

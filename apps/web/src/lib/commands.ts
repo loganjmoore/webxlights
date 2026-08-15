@@ -26,6 +26,8 @@ export interface CommandContext {
   placeEffect: (name: string, params?: Record<string, number | boolean | string>) => void;
   /** xLights' `R`: "Generate Random effects". */
   placeRandomEffect: () => void;
+  /** Up and Down move the selected effect between rows; nothing selected, nothing happens. */
+  moveSelectedEffectVertically: (direction: -1 | 1) => void;
   openPalette: () => void;
   exportFseq: () => void;
   snapshot: () => void;
@@ -119,6 +121,23 @@ export function buildCommands(ctx: CommandContext): Command[] {
       keyLabel: "→",
       run: () => ctx.nudgePlayhead(100),
       matches: (e) => e.key === "ArrowRight" && plain(e),
+    },
+
+    {
+      id: "edit.moveUp",
+      label: "Move effect up a row",
+      group: "Edit",
+      keyLabel: "↑",
+      run: () => ctx.moveSelectedEffectVertically(-1),
+      matches: (e) => e.key === "ArrowUp" && plain(e),
+    },
+    {
+      id: "edit.moveDown",
+      label: "Move effect down a row",
+      group: "Edit",
+      keyLabel: "↓",
+      run: () => ctx.moveSelectedEffectVertically(1),
+      matches: (e) => e.key === "ArrowDown" && plain(e),
     },
 
     { id: "timing.mark", label: "Add timing mark", group: "Timing", keyLabel: "T", run: ctx.addTimingMark, matches: (e) => e.key === "t" && plain(e) },

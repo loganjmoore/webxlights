@@ -22,6 +22,7 @@ import {
   type EffectPreset,
 } from "../lib/effectPresets";
 import { buildCommands, commandForEvent, isTypingTarget } from "../lib/commands";
+import { fitsOnRow, moveEffectInTime, moveEffectToRow } from "../lib/moveEffects";
 import {
   checkShortcut,
   effectShortcuts,
@@ -1060,13 +1061,53 @@ function updateShortcuts(next: ShortcutOverrides): void {
   saveShortcuts(typeof localStorage === "undefined" ? null : localStorage, next);
 }
 
+/**
+ * Moves the selected effect along its row. Returns false when there is nothing to move, so the
+ * caller can fall back to nudging the playhead.
+ */
+function moveSelectedEffectInTime(direction: -1 | 1): boolean {
+  const id = store.selectedEffectId;
+  if (!id) return false;
+  const row = store.body.rows.find((r) => r.effects.some((e) => e.id === id));
+  if (!row || !store.sequence) return false;
+  const moved = moveEffectInTime(row.effects, id, direction, prefs.value.defaultEffectMs / 10, store.sequence.duration_ms);
+  if (!moved) return true; // selected but nowhere to go: don't move the playhead instead
+  store.updateEffect(id, moved);
+  return true;
+}
+
+/** Moves the selected effect to the row above or below, if it fits there. */
+function moveSelectedEffectToAdjacentRow(direction: -1 | 1): void {
+  const id = store.selectedEffectId;
+  if (!id) return;
+  const current = store.body.rows.find((r) => r.effects.some((e) => e.id === id));
+  const effect = current?.effects.find((e) => e.id === id);
+  if (!current || !effect) return;
+
+  const target = moveEffectToRow(visibleRows.value, current, direction);
+  if (!target) return;
+  const targetRow = store.body.rows.find(
+    (r) => r.elementType === target.elementType && r.elementId === target.elementId && (r.subName ?? "") === (target.subName ?? ""),
+  );
+  // A vertical move has nowhere to jump to, so an occupied slot refuses rather than overlapping.
+  if (targetRow && !fitsOnRow(targetRow.effects, effect.startMs, effect.endMs)) return;
+  store.moveEffectToRow(id, target.elementType, target.elementId, target.subName);
+}
+
 const commands = computed(() =>
   buildCommands({
     effectShortcuts: shortcutsInForce.value,
     togglePlay,
     seekStart: () => seekTo(0),
     seekEnd: () => seekTo(store.sequence?.duration_ms ?? 0),
-    nudgePlayhead: (delta) => seekTo(Math.max(0, playheadMs.value + delta)),
+    // Arrow keys move the *selected effect* when there is one, and the playhead when there isn't.
+    // xLights: "select the effect and use the Left or Right arrow keys to move it left or right",
+    // with Up and Down moving it between rows. Falling back to the playhead keeps the transport
+    // behaviour for the case where nothing is selected, which is most of the time.
+    nudgePlayhead: (delta) => {
+      if (!moveSelectedEffectInTime(delta > 0 ? 1 : -1)) seekTo(Math.max(0, playheadMs.value + delta));
+    },
+    moveSelectedEffectVertically: (direction) => moveSelectedEffectToAdjacentRow(direction),
     addTimingMark: addTimingMarkAtPlayhead,
     splitTimingMark: splitTimingMarkAtPlayhead,
     deleteSelected: () => {
