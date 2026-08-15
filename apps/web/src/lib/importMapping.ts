@@ -132,6 +132,10 @@ export function applyMapping(
         // than an empty bag: the renderers don't all null-guard every field, so an untranslated
         // effect with `{}` could render as NaN geometry and throw on export.
         params: (eff.translated ? eff.params : defaultParamsFor(eff.name)) as Record<string, number | boolean | string>,
+        // The donor's own layer. A real xLights sequence uses layers freely, and flattening them
+        // onto one would stack every layer's effects on top of each other at the same instant -
+        // which still renders, just not as anything the author wrote.
+        ...(eff.layerIndex ? { layerIndex: eff.layerIndex } : {}),
       })),
     });
   }

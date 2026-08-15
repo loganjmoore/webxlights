@@ -142,3 +142,33 @@ describe("the .xpreset file", () => {
       .toBe("preset.xpreset");
   });
 });
+
+describe("what a preset deliberately isn't", () => {
+  it("carries no position: not the times, and not the layer", () => {
+    // Compile-time as well as runtime. A preset is "these settings"; where an effect sits - when
+    // it runs and which layer it is on - is exactly what a preset isn't about, so a new
+    // positional field must be excluded here too or presets start moving effects around.
+    const positional: Record<"id" | "startMs" | "endMs" | "layerIndex", true> = {
+      id: true,
+      startMs: true,
+      endMs: true,
+      layerIndex: true,
+    };
+    const preset = presetFromEffect(
+      { id: "e1", name: "On", startMs: 1000, endMs: 2000, params: { speed: 3 }, layerIndex: 4 },
+      "Warm twinkle",
+    );
+    for (const key of Object.keys(positional)) {
+      expect(preset.settings, `${key} should not be stored in a preset`).not.toHaveProperty(key);
+    }
+    expect(preset.settings.params).toEqual({ speed: 3 });
+  });
+
+  it("applies onto whatever layer the caller is placing on", () => {
+    const preset = presetFromEffect(
+      { id: "e1", name: "On", startMs: 0, endMs: 500, params: {}, layerIndex: 4 },
+      "Warm twinkle",
+    );
+    expect(effectFromPreset(preset, "new-id", 9000)).not.toHaveProperty("layerIndex");
+  });
+});

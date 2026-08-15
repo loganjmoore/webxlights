@@ -79,3 +79,48 @@ describe("parseXsq (SPEC ch11 §4)", () => {
     expect(() => parseXsq("<foo/>")).toThrow();
   });
 });
+
+describe("effect layers", () => {
+  // A real xLights sequence uses layers freely, and this parser has always walked <EffectLayer>
+  // elements to find the effects - then thrown the layering away. Flattening them stacks every
+  // layer's effects on top of each other at the same instant, which still renders, just not as
+  // anything the author wrote.
+  const layered = `<?xml version="1.0" encoding="UTF-8"?>
+<xsequence>
+  <head><sequenceTiming>50 ms</sequenceTiming><sequenceDuration>10.0</sequenceDuration></head>
+  <ElementEffects>
+    <Element type="model" name="Tree">
+      <EffectLayer>
+        <Effect name="On" startTime="0" endTime="1000" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Bars" startTime="0" endTime="1000" />
+        <Effect name="On" startTime="2000" endTime="3000" />
+      </EffectLayer>
+    </Element>
+  </ElementEffects>
+</xsequence>`;
+
+  it("keeps which layer each effect came from", () => {
+    const rows = parseXsq(layered).rows;
+    const effects = rows.find((r) => r.name === "Tree")!.effects;
+    expect(effects.map((e) => [e.name, e.layerIndex])).toEqual([
+      ["On", 0],
+      ["Bars", 1],
+      ["On", 1],
+    ]);
+  });
+
+  it("reads document order as bottom-to-top", () => {
+    // The first <EffectLayer> is the base the rest blend onto, which is the order the engine
+    // composites in - so the index can be used directly.
+    const effects = parseXsq(layered).rows.find((r) => r.name === "Tree")!.effects;
+    expect(effects[0]!.layerIndex).toBeLessThan(effects[1]!.layerIndex);
+  });
+
+  it("puts a single-layer sequence entirely on layer 0", () => {
+    for (const row of parseXsq(fixture).rows) {
+      for (const effect of row.effects) expect(effect.layerIndex).toBe(0);
+    }
+  });
+});

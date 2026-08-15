@@ -19,7 +19,10 @@ export interface EffectPreset {
   group: string;
   durationMs: number;
   /** Everything about the effect except its identity and where it sits. */
-  settings: Omit<SequenceEffect, "id" | "startMs" | "endMs">;
+  // Layer is a *position*, like the times: which layer an effect sits on says nothing about how
+  // it looks, and a preset that carried one would move an effect to another layer on being
+  // applied - which is not something anyone saving "my warm twinkle" is asking for.
+  settings: Omit<SequenceEffect, "id" | "startMs" | "endMs" | "layerIndex">;
 }
 
 export const PRESET_FILE_SUFFIX = ".xpreset";
@@ -37,6 +40,7 @@ export function presetFromEffect(effect: SequenceEffect, name: string, group = D
   delete (settings as Partial<SequenceEffect>).id;
   delete (settings as Partial<SequenceEffect>).startMs;
   delete (settings as Partial<SequenceEffect>).endMs;
+  delete (settings as Partial<SequenceEffect>).layerIndex;
   return {
     name,
     group: group.trim() || DEFAULT_GROUP,

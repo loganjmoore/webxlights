@@ -80,6 +80,15 @@ export interface ParsedXsqEffect {
   name: string;
   startMs: number;
   endMs: number;
+  /**
+   * Which <EffectLayer> the effect came from, 0 being the first in the file.
+   *
+   * The file has always had these - this parser walked them to find the effects and then threw
+   * the layering away, flattening every layer onto one. That was all the app could represent
+   * until layers had an interface; now it is data loss, and the worst kind, because a flattened
+   * import still renders *something*.
+   */
+  layerIndex: number;
   rawSettings: Record<string, string>;
   params: Record<string, unknown>;
   translated: boolean; // false = name/timing preserved but params are schema defaults
@@ -141,14 +150,16 @@ export function parseXsq(xml: string): ParsedXsq {
     const layers = asArray<Record<string, unknown>>(el.EffectLayer as Record<string, unknown> | Record<string, unknown>[] | undefined);
     const effects: ParsedXsqEffect[] = [];
 
-    for (const layer of layers) {
+    // Document order is bottom-to-top, which is the order this engine composites in - the first
+    // <EffectLayer> is the base the rest blend onto.
+    layers.forEach((layer, layerIndex) => {
       for (const effectEl of asArray<Record<string, unknown>>(layer.Effect as Record<string, unknown> | Record<string, unknown>[] | undefined)) {
         const startMs = parseInt(String(effectEl.startTime ?? "0"), 10);
         const endMs = parseInt(String(effectEl.endTime ?? "0"), 10);
         if (startMs >= endMs) continue; // SPEC: dropped on load
 
         if (elementType === "timing") {
-          effects.push({ name: String(effectEl.label ?? ""), startMs, endMs, rawSettings: {}, params: {}, translated: true });
+          effects.push({ name: String(effectEl.label ?? ""), startMs, endMs, rawSettings: {}, params: {}, translated: true, layerIndex });
           continue;
         }
 
@@ -157,9 +168,9 @@ export function parseXsq(xml: string): ParsedXsq {
         const rawSettings = parseSettingsString(resolveSettingsString(effectEl, effectDb));
         const { params, translated } = translateEffectParams(effectName, rawSettings);
         if (!translated) unsupported.add(effectName);
-        effects.push({ name: effectName, startMs, endMs, rawSettings, params, translated });
+        effects.push({ name: effectName, startMs, endMs, rawSettings, params, translated, layerIndex });
       }
-    }
+    });
 
     rows.push({ elementType, name, effects });
   }
