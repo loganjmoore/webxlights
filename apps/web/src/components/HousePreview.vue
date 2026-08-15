@@ -238,7 +238,11 @@ onBeforeUnmount(() => {
   if (setup && containerRef.value) disposeScene(setup, containerRef.value);
 });
 
-watch(() => [props.playheadMs, props.body], updateColors, { deep: true });
+// Two watchers, not one. They used to share a `deep: true` watch, which meant every playhead
+// change re-traversed the whole sequence body to decide whether it had changed too - affordable
+// four times a second, not sixty, and the playhead is the one that moves every frame.
+watch(() => props.playheadMs, updateColors);
+watch(() => props.body, updateColors, { deep: true });
 // `audio` arrives after the track is analysed, which is a repaint even at a stationary
 // playhead - without it a VU Meter sits dark until the next scrub. Watched by identity, not
 // deeply: the series is thousands of frames, and traversing it on every playhead tick would

@@ -2,15 +2,12 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import {
-  appliedPlacementFor,
   computeGeometryFromAttrs,
   DEFAULT_GENERATE_OPTIONS,
   generateCustomModel,
   GROUP_RENDER_STYLES,
   propertyFieldsFor,
-  transformedHalfExtents,
   propertyValueFor,
-  screenFromAttrs,
   type BoxedScaleReading,
   type ModelGeometry,
   type FaceSpec,
@@ -37,12 +34,8 @@ import { confirm } from "../lib/confirm";
 import { loadPreferences } from "../lib/preferences";
 import { buildPlacementReport, copyOrDownloadReport } from "../lib/placementReport";
 import { channelCountForModel } from "../lib/fseqExport";
-import LayoutCanvas from "../components/LayoutCanvas.vue";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
 import ModelPalette from "../components/ModelPalette.vue";
-
-// The canvases' local-unit-to-world factor, same value LayoutCanvas and the importer use.
-const NODE_SPACING = 4;
 
 const route = useRoute();
 const projectId = computed(() => Number(route.params.projectId));
@@ -57,47 +50,18 @@ const importing = ref(false);
 const importMessage = ref("");
 const reportMessage = ref("");
 
-// How a boxed model's ScaleX is read. The importer decides this per file from the models it can
-// already measure (engine/models/boxedScale.ts), but the two readings differ by a model's node
-// count, so when a show has nothing to check against, the wrong call is dramatic and obvious -
-// one prop swallowing the yard. This is the one-click way out: flip it, look, keep whichever is
-// right. Nothing is lost either way, because raw_attrs is what gets re-read.
+// How a boxed model's ScaleX is read is decided per file by the importer, from the models in it
+// that can already be measured (engine/models/boxedScale.ts). The label is kept for the import
+// summary, which says which reading a file got.
+//
+// There used to be a pair of buttons here to override that by hand and re-scale every boxed
+// model. Removed: it existed for a period when the importer's own choice wasn't trusted, and a
+// control whose two settings differ by a factor of a model's node count is one that mostly gets
+// pressed by accident.
 const BOXED_SCALE_LABEL: Record<BoxedScaleReading, string> = {
-  perNode: "ScaleX × node count",
+  perNode: "ScaleX \u00d7 node count",
   worldSize: "ScaleX as world size",
 };
-const boxedScale = ref<BoxedScaleReading>("perNode");
-const rescaling = ref(false);
-
-async function setBoxedScale(reading: BoxedScaleReading): Promise<void> {
-  if (!layout.value || reading === boxedScale.value) return;
-  boxedScale.value = reading;
-  rescaling.value = true;
-  try {
-    const boxedModels = models.value.filter((m) => m.supported && appliedPlacementFor(m.type, m.raw_attrs) === "boxed");
-    await Promise.all(
-      boxedModels.map(async (model) => {
-        let geo: ModelGeometry | null;
-        try {
-          geo = computeGeometryFromAttrs(model.type, model.raw_attrs);
-        } catch {
-          geo = null;
-        }
-        const screen = screenFromAttrs(model.type, model.raw_attrs, geo, NODE_SPACING, reading);
-        // Position and rotation don't depend on the reading; only rewrite what does, so a model
-        // that has since been dragged or resized by hand keeps where it was put.
-        const updated = await api.updateModel(layout.value!.id, model.id, {
-          screen: { ...model.screen, scale: screen.scale, scaleY: screen.scaleY, scaleZ: screen.scaleZ },
-        });
-        const idx = models.value.findIndex((m) => m.id === model.id);
-        if (idx !== -1) models.value[idx] = updated;
-      }),
-    );
-    importMessage.value = `Boxed model sizes re-read as ${BOXED_SCALE_LABEL[reading]} (${boxedModels.length} models).`;
-  } finally {
-    rescaling.value = false;
-  }
-}
 
 // Placement can't be verified from inside the app - the maths is unit-tested and the placement
 // systems are confirmed against the xLights manual, but whether a real show lands where it does
@@ -121,7 +85,6 @@ async function copyPlacementReport(): Promise<void> {
 const selectedIds = ref<number[]>([]);
 const selectedModelId = computed(() => (selectedIds.value.length === 1 ? selectedIds.value[0]! : null));
 const selectedModels = computed(() => models.value.filter((m) => selectedIds.value.includes(m.id)));
-const viewMode = ref<"2d" | "3d">("2d");
 const selectedModel = computed(() => models.value.find((m) => m.id === selectedModelId.value) ?? null);
 
 // A row expands only when it is the *only* thing selected. A marquee selection of thirty props
@@ -319,44 +282,11 @@ async function updateScreen(modelId: number, patch: Partial<{ x: number; y: numb
   if (idx !== -1) models.value[idx] = updated;
 }
 
-// The 2D canvas moves the whole selection at once, so this takes a batch. Each model still
-// gets its own PATCH - ModelEntityController::update is per-model, and a drag of a handful of
-// props isn't worth a bulk endpoint that would need its own screen-merge semantics.
-// The same rule the 3D view enforces while dragging: the 2D canvas is a front elevation on the
-// same Y axis, so a drag there can put a prop underground just as easily. The floor is never
-// above where the model already was, so a show that deliberately places something low doesn't
-// get it yanked up the first time it's nudged sideways.
-function groundedY(model: ModelRecord, y: number): number {
-  let geo: ModelGeometry | null;
-  try {
-    geo = computeGeometryFromAttrs(model.type, model.raw_attrs);
-  } catch {
-    geo = null;
-  }
-  if (!geo) return y;
-  const halfH = transformedHalfExtents(geo, {
-    scale: model.screen.scale ?? 1,
-    scaleY: model.screen.scaleY,
-    scaleZ: model.screen.scaleZ,
-    rotateDeg: model.screen.rotate ?? 0,
-  }).halfH * NODE_SPACING;
-  return Math.max(y, Math.min(halfH, model.screen.y ?? 0));
-}
-
-async function handleMove(moves: Array<{ id: number; x: number; y: number }>): Promise<void> {
-  await Promise.all(
-    moves.map((m) => {
-      const model = models.value.find((mm) => mm.id === m.id);
-      return updateScreen(m.id, { x: m.x, y: model ? groundedY(model, m.y) : m.y });
-    }),
-  );
-}
-
-// Corner/edge handles on the 2D canvas. scaleZ follows scaleX so a model resized in the 2D
-// view keeps its proportions in the 3D view - a prop that got wider but stayed the same depth
-// would look wrong the moment you switched views.
-function handleResize(modelId: number, scale: number, scaleY: number): void {
-  void updateScreen(modelId, { scale, scaleY, scaleZ: scale });
+// Corner grips on the 3D canvas. The canvas has already worked out the new scales and, when
+// "keep on the ground" is on, the anchor Y that plants the prop back on the lawn - resizing
+// about the centre otherwise drops the base by half of whatever height was added.
+function handleResize3D(modelId: number, screen: { scale: number; scaleY: number; scaleZ: number; y: number }): void {
+  void updateScreen(modelId, screen);
 }
 
 // Ctrl/Cmd-click and shift-click in the model list mirror the canvas's own modifiers.
@@ -751,7 +681,6 @@ async function handleFileChange(e: Event): Promise<void> {
     // those attributes aren't named what the importer expects in this file - worth seeing
     // rather than silently falling back to the boxed reading.
     const { boxed, twoPoint, threePoint, polyLine } = summary.placement;
-    boxedScale.value = summary.boxedScale.reading;
     importMessage.value =
       `Imported ${summary.imported} models` +
       (summary.groups ? `, ${summary.groups} groups` : "") +
@@ -898,28 +827,12 @@ onUnmounted(() => {
     <header>
       <router-link to="/projects">&larr; Projects</router-link>
       <h1>Layout</h1>
-      <div class="view-toggle">
-        <button :class="{ active: viewMode === '2d' }" @click="viewMode = '2d'">2D</button>
-        <button :class="{ active: viewMode === '3d' }" @click="viewMode = '3d'">3D</button>
-      </div>
       <router-link :to="`/projects/${projectId}/controllers`" class="controllers-link">Controllers &rarr;</router-link>
       <router-link :to="`/projects/${projectId}/sequences`" class="sequences-link">Sequences &rarr;</router-link>
       <label class="import-btn">
         {{ importing ? "Importing..." : "Import xlights_rgbeffects.xml" }}
         <input type="file" accept=".xml" @change="handleFileChange" :disabled="importing" hidden />
       </label>
-      <span v-if="models.length" class="boxed-scale" title="How ScaleX sizes models that aren't placed by their endpoints. If one prop swallows the yard, it's this.">
-        Boxed sizes:
-        <button
-          v-for="reading in (['perNode', 'worldSize'] as BoxedScaleReading[])"
-          :key="reading"
-          :class="{ active: boxedScale === reading }"
-          :disabled="rescaling"
-          @click="setBoxedScale(reading)"
-        >
-          {{ BOXED_SCALE_LABEL[reading] }}
-        </button>
-      </span>
       <button
         class="report-btn"
         :disabled="models.length === 0"
@@ -1277,7 +1190,7 @@ onUnmounted(() => {
         </div>
       </aside>
       <div class="canvas-wrap">
-        <ModelPalette v-if="viewMode === '2d'" />
+        <ModelPalette />
         <div class="canvas-area">
           <!--
             The house photo sits behind the 2D canvas rather than being drawn into it: the canvas
@@ -1286,29 +1199,20 @@ onUnmounted(() => {
             the browser and costs nothing per frame.
           -->
           <img
-            v-if="viewMode === '2d' && background"
+            v-if="background"
             class="layout-background"
             :src="background.dataUrl"
             :style="{ opacity: background.opacity / 100 }"
             alt=""
           />
-          <LayoutCanvas
-            v-if="viewMode === '2d'"
-            :models="previewModels"
-            :view-objects="viewObjects"
-            :selected-ids="selectedIds"
-            @select="selectedIds = $event"
-            @move="handleMove"
-            @resize="handleResize"
-            @create="handleCreate"
-          />
           <LayoutCanvas3D
-            v-else
             :models="previewModels"
             :view-objects="viewObjects"
             :selected-model-id="selectedModelId"
             @select="selectedIds = $event === null ? [] : [$event]"
             @move="handleMove3D"
+            @create="handleCreate"
+            @resize="handleResize3D"
           />
         </div>
       </div>
@@ -1783,5 +1687,9 @@ header h1 {
   /* The backdrop is absolutely positioned inside this box, so it has to be the containing block -
      otherwise the photo would size itself against the page rather than the canvas. */
   position: relative;
+  /* The 3D scene renders transparent so the house photo behind it shows through, which means
+     this is now what's behind the scene when there is no photo. Same colour the renderer used
+     to clear to, so a layout without a backdrop looks exactly as it did. */
+  background: #0a0a0d;
 }
 </style>

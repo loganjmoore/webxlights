@@ -46,6 +46,19 @@ describe("where a dropped effect lands", () => {
     expect(placementFor([1000, 1120], 1050, DURATION, DEFAULT_MS)).toEqual({ startMs: 1000, endMs: 1120 });
   });
 
+  it("grows a placement too narrow to grab, when the caller says how narrow that is", () => {
+    // The sequencer passes 30px converted into milliseconds at the current zoom. A 120ms
+    // interval is a comfortable target zoomed into a bar and under a pixel zoomed out to the
+    // whole song, and an effect a pixel wide can't be selected, moved or deleted.
+    expect(placementFor([1000, 1120], 1050, DURATION, DEFAULT_MS, 500)).toEqual({ startMs: 1000, endMs: 1500 });
+    // The start stays on the mark it was dropped against - that edge is the one the drop aimed at.
+    expect(placementFor([1000, 1120], 1050, DURATION, DEFAULT_MS, 50)).toEqual({ startMs: 1000, endMs: 1120 });
+  });
+
+  it("backs a widened placement off the end of the sequence rather than overrunning it", () => {
+    expect(placementFor([9800, 9900], 9850, 10000, DEFAULT_MS, 400)).toEqual({ startMs: 9600, endMs: 10000 });
+  });
+
   it("falls back to the default length with no marks at all", () => {
     // "If no timing track is selected then you can drag and drop even if you have no timing marks
     // but the effect defaults to 1 second long."
