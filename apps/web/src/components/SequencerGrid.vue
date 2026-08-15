@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import type { SequenceBody, SequenceEffect } from "../lib/api";
 import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
+import { fadeDurationAt } from "../lib/effectFade";
 
 export interface GridRow {
   elementType: "model" | "group" | "submodel";
@@ -49,6 +50,8 @@ const emit = defineEmits<{
   place: [row: GridRow, startMs: number, endMs: number];
   dropEffect: [row: GridRow, name: string, startMs: number];
   move: [effectId: string, startMs: number, endMs: number];
+  // Shift+drag on an effect edge: the fade length dragged in from that edge.
+  fade: [effectId: string, edge: "left" | "right", durationMs: number];
   seek: [ms: number];
   dragStart: [];
   addMark: [trackIndex: number, ms: number];
@@ -86,6 +89,9 @@ let dragState:
   | { kind: "place"; row: GridRow; startMs: number }
   | { kind: "move"; effect: SequenceEffect; grabOffsetMs: number }
   | { kind: "resize"; effect: SequenceEffect; edge: "left" | "right" }
+  // Shift+resize authors a fade instead of moving the edge (manual: "hold the Shift key and drag
+  // the left edge of an effect inwards to create a fade in").
+  | { kind: "fade"; effect: SequenceEffect; edge: "left" | "right" }
   | null = null;
 
 // Full content width, not container width - at zoom > baseline this is wider than the
@@ -396,7 +402,10 @@ function onPointerDown(e: PointerEvent): void {
     emit("select", hit.effect.id);
     emit("dragStart");
     if (hit.edge) {
-      dragState = { kind: "resize", effect: hit.effect, edge: hit.edge };
+      // Shift turns the edge drag into a fade. The edge itself stays put, which is what makes the
+      // two gestures tell each other apart: one changes when the effect runs, the other how it
+      // arrives.
+      dragState = { kind: e.shiftKey ? "fade" : "resize", effect: hit.effect, edge: hit.edge };
     } else {
       dragState = { kind: "move", effect: hit.effect, grabOffsetMs: xToMs(x) - hit.effect.startMs };
     }
@@ -446,6 +455,13 @@ function onPointerMove(e: PointerEvent): void {
       const clamped = Math.max(0, Math.min(dragState.effect.endMs - 50, snapped));
       emit("move", dragState.effect.id, clamped, dragState.effect.endMs);
     }
+  }
+  if (dragState.kind === "fade") {
+    hoverCursor.value = "col-resize";
+    // Unsnapped deliberately: a fade is a length by ear, not a boundary, and snapping it to the
+    // nearest timing mark would quantise exactly the thing you are dragging to taste.
+    emit("fade", dragState.effect.id, dragState.edge, fadeDurationAt(dragState.effect, dragState.edge, ms));
+    return;
   }
   if (dragState.kind === "move") {
     hoverCursor.value = "grabbing";

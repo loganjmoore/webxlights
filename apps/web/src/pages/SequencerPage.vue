@@ -54,6 +54,7 @@ import {
 } from "../lib/preferences";
 import { intervalAt, subdivisionMarks } from "../lib/timingSubdivide";
 import { marksInForce, placementFor } from "../lib/effectPlacement";
+import { withFade } from "../lib/effectFade";
 import { DEFAULT_ZOOM_INDEX, ZOOM_STEPS, clampZoomIndex, scrollLeftHolding, wheelScrollDelta, zoomIndexIn, zoomIndexOut } from "../lib/zoom";
 import {
   loadPerspectives,
@@ -922,6 +923,18 @@ function handlePaletteUpdate(palette: StoredSwatch[]): void {
 function handleBlendUpdate(patch: { blendMode?: BlendMode; mix?: number }): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, patch);
 }
+/**
+ * Shift+drag on an effect edge, authoring a fade.
+ *
+ * Live like a move rather than snapshotted per event - the drag already took one snapshot at
+ * pointerdown, and snapshotting here would fill the undo stack with one entry per pixel.
+ */
+function handleFade(effectId: string, edge: "left" | "right", durationMs: number): void {
+  const effect = store.findEffect(effectId);
+  if (!effect) return;
+  store.updateEffectLive(effectId, { transition: withFade(effect.transition, edge, durationMs) });
+}
+
 function handleTransitionUpdate(transition: TransitionSpec): void {
   if (store.selectedEffectId) store.updateEffect(store.selectedEffectId, { transition });
 }
@@ -2121,6 +2134,7 @@ watch(sequenceId, async (id) => {
             @place="handlePlace"
             @drop-effect="handleDropEffect"
             @move="handleMove"
+            @fade="handleFade"
             @seek="seekTo"
             @drag-start="handleDragStart"
             @add-mark="handleAddMark"
