@@ -18,6 +18,15 @@ export type GridSpacing = "xs" | "s" | "m" | "l" | "xl";
 export type DoubleClickMode = "play-timing" | "edit-text";
 
 /**
+ * What the timeline zooms around (xLights' Settings > View > Timeline Zooming).
+ *
+ * "Zoom in on the Sequencer Timeline based on the Play Marker (Green Triangle with Red Line) or
+ * the Mouse Cursor Location." Both are reasonable and people want different ones: the cursor is
+ * right when you are pointing at the bar you want, the playhead when you are listening to it.
+ */
+export type TimelineZoomAnchor = "cursor" | "playhead";
+
+/**
  * Grid row height for each spacing. xLights names the sizes rather than giving pixel counts, so
  * these are ours - chosen so the smallest still fits an 11px effect label and the largest is
  * roughly double it, which is the range the setting is for: fitting fifty rows on a laptop, or
@@ -79,6 +88,8 @@ export interface Preferences {
   showTransitionMarks: boolean;
   /** Whether double-clicking a timing mark plays its interval or edits its label. */
   doubleClickMode: DoubleClickMode;
+  /** What the timeline zooms around: the mouse cursor, or the playhead. */
+  timelineZoomAnchor: TimelineZoomAnchor;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -92,6 +103,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   smallWaveform: false,
   showTransitionMarks: true,
   doubleClickMode: "play-timing",
+  // The cursor by default: a zoom gesture made with the mouse is aimed at something, and holding
+  // the playhead instead would move the thing being pointed at out from under the pointer.
+  timelineZoomAnchor: "cursor",
 };
 
 const STORAGE_KEY = "webxlights.preferences";
@@ -144,6 +158,7 @@ export function sanitize(prefs: Preferences): Preferences {
     // Defaults on, so an unset value has to become true rather than false.
     showTransitionMarks: prefs.showTransitionMarks !== false,
     doubleClickMode: prefs.doubleClickMode === "edit-text" ? "edit-text" : "play-timing",
+    timelineZoomAnchor: prefs.timelineZoomAnchor === "playhead" ? "playhead" : "cursor",
   };
 }
 
