@@ -53,7 +53,7 @@ written down. Status here means:
 
 | Feature | Status | Notes |
 |---|---|---|
-| Timeline + waveform, zoom, scroll | ✅ | 3 zoom levels |
+| Timeline + waveform, zoom, scroll | ⚠️ | 3 zoom levels. **Play range**: shift-drag the waveform to mark a section and it plays on its own, looping — "when it reaches the end of the area, will loop back to play from the beginning of that area", which is the point of it, since working on one chorus means hearing it repeatedly. Play jumps into the range rather than ignoring the highlight, and carries on from where it is if already inside, so pausing mid-phrase doesn't throw you back. Marked with shift rather than a plain drag because a plain drag here already scrubs the audio, which xLights' waveform doesn't do — trading that away for a more familiar gesture would be the wrong way round. Missing: xLights' separate *timeline* selection, draggable range edges, double-click and ctrl+wheel zoom gestures, right-click to reset zoom, and shift+wheel scrolling |
 | Audio scrubbing | ✅ | Drag the waveform and the track plays under the pointer, in short bursts. The burst is stopped on a timer rather than left running: a scrub that kept playing would drift away from the pointer within a second, and dragging back would then be seeking against audio that had moved on |
 | Time display format | ✅ | Minutes:seconds, plain seconds, or frames — frames counted against the sequence's own frame rate, since a 20ms sequence and a 50ms one number the same second very differently |
 | Timeline tags | ⚠️ | A region boundary is a named point on the timeline, which is what a tag is; xLights' separate tag list, with its own colours and independent of the section structure, isn't offered |
