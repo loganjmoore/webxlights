@@ -2,9 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as THREE from "three";
 import {
-  applyGroupBase,
   computeGeometryFromAttrs,
-  computeSubModel,
   strandSpecs,
   DEFAULT_PALETTE,
   geometryCenter,
@@ -18,6 +16,7 @@ import {
 } from "@webxlights/engine";
 import type { ModelGroupRecord, ModelRecord, SequenceBody } from "../lib/api";
 import { groupRenderSpecs } from "../lib/groupRendering";
+import { composeModel, type RenderRow } from "../lib/composeModel";
 import { toRenderableEffects } from "../lib/renderableEffects";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 
@@ -121,79 +120,46 @@ function updateColors(): void {
   }
 
   for (const entry of rowEntries) {
-    const rowEffects = toRenderableEffects(
-      props.body.rows
-        .filter((r) => r.elementType === "model" && r.elementId === entry.model.id)
-        .flatMap((r) => r.effects),
-      { timingTracks: props.body.timingTracks, model: entry.model },
-    );
-    const nodeColors = renderRowAtMs(
-      { geometry: entry.geometry, effects: rowEffects },
-      props.playheadMs,
-      props.frameMs,
-      SEED,
-      DEFAULT_PALETTE,
-      props.audio,
-    );
-
-    applyGroupBase(nodeColors, groupBase.get(entry.model.id), props.blendBetweenModels === true);
-
-    // Strands, then sub-models. "The strands blend onto the model level effects", so a strand sits
-    // on top of the model's own rows - and a sub-model sits on top of that, being the thing
-    // somebody drew deliberately rather than a fact about the wiring.
-    for (const spec of strandSpecs(entry.geometry)) {
-      const strandEffects = toRenderableEffects(
+    // The compose order lives in lib/composeModel.ts so the screen's copy of these rules can be
+    // tested: nothing in this suite mounts a Vue component, and the .fseq export carries its own
+    // copy of the same rules. Two implementations, one of them unobserved, is how a show comes to
+    // look right on screen and play wrong in the yard.
+    const nodeColors = composeModel({
+      geometry: entry.geometry,
+      own: toRenderableEffects(
         props.body.rows
-          .filter((r) => r.elementType === "strand" && r.elementId === entry.model.id && r.subName === spec.name)
+          .filter((r) => r.elementType === "model" && r.elementId === entry.model.id)
           .flatMap((r) => r.effects),
-        { timingTracks: props.body.timingTracks },
-      );
-      if (strandEffects.length === 0) continue;
-      const strand = computeSubModel(entry.geometry, spec);
-      if (!strand) continue;
-      const strandColors = renderRowAtMs(
-        { geometry: strand.geometry, effects: strandEffects },
-        props.playheadMs,
-        props.frameMs,
-        SEED,
-        DEFAULT_PALETTE,
-        props.audio,
-      );
-      strandColors.forEach((c, i) => {
-        const parentIndex = strand.parentIndices[i];
-        if (parentIndex !== undefined && c.a > 0) nodeColors[parentIndex] = c;
-      });
-    }
-
-    // A sub-model borrows its parent's lights, so whatever it renders is written back onto the
-    // parent's nodes. Drawn after the parent's own rows, which is the order xLights uses: a
-    // sub-model is the more specific statement about those nodes.
-    for (const spec of entry.model.sub_models ?? []) {
-      const sub = computeSubModel(entry.geometry, spec);
-      if (!sub) continue;
+        { timingTracks: props.body.timingTracks, model: entry.model },
+      ),
+      strands: new Map(
+        strandSpecs(entry.geometry).map((spec) => [
+          spec.name,
+          toRenderableEffects(
+            props.body.rows
+              .filter((r) => r.elementType === "strand" && r.elementId === entry.model.id && r.subName === spec.name)
+              .flatMap((r) => r.effects),
+            { timingTracks: props.body.timingTracks },
+          ),
+        ]),
+      ),
       // A sub-model row gets the timing tracks but not the parent's state definitions: a state's
       // node ranges are numbered against the model they were defined on, so applying them to a
       // sub-model's own numbering would light the wrong nodes.
-      const subEffects = toRenderableEffects(
-        props.body.rows
-          .filter((r) => r.elementType === "submodel" && r.elementId === entry.model.id && r.subName === spec.name)
-          .flatMap((r) => r.effects),
-        { timingTracks: props.body.timingTracks },
-      );
-      if (subEffects.length === 0) continue;
-      const subColors = renderRowAtMs(
-        { geometry: sub.geometry, effects: subEffects },
-        props.playheadMs,
-        props.frameMs,
-        SEED,
-        DEFAULT_PALETTE,
-        props.audio,
-      );
-      subColors.forEach((c, i) => {
-        const parentIndex = sub.parentIndices[i];
-        if (parentIndex !== undefined && c.a > 0) nodeColors[parentIndex] = c;
-      });
-    }
+      subModels: (entry.model.sub_models ?? []).map((spec) => ({
+        spec,
+        effects: toRenderableEffects(
+          props.body.rows
+            .filter((r) => r.elementType === "submodel" && r.elementId === entry.model.id && r.subName === spec.name)
+            .flatMap((r) => r.effects),
+          { timingTracks: props.body.timingTracks },
+        ),
+      })),
+      groupBase: groupBase.get(entry.model.id),
+      blendGroup: props.blendBetweenModels === true,
+      render: ((geometry, effects) =>
+        renderRowAtMs({ geometry, effects }, props.playheadMs, props.frameMs, SEED, DEFAULT_PALETTE, props.audio)) as RenderRow,
+    });
 
     nodeColors.forEach((c, i) => {
       const idx = (entry.offset + i) * 3;

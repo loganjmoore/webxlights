@@ -1,5 +1,25 @@
 # Changelog
 
+## The screen's copy of the compose rules is testable now
+
+Four things can address the same node, and the order they're applied in *is* the feature: the group first, then the model's own rows, then strands, then sub-models.
+
+Those rules exist **twice** — once for the live preview and once for the `.fseq` export. The export's copy has been tested since the export tests landed. The preview's copy lived inline in a Vue component, and nothing in this suite mounts one, so it had never been observed at all.
+
+Two implementations of one rule, one of them unobserved, is the exact shape of the failure this codebase guards hardest against: a show that looks right on screen and plays wrong in the yard, discovered when it's dark outside.
+
+### Why it took a refactor rather than a test
+
+The composition was tangled with canvas work and component props, so there was nothing to call. It's now a pure function the component invokes, taking **rendering as a callback**. That's the part that makes it testable without an engine, a canvas or a clock — what's being asserted isn't what an effect looks like, it's which of four sources wins on a given node.
+
+Eight tests: the group showing through where the model is silent, the model over the group, a strand over the model, a sub-model over a strand, and the writeback rule that makes the ordering safe — **a borrowed set of lights writes back only where it actually drew**, because a transparent pixel means "nothing to say here", not "turn this off". Plus the blending toggle, and two degenerate cases that should not blank a model: a strand that rendered nothing, and a sub-model whose spec selects nodes the model doesn't have.
+
+### On carrying an item four times
+
+This was on the list for four passes, described each time as worth doing "when a cheap way appears". It wasn't going to appear — it needed a refactor, and calling it a test-only change was what kept it looking postponable.
+
+That's the same failure the unaudited-pages list was built to prevent, in a different costume: work that stays invisible stays undone.
+
 ## Retention reaches the other history, and the last Settings tab
 
 ### A correction to the last change
