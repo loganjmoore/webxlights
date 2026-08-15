@@ -17,6 +17,11 @@ function context(): CommandContext & Record<string, ReturnType<typeof vi.fn>> {
     "addTimingMark",
     "splitTimingMark",
     "subdivideTiming",
+    "expandToMark",
+    "markSpot",
+    "returnToSpot",
+    "jumpToTenth",
+    "selectAllEffects",
     "deleteSelected",
     "copySelected",
     "pasteAtPlayhead",
@@ -62,6 +67,45 @@ describe("dispatching a key to a command", () => {
     const { ctx } = run({ key: "c", ctrlKey: true });
     expect(ctx.copySelected).toHaveBeenCalled();
     expect(ctx.placeEffect).not.toHaveBeenCalled();
+  });
+
+  it("expands an effect to a timing mark on ctrl+shift+arrow", () => {
+    // The appendix's most useful key: how an effect gets snapped to a beat without dragging, since
+    // at a working zoom a 50ms frame is a pixel wide.
+    expect(run({ key: "ArrowRight", ctrlKey: true, shiftKey: true }).ctx.expandToMark).toHaveBeenCalledWith(1);
+    expect(run({ key: "ArrowLeft", ctrlKey: true, shiftKey: true }).ctx.expandToMark).toHaveBeenCalledWith(-1);
+  });
+
+  it("keeps the plain arrows as they were", () => {
+    // Ctrl+Shift is the expand; unmodified is still the nudge, and the two must not collide.
+    const { ctx } = run({ key: "ArrowRight" });
+    expect(ctx.expandToMark).not.toHaveBeenCalled();
+    expect(ctx.nudgePlayhead).toHaveBeenCalled();
+  });
+
+  it("marks and returns to a spot", () => {
+    expect(run({ key: ".", ctrlKey: true }).ctx.markSpot).toHaveBeenCalled();
+    expect(run({ key: "/", ctrlKey: true }).ctx.returnToSpot).toHaveBeenCalled();
+  });
+
+  it("jumps a tenth of the way through on ctrl+shift+digit", () => {
+    expect(run({ key: "3", ctrlKey: true, shiftKey: true }).ctx.jumpToTenth).toHaveBeenCalledWith(3);
+    // And doesn't collide with the bare digit, which divides the timing.
+    const { ctx } = run({ key: "3" });
+    expect(ctx.jumpToTenth).not.toHaveBeenCalled();
+    expect(ctx.subdivideTiming).toHaveBeenCalledWith(3);
+  });
+
+  it("selects every effect on ctrl+a", () => {
+    expect(run({ key: "a", ctrlKey: true }).ctx.selectAllEffects).toHaveBeenCalled();
+  });
+
+  it("places Spirals on capital S, which is not the split key", () => {
+    // The appendix distinguishes `s` (split timing mark) from `S` (Spirals). An earlier note said
+    // the manual gave `s` to both and the structural action won - true of the sequencer's own
+    // shortcuts page, and the appendix settles it.
+    expect(run({ key: "S", shiftKey: true }).ctx.placeEffect).toHaveBeenCalledWith("Spirals");
+    expect(run({ key: "s" }).ctx.splitTimingMark).toHaveBeenCalled();
   });
 
   it("divides the timing on the number keys", () => {

@@ -1,5 +1,30 @@
 # Changelog
 
+## The shortcuts appendix, which is a different list
+
+`appendicies/keyboard-shortcuts.md` is not the sequencer's shortcuts page with a different cover. It's a second, longer list, and reading it corrected a decision made on the shorter one.
+
+### Spirals gets its key back
+
+The sequencer's own page gives `s` to both Timing Split and Spirals. Faced with that, an earlier change kept the split — a structural action beats an effect — and noted Spirals as bindable to any free key.
+
+The appendix distinguishes them: **s** is split, **S** is Spirals. Different keys, and case has always been significant here (`o` is On, `O` is Off). So Spirals has its key, and `S` is no longer reserved — reserving both was reserving one key too many.
+
+That's the fourth time a second page has settled something the first left ambiguous. The habit is worth stating: a shortcut list that looks complete may be one of two.
+
+### What the appendix added
+
+- **Ctrl+Shift+←/→ — expand an effect to the previous/next timing mark.** The most useful key in the set. It's how an effect gets snapped to a beat without dragging, and dragging can only be as precise as the zoom allows — at a working zoom a 50ms frame is a pixel wide. It acts on the whole block selection and takes one undo entry. And it *expands*: the far edge stays put. An effect that could shrink on this key would make the two arrows a second pair of nudges, which is what the plain arrows already are.
+- **Ctrl+. / Ctrl+/** — mark a spot and return to it.
+- **Ctrl+Shift+0-9** — jump a tenth of the way through. The digit *is* the tenth, so 3 is three tenths in however long the song is. It doesn't collide with the bare digits that divide the timing, and there's a test for exactly that.
+- **Ctrl+A** — select every effect. "Select All effects but no timing tracks", which is what it selects anyway: a timing mark isn't an effect and can't be in a block.
+
+### Recorded rather than guessed
+
+**Ctrl+L / Ctrl+U lock and unlock an effect.** We have no notion of a locked effect, and inventing what locking prevents — moving? editing? deleting? — would be exactly the Alt-drag mistake again.
+
+Also missing: Ctrl+0-9 jump to a timeline tag (needs tags we don't have), F5 Effect Update, Alt+1..4 tool icon size (our palette is text), and the Ctrl+F1..F12 window toggles, which our panels could take but which are a set worth doing together.
+
 ## A Custom value curve can repeat
 
 Two more sequencer pages read. The views page found nothing missing — creating, deleting, adding and removing models, reordering with the arrows, and per-row visibility are all there.
