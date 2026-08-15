@@ -67,6 +67,7 @@ import {
   type PaletteEntry,
 } from "./colorCurve";
 import { applyTransitions, type TransitionSpec } from "./transition";
+import { applyColorAdjust, type ColorAdjust } from "./colorAdjust";
 
 export interface RenderableEffect {
   name: string;
@@ -88,6 +89,10 @@ export interface RenderableEffect {
   // the effect and the model, so they apply to every effect without any effect knowing
   // (layerSettings.ts).
   layer?: LayerSettings;
+  // Real xLights' Colour panel, beside the swatches: "you can change the Colors that apply to the
+  // effect, as well as the Sparkles, Brightness and Contrast values". They apply to every effect,
+  // so like the layer settings they sit between the effect and the model (colorAdjust.ts).
+  colorAdjust?: ColorAdjust;
   // What the label-driven effects (State, Piano) need and their parameters can't carry: the cells
   // of the timing track this effect names, and the model's own state definitions. Resolved by the
   // caller, because a row renders in isolation and knows nothing of the sequence around it.
@@ -490,6 +495,10 @@ export function renderRowAtMs(
             else if (effect.layer?.persistent) renderPersistent(paint, colors, effect, shownAt, frameMs, seed, audio, geometry.nodes);
             else renderStateless(paint, colors, effect, shownAt, seed, audio, { nodes: geometry.nodes, frameMs });
           });
+          // Before the transition, so a fade in fades what the sliders produced rather than the
+          // sliders brightening a partly-revealed frame back up. The frame number rather than the
+          // time, so sparkles twinkle at the sequence's rate however fast this is being called.
+          applyColorAdjust(target, effect.colorAdjust, Math.floor(shownAt / Math.max(1, frameMs)));
           if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
         });
       },
@@ -566,7 +575,11 @@ export function createRowSequencer(
                 renderStateless(paint, colors, effect, shownAt, seed, audio, { nodes: geometry.nodes, frameMs });
               }
             });
-            if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
+            // Before the transition, so a fade in fades what the sliders produced rather than the
+          // sliders brightening a partly-revealed frame back up. The frame number rather than the
+          // time, so sparkles twinkle at the sequence's rate however fast this is being called.
+          applyColorAdjust(target, effect.colorAdjust, Math.floor(shownAt / Math.max(1, frameMs)));
+          if (effect.transition) applyTransitions(target, effect, atMs, effect.transition);
           });
         },
         blendMode: effect.blendMode ?? "Normal",

@@ -1,7 +1,7 @@
 import type { EffectPreset } from "./effectPresets";
 import type { BackgroundImage } from "./backgroundImage";
 import type { SongBoundary } from "./songRegions";
-import type { BlendMode, FaceSpec, LayerSettings, PictureImage, StateSpec, StoredSwatch, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
+import type { BlendMode, ColorAdjust, FaceSpec, LayerSettings, PictureImage, StateSpec, StoredSwatch, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
 
 export class ApiError extends Error {
   status: number;
@@ -185,6 +185,8 @@ export interface SequenceEffect {
   mix?: number; // 0..1, the "Mix" slider
   // In/out reveals - now the full transition system (engine/transition.ts), not just fades.
   transition?: TransitionSpec;
+  // The rest of the Colour panel: "the Sparkles, Brightness and Contrast values".
+  colorAdjust?: ColorAdjust;
   // Real xLights' Layer Settings panel - transformation, blur and sub-buffer. Applies between
   // the effect and the model, so it works on every effect (engine/layerSettings.ts).
   layer?: LayerSettings;

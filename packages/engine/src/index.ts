@@ -85,3 +85,4 @@ export * from "./groupRenderStyle";
 export * from "./renderFrame";
 export * from "./valueCurve";
 export * from "./transition";
+export * from "./colorAdjust";

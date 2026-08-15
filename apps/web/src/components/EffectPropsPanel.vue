@@ -15,6 +15,7 @@ import {
   isValueCurve,
   midiKeyName,
   type BlendMode,
+  type ColorAdjust,
   type ColorCurve,
   type PictureImage,
   type StoredSwatch,
@@ -34,7 +35,9 @@ import { decodeImageForEffect } from "../lib/pictureImport";
 import SketchEditor from "./SketchEditor.vue";
 import ValueCurveEditor from "./ValueCurveEditor.vue";
 
-const MAX_COLORS = 6; // matches real xLights' Color tab swatch count
+// "Some support just one, some support up to 8." Six was wrong, and low enough to have been
+// hit by anyone building a rainbow.
+const MAX_COLORS = 8;
 
 
 const props = defineProps<{
@@ -44,12 +47,18 @@ const props = defineProps<{
   timingTrackNames?: string[];
   stateDefinitionNames?: string[];
   faceDefinitionNames?: string[];
+  /** How many effects are selected, so the palette's "Update" button knows whether to offer itself. */
+  selectionSize?: number;
   /** The mouth positions the selected face definition actually has. */
   phonemeNames?: string[];
 }>();
 const emit = defineEmits<{
   update: [params: Record<string, EffectParamValue>];
   updatePalette: [palette: StoredSwatch[]];
+  // The Colour panel's other three controls, which apply to any effect.
+  updateColorAdjust: [adjust: ColorAdjust];
+  // "The 'Update' button will apply the current colors palettes to all the selected effects."
+  applyPaletteToSelection: [];
   updateBlend: [patch: { blendMode?: BlendMode; mix?: number }];
   updateTransition: [transition: TransitionSpec];
   updateLayer: [layer: LayerSettings];
@@ -119,6 +128,30 @@ function unmakeCurve(index: number): void {
 }
 function swatchHex(entry: StoredSwatch): string {
   return typeof entry === "string" ? entry : (entry.points[0]?.color ?? "#ffffff");
+}
+
+const colorAdjust = computed<ColorAdjust>(() => props.effect?.colorAdjust ?? {});
+
+const sparkleHex = computed(() => {
+  const c = colorAdjust.value.sparkleColor;
+  if (!c) return "#ffffff";
+  const hex = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${hex(c.r)}${hex(c.g)}${hex(c.b)}`;
+});
+
+function setColorAdjust(changes: Partial<ColorAdjust>): void {
+  emit("updateColorAdjust", { ...colorAdjust.value, ...changes });
+}
+
+function setSparkleColor(hex: string): void {
+  const value = hex.replace("#", "");
+  setColorAdjust({
+    sparkleColor: {
+      r: parseInt(value.slice(0, 2), 16),
+      g: parseInt(value.slice(2, 4), 16),
+      b: parseInt(value.slice(4, 6), 16),
+    },
+  });
 }
 
 function setBlendMode(mode: string): void {
@@ -268,6 +301,49 @@ function curveable(p: EffectParamSpec): boolean {
             @remove="unmakeCurve(i)"
           />
         </template>
+      </div>
+
+      <!-- "From the Color window, you can change the Colors that apply to the effect, as well as
+           the Sparkles, Brightness and Contrast values." -->
+      <div class="blend-panel">
+        <h4>Colour</h4>
+        <label class="blend-row">
+          Sparkles
+          <input
+            type="range"
+            min="0"
+            max="100"
+            :value="colorAdjust.sparkles ?? 0"
+            @input="setColorAdjust({ sparkles: Number(($event.target as HTMLInputElement).value) })"
+          />
+        </label>
+        <label class="blend-row">
+          Sparkle colour
+          <input type="color" :value="sparkleHex" @input="setSparkleColor(($event.target as HTMLInputElement).value)" />
+        </label>
+        <label class="blend-row">
+          Brightness
+          <input
+            type="range"
+            min="-100"
+            max="100"
+            :value="colorAdjust.brightness ?? 0"
+            @input="setColorAdjust({ brightness: Number(($event.target as HTMLInputElement).value) })"
+          />
+        </label>
+        <label class="blend-row">
+          Contrast
+          <input
+            type="range"
+            min="0"
+            max="100"
+            :value="colorAdjust.contrast ?? 0"
+            @input="setColorAdjust({ contrast: Number(($event.target as HTMLInputElement).value) })"
+          />
+        </label>
+        <button v-if="(selectionSize ?? 0) > 1" class="add-swatch" @click="emit('applyPaletteToSelection')">
+          Update — apply this palette to all {{ selectionSize }} selected
+        </button>
       </div>
 
       <div class="blend-panel">
