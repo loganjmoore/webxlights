@@ -4,6 +4,7 @@ import type { SequenceBody, SequenceEffect } from "../lib/api";
 import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
 import { fadeDurationAt } from "../lib/effectFade";
 import { boxFromDrag, idsInBox, isDrag, selectionAfterClick } from "../lib/blockSelect";
+import { acceptedMoves, previewMoves, type DraggedEffect, type GhostPlacement } from "../lib/dragPreview";
 
 export interface GridRow {
   elementType: "model" | "group" | "submodel";
@@ -55,7 +56,9 @@ const emit = defineEmits<{
   selectMany: [ids: string[], reference: string | null];
   place: [row: GridRow, startMs: number, endMs: number];
   dropEffect: [row: GridRow, name: string, startMs: number];
-  move: [effectId: string, startMs: number, endMs: number];
+  // Where the dragged effects landed, on release. One event for the whole drag, so the move is one
+  // undo entry rather than one per pointermove.
+  moveMany: [moves: { id: string; startMs: number; endMs: number; rowIndex: number }[]];
   // Shift+drag on an effect edge: the fade length dragged in from that edge.
   fade: [effectId: string, edge: "left" | "right", durationMs: number];
   seek: [ms: number];
@@ -93,8 +96,11 @@ const scrollTop = ref(0);
 const hoverCursor = ref("crosshair");
 let dragState:
   | { kind: "place"; row: GridRow; startMs: number }
-  | { kind: "move"; effect: SequenceEffect; grabOffsetMs: number }
-  | { kind: "resize"; effect: SequenceEffect; edge: "left" | "right" }
+  // A move is a *proposal* until release: the ghosts show where the block will land, and only the
+  // unblocked ones drop. `dragged` is the whole selected block, since the manual's ghost is
+  // explicitly "the effect (or effects)".
+  | { kind: "move"; dragged: DraggedEffect[]; grabOffsetMs: number; fromRow: number; ghosts: GhostPlacement[] }
+  | { kind: "resize"; effect: SequenceEffect; rowIndex: number; edge: "left" | "right"; ghost: GhostPlacement | null }
   // Shift+resize authors a fade instead of moving the edge (manual: "hold the Shift key and drag
   // the left edge of an effect inwards to create a fade in").
   | { kind: "fade"; effect: SequenceEffect; edge: "left" | "right" }
@@ -267,6 +273,24 @@ function draw(): void {
   ctx.lineTo(px, rect.height);
   ctx.stroke();
 
+  // The ghosts, over the effects but under the band: an outline hidden behind a block would look
+  // like it had stopped following the pointer.
+  const ghosts = dragState?.kind === "move" ? dragState.ghosts : dragState?.kind === "resize" && dragState.ghost ? [dragState.ghost] : [];
+  for (const ghost of ghosts) {
+    const gy = HEADER_HEIGHT + ghost.rowIndex * height - scrollTop.value;
+    if (gy + height < HEADER_HEIGHT || gy > rect.height) continue;
+    const gx1 = msToX(ghost.startMs);
+    const gx2 = msToX(ghost.endMs);
+    // "Only the ghost outlines that would collide with an existing effect turn red" - so the
+    // colour is the answer to "will this one drop", not decoration.
+    ctx.strokeStyle = ghost.blocked ? "#e5534b" : "#8fe0a0";
+    ctx.fillStyle = ghost.blocked ? "rgba(229, 83, 75, 0.18)" : "rgba(143, 224, 160, 0.15)";
+    ctx.lineWidth = 2;
+    ctx.fillRect(gx1, gy + 2, Math.max(2, gx2 - gx1), height - 4);
+    ctx.strokeRect(gx1, gy + 2, Math.max(2, gx2 - gx1), height - 4);
+    ctx.lineWidth = 1;
+  }
+
   // The rubber band, over everything - it is a transient thing you are drawing right now, and
   // having it hide behind an effect would make it look like it had stopped following the pointer.
   if (dragState?.kind === "band" && dragState.dragging) {
@@ -284,6 +308,32 @@ function draw(): void {
 /** The row index a y coordinate falls on, whether or not a row is actually there. */
 function rowIndexAt(y: number): number {
   return Math.floor((y - HEADER_HEIGHT + scrollTop.value) / rowHeight.value);
+}
+
+const MINIMUM_EFFECT_MS = 50;
+
+/** The effect the pointer actually grabbed - the delta is measured from it, then applied to the block. */
+let grabbedEffectId: string | null = null;
+
+/**
+ * The effects a move drag carries: the whole selected block when the grabbed effect is part of it,
+ * otherwise just the one grabbed.
+ *
+ * "Where the effect (or effects) will land" - dragging one effect out of a selection of twelve
+ * more likely means moving the twelve than abandoning the selection.
+ */
+function draggedBlock(grabbed: SequenceEffect, grabbedRow: number, selectedIds: readonly string[]): DraggedEffect[] {
+  grabbedEffectId = grabbed.id;
+  const ids = new Set(selectedIds.includes(grabbed.id) ? selectedIds : [grabbed.id]);
+  const out: DraggedEffect[] = [];
+  props.rows.forEach((row, rowIndex) => {
+    for (const effect of effectsForRow(row)) {
+      if (ids.has(effect.id)) out.push({ id: effect.id, startMs: effect.startMs, endMs: effect.endMs, rowIndex });
+    }
+  });
+  // The grabbed effect is always in, even if the row lookup missed it (a sub-model row shares its
+  // parent's effect list, so the same effect can appear on more than one row).
+  return out.length > 0 ? out : [{ id: grabbed.id, startMs: grabbed.startMs, endMs: grabbed.endMs, rowIndex: grabbedRow }];
 }
 
 /** The effects of every visible row, indexed by row, for the band to be tested against. */
@@ -440,15 +490,30 @@ function onPointerDown(e: PointerEvent): void {
     // effect you want to be the reference"); an ordinary click selects just this one.
     const next = selectionAfterClick(props.selectedEffectIds ?? [], hit.effect.id, e.shiftKey);
     emit("selectMany", next.selected, next.reference);
-    if (e.shiftKey) return; // choosing the reference isn't the start of a drag
-    emit("dragStart");
+    // Shift on the *body* of an effect picks the reference and is not a drag. Shift on an *edge*
+    // is the fade gesture, so it has to get past here - returning on any shift (as this did) made
+    // the fade unreachable the moment reference-picking was added.
+    if (e.shiftKey && !hit.edge) return;
+
+    const rowIndex = rowIndexAt(y);
     if (hit.edge) {
       // Shift turns the edge drag into a fade. The edge itself stays put, which is what makes the
       // two gestures tell each other apart: one changes when the effect runs, the other how it
       // arrives.
-      dragState = { kind: e.shiftKey ? "fade" : "resize", effect: hit.effect, edge: hit.edge };
+      if (e.shiftKey) {
+        emit("dragStart"); // the fade previews by redrawing its own wedge, so it commits live
+        dragState = { kind: "fade", effect: hit.effect, edge: hit.edge };
+      } else {
+        dragState = { kind: "resize", effect: hit.effect, rowIndex, edge: hit.edge, ghost: null };
+      }
     } else {
-      dragState = { kind: "move", effect: hit.effect, grabOffsetMs: xToMs(x) - hit.effect.startMs };
+      dragState = {
+        kind: "move",
+        dragged: draggedBlock(hit.effect, rowIndex, next.selected),
+        grabOffsetMs: xToMs(x) - hit.effect.startMs,
+        fromRow: rowIndex,
+        ghosts: [],
+      };
     }
     return;
   }
@@ -504,13 +569,21 @@ function onPointerMove(e: PointerEvent): void {
   if (dragState.kind === "resize") {
     hoverCursor.value = "col-resize";
     const snapped = snapMs(ms);
-    if (dragState.edge === "right") {
-      const clamped = Math.max(dragState.effect.startMs + 50, snapped);
-      emit("move", dragState.effect.id, dragState.effect.startMs, clamped);
-    } else {
-      const clamped = Math.max(0, Math.min(dragState.effect.endMs - 50, snapped));
-      emit("move", dragState.effect.id, clamped, dragState.effect.endMs);
-    }
+    const effect = dragState.effect;
+    const bounds =
+      dragState.edge === "right"
+        ? { startMs: effect.startMs, endMs: Math.max(effect.startMs + MINIMUM_EFFECT_MS, snapped) }
+        : { startMs: Math.max(0, Math.min(effect.endMs - MINIMUM_EFFECT_MS, snapped)), endMs: effect.endMs };
+    const [ghost] = previewMoves(
+      [{ id: effect.id, ...bounds, rowIndex: dragState.rowIndex }],
+      0,
+      0,
+      effectsByRow(),
+      props.durationMs,
+    );
+    dragState.ghost = ghost ?? null;
+    draw();
+    return;
   }
   if (dragState.kind === "fade") {
     hoverCursor.value = "col-resize";
@@ -521,9 +594,14 @@ function onPointerMove(e: PointerEvent): void {
   }
   if (dragState.kind === "move") {
     hoverCursor.value = "grabbing";
-    const duration = dragState.effect.endMs - dragState.effect.startMs;
-    const newStart = Math.max(0, snapMs(ms - dragState.grabOffsetMs));
-    emit("move", dragState.effect.id, newStart, newStart + duration);
+    // The delta is taken from the effect actually grabbed, then applied to the whole block, so the
+    // block keeps its shape however far it is dragged.
+    const grabbed = dragState.dragged.find((d) => d.id === grabbedEffectId) ?? dragState.dragged[0];
+    if (!grabbed) return;
+    const deltaMs = Math.max(0, snapMs(ms - dragState.grabOffsetMs)) - grabbed.startMs;
+    const deltaRows = rowIndexAt(y) - dragState.fromRow;
+    dragState.ghosts = previewMoves(dragState.dragged, deltaMs, deltaRows, effectsByRow(), props.durationMs);
+    draw();
   }
 }
 
@@ -541,6 +619,24 @@ function onPointerUp(e: PointerEvent): void {
       emit("selectMany", [], null);
       emit("seek", xToMs(band.fromX));
     }
+    draw();
+    return;
+  }
+
+  if (dragState?.kind === "move") {
+    const moves = acceptedMoves(dragState.ghosts, dragState.dragged);
+    dragState = null;
+    grabbedEffectId = null;
+    if (moves.length > 0) emit("moveMany", moves);
+    draw();
+    return;
+  }
+
+  if (dragState?.kind === "resize") {
+    const ghost = dragState.ghost;
+    dragState = null;
+    // A blocked resize releases as no change at all, the same rule the ghosts were showing.
+    if (ghost && !ghost.blocked) emit("moveMany", [{ id: ghost.id, startMs: ghost.startMs, endMs: ghost.endMs, rowIndex: ghost.rowIndex }]);
     draw();
     return;
   }

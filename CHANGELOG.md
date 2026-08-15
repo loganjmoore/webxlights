@@ -1,5 +1,24 @@
 # Changelog
 
+## The ghost outline, and a drag that is a proposal
+
+"While you drag, a 'ghost' outline follows the cursor to show where the effect (or effects) will land when you release the mouse button." And: "when dragging several effects at once, only the ghost outlines that would collide with an existing effect turn red, so you can see exactly which effects are blocked while the rest are free to drop."
+
+The second sentence is why this needed the drag rewritten rather than a rectangle drawn over the old one. Our drag committed on **every pointermove** — which is why it needed a snapshot taken at drag start and carefully *not* taken again per move, and why there was nothing to draw a ghost *of*: the effect was already there.
+
+A drag is now a proposal until the mouse is released. That falls out into several things at once:
+
+- **The ghosts show where the block will land**, in time and across rows.
+- **Colliding ghosts turn red**, and on release the free ones drop while the blocked ones stay where they were. Refusing the whole drag because one of twelve effects overlapped would make block dragging useless on exactly the busy row where you want it.
+- **One drag is one undo entry**, including a drag that changed both the time and the row.
+- The live-mutation-per-move pattern, and the snapshot guard that existed only to survive it, are gone.
+
+**The block stays rigid.** The delta is clamped for the block as a whole rather than per effect: clamping each one separately would let the effect that reaches the start of the sequence stop while the rest kept going, quietly changing the spacing between them.
+
+### A regression fixed on the way
+
+Adding reference-picking in the last change put `if (e.shiftKey) return` at the top of the effect branch — which made the shift-drag fade gesture from the change before it **unreachable**. Both gestures use shift on an effect, and they're told apart by whether the pointer is on an edge, so the early return now only applies to the body of an effect. Found by re-reading the pointerdown path while refactoring it, not by a test — the two gestures were added in consecutive changes and nothing tied them together.
+
 ## Block selection, and the alignment commands it unblocks
 
 The last audit found that three recorded gaps — the align commands, Alt-drag stretching, and the ghost outline — were one gap wearing three hats. All of them need **selecting a block of cells across rows**, which this app had no notion of. This builds it, and then the alignment commands that were the clearest thing waiting on it.

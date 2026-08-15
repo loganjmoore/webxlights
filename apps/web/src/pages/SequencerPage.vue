@@ -852,13 +852,27 @@ function handleDropEffect(row: GridRow, name: string, startMs: number): void {
   });
 }
 
-function handleMove(effectId: string, startMs: number, endMs: number): void {
-  // Live update during a pointermove-driven drag - store.snapshot() already ran once via
-  // handleDragStart, so this must not snapshot again per move or the undo stack fills with
-  // intermediate drag frames (see DECISIONS.md).
-  store.updateEffectLive(effectId, { startMs, endMs });
+/**
+ * A finished drag: where the effects landed.
+ *
+ * One event for the whole drag, so it is one undo entry. This replaced a live update on every
+ * pointermove, which needed a snapshot taken at drag start and carefully *not* taken again per
+ * move - the ghost outline made that unnecessary as well as showing where things will land, since
+ * a drag that hasn't committed yet has nothing to undo.
+ */
+function handleMoves(moves: { id: string; startMs: number; endMs: number; rowIndex: number }[]): void {
+  if (moves.length === 0) return;
+  store.updateEffects(moves.map(({ id, startMs, endMs }) => ({ id, startMs, endMs })));
+  // Row changes after the times, and without a second snapshot: updateEffects already took one, so
+  // a drag that moved an effect to another row is still a single Ctrl+Z.
+  for (const move of moves) {
+    const row = visibleRows.value[move.rowIndex];
+    if (row) store.moveEffectToRowLive(move.id, row.elementType, row.elementId, row.subName);
+  }
 }
 
+// The fade drag still commits live: its preview *is* the wedge the grid draws from the store, so
+// previewing it separately would mean drawing the same thing twice from two sources.
 function handleDragStart(): void {
   store.snapshot();
 }
@@ -2165,7 +2179,7 @@ watch(sequenceId, async (id) => {
             @wheel="openWheel"
             @place="handlePlace"
             @drop-effect="handleDropEffect"
-            @move="handleMove"
+            @move-many="handleMoves"
             @fade="handleFade"
             @seek="seekTo"
             @drag-start="handleDragStart"
