@@ -1,5 +1,24 @@
 # Changelog
 
+## Strands, derived from the wiring
+
+"To add layers at the strand level, click on the Model name in the sequencer to display the Strand names. Then right click on the strand name and choose Add Layer above or below the selected strand."
+
+Which needed a question answered before any of it could be built: what *is* a strand here? It is one string of a multi-string prop — the physical run of lights — and it is not a sub-model. A sub-model is something a person drew; a strand is a fact about how the prop is wired.
+
+The good news on reading the geometry: every node already knows its `string` and its `indexInString`. So a strand needs no new geometry code at all. It is expressible as a node-range sub-model, which means it resolves through the path sub-models already use — including the `parentIndices` writeback that lets anything rendered on a borrowed set of lights actually reach the yard.
+
+- **Derived, never stored.** Strands are a fact about the wiring. A stored copy would go stale the moment someone changed a model's string count, and the symptom would be effects rendering onto lights that had moved.
+- **Nodes in run order**, not the parent's array order. A strand is what a chase travels along, and a strand whose nodes came out shuffled would render a chase as noise.
+- **Ranges are compressed** into the same notation the sub-model editor reads and writes, so a strand is expressible in exactly the terms a hand-written sub-model is — and anyone who wants to start from one can copy it. A 500-node strand would otherwise be a paragraph.
+- The property that makes strand rows safe to render, and the test that pins it: **the strands cover every node exactly once.** No light belongs to two strands and none is left out, so strand rows can't double-light or silently drop part of a prop.
+
+### What's deliberately not here
+
+The sequencer rows. Expanding a model into its strands needs a new row kind threaded through the store, the grid, the `.fseq` export and the package format — and a half-built row kind is worse than none, which is the same call made when block selection was named as a prerequisite and built on its own afterwards.
+
+The geometry half is done and tested, so the row work has nothing left to discover.
+
 ## Layers survive an import
 
 Adding a field to an effect means checking every path that carries an effect somewhere else. Two of the three needed work, and both would have failed silently.

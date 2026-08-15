@@ -6,6 +6,7 @@ export * from "./models/transform";
 export * from "./models/placement";
 export * from "./models/polyPoints";
 export * from "./models/subModel";
+export * from "./models/strands";
 export * from "./models/states";
 export * from "./models/faces";
 export * from "./models/boxedScale";
