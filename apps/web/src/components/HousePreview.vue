@@ -105,6 +105,58 @@ function buildPositions(): Float32Array {
   return positions;
 }
 
+/**
+ * Everything the compose step needs that does NOT depend on the playhead.
+ *
+ * All of this used to be rebuilt inside the per-frame loop: for each model, a
+ * filter over every row in the body for its own effects, then another full-body
+ * filter per strand, then another per sub-model, each feeding a fresh
+ * toRenderableEffects() and a new Map. At 100 rows that is thousands of array
+ * scans and allocations per frame for data that only changes when the sequence
+ * is edited. Rows are indexed once and the per-model inputs are memoised; the
+ * group render plan is hoisted the same way, since only the renderRowAtMs call
+ * inside it depends on time.
+ */
+interface ComposeInputs {
+  own: ReturnType<typeof toRenderableEffects>;
+  strands: Map<string, ReturnType<typeof toRenderableEffects>>;
+  subModels: { spec: NonNullable<ModelRecord["sub_models"]>[number]; effects: ReturnType<typeof toRenderableEffects> }[];
+}
+let composeInputs: ComposeInputs[] = [];
+let groupJobs: ReturnType<typeof planGroupRendering> = [];
+
+function rebuildComposeCache(): void {
+  // key -> effects, so a row lookup is a hash hit instead of a full-body scan.
+  const byKey = new Map<string, SequenceBody["rows"][number]["effects"]>();
+  for (const r of props.body.rows) {
+    const key = `${r.elementType}|${r.elementId}|${r.subName ?? ""}`;
+    const existing = byKey.get(key);
+    if (existing) existing.push(...r.effects);
+    else byKey.set(key, [...r.effects]);
+  }
+  const at = (type: string, id: number, sub?: string) => byKey.get(`${type}|${id}|${sub ?? ""}`) ?? [];
+  const tracks = props.body.timingTracks;
+
+  composeInputs = rowEntries.map((entry) => ({
+    own: toRenderableEffects(at("model", entry.model.id), { timingTracks: tracks, model: entry.model }),
+    strands: new Map(
+      strandSpecs(entry.geometry).map((spec) => [
+        spec.name,
+        toRenderableEffects(at("strand", entry.model.id, spec.name), { timingTracks: tracks }),
+      ]),
+    ),
+    // A sub-model row gets the timing tracks but not the parent's state definitions: a state's
+    // node ranges are numbered against the model they were defined on, so applying them to a
+    // sub-model's own numbering would light the wrong nodes.
+    subModels: (entry.model.sub_models ?? []).map((spec) => ({
+      spec,
+      effects: toRenderableEffects(at("submodel", entry.model.id, spec.name), { timingTracks: tracks }),
+    })),
+  }));
+
+  groupJobs = planGroupRendering(groupRenderSpecs(props.groups ?? [], geometryByModelId(), props.body));
+}
+
 function updateColors(): void {
   if (!points) return;
   const colorAttr = points.geometry.getAttribute("color") as THREE.BufferAttribute;
@@ -114,47 +166,24 @@ function updateColors(): void {
   // effects sit on top of. Rendered once per group rather than once per member, because that is
   // the point of a group render style - one buffer spanning several props.
   const groupBase = new Map<number, RGBA[]>();
-  for (const job of planGroupRendering(groupRenderSpecs(props.groups ?? [], geometryByModelId(), props.body))) {
+  for (const job of groupJobs) {
     const colors = renderRowAtMs(job.row, props.playheadMs, props.frameMs, SEED, DEFAULT_PALETTE, props.audio);
     scatterGroupColors(job, colors, groupBase);
   }
 
-  for (const entry of rowEntries) {
+  for (let e = 0; e < rowEntries.length; e++) {
+    const entry = rowEntries[e]!;
+    const inputs = composeInputs[e];
+    if (!inputs) continue;
     // The compose order lives in lib/composeModel.ts so the screen's copy of these rules can be
     // tested: nothing in this suite mounts a Vue component, and the .fseq export carries its own
     // copy of the same rules. Two implementations, one of them unobserved, is how a show comes to
     // look right on screen and play wrong in the yard.
     const nodeColors = composeModel({
       geometry: entry.geometry,
-      own: toRenderableEffects(
-        props.body.rows
-          .filter((r) => r.elementType === "model" && r.elementId === entry.model.id)
-          .flatMap((r) => r.effects),
-        { timingTracks: props.body.timingTracks, model: entry.model },
-      ),
-      strands: new Map(
-        strandSpecs(entry.geometry).map((spec) => [
-          spec.name,
-          toRenderableEffects(
-            props.body.rows
-              .filter((r) => r.elementType === "strand" && r.elementId === entry.model.id && r.subName === spec.name)
-              .flatMap((r) => r.effects),
-            { timingTracks: props.body.timingTracks },
-          ),
-        ]),
-      ),
-      // A sub-model row gets the timing tracks but not the parent's state definitions: a state's
-      // node ranges are numbered against the model they were defined on, so applying them to a
-      // sub-model's own numbering would light the wrong nodes.
-      subModels: (entry.model.sub_models ?? []).map((spec) => ({
-        spec,
-        effects: toRenderableEffects(
-          props.body.rows
-            .filter((r) => r.elementType === "submodel" && r.elementId === entry.model.id && r.subName === spec.name)
-            .flatMap((r) => r.effects),
-          { timingTracks: props.body.timingTracks },
-        ),
-      })),
+      own: inputs.own,
+      strands: inputs.strands,
+      subModels: inputs.subModels,
       groupBase: groupBase.get(entry.model.id),
       blendGroup: props.blendBetweenModels === true,
       render: ((geometry, effects) =>
@@ -202,6 +231,7 @@ function initScene(): void {
   setup = createScene(container);
 
   buildGeometryCache();
+  rebuildComposeCache();
   const positions = buildPositions();
   const colors = new Float32Array(positions.length);
 
@@ -242,7 +272,25 @@ onBeforeUnmount(() => {
 // change re-traversed the whole sequence body to decide whether it had changed too - affordable
 // four times a second, not sixty, and the playhead is the one that moves every frame.
 watch(() => props.playheadMs, updateColors);
-watch(() => props.body, updateColors, { deep: true });
+// The body watcher also refreshes the memoised compose inputs: they are derived from
+// the body, so anything that invalidates one invalidates the other.
+watch(
+  () => props.body,
+  () => {
+    rebuildComposeCache();
+    updateColors();
+  },
+  { deep: true },
+);
+// Group memberships feed the hoisted group render plan.
+watch(
+  () => props.groups,
+  () => {
+    rebuildComposeCache();
+    updateColors();
+  },
+  { deep: true },
+);
 // `audio` arrives after the track is analysed, which is a repaint even at a stationary
 // playhead - without it a VU Meter sits dark until the next scrub. Watched by identity, not
 // deeply: the series is thousands of frames, and traversing it on every playhead tick would
@@ -252,6 +300,7 @@ watch(
   () => props.models,
   () => {
     buildGeometryCache();
+    rebuildComposeCache();
     if (!points) return;
     const positions = buildPositions();
     points.geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));

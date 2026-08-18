@@ -43,6 +43,9 @@ const router = createRouter({
       component: PanelWindowPage,
       meta: { requiresAuth: true },
     },
+    ...(import.meta.env.DEV
+      ? [{ path: "/dev/bench", component: () => import("../pages/DevBenchPage.vue") }]
+      : []),
   ],
 });
 
