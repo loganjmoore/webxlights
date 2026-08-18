@@ -137,6 +137,60 @@ function allMarks(): number[] {
 }
 
 /**
+ * A plain, non-reactive copy of just what draw() paints, rebuilt when the body changes.
+ *
+ * draw() reads every visible effect's fields once per frame, and `props.body` is a deep
+ * reactive object, so each of those reads went through a Proxy trap. Measured on the
+ * 100-row/5k-effect budget, reading the effects reactively costs ~12x what reading plain
+ * objects does, and that difference - not the canvas calls, which measure under 3ms a
+ * frame - was the bulk of the frame. The canvas never needs reactivity: it is repainted
+ * by an explicit watcher, not by tracking.
+ *
+ * Only the draw path uses this. Hit-testing and the drag handlers still resolve the real
+ * effects, because they emit ids that the store has to be able to find.
+ */
+interface DrawEffect {
+  id: string;
+  name: string;
+  startMs: number;
+  endMs: number;
+  layerIndex?: number;
+  inMs: number;
+  outMs: number;
+}
+let drawIndex = new Map<string, DrawEffect[]>();
+let drawMarks: number[] = [];
+
+function rebuildDrawIndex(): void {
+  drawIndex = new Map();
+  for (const r of props.body.rows) {
+    // Keyed and first-wins to match effectsForRow's Array.find() exactly, so the painted
+    // rows stay identical to the ones hit-testing resolves.
+    const key = `${r.elementType}|${r.elementId}`;
+    if (drawIndex.has(key)) continue;
+    drawIndex.set(
+      key,
+      r.effects.map((e) => ({
+        id: e.id,
+        name: e.name,
+        startMs: e.startMs,
+        endMs: e.endMs,
+        layerIndex: e.layerIndex,
+        inMs: e.transition?.inDurationMs ?? 0,
+        outMs: e.transition?.outDurationMs ?? 0,
+      })),
+    );
+  }
+  drawMarks = props.body.timingTracks.flatMap((t) => [...t.marks]);
+}
+
+function drawEffectsForRow(row: GridRow): DrawEffect[] {
+  const all = drawIndex.get(`${row.elementType}|${row.elementId}`) ?? [];
+  if (row.layerIndex === undefined) return all;
+  return all.filter((e) => (e.layerIndex ?? 0) === row.layerIndex);
+}
+
+/**
  * The marks that snapping acts on.
  *
  * Falls back to every track's when no track is selected, which is what this component did before
@@ -181,16 +235,29 @@ function xToMs(x: number): number {
   return Math.max(0, Math.round((x - ROW_LABEL_WIDTH) / props.pxPerMs));
 }
 
+let ctxCache: CanvasRenderingContext2D | null = null;
+let lastBackingW = 0;
+let lastBackingH = 0;
+
 function draw(): void {
   const canvas = canvasRef.value;
   if (!canvas) return;
-  const ctx = canvas.getContext("2d");
+  const ctx = ctxCache ?? (ctxCache = canvas.getContext("2d"));
   if (!ctx) return;
 
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
+  // Assigning canvas.width/height reallocates and clears the backing store. Doing it
+  // unconditionally meant a full buffer realloc on every playhead tick, sixty times a
+  // second, for a canvas whose size almost never changes.
+  const bw = Math.round(rect.width * dpr);
+  const bh = Math.round(rect.height * dpr);
+  if (bw !== lastBackingW || bh !== lastBackingH) {
+    canvas.width = bw;
+    canvas.height = bh;
+    lastBackingW = bw;
+    lastBackingH = bh;
+  }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   ctx.fillStyle = "#16161b";
@@ -211,7 +278,7 @@ function draw(): void {
     ctx.font = "11px system-ui";
     ctx.fillText(row.name, 8, y + height / 2 + 4, ROW_LABEL_WIDTH - 12);
 
-    for (const effect of effectsForRow(row)) {
+    for (const effect of drawEffectsForRow(row)) {
       const x1 = msToX(effect.startMs);
       const x2 = msToX(effect.endMs);
       const isReference = effect.id === props.selectedEffectId;
@@ -225,7 +292,7 @@ function draw(): void {
       ctx.lineWidth = isReference ? 2 : 1;
       ctx.strokeRect(x1, y + 2, Math.max(2, x2 - x1), height - 4);
       ctx.lineWidth = 1;
-      if (props.showTransitionMarks !== false) drawTransitionMarks(ctx, effect, x1, x2, y, height);
+      if (props.showTransitionMarks !== false) drawTransitionMarks(ctx, effect.inMs, effect.outMs, x1, x2, y, height);
       // The label is drawn last so a transition mark can't sit on top of it. Only when the block
       // is wide enough for the name to be legible at all, which was already the rule.
       if (x2 - x1 > 24) {
@@ -246,7 +313,7 @@ function draw(): void {
   // flag: an effect snapping to a mark that looks the same as one it ignores is the kind of
   // thing you would blame on the snapping being broken.
   const inForce = new Set(activeMarks());
-  for (const ms of allMarks()) {
+  for (const ms of drawMarks) {
     const x = msToX(ms);
     const active = inForce.has(ms);
     ctx.globalAlpha = active ? 1 : 0.35;
@@ -364,17 +431,16 @@ function effectsByRow(): SequenceEffect[][] {
 // nothing is showing yet.
 function drawTransitionMarks(
   ctx: CanvasRenderingContext2D,
-  effect: SequenceEffect,
+  // Durations rather than the effect: the draw path works from the plain snapshot.
+  // Zero is the engine's own default for a missing duration, so an effect carrying only a
+  // transition *type* has no reveal to draw and shouldn't be marked as if it had.
+  inMs: number,
+  outMs: number,
   x1: number,
   x2: number,
   y: number,
   height: number,
 ): void {
-  const transition = effect.transition;
-  // Zero is the engine's own default for a missing duration, so an effect carrying only a
-  // transition *type* has no reveal to draw and shouldn't be marked as if it had.
-  const inMs = transition?.inDurationMs ?? 0;
-  const outMs = transition?.outDurationMs ?? 0;
   if (inMs <= 0 && outMs <= 0) return;
 
   const top = y + 2;
@@ -695,25 +761,41 @@ function onDrop(e: DragEvent): void {
 }
 
 onMounted(() => {
+  rebuildDrawIndex();
   draw();
   window.addEventListener("resize", draw);
 });
 // flush: "post" - draw() reads getBoundingClientRect(), which must run after Vue applies
 // any template-derived inline sizing, not before (pre-flush default risks a stale 0px read
 // on the same tick rows go from empty to populated - see DECISIONS.md M2 bug note).
+//
+// Split from the body watcher below. These all change without the sequence changing, and
+// the playhead changes every frame; sharing one `deep: true` watcher meant Vue re-traversed
+// all 5k effects on every playhead tick just to decide nothing in the body had moved.
 watch(
   () => [
     props.rows,
-    props.body,
     props.playheadMs,
     props.selectedEffectId,
+    props.selectedEffectIds,
     props.pxPerMs,
     props.durationMs,
     props.rowHeight,
     props.showTransitionMarks,
     props.activeTrackIndex,
+    props.colors,
+    props.snapToTiming,
   ],
   draw,
+  { flush: "post" },
+);
+// The one deep watcher left, and the only thing that invalidates the draw snapshot.
+watch(
+  () => props.body,
+  () => {
+    rebuildDrawIndex();
+    draw();
+  },
   { deep: true, flush: "post" },
 );
 </script>
