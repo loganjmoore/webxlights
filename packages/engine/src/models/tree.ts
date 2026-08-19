@@ -4,6 +4,16 @@ import { computeVerticalMatrixTopLeft } from "./matrix";
 export interface TreeParams {
   strings: number;
   nodesPerString: number;
+  /**
+   * Folds per string (xLights' StrandsPerString / parm3), default 1.
+   *
+   * "The Strands per String represents the number of 'folds' in each string of lights. If the
+   * string will go up once and terminate, the Strands per String is 1." A string that goes up,
+   * folds, and comes back down is two strands - so the tree shows `strings x strandsPerString`
+   * vertical lines, and each of them is `nodesPerString / strandsPerString` nodes tall. The
+   * manual's own example: 15 strings at 2 strands each is 30 visual strands.
+   */
+  strandsPerString?: number;
   style?: "Round" | "Flat" | "Ribbon"; // default Round
   degrees?: number; // Round only, default 360
   bottomTopRatio?: number; // default 6.0 (bottom radius = top radius x ratio)
@@ -45,7 +55,22 @@ export function computeTree(params: TreeParams): ModelGeometry {
   // A ratio at or below zero would put the apex on or through the axis and turn the cone inside
   // out; 1 is a cylinder, which is an unusual tree but a legitimate one, and stays allowed.
   const bottomTopRatio = Math.max(params.bottomTopRatio ?? 6.0, 1e-6);
-  const geo = computeVerticalMatrixTopLeft({ strings: params.strings, nodesPerString: params.nodesPerString });
+
+  // Folding a string turns it into several vertical lines side by side, each a fraction as tall.
+  // Ignoring it - which this did - gets a tree wrong twice over: a 16-string tree with 4 strands
+  // apiece drew 16 lines instead of 64, and drew them four times taller than they are, because
+  // all 50 nodes went into one run instead of four of twelve.
+  //
+  // Only folded when it divides evenly. xLights derives nodes-per-string from the fold count, so
+  // real files always do; a file where it doesn't is either hand-edited or from a version that
+  // meant something else by it, and dropping the remainder would silently move every channel
+  // after this model.
+  const strands = Math.max(Math.trunc(params.strandsPerString ?? 1), 1);
+  const folds = strands > 1 && params.nodesPerString % strands === 0 ? strands : 1;
+  const geo = computeVerticalMatrixTopLeft({
+    strings: params.strings * folds,
+    nodesPerString: params.nodesPerString / folds,
+  });
 
   // Height in node units: a 50-node string is 49 units tall, the same as a 50-node line.
   const heightUnits = Math.max(geo.height - 1, 1);

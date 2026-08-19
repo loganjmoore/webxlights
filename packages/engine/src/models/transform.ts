@@ -39,9 +39,19 @@ export function nodeWorldOffset(
   center: { x: number; y: number },
   transform: ScreenTransform,
 ): { x: number; y: number; z: number } {
-  const scaleX = transform.scale ?? 1;
-  const scaleY = transform.scaleY ?? scaleX;
-  const scaleZ = transform.scaleZ ?? scaleX;
+  // Magnitudes. A negative scale is a frame convention, not an instruction to mirror - xLights'
+  // model-local Y runs the other way from ours (models/matrix.ts), so a show writes ScaleY
+  // negative to stand a model up the right way, and applying that sign to geometry that is
+  // already the right way up turns it over. A mega tree stood on its point is the visible case.
+  //
+  // The importer has taken the magnitude since it learned about placement systems, but only on
+  // the way in: a layout imported before that still holds the negative in its saved screen, and
+  // nothing in the app would ever correct it. Taking it here too means the rule holds for data
+  // already stored, and this is the one function every renderer and every bounds computation
+  // goes through - so there is no second place to forget it.
+  const scaleX = Math.abs(transform.scale ?? 1);
+  const scaleY = Math.abs(transform.scaleY ?? scaleX);
+  const scaleZ = Math.abs(transform.scaleZ ?? scaleX);
   const dx = (node.screenX - center.x) * scaleX;
   const dy = (node.screenY - center.y) * scaleY;
   // Depth is measured from the model's own axis (0), not from a centre - a cone's nodes wrap

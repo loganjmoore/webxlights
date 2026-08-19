@@ -99,6 +99,7 @@ export function computeGeometryFromAttrs(displayAs: string, attrs: Record<string
       return computeTree({
         strings: count(attrs, ["NumStrings", "parm1"], 16),
         nodesPerString: count(attrs, ["NodesPerString", "parm2"], 50),
+        strandsPerString: count(attrs, ["StrandsPerString", "parm3"], 1),
         style,
         degrees: float(attrs.TreeDegrees, 360),
         bottomTopRatio: float(attrs.TreeBottomTopRatio, 6.0),

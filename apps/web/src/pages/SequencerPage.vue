@@ -768,28 +768,61 @@ async function loadStoredAudio(): Promise<boolean> {
   }
 }
 
+// The transport runs on its own clock, and treats the audio element as a *source* of time rather
+// than as the thing that decides whether time passes at all.
+//
+// It used to be the other way round: every one of these functions began `const el = audioEl.value;
+// if (!el) return;`, and the element itself is `v-if="audioUrl"` - it does not exist until a track
+// has been loaded into this browser session. So a sequence with no audio, or one whose audio
+// hadn't been re-picked after a reload, could not play at all: pressing space did nothing, the
+// playhead never moved, and the preview sat on whatever frame it was last given. That reads
+// exactly like a frozen preview, because it is one.
+//
+// The same failure had a second door: `playing` was set only by the element's own `play` event,
+// so an `el.play()` rejected by the browser's autoplay policy left the flag false and the clock
+// stopped, with nothing on screen to say why.
 function togglePlay(): void {
-  const el = audioEl.value;
-  if (!el) return;
   if (playing.value) {
-    el.pause();
+    pausePlayback();
     return;
   }
   // "Highlighting a portion of the waveform will cause only that section to be played. Pressing
   // the spacebar will replay that section."
   const start = startOfPlay(playRange.value, playheadMs.value);
-  if (start !== null) {
-    el.currentTime = start / 1000;
-    playheadMs.value = start;
+  if (start !== null) playheadMs.value = start;
+  const el = audioEl.value;
+  if (el) {
+    el.currentTime = playheadMs.value / 1000;
+    // A rejection is not fatal any more - the sequence plays silently rather than not at all.
+    void el.play().catch(() => {});
   }
-  void el.play();
+  playing.value = true;
+}
+
+function pausePlayback(): void {
+  playing.value = false;
+  audioEl.value?.pause();
+}
+
+/**
+ * The element pausing itself - the end of the track, or the user reaching its native controls.
+ *
+ * Not treated as "stop the transport" when the sequence is longer than its audio: the lights
+ * carry on to the end of the sequence, which is what the remaining frames are for.
+ */
+function onAudioPause(): void {
+  const durationMs = store.sequence?.duration_ms ?? 0;
+  if (playing.value && playheadMs.value < durationMs) return;
+  playing.value = false;
 }
 
 function stop(): void {
+  playing.value = false;
   const el = audioEl.value;
-  if (!el) return;
-  el.pause();
-  el.currentTime = 0;
+  if (el) {
+    el.pause();
+    el.currentTime = 0;
+  }
   playheadMs.value = 0;
 }
 
@@ -880,15 +913,51 @@ function syncPlayheadFromAudio(): void {
 // to receive a transport message only on play/pause and on a command from its own controls: it
 // sat frozen on the frame play started at until you pressed something.
 let playbackRaf: number | null = null;
+// Kept as a float so a 16.67ms frame doesn't lose a third of a millisecond to rounding on every
+// tick - which is two seconds of drift across a five-minute song.
+let clockMs = 0;
+let lastFrameAt = 0;
 
 function startPlaybackFrames(): void {
   if (playbackRaf !== null) return;
+  clockMs = playheadMs.value;
+  lastFrameAt = performance.now();
   const tick = (): void => {
     if (!playing.value) {
       playbackRaf = null;
       return;
     }
-    syncPlayheadFromAudio();
+    const now = performance.now();
+    const el = audioEl.value;
+    if (el && !el.paused && !el.ended) {
+      // Audio is the master clock whenever it is actually running: a light show that drifts
+      // against its own music is worse than one that stutters, and the element's clock is the
+      // one the speakers are following.
+      clockMs = el.currentTime * 1000;
+    } else {
+      // No track, or the browser refused to start it. Wall-clock time keeps the sequence moving
+      // at the right speed with nothing to sync to.
+      clockMs += now - lastFrameAt;
+    }
+    lastFrameAt = now;
+
+    const durationMs = store.sequence?.duration_ms ?? 0;
+    const jumpTo = loopWithin(playRange.value, Math.round(clockMs), true);
+    if (jumpTo !== null) {
+      clockMs = jumpTo;
+      if (el) el.currentTime = jumpTo / 1000;
+    } else if (durationMs > 0 && clockMs >= durationMs) {
+      // The end, for a run that isn't following an audio element - which would have fired
+      // `ended` for us.
+      clockMs = durationMs;
+      playheadMs.value = durationMs;
+      pausePlayback();
+      broadcastTransport();
+      playbackRaf = null;
+      return;
+    }
+
+    playheadMs.value = Math.round(clockMs);
     broadcastTransport();
     playbackRaf = requestAnimationFrame(tick);
   };
@@ -2850,7 +2919,7 @@ watch(sequenceId, async (id) => {
       ref="audioEl"
       :src="audioUrl"
       @play="playing = true"
-      @pause="playing = false"
+      @pause="onAudioPause"
       @timeupdate="onTimeUpdate"
       @ended="playing = false"
     ></audio>

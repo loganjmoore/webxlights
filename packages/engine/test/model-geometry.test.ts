@@ -88,6 +88,36 @@ describe("Tree screen shape", () => {
     return { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
   };
 
+  it("folds a string into strands, so a tree shows strings x strands vertical lines", () => {
+    // "The Strands per String represents the number of 'folds' in each string of lights." The
+    // manual's own example is 15 strings at 2 strands each making 30 visual strands.
+    const geo = computeTree({ strings: 15, nodesPerString: 50, strandsPerString: 2 });
+    expect(geo.width).toBe(30);
+    expect(geo.height).toBe(25); // each fold is half as tall
+    expect(geo.nodes.length).toBe(15 * 50); // and the same lights, wired differently
+  });
+
+  it("leaves a tree alone when a fold wouldn't divide evenly", () => {
+    // Dropping the remainder would move every channel after this model, which is a worse answer
+    // than declining to fold a file that shouldn't have been written that way.
+    const geo = computeTree({ strings: 16, nodesPerString: 50, strandsPerString: 4 });
+    expect(geo.width).toBe(16);
+    expect(geo.nodes.length).toBe(16 * 50);
+  });
+
+  it("keeps its shape when a string is folded", () => {
+    // The taper is a property of the tree, not of how its lights are wired.
+    const plain = computeTree({ strings: 16, nodesPerString: 48 });
+    const folded = computeTree({ strings: 16, nodesPerString: 48, strandsPerString: 4 });
+    const aspect = (g: ReturnType<typeof computeTree>) => {
+      const xs = g.nodes.map((n) => n.screenX);
+      const ys = g.nodes.map((n) => n.screenY);
+      return (Math.max(...xs) - Math.min(...xs)) / (Math.max(...ys) - Math.min(...ys));
+    };
+    expect(aspect(folded)).toBeCloseTo(aspect(plain), 6);
+    expect(folded.width).toBe(64);
+  });
+
   it("is widest at the base and narrowest at the apex", () => {
     // The orientation test. `bufY` counts up from the bottom, and both renderers draw larger
     // world Y higher up the screen, so the base is bufY=0. A cone that had this backwards would
