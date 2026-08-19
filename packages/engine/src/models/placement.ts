@@ -57,6 +57,9 @@ export interface PlacedScreen {
   scaleY?: number;
   scaleZ?: number;
   rotate: number;
+  /** RotateX / RotateY, which tip and swing a model out of the plane it is authored in. */
+  rotateX: number;
+  rotateY: number;
 }
 
 function num(attrs: Record<string, string>, key: string, fallback: number): number {
@@ -147,6 +150,8 @@ export function screenFromAttrs(
   if (system === "boxed") {
     const perLocal = unitsPerLocal || 1;
     const rotate = num(attrs, "RotateZ", 0);
+    const rotateX = num(attrs, "RotateX", 0);
+    const rotateY = num(attrs, "RotateY", 0);
     // A boxed model's scale carries a sign, and taking it at face value turned trees upside
     // down. xLights' model-local Y runs the other way from ours - its render buffer's row 0 is
     // the top, ours is the bottom (models/matrix.ts) - so a negative scale there is how a model
@@ -176,6 +181,8 @@ export function screenFromAttrs(
         scaleY: sy === undefined ? undefined : sy / (size.height * perLocal),
         scaleZ: sz === undefined ? undefined : sz / (size.width * perLocal),
         rotate,
+        rotateX,
+        rotateY,
       };
     }
 
@@ -194,6 +201,8 @@ export function screenFromAttrs(
       scaleY: sy === undefined ? undefined : sy / perLocal,
       scaleZ: sz === undefined ? undefined : sz / perLocal,
       rotate,
+      rotateX,
+      rotateY,
     };
   }
 
@@ -220,6 +229,8 @@ export function screenFromAttrs(
       scaleY: scale,
       scaleZ: scale,
       rotate: 0,
+      rotateX: num(attrs, "RotateX", 0),
+      rotateY: num(attrs, "RotateY", 0),
     };
   }
 
@@ -250,13 +261,18 @@ export function screenFromAttrs(
   const backwards = rawRotate > 90 || rawRotate <= -90;
   const rotate = backwards ? rawRotate - Math.sign(rawRotate) * 180 : rawRotate;
   const mirror = backwards ? -1 : 1;
+  // A two/three-point model takes its Z angle from its endpoints, but a tip out of the vertical
+  // plane still has to come from the file - an arch laid flat on a lawn is RotateX, and nothing
+  // about its two endpoints says so.
+  const rotateX = num(attrs, "RotateX", 0);
+  const rotateY = num(attrs, "RotateY", 0);
   const scale = (mirror * length) / (size.width * unitsPerLocal);
 
   if (system === "twoPoint") {
     // Nothing in the XML constrains the perpendicular axis, so it stays proportional. The
     // mirror belongs to X alone - it's a direction, not a size - so Y takes the magnitude.
     const perpendicular = Math.abs(scale);
-    return { x, y, z, scale, scaleY: perpendicular, scaleZ: perpendicular, rotate };
+    return { x, y, z, scale, scaleY: perpendicular, scaleZ: perpendicular, rotate, rotateX, rotateY };
   }
 
   // Three point: Height is a multiple of the model's length (xLights' own convention - an arch
@@ -270,12 +286,12 @@ export function screenFromAttrs(
   const heightAttr = attrs.Height ?? attrs.height;
   if (heightAttr === undefined) {
     const perpendicular = Math.abs(scale);
-    return { x, y, z, scale, scaleY: perpendicular, scaleZ: perpendicular, rotate };
+    return { x, y, z, scale, scaleY: perpendicular, scaleZ: perpendicular, rotate, rotateX, rotateY };
   }
   // Height carries its own sign, and that sign is the one thing that should be able to turn the
   // arc over - xLights' third handle can be dragged below the line. It is deliberately not
   // combined with the mirror above: doing both is what flipped a right-to-left arch.
   const height = numAny(attrs, ["Height", "height"], 1);
   const scaleY = (length * height) / (size.height * unitsPerLocal);
-  return { x, y, z, scale, scaleY, scaleZ: Math.abs(scale), rotate };
+  return { x, y, z, scale, scaleY, scaleZ: Math.abs(scale), rotate, rotateX, rotateY };
 }

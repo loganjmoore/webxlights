@@ -24,6 +24,16 @@ export interface ScreenTransform {
   // consistent between 2D/3D, but a real fidelity gap if xLights turns out to use the opposite
   // sign convention.
   rotateDeg?: number;
+  /**
+   * Rotation about the X axis, in degrees - xLights' RotateX.
+   *
+   * Tips a model out of the vertical plane it is authored in. A flat stake or a sign lies in the
+   * X/Y plane by default and stands up, lies down, or leans by this; ignoring it (which we did)
+   * leaves every such prop standing bolt upright regardless of what the show says.
+   */
+  rotateXDeg?: number;
+  /** Rotation about the Y axis, in degrees - xLights' RotateY. Swings a model to face elsewhere. */
+  rotateYDeg?: number;
 }
 
 export function geometryCenter(geo: ModelGeometry): { x: number; y: number } {
@@ -57,12 +67,36 @@ export function nodeWorldOffset(
   // Depth is measured from the model's own axis (0), not from a centre - a cone's nodes wrap
   // symmetrically about it already.
   const dz = (node.screenZ ?? 0) * scaleZ;
-  const rad = ((transform.rotateDeg ?? 0) * Math.PI) / 180;
-  // RotateZ spins the model in its own X/Y plane, so depth is unchanged by it.
-  if (rad === 0) return { x: dx, y: dy, z: dz };
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  return { x: dx * cos - dy * sin, y: dx * sin + dy * cos, z: dz };
+  // Z first, then X, then Y - the order xLights applies them in, and the reason it matters is
+  // that rotations don't commute: a stake tipped back and then swung round does not land where
+  // one swung round and then tipped back does.
+  let x = dx;
+  let y = dy;
+  let z = dz;
+
+  const radZ = ((transform.rotateDeg ?? 0) * Math.PI) / 180;
+  if (radZ !== 0) {
+    // RotateZ spins the model in its own X/Y plane, so depth is unchanged by it.
+    const cos = Math.cos(radZ);
+    const sin = Math.sin(radZ);
+    [x, y] = [x * cos - y * sin, x * sin + y * cos];
+  }
+
+  const radX = ((transform.rotateXDeg ?? 0) * Math.PI) / 180;
+  if (radX !== 0) {
+    const cos = Math.cos(radX);
+    const sin = Math.sin(radX);
+    [y, z] = [y * cos - z * sin, y * sin + z * cos];
+  }
+
+  const radY = ((transform.rotateYDeg ?? 0) * Math.PI) / 180;
+  if (radY !== 0) {
+    const cos = Math.cos(radY);
+    const sin = Math.sin(radY);
+    [x, z] = [x * cos + z * sin, -x * sin + z * cos];
+  }
+
+  return { x, y, z };
 }
 
 // Half-extents of the *transformed* (scaled + rotated) shape, still centered on the anchor by

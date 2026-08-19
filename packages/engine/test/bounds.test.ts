@@ -32,15 +32,15 @@ describe("geometryScreenBounds", () => {
   it("a Tree's real width comes from its shape, not the strings count", () => {
     const geo = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: 6 });
     const b = geometryScreenBounds(geo);
-    // The widest row is the base, which is sized against the tree's height in node units - so
-    // ~37 for a 50-node string, and nothing like `strings` (16, which is the buffer width
-    // geo.width would report).
+    // The widest row is the base, sized against the tree's height in node units at xLights' own
+    // aspect (`RenderWi = RenderHt / 1.8`) - so ~27 for a 50-node string, and nothing like
+    // `strings` (16, which is the buffer width geo.width would report).
     //
     // This used to expect ~12: the base radius in raw `bottomTopRatio` units, back when that
     // ratio was doubling as a length. That was the bug - the height beside it was a real count
     // of nodes, so the cone came out 51 tall and 12 wide. The number here changed; what the
     // test is *for* did not.
-    expect(b.maxX - b.minX).toBeCloseTo(36.75, 1);
+    expect(b.maxX - b.minX).toBeCloseTo(49 / 1.8, 1);
   });
 
   it("returns a degenerate zero box for an empty geometry, not NaN/Infinity", () => {

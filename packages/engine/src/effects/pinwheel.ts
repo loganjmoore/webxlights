@@ -18,7 +18,19 @@ export function renderPinwheel(buffer: RenderBuffer, palette: RGBA[], params: Pi
   const pos = ctx.frameIndexInEffect * params.speed;
   const degreesPerArm = 360 / params.arms;
   const maxRadius = (Math.hypot(W, H) / 2) * (params.armSizePct / 100);
-  const tmax = Math.max(1, (params.thicknessPct / 100) * degreesPerArm);
+  // xLights: `if (pinwheel_thickness == 0) pinwheel_thickness = 1;` then
+  // `tmax = (pinwheel_thickness / 100.0) * degrees_per_arm` - so the default thickness of 0 gives
+  // an arm about a degree wide.
+  //
+  // It draws its arms as lines, though, and this tests each pixel's own angle instead. A one
+  // degree arm is thinner than the angle a single pixel subtends, so it lands between pixels for
+  // most rotations: with the frame index frozen at 0 that showed up as a dim wheel, and the
+  // moment the frame index started advancing it became a wheel that blinks out for two frames in
+  // every three. The floor is the angle one pixel covers at the arm's tip, which is the width at
+  // which "an arm is here" can be answered per pixel at all.
+  const thickness = params.thicknessPct === 0 ? 1 : params.thicknessPct;
+  const pixelDegrees = maxRadius > 0.001 ? 180 / Math.PI / maxRadius : degreesPerArm;
+  const tmax = Math.max((thickness / 100) * degreesPerArm, pixelDegrees);
   const xc = W / 2;
   const yc = H / 2;
 

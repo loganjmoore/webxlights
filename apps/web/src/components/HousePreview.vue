@@ -18,6 +18,7 @@ import type { ModelGroupRecord, ModelRecord, SequenceBody } from "../lib/api";
 import { groupRenderSpecs } from "../lib/groupRendering";
 import { composeModel, type RenderRow } from "../lib/composeModel";
 import { toRenderableEffects } from "../lib/renderableEffects";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 
 const props = defineProps<{
@@ -42,6 +43,7 @@ const NODE_SPACING = 4; // matches LayoutCanvas's local-unit-to-px scale
 const containerRef = ref<HTMLDivElement | null>(null);
 let setup: SceneSetup | null = null;
 let points: THREE.Points | null = null;
+let orbit: OrbitControls | null = null;
 let rafId: number | null = null;
 
 interface RowEntry {
@@ -92,6 +94,8 @@ function buildPositions(): Float32Array {
       scaleY: entry.model.screen.scaleY,
       scaleZ: entry.model.screen.scaleZ,
       rotateDeg: entry.model.screen.rotate ?? 0,
+      rotateXDeg: entry.model.screen.rotateX ?? 0,
+      rotateYDeg: entry.model.screen.rotateY ?? 0,
     };
     const center = geometryCenter(entry.geometry);
     entry.geometry.nodes.forEach((node, i) => {
@@ -218,10 +222,19 @@ function fitCameraToScene(): void {
   const span = Math.max(maxX - minX, maxY - minY, 10);
   const { camera } = setup;
   camera.position.set(cx, cy, span * 1.3);
-  camera.lookAt(cx, cy, 0);
   camera.near = 1;
-  camera.far = span * 5;
+  // Far enough to keep the yard in view after the camera has been pulled well back by hand -
+  // the old span x 5 clipped the show out of existence a couple of wheel notches out.
+  camera.far = span * 40;
   camera.updateProjectionMatrix();
+  // Orbiting turns about this point, so it has to be told where the show is; setting it after
+  // the camera means lookAt is redundant - OrbitControls.update() does it.
+  if (orbit) {
+    orbit.target.set(cx, cy, 0);
+    orbit.update();
+  } else {
+    camera.lookAt(cx, cy, 0);
+  }
 }
 
 function initScene(): void {
@@ -229,6 +242,16 @@ function initScene(): void {
   if (!container) return;
 
   setup = createScene(container);
+
+  // Look around the show while it plays: drag to orbit, right-drag to pan, wheel to zoom. The
+  // preview is a 3D scene and always has been - it just had a fixed camera pointed at the whole
+  // yard, which is the one view that can't show you whether the far side of a mega tree is
+  // lighting up, or what a prop at the back is doing.
+  //
+  // Damping off: it keeps animating for a beat after the pointer stops, and this component
+  // already redraws every frame during playback. "Reset view" is how you get back.
+  orbit = new OrbitControls(setup.camera, setup.renderer.domElement);
+  orbit.enableDamping = false;
 
   buildGeometryCache();
   rebuildComposeCache();
@@ -246,6 +269,7 @@ function initScene(): void {
   updateColors();
 
   const animate = () => {
+    orbit?.update();
     if (setup) setup.renderer.render(setup.scene, setup.camera);
     rafId = requestAnimationFrame(animate);
   };
@@ -312,10 +336,35 @@ watch(
 </script>
 
 <template>
-  <div ref="containerRef" class="house-preview"></div>
+  <div class="house-preview-wrap">
+    <div ref="containerRef" class="house-preview"></div>
+    <button type="button" class="reset-view" title="Back to the whole yard" @click="fitCameraToScene">Reset view</button>
+  </div>
 </template>
 
 <style scoped>
+.house-preview-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.reset-view {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  background: rgba(20, 20, 26, 0.75);
+  color: #cfcfd8;
+  border: 1px solid #3a3a44;
+  cursor: pointer;
+  /* Only in the way while you are looking at the corner it sits in. */
+  opacity: 0.55;
+}
+.reset-view:hover {
+  opacity: 1;
+}
 .house-preview {
   width: 100%;
   height: 100%;

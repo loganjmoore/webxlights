@@ -29,10 +29,24 @@ export const SUPPORTED_DISPLAY_AS = [
 const LEGACY_DISPLAY_AS: Record<string, string> = {
   "Vert Matrix": "Matrix",
   "Horiz Matrix": "Matrix",
-  "Tree 360": "Tree",
-  "Tree Flat": "Tree",
-  "Tree Ribbon": "Tree",
 };
+
+/**
+ * The family a `DisplayAs` belongs to, so downstream switches can stay on the plain names.
+ *
+ * Trees are matched by prefix rather than by a list of three. xLights: "Handle legacy compound
+ * tree values: 'Tree 360', 'Tree Flat', 'Tree Ribbon', etc." - the suffix is open-ended, since it
+ * carries the tree's degrees, so a spelled-out list silently drops every angle nobody thought to
+ * write down. "Tree 270" and "Tree 180" were both being imported as unsupported.
+ *
+ * What is normalised away here - which kind of matrix, how many degrees of tree - is recoverable
+ * from `attrs.DisplayAs`, which keeps xLights' own string verbatim.
+ */
+function displayAsFamily(raw: string): string {
+  if (LEGACY_DISPLAY_AS[raw]) return LEGACY_DISPLAY_AS[raw];
+  if (raw.startsWith("Tree ") && raw.length > 5) return "Tree";
+  return raw;
+}
 
 // A named subset of a model's nodes, addressable in the sequencer as its own row. xLights
 // stores these as <subModel> elements nested inside <model>, not as attributes, which is why
@@ -246,7 +260,7 @@ export function parseRgbEffectsXml(xml: string): ParsedRgbEffects {
 
   for (const m of rawModels) {
     const rawDisplayAs = m.DisplayAs ?? "";
-    const displayAs = LEGACY_DISPLAY_AS[rawDisplayAs] ?? rawDisplayAs;
+    const displayAs = displayAsFamily(rawDisplayAs);
     const supported = (SUPPORTED_DISPLAY_AS as readonly string[]).includes(displayAs);
     if (!supported) unsupported.add(displayAs);
     models.push({
