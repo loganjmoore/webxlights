@@ -20,17 +20,13 @@ export interface TreeParams {
 }
 
 /**
- * How wide a tree is at the base, as a fraction of its height.
+ * How wide a tree is, as a fraction of its height - xLights' own number, not a guess.
  *
- * A default, not a derivation, and the one number here that isn't forced. It can't come from the
- * node counts: in a real mega tree the nodes along a string sit inches apart while the strings
- * at the base are spread a foot or more around the hoop, so `ringRadiusForNodeCount(strings)` -
- * the right answer for a Circle or a Wreath - would assume the base is packed as densely as a
- * string is and give a 16 x 50 tree a base 5 units across against a height of 49. In xLights the
- * width comes from the model's own box, and ours is set by ScaleX; this is what it looks like
- * before anyone sizes it. 0.75 is roughly a real mega tree (an 8ft hoop under a 12ft peak).
+ * `TreeModel::SetTreeCoord`: `RenderHt = BufferHt * 3; RenderWi = ((double)RenderHt) / 1.8;`
+ * so the widest part of the tree is its height over 1.8. This was 0.75, picked to look like a
+ * real mega tree, which is close but not what xLights draws.
  */
-const BASE_WIDTH_PER_HEIGHT = 0.75;
+const WIDTH_PER_HEIGHT = 1 / 1.8;
 
 // SPEC ch4: "subclass of MatrixModel... Buffer identical to matrix; screen coords wrap
 // strands around a cone" (Round), a flat fan (Flat), or a vertical ribbon strip (Ribbon).
@@ -52,9 +48,7 @@ const BASE_WIDTH_PER_HEIGHT = 0.75;
 export function computeTree(params: TreeParams): ModelGeometry {
   const style = params.style ?? "Round";
   const degrees = params.degrees ?? 360;
-  // A ratio at or below zero would put the apex on or through the axis and turn the cone inside
-  // out; 1 is a cylinder, which is an unusual tree but a legitimate one, and stays allowed.
-  const bottomTopRatio = Math.max(params.bottomTopRatio ?? 6.0, 1e-6);
+  const bottomTopRatio = params.bottomTopRatio ?? 6.0;
 
   // Folding a string turns it into several vertical lines side by side, each a fraction as tall.
   // Ignoring it - which this did - gets a tree wrong twice over: a 16-string tree with 4 strands
@@ -74,7 +68,30 @@ export function computeTree(params: TreeParams): ModelGeometry {
 
   // Height in node units: a 50-node string is 49 units tall, the same as a 50-node line.
   const heightUnits = Math.max(geo.height - 1, 1);
-  const baseRadius = (heightUnits * BASE_WIDTH_PER_HEIGHT) / 2;
+
+  // The two radii, exactly as TreeModel::SetTreeCoord derives them:
+  //
+  //     double radius = RenderWi / 2.0;
+  //     if (_botTopRatio != 0.0f) { topradius = radius / std::abs(_botTopRatio); }
+  //     if (_botTopRatio < 0.0f) { std::swap(topradius, radius); }
+  //
+  // The magnitude sets the taper and the *sign* decides which end is wide - a negative ratio is
+  // how xLights writes a tree that flares upward, and it is a value real files carry.
+  //
+  // This used to clamp the ratio to a minimum of 1e-6 to keep it away from zero, which quietly
+  // turned a stored -6 into a top radius a million times the base: an upside-down cone wide
+  // enough to fill the whole yard. That is the giant inverted fan trees have been rendering as.
+  let bottomRadius = (heightUnits * WIDTH_PER_HEIGHT) / 2;
+  let topRadius = bottomTopRatio !== 0 ? bottomRadius / Math.abs(bottomTopRatio) : bottomRadius;
+  if (bottomTopRatio < 0) [bottomRadius, topRadius] = [topRadius, bottomRadius];
+
+  // `StartAngle = -radians / 2` and `AngleIncr = radians / BufferWi`, except that a tree which
+  // isn't nearly a full circle divides by `BufferWi - 1` so its last strand lands exactly on the
+  // far edge rather than one step short of it. Centred on zero, so a part-circle tree faces the
+  // viewer instead of starting at one side.
+  const radians = (degrees * Math.PI) / 180;
+  const startAngle = -radians / 2;
+  const angleIncrement = degrees < 350 && geo.width > 1 ? radians / (geo.width - 1) : radians / geo.width;
 
   for (const node of geo.nodes) {
     // 0 at the base, 1 at the apex. `bufY` counts up from the bottom: the matrix's Top Left
@@ -82,7 +99,6 @@ export function computeTree(params: TreeParams): ModelGeometry {
     // higher up the screen (LayoutCanvas.vue flips the Y *pixel* value for a top-left canvas
     // origin, not the up/down sense itself).
     const heightT = geo.height > 1 ? node.bufY / (geo.height - 1) : 0;
-    const strandT = geo.width > 1 ? node.bufX / geo.width : 0;
 
     if (style === "Ribbon") {
       node.screenX = node.bufX;
@@ -90,12 +106,14 @@ export function computeTree(params: TreeParams): ModelGeometry {
       continue;
     }
 
-    // Base radius at the bottom, base/ratio at the apex - so bottom/top is exactly
-    // `bottomTopRatio`, per this parameter's own doc comment ("bottom radius = top radius x
-    // ratio"), and the widest part is at the bottom.
-    const radius = baseRadius * ((1 - heightT) + heightT / bottomTopRatio);
-    const angle = (strandT * (degrees * Math.PI)) / 180;
-    node.screenX = Math.cos(angle) * radius;
+    // Interpolated up the strand between the two radii, the way xLights does it:
+    // `screenX = xb + (xt - xb) * posOnString`, with posOnString 0 at the base.
+    const radius = bottomRadius + (topRadius - bottomRadius) * heightT;
+    const angle = startAngle + node.bufX * angleIncrement;
+    // sin for X and cos for Z, matching `xb = radius * sin(angle)` / `zb = radius * cos(angle)`.
+    // It only shows on a tree that isn't a full circle: with these the other way round, a 180
+    // degree tree faces sideways instead of at the house.
+    node.screenX = Math.sin(angle) * radius;
     node.screenY = node.bufY;
     if (style !== "Flat") {
       // Round: the strands wrap around a cone, so the wrap belongs on the Z axis. Folding it
@@ -103,7 +121,7 @@ export function computeTree(params: TreeParams): ModelGeometry {
       // 2D and 3D views - the single most visible difference against real xLights' 3D layout,
       // where a mega tree reads as a cone with an elliptical base. Z is in the same node units
       // as X, so the cone is as deep as it is wide.
-      node.screenZ = Math.sin(angle) * radius;
+        node.screenZ = Math.cos(angle) * radius;
     }
   }
   return geo;

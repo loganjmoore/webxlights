@@ -175,7 +175,18 @@ function renderStateless(
 ): void {
   const palette = rowPalette; // already resolved for this frame and position (colorCurve.ts)
   const positionInEffect01 = positionOf(effect, atMs);
-  const frameIndexInEffect = 0; // shimmer/parity-only field; scrubbing doesn't track frame parity
+  // Frames since the effect started, which is what the field has always meant.
+  //
+  // This was hardcoded to 0, on the grounds that it was "shimmer/parity-only" and that scrubbing
+  // can't know frame parity. It is neither: eight effects drive their whole animation from it -
+  // Butterfly, Wave, Pinwheel, Spirograph, Tree, Lines, Candle and Twinkle all multiply it by
+  // their Speed - so every one of them rendered the same frame forever, in the preview and in an
+  // exported .fseq alike. A Butterfly that never moves is the visible case.
+  //
+  // And random access can know it perfectly well: frames since the start is arithmetic on the
+  // time, not something that has to be counted by playing forward. It is the same expression the
+  // stateful path already uses for `framesElapsed`.
+  const frameIndexInEffect = Math.max(0, Math.floor((atMs - effect.startMs) / (extras.frameMs ?? 50)));
   // Left undefined when the sequence has no analysed track, so audio-reactive effects can tell
   // "no audio loaded" apart from "this frame of the song is silent".
   const ctx: FrameContext = {

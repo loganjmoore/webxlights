@@ -132,6 +132,26 @@ describe("Tree screen shape", () => {
     }
   });
 
+  it("reads a negative ratio as a flare, the way xLights does", () => {
+    // `if (_botTopRatio < 0.0f) { std::swap(topradius, radius); }` - the sign chooses which end
+    // is wide, and real files carry negative values. This used to clamp the ratio to 1e-6, which
+    // turned a stored -6 into a top radius a *million* times the base: an upside-down cone wide
+    // enough to fill the yard, which is what trees have been rendering as.
+    const upright = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: 6 });
+    const flared = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: -6 });
+    expect(spanAtRow(upright, 0)).toBeGreaterThan(spanAtRow(upright, 49));
+    expect(spanAtRow(flared, 49)).toBeGreaterThan(spanAtRow(flared, 0));
+    // and it is the same tree, just the other way up - not one a million times the size
+    expect(spanAtRow(flared, 49)).toBeCloseTo(spanAtRow(upright, 0), 6);
+    expect(spanAtRow(flared, 0)).toBeCloseTo(spanAtRow(upright, 49), 6);
+  });
+
+  it("treats a zero ratio as a cylinder rather than dividing by it", () => {
+    const geo = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: 0 });
+    expect(spanAtRow(geo, 0)).toBeCloseTo(spanAtRow(geo, 49), 6);
+    for (const n of geo.nodes) expect(Number.isFinite(n.screenX)).toBe(true);
+  });
+
   it("tapers by bottomTopRatio, not by how many nodes are on a string", () => {
     for (const ratio of [2, 6, 10]) {
       const geo = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: ratio });
@@ -147,7 +167,8 @@ describe("Tree screen shape", () => {
     // tree's build, not of how many bulbs are on it.
     for (const nodesPerString of [20, 50, 200]) {
       const b = boundsOf(computeTree({ strings: 16, nodesPerString }));
-      expect(b.w / b.h, `${nodesPerString} nodes`).toBeCloseTo(0.75, 1);
+      // xLights' own aspect: `RenderWi = ((double)RenderHt) / 1.8`.
+      expect(b.w / b.h, `${nodesPerString} nodes`).toBeCloseTo(1 / 1.8, 2);
     }
   });
 

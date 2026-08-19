@@ -49,12 +49,39 @@ function count(attrs: Record<string, string>, names: string[], fallback: number)
 // XML attributes in (xLights' own "typed-prefix attribute bag" convention), one
 // ModelGeometry out. Returns null for a DisplayAs this engine doesn't render (M1 scope
 // is the goal prompt's 12-type list; everything else stays imported-but-inert).
-export function computeGeometryFromAttrs(displayAs: string, attrs: Record<string, string>): ModelGeometry | null {
+/**
+ * What a `DisplayAs` string means, with xLights' own aliases resolved.
+ *
+ * Real files hardly ever say "Matrix" or "Tree". `DisplayAsType.cpp` maps `"Vert Matrix"` and
+ * `"Horiz Matrix"` onto Matrix, and treats anything starting `"Tree "` as a Tree - "Handle legacy
+ * compound tree values: 'Tree 360', 'Tree Flat', 'Tree Ribbon', etc." - with the suffix carrying
+ * the degrees or the style.
+ *
+ * Matching only the bare names meant a real matrix or a real tree fell through to "a DisplayAs
+ * this engine doesn't render" and came in inert, which is why imported matrices had nothing to
+ * draw. The suffix is also the only place some files state a tree's degrees.
+ */
+export function resolveDisplayAs(displayAs: string): { type: string; horizontal?: boolean; treeSuffix?: string } {
+  if (displayAs === "Vert Matrix") return { type: "Matrix", horizontal: false };
+  if (displayAs === "Horiz Matrix") return { type: "Matrix", horizontal: true };
+  if (displayAs.startsWith("Tree ") && displayAs.length > 5) return { type: "Tree", treeSuffix: displayAs.slice(5).trim() };
+  return { type: displayAs };
+}
+
+export function computeGeometryFromAttrs(displayAsRaw: string, attrs: Record<string, string>): ModelGeometry | null {
+  // The raw attribute bag wins when it has one. The importer normalises `DisplayAs` to a family
+  // ("Horiz Matrix" and "Vert Matrix" both become "Matrix") so that downstream switches stay
+  // simple, and in doing so drops the very thing that tells a horizontal matrix from a vertical
+  // one - a distinction that transposes the model. `attrs` is xLights' own XML verbatim, so the
+  // original survives there whether or not anything else kept it.
+  const { type: displayAs, horizontal, treeSuffix } = resolveDisplayAs(attrs.DisplayAs ?? displayAsRaw);
   switch (displayAs) {
     case "Matrix":
       return computeVerticalMatrixTopLeft({
         strings: count(attrs, ["NumStrings", "parm1"], 16),
         nodesPerString: count(attrs, ["NodesPerString", "parm2"], 50),
+        strandsPerString: count(attrs, ["StrandsPerString", "parm3"], 1),
+        horizontal,
       });
     case "Single Line":
       return computeSingleLine({
@@ -94,14 +121,19 @@ export function computeGeometryFromAttrs(displayAs: string, attrs: Record<string
         outerToInnerRatio: float(attrs.starRatio, 2.618034),
       });
     case "Tree": {
+      // The suffix on `DisplayAs` says which kind of tree this is, and for many files it is the
+      // only place that is written down: "Tree 270" is a three-quarter round tree, "Tree Flat"
+      // and "Tree Ribbon" are the two flat styles. An explicit attribute still wins over it.
+      const suffixDegrees = treeSuffix !== undefined ? Number.parseFloat(treeSuffix) : NaN;
+      const suffixStyle = treeSuffix === "Flat" ? "Flat" : treeSuffix === "Ribbon" ? "Ribbon" : undefined;
       const treeType = int(attrs.TreeType, 0);
-      const style = treeType === 1 ? "Flat" : treeType === 2 ? "Ribbon" : "Round";
+      const style = suffixStyle ?? (treeType === 1 ? "Flat" : treeType === 2 ? "Ribbon" : "Round");
       return computeTree({
         strings: count(attrs, ["NumStrings", "parm1"], 16),
         nodesPerString: count(attrs, ["NodesPerString", "parm2"], 50),
         strandsPerString: count(attrs, ["StrandsPerString", "parm3"], 1),
         style,
-        degrees: float(attrs.TreeDegrees, 360),
+        degrees: float(attrs.TreeDegrees, Number.isFinite(suffixDegrees) ? suffixDegrees : 360),
         bottomTopRatio: float(attrs.TreeBottomTopRatio, 6.0),
       });
     }
