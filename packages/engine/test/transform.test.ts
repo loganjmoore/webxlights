@@ -113,3 +113,27 @@ describe("per-node depth", () => {
     expect(nodeWorldOffset(node, center, { scale: 1, scaleZ: 2, rotateDeg: 90 }).z).toBe(6);
   });
 });
+
+describe("a negative scale is a frame convention at render time too", () => {
+  // The importer takes the magnitude, but only for models it imports. A layout saved before it
+  // learned to do that still holds the negative, and the tree it belongs to renders upside down
+  // every time it is opened until something takes the magnitude at the point of use.
+  const node = { bufX: 0, bufY: 0, screenX: 2, screenY: 4, screenZ: 6, string: 0, indexInString: 0 };
+  const centre = { x: 0, y: 0 };
+
+  it("puts a node in the same place whichever sign the scale was stored with", () => {
+    const positive = nodeWorldOffset(node, centre, { scale: 3, scaleY: 2, scaleZ: 4 });
+    const negative = nodeWorldOffset(node, centre, { scale: -3, scaleY: -2, scaleZ: -4 });
+    expect(negative).toEqual(positive);
+  });
+
+  it("does the same when scaleY falls back to scale", () => {
+    expect(nodeWorldOffset(node, centre, { scale: -2 })).toEqual(nodeWorldOffset(node, centre, { scale: 2 }));
+  });
+
+  it("leaves rotation alone - a deliberate half turn is still a half turn", () => {
+    const turned = nodeWorldOffset(node, centre, { scale: 1, rotateDeg: 180 });
+    expect(turned.x).toBeCloseTo(-2, 6);
+    expect(turned.y).toBeCloseTo(-4, 6);
+  });
+});
