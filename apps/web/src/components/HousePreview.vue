@@ -10,6 +10,7 @@ import {
   planGroupRendering,
   scatterGroupColors,
   renderRowAtMs,
+  transformedHalfExtents,
   type AudioSeries,
   type ModelGeometry,
   type RGBA,
@@ -20,7 +21,7 @@ import { composeModel, type RenderRow } from "../lib/composeModel";
 import { toRenderableEffects } from "../lib/renderableEffects";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
-import { transformForModel } from "../lib/modelTransform";
+import { displayY, transformForModel } from "../lib/modelTransform";
 
 const props = defineProps<{
   models: ModelRecord[];
@@ -85,12 +86,16 @@ function buildPositions(): Float32Array {
   const positions = new Float32Array(total * 3);
   for (const entry of rowEntries) {
     const mx = entry.model.screen.x ?? 0;
-    const my = entry.model.screen.y ?? 0;
     const mz = entry.model.screen.z ?? 0;
     // Shares the layout canvases' transform so the show previews in the same shape it's laid
     // out in - per-axis scale, rotation and real per-node depth, not a flat scale on raw
     // screenX/screenY (which ignored rotation and squashed a 360-degree tree into a triangle).
     const transform = transformForModel(entry.model);
+    // Same ground rule as the layout view. This window has no Gridlines object to read a height
+    // from, so the lawn is y=0 here - which is where it sits in a layout that hasn't moved it.
+    // Without this the two windows put the same tree at different heights, which is exactly the
+    // kind of disagreement sharing the transform was meant to end.
+    const my = displayY(entry.model, transformedHalfExtents(entry.geometry, transform).halfH * NODE_SPACING, 0, true);
     const center = geometryCenter(entry.geometry);
     entry.geometry.nodes.forEach((node, i) => {
       const idx = (entry.offset + i) * 3;

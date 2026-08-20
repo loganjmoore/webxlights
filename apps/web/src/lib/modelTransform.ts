@@ -25,6 +25,37 @@ import type { ModelRecord } from "./api";
  */
 const UPRIGHT_ONLY = new Set(["Tree"]);
 
+/**
+ * Model types that stand on the ground.
+ *
+ * A mega tree's base is on the lawn - that is what a mega tree is. Its stored position is its
+ * *centre* (models/transform.ts), so how high the centre has to be depends on how tall we draw
+ * it, and that changed the moment strand folding made a tree a quarter of its old height. A
+ * position that was right for the old geometry leaves the same tree hanging in the air.
+ *
+ * Planting it removes the dependency: whatever the geometry works out to, the base sits on the
+ * ground. Deliberately not every model - a star on a roof peak and lights along a gutter are
+ * placed where they are on purpose, and dropping them to the lawn would be worse than leaving
+ * them alone.
+ */
+const GROUND_STANDING = new Set(["Tree"]);
+
+export function standsOnGround(model: ModelRecord): boolean {
+  return GROUND_STANDING.has(resolveDisplayAs(model.raw_attrs?.DisplayAs ?? model.type).type);
+}
+
+/**
+ * The Y a model is drawn at, given how tall it turned out to be.
+ *
+ * Applied at draw time rather than written back, so nothing rewrites a position somebody set. The
+ * pick box uses the same answer, which is what stops a model jumping the moment it is grabbed.
+ */
+export function displayY(model: ModelRecord, halfHeightWorld: number, groundY: number, keepOnGround: boolean): number {
+  const stored = model.screen.y ?? 0;
+  if (!keepOnGround || !standsOnGround(model)) return stored;
+  return groundY + halfHeightWorld;
+}
+
 export function transformForModel(model: ModelRecord): ScreenTransform {
   const { type } = resolveDisplayAs(model.raw_attrs?.DisplayAs ?? model.type);
   const rotate = model.screen.rotate ?? 0;
