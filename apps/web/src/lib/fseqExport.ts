@@ -155,7 +155,9 @@ export function exportSequenceToFseq(
     const geo = geometries[i];
     if (geo) geometryByModelId.set(model.id, geo);
   });
-  const groupSequencers = planGroupRendering(groupRenderSpecs(groups, geometryByModelId, body)).map((job) => ({
+  const groupSequencers = planGroupRendering(
+    groupRenderSpecs(groups, geometryByModelId, body, new Map(supported.map((m) => [m.id, m]))),
+  ).map((job) => ({
     job,
     sequencer: createRowSequencer(job.row, frameMs, SEED, DEFAULT_PALETTE, audio),
   }));

@@ -453,3 +453,49 @@ describe("a group row, rendered end to end", () => {
     }
   });
 });
+
+describe("Per Preview lays members out where they actually stand", () => {
+  // Two identical props, twenty units apart in the yard. Their *local* coordinates are the same -
+  // every model's are centred on its own origin - so a group buffer built from geometry alone
+  // put them on top of each other, and each ended up mapped across the whole buffer. On screen
+  // that is two props each showing a complete copy of the effect instead of its own part of one.
+  const prop = () => computeVerticalMatrixTopLeft({ strings: 4, nodesPerString: 4 });
+  const flat = { scale: 1, scaleY: 1, scaleZ: 1, rotateDeg: 0 };
+
+  const spread = [
+    { modelId: 1, geometry: prop(), placement: { x: 0, y: 0, transform: flat } },
+    { modelId: 2, geometry: prop(), placement: { x: 40, y: 0, transform: flat } },
+  ];
+
+  function columnsOf(buffer: ReturnType<typeof composeGroupBuffer>, member: 0 | 1): number[] {
+    const start = buffer.memberStarts[member]!;
+    const end = buffer.memberStarts[member + 1]!;
+    return buffer.geometry.nodes.slice(start, end).map((n) => n.bufX);
+  }
+
+  it("gives each member its own band of the buffer", () => {
+    const buffer = composeGroupBuffer(spread, "Per Preview");
+    const left = columnsOf(buffer, 0);
+    const right = columnsOf(buffer, 1);
+    // No overlap at all: everything the left prop reads is left of everything the right one does.
+    expect(Math.max(...left)).toBeLessThan(Math.min(...right));
+  });
+
+  it("puts a prop further away further across the buffer", () => {
+    const near = composeGroupBuffer(spread, "Per Preview");
+    const further = composeGroupBuffer(
+      [spread[0]!, { ...spread[1]!, placement: { x: 400, y: 0, transform: flat } }],
+      "Per Preview",
+    );
+    // The gap between the two props' bands grows with the gap between the props.
+    const gap = (b: ReturnType<typeof composeGroupBuffer>) => Math.min(...columnsOf(b, 1)) - Math.max(...columnsOf(b, 0));
+    expect(gap(further)).toBeGreaterThan(gap(near));
+  });
+
+  it("still composes from geometry alone when nobody says where anything is", () => {
+    // A preset thumbnail or a test has no layout to place members against, and should get a
+    // buffer rather than an error.
+    const buffer = composeGroupBuffer([prop(), prop()], "Per Preview");
+    expect(buffer.geometry.nodes).toHaveLength(32);
+  });
+});
