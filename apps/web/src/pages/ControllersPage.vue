@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import TabNav from "../components/TabNav.vue";
 import { useRoute } from "vue-router";
 import { api, type ControllerProtocol, type ControllerRecord, type ControllerUpsertPayload, type ModelRecord } from "../lib/api";
 
@@ -68,7 +69,7 @@ onMounted(load);
 <template>
   <main class="controllers-page">
     <header>
-      <router-link :to="`/projects/${projectId}/layout`">&larr; Layout</router-link>
+      <TabNav :project-id="projectId" active="controllers" />
       <h1>Controllers</h1>
       <div class="add-buttons">
         <button @click="addController('usb', 'USB')">Add USB</button>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import CollapsibleSection from "./CollapsibleSection.vue";
 import {
   DEFAULT_PALETTE_HEX,
   EFFECT_SCHEMAS,
@@ -172,6 +173,33 @@ function setTransitionMs(field: "inDurationMs" | "outDurationMs", ms: string): v
   patchTransition({ [field]: Math.max(0, value) });
 }
 
+/**
+ * Fade in and fade out, as their own control.
+ *
+ * A fade is already expressible here - it is the "Fade" transition type with a duration - but only
+ * if you know that a fade is a kind of transition, and the two fields that make one are three rows
+ * apart. Fading an effect in is much the commoner thing to want than choosing between twenty wipe
+ * patterns, so it gets a control that says what it does and sets both halves at once.
+ */
+const FADE_STEPS_MS = [0, 250, 500, 1000, 2000];
+
+function setFade(edge: "in" | "out", ms: number): void {
+  const clamped = Math.max(0, Math.round(ms));
+  patchTransition(
+    edge === "in"
+      ? { inType: "Fade", inDurationMs: clamped }
+      : { outType: "Fade", outDurationMs: clamped },
+  );
+}
+
+/** A fade is showing only when the edge is actually a Fade - a wipe of 500ms is not one. */
+function fadeMs(edge: "in" | "out"): number {
+  const spec = props.effect?.transition ?? {};
+  const type = edge === "in" ? spec.inType ?? "Fade" : spec.outType ?? "Fade";
+  if (type !== "Fade") return 0;
+  return (edge === "in" ? spec.inDurationMs : spec.outDurationMs) ?? 0;
+}
+
 // Kaleidoscope, Warp and Adjust have nothing to work on unless the layer is in Canvas mode -
 // they would render an empty layer with no error, which is exactly the kind of silence worth
 // spending a line of UI on.
@@ -272,8 +300,7 @@ function curveable(p: EffectParamSpec): boolean {
     <template v-else>
       <h3>{{ effect.name }}</h3>
 
-      <div class="color-panel">
-        <h4>Color</h4>
+      <CollapsibleSection title="Colors">
         <div class="swatches">
           <div v-for="(entry, i) in palette" :key="i" class="swatch">
             <input
@@ -301,12 +328,11 @@ function curveable(p: EffectParamSpec): boolean {
             @remove="unmakeCurve(i)"
           />
         </template>
-      </div>
+      </CollapsibleSection>
 
       <!-- "From the Color window, you can change the Colors that apply to the effect, as well as
            the Sparkles, Brightness and Contrast values." -->
-      <div class="blend-panel">
-        <h4>Colour</h4>
+      <CollapsibleSection title="Colour adjust" :default-open="false">
         <label class="blend-row">
           Sparkles
           <input
@@ -344,10 +370,9 @@ function curveable(p: EffectParamSpec): boolean {
         <button v-if="(selectionSize ?? 0) > 1" class="add-swatch" @click="emit('applyPaletteToSelection')">
           Update — apply this palette to all {{ selectionSize }} selected
         </button>
-      </div>
+      </CollapsibleSection>
 
-      <div class="blend-panel">
-        <h4>Layer Blending</h4>
+      <CollapsibleSection title="Layer blending" :default-open="false">
         <label class="blend-row">
           Blend Mode
           <select :value="effect.blendMode ?? 'Normal'" @change="setBlendMode(($event.target as HTMLSelectElement).value)">
@@ -400,10 +425,33 @@ function curveable(p: EffectParamSpec): boolean {
           the Canvas blend mode and a layer underneath. On any other mode it is handed a blank
           buffer and renders nothing.
         </p>
-      </div>
+      </CollapsibleSection>
 
-      <div class="blend-panel">
-        <h4>Transitions</h4>
+      <CollapsibleSection title="Transitions & fades">
+        <div class="fade-row">
+          <label>
+            Fade in (ms)
+            <input type="number" min="0" step="50" :value="fadeMs('in')" @change="setFade('in', Number(($event.target as HTMLInputElement).value))" />
+          </label>
+          <span class="fade-steps">
+            <button v-for="ms in FADE_STEPS_MS" :key="`in${ms}`" type="button" :class="{ on: fadeMs('in') === ms }" @click="setFade('in', ms)">
+              {{ ms === 0 ? "off" : `${ms / 1000}s` }}
+            </button>
+          </span>
+        </div>
+        <div class="fade-row">
+          <label>
+            Fade out (ms)
+            <input type="number" min="0" step="50" :value="fadeMs('out')" @change="setFade('out', Number(($event.target as HTMLInputElement).value))" />
+          </label>
+          <span class="fade-steps">
+            <button v-for="ms in FADE_STEPS_MS" :key="`out${ms}`" type="button" :class="{ on: fadeMs('out') === ms }" @click="setFade('out', ms)">
+              {{ ms === 0 ? "off" : `${ms / 1000}s` }}
+            </button>
+          </span>
+        </div>
+        <p class="fade-note">A fade is a transition of type Fade — the controls below set the same two values, and any other pattern as well.</p>
+
         <label class="blend-row">
           In
           <select
@@ -484,10 +532,9 @@ function curveable(p: EffectParamSpec): boolean {
           />
         </label>
         <p class="hint">A transition only shows with a duration above 0.</p>
-      </div>
+      </CollapsibleSection>
 
-      <div class="blend-panel">
-        <h4>Layer Settings</h4>
+      <CollapsibleSection title="Layer settings" :default-open="false">
         <label class="blend-row">
           Render Style
           <select
@@ -593,7 +640,7 @@ function curveable(p: EffectParamSpec): boolean {
           </span>
         </label>
         <button v-if="subBufferTrimmed" class="reset-sub" @click="resetSubBuffer">Full buffer</button>
-      </div>
+      </CollapsibleSection>
 
       <div v-for="p in schema.params" :key="p.key" class="param">
         <label>{{ p.label }}</label>
@@ -688,6 +735,46 @@ function curveable(p: EffectParamSpec): boolean {
 </template>
 
 <style scoped>
+.fade-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+.fade-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: #cfcfd8;
+}
+.fade-row input {
+  width: 68px;
+}
+.fade-steps {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+.fade-steps button {
+  padding: 0.1rem 0.3rem;
+  font-size: 0.68rem;
+  border: 1px solid #3a3a44;
+  border-radius: 3px;
+  background: #1e1e26;
+  color: #9a9aa6;
+  cursor: pointer;
+}
+.fade-steps button.on {
+  background: #e8c468;
+  border-color: #e8c468;
+  color: #111;
+}
+.fade-note {
+  margin: 0.1rem 0 0.5rem;
+  font-size: 0.68rem;
+  color: #7a7a86;
+}
 .props-panel {
   padding: 0.75rem;
   font-size: 0.85rem;

@@ -36,6 +36,7 @@ import { buildPlacementReport, copyOrDownloadReport } from "../lib/placementRepo
 import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
 import ModelPalette from "../components/ModelPalette.vue";
+import TabNav from "../components/TabNav.vue";
 
 const route = useRoute();
 const projectId = computed(() => Number(route.params.projectId));
@@ -825,10 +826,9 @@ onUnmounted(() => {
 <template>
   <main class="layout-page">
     <header>
-      <router-link to="/projects">&larr; Projects</router-link>
+      <router-link to="/projects" class="projects-link">&larr; Projects</router-link>
+      <TabNav :project-id="projectId" active="layout" />
       <h1>Layout</h1>
-      <router-link :to="`/projects/${projectId}/controllers`" class="controllers-link">Controllers &rarr;</router-link>
-      <router-link :to="`/projects/${projectId}/sequences`" class="sequences-link">Sequences &rarr;</router-link>
       <label class="import-btn">
         {{ importing ? "Importing..." : "Import xlights_rgbeffects.xml" }}
         <input type="file" accept=".xml" @change="handleFileChange" :disabled="importing" hidden />

@@ -10,6 +10,9 @@ import { parseMidi, parsePapagayo, type ParsedMidi } from "@webxlights/formats";
 import { ALL_TRACKS, describeMidiImport, midiTrackChoices, timingTrackFromMidi } from "../lib/midiTiming";
 import { describePapagayoImport, tracksFromPapagayo } from "../lib/papagayoTiming";
 import { breakdownPhrases, breakdownWords, cellsOf, phonemesTrackName, wordsTrackName } from "../lib/lyricBreakdown";
+import { effectIcon } from "../lib/effectIcons";
+import ModalPanel from "../components/ModalPanel.vue";
+import TabNav from "../components/TabNav.vue";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
 import { openPanelWindow, openPreviewChannel, postPreviewMessage, previewUrlFor, type PreviewMessage } from "../lib/previewChannel";
@@ -2259,7 +2262,7 @@ watch(sequenceId, async (id) => {
 <template>
   <main class="sequencer-page">
     <header>
-      <router-link :to="`/projects/${route.params.projectId}/sequences`">&larr; Sequences</router-link>
+      <TabNav :project-id="route.params.projectId as string" active="sequences" />
       <h1>{{ store.sequence?.name }}</h1>
       <div class="transport">
         <button @click="togglePlay" :disabled="!audioLoaded">{{ playing ? "Pause" : "Play" }}</button>
@@ -2347,7 +2350,8 @@ watch(sequenceId, async (id) => {
       </div>
     </div>
 
-    <div v-if="showTimingPanel" class="timing-panel">
+    <ModalPanel v-if="showTimingPanel" wide title="Timing tracks" @close="showTimingPanel = false">
+      <div class="timing-panel">
       <!-- Tracks could be created and never removed, and creating one is a single click: a fixed
            interval, a metronome and an onset detection each add one. -->
       <div v-if="store.body.timingTracks.length" class="timing-tracks">
@@ -2456,9 +2460,11 @@ watch(sequenceId, async (id) => {
         <label class="midi-field">Offset <input v-model.number="papagayoOffsetFrames" type="number" step="1" /> frames</label>
       </div>
       <p v-if="papagayoMessage" class="timing-note">{{ papagayoMessage }}</p>
-    </div>
+      </div>
+    </ModalPanel>
 
-    <div v-if="showFppPanel" class="fpp-panel">
+    <ModalPanel v-if="showFppPanel" title="FPP Connect" @close="showFppPanel = false">
+      <div class="fpp-panel">
       <template v-if="!fppChromiumCapable">
         <p>
           Uploading directly to an FPP device needs Chrome or Edge (the Local Network Access permission). In this browser, use
@@ -2477,7 +2483,8 @@ watch(sequenceId, async (id) => {
         </div>
         <p v-if="fppStatus" class="fpp-status">{{ fppStatus }}</p>
       </template>
-    </div>
+      </div>
+    </ModalPanel>
 
     <div v-if="importMessage" class="conflict-banner">
       <p>{{ importMessage }}</p>
@@ -2490,7 +2497,8 @@ watch(sequenceId, async (id) => {
       <button @click="store.takeTheirs">Take theirs</button>
     </div>
 
-    <div v-if="showHistory" class="history-panel">
+    <ModalPanel v-if="showHistory" title="Version history" @close="showHistory = false">
+      <div class="history-panel">
       <h2>Version history</h2>
       <ul>
         <li v-for="v in versions" :key="v.id">
@@ -2499,13 +2507,15 @@ watch(sequenceId, async (id) => {
         </li>
         <li v-if="versions.length === 0" class="empty">No snapshots yet — click "Snapshot" to create one.</li>
       </ul>
-    </div>
+      </div>
+    </ModalPanel>
 
     <CommandPalette :open="paletteOpen" :commands="commands" @close="paletteOpen = false" />
     <EffectWheel
       :shortcuts="shortcutsInForce" v-if="wheel" :x="wheel.x" :y="wheel.y" @pick="placeFromWheel" @close="wheel = null" />
 
-    <div v-if="showRegionsPanel" class="models-panel">
+    <ModalPanel v-if="showRegionsPanel" title="Song regions" @close="showRegionsPanel = false">
+      <div class="models-panel">
       <div class="models-panel-head">
         <h2>Song structure</h2>
         <div class="models-panel-actions">
@@ -2559,9 +2569,11 @@ watch(sequenceId, async (id) => {
           in step with it. Anything that wouldn't fit is skipped rather than trimmed.
         </p>
       </template>
-    </div>
+      </div>
+    </ModalPanel>
 
-    <div v-if="showPrefsPanel" class="models-panel">
+    <ModalPanel v-if="showPrefsPanel" title="Preferences" @close="showPrefsPanel = false">
+      <div class="models-panel">
       <div class="models-panel-head"><h2>Preferences</h2></div>
       <p class="timing-note">
         These are yours, not the show's — they're kept in this browser rather than saved with the
@@ -2824,10 +2836,12 @@ watch(sequenceId, async (id) => {
         that happens on a server rather than at your desk, and Hide Colour Update Warning hides a
         warning we don't show.
       </p>
-    </div>
+      </div>
+    </ModalPanel>
 
     <!-- xLights' Select Effect window: "select effects based on type, model, and time". -->
-    <div v-if="showSelectPanel" class="models-panel">
+    <ModalPanel v-if="showSelectPanel" wide title="Select effects" @close="showSelectPanel = false">
+      <div class="models-panel">
       <div class="models-panel-head"><h2>Select effects</h2></div>
       <label class="blend-row">
         Type
@@ -2856,11 +2870,13 @@ watch(sequenceId, async (id) => {
         <button @click="runSelect">Select</button>
         <span class="save-status">{{ store.selectedEffectIds.length }} selected</span>
       </div>
-    </div>
+      </div>
+    </ModalPanel>
 
     <!-- xLights' Sequence Settings dialog. The Info/Media and Metadata tabs; its Timings tab is
          the Timing panel here, and Data Layers and Images have nothing behind them yet. -->
-    <div v-if="showSettingsPanel" class="models-panel">
+    <ModalPanel v-if="showSettingsPanel" wide title="Sequence settings" @close="showSettingsPanel = false">
+      <div class="models-panel">
       <div class="models-panel-head">
         <h2>Sequence settings</h2>
         <div class="models-panel-actions">
@@ -2913,9 +2929,11 @@ watch(sequenceId, async (id) => {
         Travels with the sequence. xLights writes these into the sequence file and some sharing
         sites read them, which is the whole reason they're separate fields rather than one note.
       </p>
-    </div>
+      </div>
+    </ModalPanel>
 
-    <div v-if="showPresetsPanel" class="models-panel">
+    <ModalPanel v-if="showPresetsPanel" title="Effect presets" @close="showPresetsPanel = false">
+      <div class="models-panel">
       <div class="models-panel-head">
         <h2>Effect presets</h2>
         <div class="models-panel-actions">
@@ -2961,9 +2979,11 @@ watch(sequenceId, async (id) => {
       <p v-if="presets.length === 0" class="empty">
         No presets yet. Select an effect on the grid, name it above and save it.
       </p>
-    </div>
+      </div>
+    </ModalPanel>
 
-    <div v-if="showViewsPanel" class="models-panel">
+    <ModalPanel v-if="showViewsPanel" title="Views" @close="showViewsPanel = false">
+      <div class="models-panel">
       <div class="models-panel-head">
         <h2>Views</h2>
         <div class="models-panel-actions">
@@ -3018,9 +3038,11 @@ watch(sequenceId, async (id) => {
           </li>
         </ul>
       </template>
-    </div>
+      </div>
+    </ModalPanel>
 
-    <div v-if="showModelsPanel" class="models-panel">
+    <ModalPanel v-if="showModelsPanel" wide title="Models" @close="showModelsPanel = false">
+      <div class="models-panel">
       <div class="models-panel-head">
         <h2>Rows shown on the grid</h2>
         <div class="models-panel-actions">
@@ -3039,7 +3061,8 @@ watch(sequenceId, async (id) => {
         </li>
         <li v-if="rows.length === 0" class="empty">No models or groups in this project's layout yet.</li>
       </ul>
-    </div>
+      </div>
+    </ModalPanel>
 
     <div v-if="!audioLoaded" class="reselect-audio">
       <p>Select the audio file for this sequence.</p>
@@ -3062,12 +3085,15 @@ watch(sequenceId, async (id) => {
         <button
           v-for="name in Object.keys(EFFECT_SCHEMAS)"
           :key="name"
+          class="effect-btn"
           draggable="true"
+          :title="name"
+          :aria-label="name"
           :class="{ armed: pendingEffectName === name }"
           @click="armEffect(name)"
           @dragstart="onEffectDragStart($event, name)"
         >
-          {{ name }}
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" v-html="effectIcon(name)"></svg>
         </button>
       </div>
       <!-- Always rendered (visibility, not v-if) so arming/disarming never changes the palette's
@@ -3282,12 +3308,7 @@ header select {
   flex: 1;
 }
 .history-panel {
-  padding: 0.6rem 1rem;
-  background: #1a1a1a;
-  border-bottom: 1px solid #333;
   font-size: 0.85rem;
-  max-height: 200px;
-  overflow-y: auto;
 }
 .history-panel h2 {
   font-size: 0.85rem;
@@ -3316,13 +3337,11 @@ header select {
   margin-right: 0.3rem;
   vertical-align: middle;
 }
+/* These panels are dialogs now (components/ModalPanel.vue), which supplies the frame, the
+   padding and the scrolling. What is left here is only what their *contents* need - the
+   descendant rules below still key off this class. */
 .models-panel {
-  padding: 0.6rem 1rem;
-  background: #1a1a1a;
-  border-bottom: 1px solid #333;
   font-size: 0.85rem;
-  max-height: 260px;
-  overflow-y: auto;
 }
 .models-panel-head {
   display: flex;
@@ -3382,9 +3401,6 @@ header button.active {
 }
 .fpp-panel,
 .timing-panel {
-  padding: 0.6rem 1rem;
-  background: #1a1a1a;
-  border-bottom: 1px solid #333;
   font-size: 0.85rem;
 }
 .timing-note {
@@ -3458,14 +3474,25 @@ header button.active {
   flex-wrap: wrap;
   gap: 0.4rem;
 }
-.palette-buttons button {
-  padding: 0.3rem 0.6rem;
-  font-size: 0.8rem;
+/* Square, so forty-eight of them make an even grid rather than a ragged block of names whose
+   width depends on how long each effect happens to be called. */
+.palette-buttons button.effect-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 4px;
   border: 1px solid #444;
   border-radius: 4px;
   background: #1e1e26;
   color: #ddd;
   cursor: grab;
+}
+.palette-buttons button.effect-btn svg {
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* the button owns the drag, not the glyph inside it */
 }
 .palette-buttons button:hover {
   border-color: #e8c468;

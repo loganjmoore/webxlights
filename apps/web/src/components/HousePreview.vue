@@ -205,6 +205,18 @@ function updateColors(): void {
   colorAttr.needsUpdate = true;
 }
 
+// Same first-load rule as the layout canvas: the fit at mount measures a scene the models have
+// not arrived in yet, so the opening view was never the one Reset view gives.
+let hasFittedToModels = false;
+
+function zoomView(factor: number): void {
+  if (!setup || !orbit) return;
+  const camera = setup.camera;
+  const fromTarget = camera.position.clone().sub(orbit.target).multiplyScalar(factor);
+  camera.position.copy(orbit.target.clone().add(fromTarget));
+  orbit.update();
+}
+
 function fitCameraToScene(): void {
   if (!setup) return;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -266,6 +278,7 @@ function initScene(): void {
   setup.scene.add(points);
 
   fitCameraToScene();
+  hasFittedToModels = rowEntries.length > 0;
   updateColors();
 
   const animate = () => {
@@ -329,7 +342,13 @@ watch(
     const positions = buildPositions();
     points.geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     points.geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(positions.length), 3));
-    fitCameraToScene();
+    // Only the first time models arrive. This used to re-fit on every change, which threw away
+    // the camera the moment anything in the show was edited - now that the preview can be
+    // orbited, that is a view someone chose.
+    if (!hasFittedToModels && rowEntries.length > 0) {
+      hasFittedToModels = true;
+      fitCameraToScene();
+    }
     updateColors();
   },
 );
@@ -338,7 +357,11 @@ watch(
 <template>
   <div class="house-preview-wrap">
     <div ref="containerRef" class="house-preview"></div>
-    <button type="button" class="reset-view" title="Back to the whole yard" @click="fitCameraToScene">Reset view</button>
+    <div class="view-controls">
+      <button type="button" title="Zoom out" @click="zoomView(1.25)">−</button>
+      <button type="button" title="Zoom in" @click="zoomView(0.8)">+</button>
+      <button type="button" title="Back to the whole yard" @click="fitCameraToScene">Reset view</button>
+    </div>
   </div>
 </template>
 
@@ -348,22 +371,26 @@ watch(
   width: 100%;
   height: 100%;
 }
-.reset-view {
+.view-controls {
   position: absolute;
   top: 0.4rem;
   right: 0.4rem;
+  display: flex;
+  gap: 0.15rem;
+  /* Only in the way while you are looking at the corner they sit in. */
+  opacity: 0.55;
+}
+.view-controls:hover {
+  opacity: 1;
+}
+.view-controls button {
   font-size: 0.7rem;
   padding: 0.15rem 0.4rem;
   border-radius: 3px;
-  background: rgba(20, 20, 26, 0.75);
+  background: rgba(20, 20, 26, 0.85);
   color: #cfcfd8;
   border: 1px solid #3a3a44;
   cursor: pointer;
-  /* Only in the way while you are looking at the corner it sits in. */
-  opacity: 0.55;
-}
-.reset-view:hover {
-  opacity: 1;
 }
 .house-preview {
   width: 100%;

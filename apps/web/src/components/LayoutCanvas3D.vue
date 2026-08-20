@@ -352,6 +352,29 @@ function applyResize(hit: THREE.Vector3): void {
   moveHandlesTo(entry);
 }
 
+/**
+ * Whether the camera has ever been fitted to a scene that actually had something in it.
+ *
+ * The fit used to happen once, at mount - before the models had loaded, so it measured an empty
+ * scene and fell back to a fixed +/-100 box. Every layout therefore opened on a view that was
+ * nothing like the one Reset view gives you, and pressing the button was the only way to get it.
+ * Fitting on the first load that brings models in makes the opening view and the reset view the
+ * same thing.
+ *
+ * Only the first: re-fitting on every change would yank the camera back every time a model was
+ * dragged, which is the opposite of useful while arranging a yard.
+ */
+let hasFittedToModels = false;
+
+/** Moves the camera towards or away from what it is looking at. */
+function zoomView(factor: number): void {
+  if (!setup || !orbit) return;
+  const camera = setup.camera;
+  const fromTarget = camera.position.clone().sub(orbit.target).multiplyScalar(factor);
+  camera.position.copy(orbit.target.clone().add(fromTarget));
+  orbit.update();
+}
+
 function fitCameraToScene(): void {
   if (!setup) return;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -661,6 +684,7 @@ onMounted(() => {
   buildScene();
   buildViewObjects();
   fitCameraToScene();
+  hasFittedToModels = rowEntries.length > 0;
 
   container.addEventListener("pointerdown", onPointerDown);
   container.addEventListener("pointermove", onPointerMove);
@@ -698,7 +722,17 @@ onBeforeUnmount(() => {
   if (setup && container) disposeScene(setup, container);
 });
 
-watch(() => props.models, buildScene, { deep: true });
+watch(
+  () => props.models,
+  () => {
+    buildScene();
+    if (!hasFittedToModels && rowEntries.length > 0) {
+      hasFittedToModels = true;
+      fitCameraToScene();
+    }
+  },
+  { deep: true },
+);
 watch(() => props.viewObjects, buildViewObjects, { deep: true });
 watch(() => props.selectedModelId, updateSelectionHighlight);
 </script>
@@ -718,6 +752,10 @@ watch(() => props.selectedModelId, updateSelectionHighlight);
         <input type="checkbox" v-model="uniformScale" />
         Scale all axes
       </label>
+      <span class="zoom-group">
+        <button type="button" title="Zoom out" @click="zoomView(1.25)">−</button>
+        <button type="button" title="Zoom in" @click="zoomView(0.8)">+</button>
+      </span>
       <button type="button" @click="fitCameraToScene">Reset view</button>
     </div>
   </div>
@@ -755,6 +793,16 @@ watch(() => props.selectedModelId, updateSelectionHighlight);
 }
 .hud-toggle input {
   cursor: pointer;
+}
+.zoom-group {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+.zoom-group button {
+  width: 22px;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0.1rem 0;
 }
 .axis-hint {
   padding: 0.2rem 0.45rem;
