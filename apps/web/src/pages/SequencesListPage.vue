@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import TabNav from "../components/TabNav.vue";
 import { useRoute, useRouter } from "vue-router";
 import { parseXsq } from "@webxlights/formats";
 import { describeMapping, mapXsqToBody } from "../lib/xsqConvert";
@@ -260,7 +261,7 @@ onMounted(load);
       @confirm="confirmImport"
     />
     <header>
-      <router-link :to="`/projects/${projectId}/layout`">&larr; Layout</router-link>
+      <TabNav :project-id="projectId" active="sequences" />
       <h1>Sequences</h1>
       <label class="import-btn">
         {{ importing ? "Importing..." : "Import .xsq" }}
