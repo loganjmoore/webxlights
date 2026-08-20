@@ -1,7 +1,8 @@
-import type { GroupRenderSpec, ModelGeometry } from "@webxlights/engine";
+import { transformedHalfExtents, type GroupRenderSpec, type ModelGeometry } from "@webxlights/engine";
 import type { ModelGroupRecord, ModelRecord, SequenceBody } from "./api";
-import { transformForModel } from "./modelTransform";
+import { displayY, transformForModel } from "./modelTransform";
 import { toRenderableEffects } from "./renderableEffects";
+import { NODE_SPACING } from "./worldUnits";
 
 // Turns this app's stored records into what the engine needs to render a group row.
 //
@@ -29,13 +30,8 @@ export function groupRenderSpecs(
     members: group.members
       .map((m) => {
         const model = modelsById?.get(m.id);
-        return {
-          modelId: m.id,
-          geometry: geometryByModelId.get(m.id),
-          placement: model
-            ? { x: model.screen.x ?? 0, y: model.screen.y ?? 0, transform: transformForModel(model) }
-            : undefined,
-        };
+        const geometry = geometryByModelId.get(m.id);
+        return { modelId: m.id, geometry, placement: model && geometry ? placementFor(model, geometry) : undefined };
       })
       .flatMap((m) => (m.geometry ? [{ ...m, geometry: m.geometry }] : [])),
     // A group has no state definitions of its own - states are defined on a model - so a group
@@ -45,4 +41,23 @@ export function groupRenderSpecs(
       { timingTracks: body.timingTracks },
     ),
   }));
+}
+
+/**
+ * Where a member stands, in the coordinates the views actually draw it at.
+ *
+ * This has to be the *drawn* position rather than the stored one, and the two are not always the
+ * same: a tree's stored Y is wherever the file put its centre, but every view plants it on the
+ * lawn instead (modelTransform.ts). A group buffer built from stored positions would lay an
+ * effect out across a yard whose trees are somewhere other than where they appear.
+ */
+function placementFor(model: ModelRecord, geometry: ModelGeometry): NonNullable<GroupRenderSpec["members"][number]["placement"]> {
+  const transform = transformForModel(model);
+  const halfHeightWorld = transformedHalfExtents(geometry, transform).halfH * NODE_SPACING;
+  return {
+    x: model.screen.x ?? 0,
+    y: displayY(model, halfHeightWorld, 0, true),
+    transform,
+    unitScale: NODE_SPACING,
+  };
 }

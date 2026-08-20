@@ -22,6 +22,7 @@ import { toRenderableEffects } from "../lib/renderableEffects";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 import { displayY, transformForModel } from "../lib/modelTransform";
+import { NODE_SPACING } from "../lib/worldUnits";
 
 const props = defineProps<{
   models: ModelRecord[];
@@ -40,7 +41,6 @@ const props = defineProps<{
 }>();
 
 const SEED = 12345;
-const NODE_SPACING = 4; // matches LayoutCanvas's local-unit-to-px scale
 
 const containerRef = ref<HTMLDivElement | null>(null);
 let setup: SceneSetup | null = null;

@@ -499,3 +499,61 @@ describe("Per Preview lays members out where they actually stand", () => {
     expect(buffer.geometry.nodes).toHaveLength(32);
   });
 });
+
+// A group buffer is only useful if it agrees with the view about where the props are. The two
+// have to be told that separately - the buffer gets a placement, the view draws from the same
+// numbers - and nothing but a test makes them stay in step.
+describe("Per Preview matches where the view draws the members", () => {
+  // Two props side by side, far enough apart that a mistake in the unit conversion moves them
+  // relative to each other rather than just rescaling the pair.
+  const UNIT = 4; // the app's local-unit-to-world scale
+  const A = computeVerticalMatrixTopLeft({ strings: 4, nodesPerString: 4 });
+  const B = computeVerticalMatrixTopLeft({ strings: 4, nodesPerString: 4 });
+  const members = [
+    { modelId: 1, geometry: A, placement: { x: 0, y: 0, transform: {}, unitScale: UNIT } },
+    { modelId: 2, geometry: B, placement: { x: 40, y: 0, transform: {}, unitScale: UNIT } },
+  ];
+
+  it("gives each member the share of the buffer its drawn footprint occupies", () => {
+    const { geometry, memberStarts } = composeGroupBuffer(members, "Per Preview");
+    const xsOf = (m: number) =>
+      geometry.nodes.slice(memberStarts[m]!, memberStarts[m + 1]!).map((n) => n.bufX);
+
+    const a = xsOf(0);
+    const b = xsOf(1);
+    // Each prop spans 3 local units, so 12 world units of a 52-wide span: a little under a
+    // quarter of the buffer each, with a clear gap between them. Without the conversion each
+    // would collapse to a near-point and the effect would step from one prop to the next
+    // instead of sweeping across them.
+    expect(Math.max(...a)).toBeLessThan(Math.min(...b));
+    const spread = (xs: number[]) => Math.max(...xs) - Math.min(...xs);
+    expect(spread(a)).toBeGreaterThan(geometry.width * 0.15);
+    expect(spread(b)).toBeGreaterThan(geometry.width * 0.15);
+  });
+
+  it("puts the two props the same distance apart as the view does", () => {
+    const { geometry, memberStarts } = composeGroupBuffer(members, "Per Preview");
+    const centre = (m: number) => {
+      const xs = geometry.nodes.slice(memberStarts[m]!, memberStarts[m + 1]!).map((n) => n.bufX);
+      return (Math.max(...xs) + Math.min(...xs)) / 2;
+    };
+    // In world units the props' centres are 40 apart and each is 12 wide, so the gap between
+    // centres is 40/52 of the total span. The buffer has to reproduce that ratio.
+    const gap = (centre(1) - centre(0)) / geometry.width;
+    expect(gap).toBeGreaterThan(0.6);
+    expect(gap).toBeLessThan(0.85);
+  });
+
+  it("ignoring the unit scale misplaces the members relative to each other", () => {
+    // The bug this fixes, stated as its own expectation: with no conversion the props' own size
+    // shrinks to a quarter while the gap between them stays put, so each collapses toward a
+    // point and the space between them swallows the buffer.
+    const unconverted = members.map((m) => ({ ...m, placement: { ...m.placement, unitScale: 1 } }));
+    const { geometry, memberStarts } = composeGroupBuffer(unconverted, "Per Preview");
+    const spreadOf = (m: number) => {
+      const xs = geometry.nodes.slice(memberStarts[m]!, memberStarts[m + 1]!).map((n) => n.bufX);
+      return Math.max(...xs) - Math.min(...xs);
+    };
+    expect(spreadOf(0)).toBeLessThan(geometry.width * 0.15);
+  });
+});

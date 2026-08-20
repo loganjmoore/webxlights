@@ -9,10 +9,10 @@ import {
   type ModelGeometry,
 } from "@webxlights/engine";
 import { api, type GroupUpsertPayload, type ModelUpsertPayload, type ViewObjectUpsertPayload } from "./api";
+import { NODE_SPACING } from "./worldUnits";
 
 // The canvases' local-unit-to-world factor (LayoutCanvas/LayoutCanvas3D's NODE_SPACING).
 // Placement needs it to turn xLights' world-unit endpoint vectors into our local-unit scales.
-const NODE_SPACING = 4;
 
 function geometryOf(displayAs: string, attrs: Record<string, string>, supported: boolean): ModelGeometry | null {
   if (!supported) return null;
