@@ -132,18 +132,31 @@ describe("Tree screen shape", () => {
     }
   });
 
-  it("reads a negative ratio as a flare, the way xLights does", () => {
-    // `if (_botTopRatio < 0.0f) { std::swap(topradius, radius); }` - the sign chooses which end
-    // is wide, and real files carry negative values. This used to clamp the ratio to 1e-6, which
-    // turned a stored -6 into a top radius a *million* times the base: an upside-down cone wide
-    // enough to fill the yard, which is what trees have been rendering as.
-    const upright = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: 6 });
-    const flared = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: -6 });
-    expect(spanAtRow(upright, 0)).toBeGreaterThan(spanAtRow(upright, 49));
-    expect(spanAtRow(flared, 49)).toBeGreaterThan(spanAtRow(flared, 0));
-    // and it is the same tree, just the other way up - not one a million times the size
-    expect(spanAtRow(flared, 49)).toBeCloseTo(spanAtRow(upright, 0), 6);
-    expect(spanAtRow(flared, 0)).toBeCloseTo(spanAtRow(upright, 49), 6);
+  it("stands on its wide end whatever sign or size the ratio has", () => {
+    // xLights takes the ratio literally: negative swaps the ends, and a value between 0 and 1
+    // does the same by arithmetic. We deliberately don't - the magnitude sets the taper and the
+    // base is always the wide end, because nobody builds an upside-down mega tree and a stored
+    // value that would flare one is a data artifact rather than someone's intent.
+    for (const ratio of [6, -6, 1 / 6, -1 / 6, 2, 0.5]) {
+      const geo = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: ratio });
+      expect(spanAtRow(geo, 0), `ratio ${ratio}`).toBeGreaterThan(spanAtRow(geo, 49));
+    }
+  });
+
+  it("reads a ratio and its reciprocal as the same tree", () => {
+    const a = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: 6 });
+    const b = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: 1 / 6 });
+    expect(spanAtRow(b, 0)).toBeCloseTo(spanAtRow(a, 0), 6);
+    expect(spanAtRow(b, 49)).toBeCloseTo(spanAtRow(a, 49), 6);
+  });
+
+  it("never renders a tree far larger than its own height", () => {
+    // The clamp this replaced turned a stored -6 into a top radius a million times the base.
+    for (const ratio of [-6, 1e-6, -1e-9, 0.0001]) {
+      const geo = computeTree({ strings: 16, nodesPerString: 50, bottomTopRatio: ratio });
+      const xs = geo.nodes.map((n) => n.screenX);
+      expect(Math.max(...xs) - Math.min(...xs), `ratio ${ratio}`).toBeLessThanOrEqual(50);
+    }
   });
 
   it("treats a zero ratio as a cylinder rather than dividing by it", () => {

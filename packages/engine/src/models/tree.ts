@@ -69,21 +69,29 @@ export function computeTree(params: TreeParams): ModelGeometry {
   // Height in node units: a 50-node string is 49 units tall, the same as a 50-node line.
   const heightUnits = Math.max(geo.height - 1, 1);
 
-  // The two radii, exactly as TreeModel::SetTreeCoord derives them:
+  // A tree stands on its wide end.
   //
-  //     double radius = RenderWi / 2.0;
+  // TreeModel::SetTreeCoord takes the ratio literally in both directions:
+  //
   //     if (_botTopRatio != 0.0f) { topradius = radius / std::abs(_botTopRatio); }
   //     if (_botTopRatio < 0.0f) { std::swap(topradius, radius); }
   //
-  // The magnitude sets the taper and the *sign* decides which end is wide - a negative ratio is
-  // how xLights writes a tree that flares upward, and it is a value real files carry.
+  // so a negative ratio flares the cone upward, and a ratio between 0 and 1 does the same thing
+  // by arithmetic. This deliberately does not: the magnitude sets how sharply the tree tapers,
+  // and the wide end is always the bottom.
   //
-  // This used to clamp the ratio to a minimum of 1e-6 to keep it away from zero, which quietly
-  // turned a stored -6 into a top radius a million times the base: an upside-down cone wide
-  // enough to fill the whole yard. That is the giant inverted fan trees have been rendering as.
-  let bottomRadius = (heightUnits * WIDTH_PER_HEIGHT) / 2;
-  let topRadius = bottomTopRatio !== 0 ? bottomRadius / Math.abs(bottomTopRatio) : bottomRadius;
-  if (bottomTopRatio < 0) [bottomRadius, topRadius] = [topRadius, bottomRadius];
+  // That is a real departure from xLights and worth stating plainly. The reason is that nobody
+  // builds an upside-down mega tree. A stored value that would flare one is a data artifact -
+  // another tool's sign convention, a hand-edited file, a number entered as its own reciprocal -
+  // and the two outcomes are not symmetrical: rendering a normal tree upside down makes the whole
+  // preview useless for the prop it is most needed for, while refusing to render a genuinely
+  // inverted cone costs a shape nobody has in their yard.
+  //
+  // A ratio of 0 stays a cylinder, which is what xLights does with it and is a shape people do
+  // build - a wrapped pole.
+  const taper = Math.abs(bottomTopRatio);
+  const bottomRadius = (heightUnits * WIDTH_PER_HEIGHT) / 2;
+  const topRadius = taper === 0 ? bottomRadius : bottomRadius / Math.max(taper, 1 / taper);
 
   // `StartAngle = -radians / 2` and `AngleIncr = radians / BufferWi`, except that a tree which
   // isn't nearly a full circle divides by `BufferWi - 1` so its last strand lands exactly on the
