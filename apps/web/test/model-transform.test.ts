@@ -74,3 +74,24 @@ describe("a model's screen transform", () => {
     expect(transformForModel(model())).toEqual(transformForModel(model()));
   });
 });
+
+describe("every axis is available to every model", () => {
+  it("carries all three rotations and all three scales through", () => {
+    // The panel only exposed Scale X, Scale Y and one rotation, so a model that needed tipping
+    // on X - a stake, a cube laid flat - had no way to say so.
+    const t = transformForModel(
+      model({
+        type: "Cube",
+        screen: { scale: 2, scaleY: 3, scaleZ: 4, rotate: 10, rotateX: 90, rotateY: 45 } as ModelRecord["screen"],
+      }),
+    );
+    expect(t).toEqual({ scale: 2, scaleY: 3, scaleZ: 4, rotateDeg: 10, rotateXDeg: 90, rotateYDeg: 45 });
+  });
+
+  it("treats a missing rotation as none rather than as undefined", () => {
+    const t = transformForModel(model({ type: "Cube", screen: { scale: 1 } as ModelRecord["screen"] }));
+    expect(t.rotateXDeg).toBe(0);
+    expect(t.rotateYDeg).toBe(0);
+    expect(t.rotateDeg).toBe(0);
+  });
+});
