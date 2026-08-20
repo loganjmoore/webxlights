@@ -7,6 +7,7 @@ import type { ModelRecord, ViewObjectRecord } from "../lib/api";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 import { displayY, transformForModel } from "../lib/modelTransform";
 import { groundedAnchorY, resizeFromCorner } from "../lib/resizeModel";
+import { NODE_SPACING } from "../lib/worldUnits";
 
 const props = defineProps<{ models: ModelRecord[]; viewObjects?: ViewObjectRecord[]; selectedModelId: number | null }>();
 const emit = defineEmits<{
@@ -19,7 +20,6 @@ const emit = defineEmits<{
 // Must match ModelPalette.vue's dragstart payload exactly.
 const MODEL_DRAG_MIME = "application/x-webxlights-model-type";
 
-const NODE_SPACING = 4; // matches LayoutCanvas (2D) and HousePreview's local-unit-to-px scale
 const PICK_DEPTH = 12; // flat 2D models get a thin box for raycasting, not zero-volume
 const CLICK_SLOP = 4; // px of pointer travel still counted as a click rather than a drag
 const GROUND_GRID_SPAN = 4000;

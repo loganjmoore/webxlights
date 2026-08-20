@@ -380,9 +380,17 @@ function worldMapper(member: GroupMember): (node: ModelNode) => { x: number; y: 
   const placement = member.placement;
   if (!placement) return (node) => ({ x: node.screenX, y: node.screenY });
   const centre = geometryCenter(member.geometry);
+  // Local units to world units. `placement.x/y` are already world; the offset is not, so the two
+  // cannot be added without converting - and adding them unconverted is not a uniform shrink of
+  // the whole group, because only one of the two terms is affected. Each member's nodes end up
+  // clustered far tighter than they are drawn while the gaps between members stay as they are,
+  // so the buffer is laid out to a shape the yard doesn't have. Defaults to 1 for a caller with
+  // no view to convert for - a test, a preset thumbnail - which is the ratio that changes
+  // nothing.
+  const unit = placement.unitScale ?? 1;
   return (node) => {
     const off = nodeWorldOffset(node, centre, placement.transform);
-    return { x: placement.x + off.x, y: placement.y + off.y };
+    return { x: placement.x + off.x * unit, y: placement.y + off.y * unit };
   };
 }
 
@@ -477,7 +485,19 @@ export interface GroupRenderSpec {
      * Optional so a caller that has no layout - a test, a preset preview - still gets the old
      * local-coordinate behaviour rather than an error.
      */
-    placement?: { x: number; y: number; transform: ScreenTransform };
+    placement?: {
+      x: number;
+      y: number;
+      transform: ScreenTransform;
+      /**
+       * World units per local geometry unit, as the view that draws these models uses.
+       *
+       * `x`/`y` are world coordinates and `transform` produces local ones, so the two are only
+       * addable through this. A caller that leaves it out gets 1, which is right for anything
+       * whose positions are already local and wrong for a real layout - see worldMapper.
+       */
+      unitScale?: number;
+    };
   }>;
   effects: RenderableEffect[];
 }

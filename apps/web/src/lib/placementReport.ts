@@ -6,6 +6,7 @@ import {
   type ModelGeometry,
 } from "@webxlights/engine";
 import type { ModelRecord } from "./api";
+import { NODE_SPACING } from "./worldUnits";
 
 // A compact, pasteable dump of how every model in a layout was placed: the raw xLights
 // attributes the importer read, and the position/scale/rotation it derived from them.
@@ -59,7 +60,6 @@ const PLACEMENT_ATTRS = [
   "cPointData",
 ];
 
-const NODE_SPACING = 4; // matches the canvases
 
 function geometryOf(model: ModelRecord): ModelGeometry | null {
   if (!model.supported) return null;

@@ -39,10 +39,10 @@ import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
 import ModelPalette from "../components/ModelPalette.vue";
 import TabNav from "../components/TabNav.vue";
+import { NODE_SPACING } from "../lib/worldUnits";
 
 // The canvases' local-unit-to-world factor, the same value the importer places against
 // (lib/import.ts) - re-deriving a placement with a different one would move the model.
-const NODE_SPACING = 4;
 
 const route = useRoute();
 const projectId = computed(() => Number(route.params.projectId));
