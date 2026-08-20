@@ -11,17 +11,21 @@ import type { ModelRecord } from "./api";
 /**
  * Model types that only ever stand upright.
  *
- * A rotation about Z spins a model in its own face plane. For most props that is meaningful - a
- * sign can hang at an angle, an arch can lean. For a mega tree it is not: the only useful way to
- * turn a tree is about its own vertical axis, which is RotateY, and a Z rotation can do nothing to
- * it except tip it over.
+ * Two of the three rotations can tip a model over. Z spins it in its own face plane, X pitches it
+ * forwards and backwards; either at 180 degrees stands it on its head. Only Y turns it about its
+ * own vertical axis, which for a tree is the one rotation that means anything - it decides which
+ * strand faces the street.
  *
- * So a Z rotation is dropped for these. It is a deliberate override of what the file says, in the
- * same spirit as taking the magnitude of a negative scale (models/transform.ts) and as ignoring
- * the sign of a tree's bottom/top ratio (models/tree.ts): all three are cases where a stored value
- * would stand a prop on its head, and nobody's yard has an upside-down mega tree. The cost is that
- * a deliberately tipped-over tree can't be expressed; the alternative is a preview that is wrong
- * about the biggest prop in the show.
+ * So X and Z are dropped for these, and Y is kept. It is a deliberate override of what the file
+ * says, in the same spirit as taking the magnitude of a negative scale (models/transform.ts) and
+ * ignoring the sign of a tree's bottom/top ratio (models/tree.ts): all of them are cases where a
+ * stored value would stand a prop on its head, and nobody's yard has an upside-down mega tree.
+ *
+ * Dropping Z alone was not enough, and the gap is worth recording because the reasoning above was
+ * already written down when only Z was being dropped. A layout imported before X and Y rotations
+ * were read at all had no X to apply, so trees looked right; re-importing the same show brought
+ * the file's RotateX back and stood them on their heads again. A rule that names one axis when it
+ * means two survives exactly until the other one appears in the data.
  */
 const UPRIGHT_ONLY = new Set(["Tree"]);
 
@@ -64,7 +68,9 @@ export function transformForModel(model: ModelRecord): ScreenTransform {
     scaleY: model.screen.scaleY,
     scaleZ: model.screen.scaleZ,
     rotateDeg: UPRIGHT_ONLY.has(type) ? 0 : rotate,
-    rotateXDeg: model.screen.rotateX ?? 0,
+    rotateXDeg: UPRIGHT_ONLY.has(type) ? 0 : (model.screen.rotateX ?? 0),
+    // Y is kept: it turns a tree about its own axis, which is the one rotation that doesn't
+    // tip it over.
     rotateYDeg: model.screen.rotateY ?? 0,
   };
 }
