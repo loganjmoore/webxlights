@@ -2,6 +2,10 @@ import type { RGBA } from "./color";
 import type { ModelGeometry, ModelNode } from "./models/types";
 import type { RenderableEffect, RenderableRow } from "./renderFrame";
 import { applyRenderStyle, type RenderStyle } from "./renderStyle";
+import { geometryCenter, nodeWorldOffset, type ScreenTransform } from "./models/transform";
+
+/** One member of a group, as the planner sees it. */
+export type GroupMember = GroupRenderSpec["members"][number];
 
 // xLights' group render styles (manual: Sequencer > Layers > Layer Settings). A model group can
 // be sequenced as one thing, and the render style is what decides *how* several separate props
@@ -137,13 +141,22 @@ export function perModelStyleFor(style: GroupRenderStyle): RenderStyle {
  * models in the 'Models in Group' determines the render order". Stacking styles depend on it
  * outright - it is what decides which arch is on the left.
  */
-export function composeGroupBuffer(members: ModelGeometry[], style: GroupRenderStyle | undefined): GroupBuffer {
-  const present = members.filter((m) => m.nodes.length > 0);
+export function composeGroupBuffer(
+  // Takes either bare geometries or full members. Only "Per Preview" needs the placement, and a
+  // caller with no layout to place anything against - a test, a preset thumbnail - should not have
+  // to invent one.
+  members: Array<ModelGeometry | GroupMember>,
+  style: GroupRenderStyle | undefined,
+): GroupBuffer {
+  const present = members
+    .map((m, i): GroupMember => ("geometry" in m ? m : { modelId: i, geometry: m }))
+    .filter((m) => m.geometry.nodes.length > 0);
+  const geometries = present.map((m) => m.geometry);
   const memberStarts: number[] = [];
   let running = 0;
   for (const m of present) {
     memberStarts.push(running);
-    running += m.nodes.length;
+    running += m.geometry.nodes.length;
   }
   memberStarts.push(running);
 
@@ -156,7 +169,7 @@ export function composeGroupBuffer(members: ModelGeometry[], style: GroupRenderS
   if (isPerModelStyle(resolved)) {
     // Composing is meaningless for these - the caller renders each member on its own. Returning
     // the members side by side keeps the shape valid for anything that only wants a size.
-    return place(present, memberStarts, stackedPlacement(present, "horizontal", false));
+    return place(geometries, memberStarts, stackedPlacement(geometries, "horizontal", false));
   }
 
   switch (resolved) {
@@ -164,32 +177,32 @@ export function composeGroupBuffer(members: ModelGeometry[], style: GroupRenderS
       return perPreview(present, memberStarts);
     case "Single Line":
       // Every member's nodes end to end, in member order and then wiring order.
-      return place(present, memberStarts, sequential(present, (i) => ({ bufX: i, bufY: 0 }), running, 1));
+      return place(geometries, memberStarts, sequential(geometries, (i) => ({ bufX: i, bufY: 0 }), running, 1));
     case "As Pixel":
-      return place(present, memberStarts, sequential(present, () => ({ bufX: 0, bufY: 0 }), 1, 1));
+      return place(geometries, memberStarts, sequential(geometries, () => ({ bufX: 0, bufY: 0 }), 1, 1));
     case "Single Line as a Pixel":
       // "Each Model is represented as a single Pixel and placed in a single line."
-      return place(present, memberStarts, perMemberCell((m) => ({ bufX: m, bufY: 0 }), present.length, 1));
+      return place(geometries, memberStarts, perMemberCell((m) => ({ bufX: m, bufY: 0 }), present.length, 1));
     case "Horizontal Stacked":
-      return place(present, memberStarts, stackedPlacement(present, "horizontal", false));
+      return place(geometries, memberStarts, stackedPlacement(geometries, "horizontal", false));
     case "Vertically Stacked":
-      return place(present, memberStarts, stackedPlacement(present, "vertical", false));
+      return place(geometries, memberStarts, stackedPlacement(geometries, "vertical", false));
     case "Horizontal Stacked - Scaled":
-      return place(present, memberStarts, stackedPlacement(present, "horizontal", true));
+      return place(geometries, memberStarts, stackedPlacement(geometries, "horizontal", true));
     case "Vertically Stacked - Scaled":
-      return place(present, memberStarts, stackedPlacement(present, "vertical", true));
+      return place(geometries, memberStarts, stackedPlacement(geometries, "vertical", true));
     case "Horizontal Per Model":
-      return place(present, memberStarts, perModelLine(present, "horizontal"));
+      return place(geometries, memberStarts, perModelLine(geometries, "horizontal"));
     case "Vertical Per Model":
-      return place(present, memberStarts, perModelLine(present, "vertical"));
+      return place(geometries, memberStarts, perModelLine(geometries, "vertical"));
     case "Horizontal Per Model/Strand":
-      return place(present, memberStarts, perModelStrand(present, "horizontal"));
+      return place(geometries, memberStarts, perModelStrand(geometries, "horizontal"));
     case "Vertical Per Model/Strand":
-      return place(present, memberStarts, perModelStrand(present, "vertical"));
+      return place(geometries, memberStarts, perModelStrand(geometries, "vertical"));
     case "Overlay - Centered":
-      return place(present, memberStarts, overlay(present, false));
+      return place(geometries, memberStarts, overlay(geometries, false));
     case "Overlay - Scaled":
-      return place(present, memberStarts, overlay(present, true));
+      return place(geometries, memberStarts, overlay(geometries, true));
     default:
       return perPreview(present, memberStarts);
   }
@@ -356,21 +369,41 @@ function perModelStrand(members: ModelGeometry[], axis: "horizontal" | "vertical
 // "Per Preview: this will render the way the model has been laid out in the preview." For a group
 // that is the whole point of the style - the props keep their positions relative to each other,
 // so an effect sweeps across the yard rather than across a list of models.
-function perPreview(members: ModelGeometry[], memberStarts: number[]): GroupBuffer {
+/**
+ * Where a member's node sits in the yard.
+ *
+ * With a placement, the model's own transform and anchor are applied, so two props twenty feet
+ * apart are twenty feet apart here too. Without one, the node's local coordinates stand in - the
+ * old behaviour, and right for a caller that has no layout to place anything against.
+ */
+function worldMapper(member: GroupMember): (node: ModelNode) => { x: number; y: number } {
+  const placement = member.placement;
+  if (!placement) return (node) => ({ x: node.screenX, y: node.screenY });
+  const centre = geometryCenter(member.geometry);
+  return (node) => {
+    const off = nodeWorldOffset(node, centre, placement.transform);
+    return { x: placement.x + off.x, y: placement.y + off.y };
+  };
+}
+
+function perPreview(members: GroupMember[], memberStarts: number[]): GroupBuffer {
+  const mappers = members.map(worldMapper);
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
   let total = 0;
-  for (const member of members) {
-    for (const node of member.nodes) {
-      minX = Math.min(minX, node.screenX);
-      maxX = Math.max(maxX, node.screenX);
-      minY = Math.min(minY, node.screenY);
-      maxY = Math.max(maxY, node.screenY);
+  members.forEach((member, m) => {
+    const at = mappers[m]!;
+    for (const node of member.geometry.nodes) {
+      const { x, y } = at(node);
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
       total++;
     }
-  }
+  });
   const spanX = Math.max(maxX - minX, 1e-6);
   const spanY = Math.max(maxY - minY, 1e-6);
   // Roughly one cell per node, shaped like the group's own footprint - the same rule the
@@ -378,14 +411,23 @@ function perPreview(members: ModelGeometry[], memberStarts: number[]): GroupBuff
   const width = Math.max(1, Math.round(Math.sqrt(total) * (spanX >= spanY ? spanX / spanY : 1)));
   const height = Math.max(1, Math.round(Math.sqrt(total) * (spanY > spanX ? spanY / spanX : 1)));
 
-  return place(members, memberStarts, {
-    width,
-    height,
-    at: (_m, node) => ({
-      bufX: Math.min(width - 1, Math.round(((node.screenX - minX) / spanX) * (width - 1))),
-      bufY: Math.min(height - 1, Math.round(((node.screenY - minY) / spanY) * (height - 1))),
-    }),
-  });
+  return place(
+    members.map((m) => m.geometry),
+    memberStarts,
+    {
+      width,
+      height,
+      at: (m, node) => {
+        const { x, y } = mappers[m]!(node);
+        return {
+          bufX: Math.min(width - 1, Math.round(((x - minX) / spanX) * (width - 1))),
+          // The buffer's row 0 is the bottom, the same way a model's is, so a group effect runs
+          // up the yard in the same direction it runs up a single prop.
+          bufY: Math.min(height - 1, Math.round(((y - minY) / spanY) * (height - 1))),
+        };
+      },
+    },
+  );
 }
 
 function stretch(value: number, from: number, to: number): number {
@@ -419,7 +461,24 @@ export interface GroupRenderSpec {
   /** The stored buffer style, in whatever spelling the show used. */
   style?: string | null;
   /** Members in the group's own order, which decides which prop is on the left when stacked. */
-  members: Array<{ modelId: number; geometry: ModelGeometry }>;
+  members: Array<{
+    modelId: number;
+    geometry: ModelGeometry;
+    /**
+     * Where this member actually stands in the yard, if the caller knows.
+     *
+     * "Per Preview" is defined as laying the members out where they physically are, and it cannot
+     * do that from the geometry alone: every model's `screenX`/`screenY` are its *own* local
+     * coordinates, centred on its own origin. Two props twenty feet apart have overlapping local
+     * boxes, so a group buffer built from them covers the two shapes on top of each other and
+     * every member ends up mapped across the whole buffer - which renders as each prop showing a
+     * complete copy of the effect instead of its own part of one.
+     *
+     * Optional so a caller that has no layout - a test, a preset preview - still gets the old
+     * local-coordinate behaviour rather than an error.
+     */
+    placement?: { x: number; y: number; transform: ScreenTransform };
+  }>;
   effects: RenderableEffect[];
 }
 
@@ -469,7 +528,9 @@ export function planGroupRendering(specs: GroupRenderSpec[]): GroupRenderJob[] {
       continue;
     }
 
-    const { geometry, memberStarts } = composeGroupBuffer(members.map((m) => m.geometry), style);
+    // The members themselves, not just their geometries - "Per Preview" needs to know where each
+    // one stands to lay them out where they physically are.
+    const { geometry, memberStarts } = composeGroupBuffer(members, style);
     jobs.push({
       groupId: spec.id,
       row: { geometry, effects: spec.effects },

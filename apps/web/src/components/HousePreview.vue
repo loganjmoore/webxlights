@@ -157,7 +157,9 @@ function rebuildComposeCache(): void {
     })),
   }));
 
-  groupJobs = planGroupRendering(groupRenderSpecs(props.groups ?? [], geometryByModelId(), props.body));
+  groupJobs = planGroupRendering(
+    groupRenderSpecs(props.groups ?? [], geometryByModelId(), props.body, new Map(props.models.map((m) => [m.id, m]))),
+  );
 }
 
 function updateColors(): void {
