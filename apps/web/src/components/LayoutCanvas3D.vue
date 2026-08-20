@@ -5,6 +5,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { computeGeometryFromAttrs, geometryCenter, nodeWorldOffset, transformedHalfExtents, type ModelGeometry, type ScreenTransform } from "@webxlights/engine";
 import type { ModelRecord, ViewObjectRecord } from "../lib/api";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
+import { transformForModel } from "../lib/modelTransform";
 import { groundedAnchorY, resizeFromCorner } from "../lib/resizeModel";
 
 const props = defineProps<{ models: ModelRecord[]; viewObjects?: ViewObjectRecord[]; selectedModelId: number | null }>();
@@ -124,12 +125,7 @@ function geometryFor(model: ModelRecord): ModelGeometry | null {
 // center - `model.screen.x/y/z` is that anchor. See packages/engine/src/models/transform.ts's
 // module doc for why every model type (not just the coincidentally-centered ones) needs this.
 function transformFor(model: ModelRecord): ScreenTransform {
-  return {
-    scale: model.screen.scale ?? 1,
-    scaleY: model.screen.scaleY,
-    scaleZ: model.screen.scaleZ,
-    rotateDeg: model.screen.rotate ?? 0,
-  };
+  return transformForModel(model);
 }
 
 function buildPositions(): Float32Array {

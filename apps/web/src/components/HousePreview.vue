@@ -20,6 +20,7 @@ import { composeModel, type RenderRow } from "../lib/composeModel";
 import { toRenderableEffects } from "../lib/renderableEffects";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
+import { transformForModel } from "../lib/modelTransform";
 
 const props = defineProps<{
   models: ModelRecord[];
@@ -89,14 +90,7 @@ function buildPositions(): Float32Array {
     // Shares the layout canvases' transform so the show previews in the same shape it's laid
     // out in - per-axis scale, rotation and real per-node depth, not a flat scale on raw
     // screenX/screenY (which ignored rotation and squashed a 360-degree tree into a triangle).
-    const transform = {
-      scale: entry.model.screen.scale ?? 1,
-      scaleY: entry.model.screen.scaleY,
-      scaleZ: entry.model.screen.scaleZ,
-      rotateDeg: entry.model.screen.rotate ?? 0,
-      rotateXDeg: entry.model.screen.rotateX ?? 0,
-      rotateYDeg: entry.model.screen.rotateY ?? 0,
-    };
+    const transform = transformForModel(entry.model);
     const center = geometryCenter(entry.geometry);
     entry.geometry.nodes.forEach((node, i) => {
       const idx = (entry.offset + i) * 3;
