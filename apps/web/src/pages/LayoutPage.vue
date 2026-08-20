@@ -303,11 +303,41 @@ function selectFromList(model: ModelRecord, e: MouseEvent): void {
 function handleMove3D(modelId: number, x: number, y: number, z: number): void {
   void updateScreen(modelId, { x, y, z });
 }
-function handlePositionField(field: "x" | "y" | "z" | "scale" | "scaleY" | "scaleZ" | "rotate", raw: string): void {
+type ScreenField = "x" | "y" | "z" | "scale" | "scaleY" | "scaleZ" | "rotate" | "rotateX" | "rotateY";
+
+function handlePositionField(field: ScreenField, raw: string): void {
   if (!selectedModel.value) return;
   const value = Number(raw);
   if (Number.isNaN(value)) return;
   void updateScreen(selectedModel.value.id, { [field]: value });
+}
+
+/**
+ * One number for all three axes.
+ *
+ * Sizing a prop is usually "make the whole thing bigger", and doing that through three fields
+ * means getting three numbers to agree and watching the shape distort in between. The per-axis
+ * fields are still there for the cases that genuinely want one axis - a matrix stretched wider
+ * than it is tall - so this doesn't take anything away.
+ *
+ * Shows the shared value when the three already agree, and blank when they don't, because there
+ * is no honest single number for a model scaled 2 x 1 x 2 and putting one there would suggest
+ * the axes match when they don't.
+ */
+const uniformScale = computed<number | null>(() => {
+  const s = selectedModel.value?.screen;
+  if (!s) return null;
+  const x = s.scale ?? 1;
+  const y = s.scaleY ?? x;
+  const z = s.scaleZ ?? x;
+  return Math.abs(x - y) < 1e-9 && Math.abs(x - z) < 1e-9 ? x : null;
+});
+
+function handleUniformScale(raw: string): void {
+  if (!selectedModel.value) return;
+  const value = Number(raw);
+  if (Number.isNaN(value) || value === 0) return;
+  void updateScreen(selectedModel.value.id, { scale: value, scaleY: value, scaleZ: value });
 }
 
 // M15.2: the structural-property editor the M13 "no other recovery path" comment (see
@@ -1113,8 +1143,52 @@ onUnmounted(() => {
                 />
               </label>
               <label>
-                Rotate
-                <input type="number" :value="selectedModel.screen.rotate ?? 0" @change="handlePositionField('rotate', ($event.target as HTMLInputElement).value)" />
+                Scale Z
+                <input
+                  type="number"
+                  step="0.1"
+                  :value="selectedModel.screen.scaleZ ?? selectedModel.screen.scale ?? 1"
+                  title="Depth. Defaults to Scale X until set independently"
+                  @change="handlePositionField('scaleZ', ($event.target as HTMLInputElement).value)"
+                />
+              </label>
+              <label class="uniform-scale">
+                Scale all
+                <input
+                  type="number"
+                  step="0.1"
+                  :value="uniformScale ?? ''"
+                  :placeholder="uniformScale === null ? 'mixed' : ''"
+                  title="Sets all three axes at once. Blank when they differ."
+                  @change="handleUniformScale(($event.target as HTMLInputElement).value)"
+                />
+              </label>
+              <label>
+                Rotate X
+                <input
+                  type="number"
+                  :value="selectedModel.screen.rotateX ?? 0"
+                  title="Tips the model forwards or back - a stake laid flat on the lawn is 90"
+                  @change="handlePositionField('rotateX', ($event.target as HTMLInputElement).value)"
+                />
+              </label>
+              <label>
+                Rotate Y
+                <input
+                  type="number"
+                  :value="selectedModel.screen.rotateY ?? 0"
+                  title="Swings the model round to face elsewhere - how a tree is turned on its own axis"
+                  @change="handlePositionField('rotateY', ($event.target as HTMLInputElement).value)"
+                />
+              </label>
+              <label>
+                Rotate Z
+                <input
+                  type="number"
+                  :value="selectedModel.screen.rotate ?? 0"
+                  title="Spins the model in its own face plane"
+                  @change="handlePositionField('rotate', ($event.target as HTMLInputElement).value)"
+                />
               </label>
               <button class="delete-btn" @click="handleDelete(selectedModel.id)">Delete model</button>
             </div>

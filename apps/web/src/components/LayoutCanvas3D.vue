@@ -287,7 +287,17 @@ function worldHalfExtents(entry: RowEntry): { halfW: number; halfH: number } {
 
 /** Local half-extents at scale 1, which is what a world size has to be divided by to get a scale. */
 function unitHalfExtents(entry: RowEntry): { halfW: number; halfH: number } {
-  const { halfW, halfH } = transformedHalfExtents(entry.geometry, { scale: 1, scaleY: 1, rotateDeg: entry.transform.rotateDeg });
+  // Every rotation, not just Z. A model tipped on X is a different height on screen than the same
+  // model upright, and measuring it as though it were upright makes a corner drag resize it by the
+  // wrong factor.
+  const { halfW, halfH } = transformedHalfExtents(entry.geometry, {
+    scale: 1,
+    scaleY: 1,
+    scaleZ: 1,
+    rotateDeg: entry.transform.rotateDeg,
+    rotateXDeg: entry.transform.rotateXDeg,
+    rotateYDeg: entry.transform.rotateYDeg,
+  });
   return { halfW: Math.max(halfW, 1e-6), halfH: Math.max(halfH, 1e-6) };
 }
 
