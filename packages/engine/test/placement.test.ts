@@ -59,6 +59,34 @@ describe("xLights placement systems (SPEC ch11 §2.1)", () => {
     expect(screen.rotate).toBeCloseTo(0);
   });
 
+  it("measures a run that goes front-to-back, not just its shadow on the front wall", () => {
+    // Lights down a gutter, or a line from the house out to the street: no extent in X or Y at
+    // all. The length was hypot(dx, dy), so a run like this measured zero and collapsed to a
+    // single dot on the layout.
+    const g = geo("Single Line", { NumStrings: "1", NodesPerString: "50" });
+    const along = screenFromAttrs("Single Line", { WorldPosX: "0", WorldPosY: "0", WorldPosZ: "0", X2: "0", Y2: "0", Z2: "200" }, g, SPACING);
+    const across = screenFromAttrs("Single Line", { WorldPosX: "0", WorldPosY: "0", WorldPosZ: "0", X2: "200", Y2: "0", Z2: "0" }, g, SPACING);
+    // Same length of run, so the same size - only the direction differs.
+    expect(along.scale).toBeCloseTo(across.scale, 6);
+    expect(along.scale).toBeGreaterThan(0);
+  });
+
+  it("turns a run into the depth it actually has", () => {
+    const g = geo("Single Line", { NumStrings: "1", NodesPerString: "50" });
+    // Straight back from the viewer is a quarter turn about Y.
+    const back = screenFromAttrs("Single Line", { X2: "0", Y2: "0", Z2: "200" }, g, SPACING);
+    expect(back.rotateY).toBeCloseTo(-90, 4);
+    // Straight across is no turn at all, and keeps the flat arithmetic it always had.
+    const across = screenFromAttrs("Single Line", { X2: "200", Y2: "0", Z2: "0" }, g, SPACING);
+    expect(across.rotateY).toBe(0);
+    expect(across.rotate).toBeCloseTo(0, 6);
+  });
+
+  it("still calls a model with no endpoint vector at all boxed", () => {
+    expect(appliedPlacementFor("Single Line", { X2: "0", Y2: "0", Z2: "0" })).toBe("boxed");
+    expect(appliedPlacementFor("Single Line", { X2: "0", Y2: "0", Z2: "200" })).toBe("twoPoint");
+  });
+
   it("a two-point model is scaled to actually span its endpoint vector", () => {
     const g = geo("Single Line");
     const screen = screenFromAttrs("Single Line", { WorldPosX: "0", WorldPosY: "0", X2: "300", Y2: "0" }, g, SPACING);

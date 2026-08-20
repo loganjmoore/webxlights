@@ -97,7 +97,11 @@ export function appliedPlacementFor(displayAs: string, attrs: Record<string, str
   }
   const dx = numAny(attrs, ["X2", "x2"], 0);
   const dy = numAny(attrs, ["Y2", "y2"], 0);
-  return Math.hypot(dx, dy) < 1e-9 ? "boxed" : system;
+  const dz = numAny(attrs, ["Z2", "z2"], 0);
+  // Z counts. A run along the depth axis - lights down a gutter, a line from the house out to the
+  // street - has no extent in X or Y at all, so measuring only those two called it degenerate and
+  // sent it to the boxed reading, where it came out as a dot.
+  return Math.hypot(dx, dy, dz) < 1e-9 ? "boxed" : system;
 }
 
 // Which of a boxed model's scale attributes were stored negative. The importer reads them as
@@ -237,7 +241,10 @@ export function screenFromAttrs(
   const dx = numAny(attrs, ["X2", "x2"], 0);
   const dy = numAny(attrs, ["Y2", "y2"], 0);
   const dz = numAny(attrs, ["Z2", "z2"], 0);
-  const length = Math.hypot(dx, dy);
+  // The real distance between the endpoints, depth included. This was hypot(dx, dy), which is
+  // the length of the run's *shadow* on the front wall - correct for a line across the house,
+  // zero for one running away from it.
+  const length = Math.hypot(dx, dy, dz);
 
   // A degenerate or missing endpoint vector (both offsets zero) can't say anything about size
   // or angle - fall back to the boxed reading rather than collapsing the model to nothing.
@@ -257,15 +264,28 @@ export function screenFromAttrs(
   // end you happened to anchor from doesn't change it - you can drag either handle and it stays
   // an arch. So a backwards vector is folded into a mirror along the model's own X axis rather
   // than a half turn: same line, same endpoints, same node order along it, but "up" stays up.
-  const rawRotate = (Math.atan2(dy, dx) * 180) / Math.PI;
+  //
+  // A run with depth also needs turning into it, which is a yaw about Y on top of the angle in
+  // the X/Y plane. Left at zero, a gutter line running front-to-back was drawn as if it ran
+  // across the front of the house instead.
+  //
+  // A flat run keeps exactly the arithmetic it had. The two forms agree for a forward-pointing
+  // vector, but not for a backward one - `atan2(dy, dx)` is what the mirror rule below is written
+  // against, and re-deriving it from a horizontal magnitude would quietly change which side an
+  // arch rises to.
+  const hasDepth = Math.abs(dz) > 1e-9;
+  const rawRotate = hasDepth
+    ? (Math.atan2(dy, Math.hypot(dx, dz)) * 180) / Math.PI
+    : (Math.atan2(dy, dx) * 180) / Math.PI;
   const backwards = rawRotate > 90 || rawRotate <= -90;
   const rotate = backwards ? rawRotate - Math.sign(rawRotate) * 180 : rawRotate;
   const mirror = backwards ? -1 : 1;
-  // A two/three-point model takes its Z angle from its endpoints, but a tip out of the vertical
-  // plane still has to come from the file - an arch laid flat on a lawn is RotateX, and nothing
-  // about its two endpoints says so.
+  // A two/three-point model takes its angles from its endpoints where the endpoints say
+  // something. A tip out of the vertical plane doesn't come from them - an arch laid flat on a
+  // lawn is RotateX, and nothing about its two ends says so - and neither does yaw on a run that
+  // is flat, so that keeps coming from the file.
   const rotateX = num(attrs, "RotateX", 0);
-  const rotateY = num(attrs, "RotateY", 0);
+  const rotateY = hasDepth ? (Math.atan2(-dz, dx) * 180) / Math.PI : num(attrs, "RotateY", 0);
   const scale = (mirror * length) / (size.width * unitsPerLocal);
 
   if (system === "twoPoint") {
