@@ -41,6 +41,17 @@ describe("planting a model on the ground", () => {
 });
 
 describe("a model's screen transform", () => {
+  it("drops both rotations that would tip a tree over, and keeps the one that doesn't", () => {
+    // X pitches a model forwards, Z spins it in its own face plane; either at 180 stands it on
+    // its head. Y turns it about its own vertical axis, which is what decides which strand faces
+    // the street. Dropping Z alone was enough only while nothing was storing an X - a re-import
+    // brought the file's RotateX back and the trees went over again.
+    const t = transformForModel(model());
+    expect(t.rotateDeg).toBe(0);
+    expect(t.rotateXDeg).toBe(0);
+    expect(t.rotateYDeg).toBe(20);
+  });
+
   it("drops a Z rotation on a tree, which can only tip it over", () => {
     // The one thing left that could stand a mega tree on its head once the geometry is upright
     // and the scales are magnitudes. Spinning a tree usefully is RotateY, about its own axis.
@@ -50,6 +61,8 @@ describe("a model's screen transform", () => {
   it("keeps a Z rotation on everything else", () => {
     expect(transformForModel(model({ type: "Custom" })).rotateDeg).toBe(180);
     expect(transformForModel(model({ type: "Matrix" })).rotateDeg).toBe(180);
+    // and their pitch, which a sign lying flat on a lawn depends on
+    expect(transformForModel(model({ type: "Custom" })).rotateXDeg).toBe(10);
   });
 
   it("recognises a tree by what the file actually calls it", () => {
