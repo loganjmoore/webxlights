@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { transformForModel } from "../src/lib/modelTransform";
+import { displayY, standsOnGround, transformForModel } from "../src/lib/modelTransform";
 import type { ModelRecord } from "../src/lib/api";
 
 const model = (over: Partial<ModelRecord> = {}): ModelRecord =>
@@ -12,6 +12,33 @@ const model = (over: Partial<ModelRecord> = {}): ModelRecord =>
     screen: { scale: 2, scaleY: 3, scaleZ: 4, rotate: 180, rotateX: 10, rotateY: 20 },
     ...over,
   }) as ModelRecord;
+
+describe("planting a model on the ground", () => {
+  it("puts a tree's base on the lawn whatever its record says", () => {
+    // The stored position is the model's centre, so how high it belongs depends on how tall we
+    // work the model out to be - and a tree's height changed when strand folding landed, which
+    // left every one of them hanging in the air.
+    const tree = model({ screen: { y: 900 } as ModelRecord["screen"] });
+    expect(displayY(tree, 40, 0, true)).toBe(40);
+    expect(displayY(tree, 40, -100, true)).toBe(-60);
+  });
+
+  it("leaves everything else where it was put", () => {
+    // A star on a roof peak and lights along a gutter are up there on purpose.
+    const star = model({ type: "Star", screen: { y: 900 } as ModelRecord["screen"] });
+    expect(displayY(star, 40, 0, true)).toBe(900);
+  });
+
+  it("gives a tree its record back when the rule is turned off", () => {
+    expect(displayY(model({ screen: { y: 900 } as ModelRecord["screen"] }), 40, 0, false)).toBe(900);
+  });
+
+  it("knows a tree by what the file calls it", () => {
+    const named = model({ type: "Tree", raw_attrs: { DisplayAs: "Tree 360" }, screen: { y: 900 } as ModelRecord["screen"] });
+    expect(standsOnGround(named)).toBe(true);
+    expect(standsOnGround(model({ type: "Matrix", raw_attrs: {} }))).toBe(false);
+  });
+});
 
 describe("a model's screen transform", () => {
   it("drops a Z rotation on a tree, which can only tip it over", () => {

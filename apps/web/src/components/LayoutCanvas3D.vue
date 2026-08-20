@@ -5,7 +5,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { computeGeometryFromAttrs, geometryCenter, nodeWorldOffset, transformedHalfExtents, type ModelGeometry, type ScreenTransform } from "@webxlights/engine";
 import type { ModelRecord, ViewObjectRecord } from "../lib/api";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
-import { transformForModel } from "../lib/modelTransform";
+import { displayY, transformForModel } from "../lib/modelTransform";
 import { groundedAnchorY, resizeFromCorner } from "../lib/resizeModel";
 
 const props = defineProps<{ models: ModelRecord[]; viewObjects?: ViewObjectRecord[]; selectedModelId: number | null }>();
@@ -132,9 +132,10 @@ function buildPositions(): Float32Array {
   const total = rowEntries.reduce((sum, e) => sum + e.geometry.nodes.length, 0);
   const positions = new Float32Array(total * 3);
   for (const entry of rowEntries) {
-    const mx = entry.model.screen.x ?? 0;
-    const my = entry.model.screen.y ?? 0;
-    const mz = entry.model.screen.z ?? 0;
+    // The pick box is where the model actually is - it already carries the ground rule, and
+    // reading the record again here is how the drawn nodes and the box they are picked by came
+    // to be able to disagree.
+    const { x: mx, y: my, z: mz } = entry.pickMesh.position;
     entry.geometry.nodes.forEach((node, i) => {
       const idx = (entry.offset + i) * 3;
       const off = nodeWorldOffset(node, entry.center, entry.transform);
@@ -172,7 +173,17 @@ function buildScene(): void {
       new THREE.BoxGeometry(halfWWorld * 2, halfHWorld * 2, PICK_DEPTH),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
-    mesh.position.set(model.screen.x ?? 0, model.screen.y ?? 0, model.screen.z ?? 0);
+    // A ground-standing model is drawn with its base on the lawn rather than at whatever Y it
+    // was stored with. The stored position is the model's *centre*, so how high that has to be
+    // depends on how tall we work the model out to be - and a tree's height changed when strand
+    // folding landed, which left every one of them hanging in the air. Planting it here rather
+    // than writing it back means nothing rewrites a position somebody set, and the pick box uses
+    // the same answer so a model doesn't jump when it is grabbed.
+    mesh.position.set(
+      model.screen.x ?? 0,
+      displayY(model, halfH * NODE_SPACING, groundY(), keepOnGround.value),
+      model.screen.z ?? 0,
+    );
     mesh.userData.modelId = model.id;
     setup.scene.add(mesh);
     rowEntries.push({
@@ -223,6 +234,9 @@ function updateSelectionHighlight(): void {
  * peak, lights along a gutter.
  */
 const keepOnGround = ref(true);
+// Turning it off should put a planted model back where its record says it is, so the scene has to
+// be rebuilt rather than only the next drag behaving differently.
+watch(keepOnGround, () => buildScene());
 
 /**
  * Resize every axis together rather than X and Y separately.
@@ -375,8 +389,7 @@ function fitCameraToScene(): void {
   if (!setup) return;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const entry of rowEntries) {
-    const mx = entry.model.screen.x ?? 0;
-    const my = entry.model.screen.y ?? 0;
+    const { x: mx, y: my } = entry.pickMesh.position;
     // Real half-extents, not a flat 40-unit guess - a scaled-up or rotated model could
     // exceed that margin and clip against the camera's frustum edges.
     const { halfW, halfH } = transformedHalfExtents(entry.geometry, entry.transform);
