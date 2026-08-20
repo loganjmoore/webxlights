@@ -2,12 +2,14 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import {
+  chooseBoxedScaleReading,
   computeGeometryFromAttrs,
   DEFAULT_GENERATE_OPTIONS,
   generateCustomModel,
   GROUP_RENDER_STYLES,
   propertyFieldsFor,
   propertyValueFor,
+  screenFromAttrs,
   type BoxedScaleReading,
   type ModelGeometry,
   type FaceSpec,
@@ -37,6 +39,10 @@ import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
 import ModelPalette from "../components/ModelPalette.vue";
 import TabNav from "../components/TabNav.vue";
+
+// The canvases' local-unit-to-world factor, the same value the importer places against
+// (lib/import.ts) - re-deriving a placement with a different one would move the model.
+const NODE_SPACING = 4;
 
 const route = useRoute();
 const projectId = computed(() => Number(route.params.projectId));
@@ -274,7 +280,10 @@ async function deleteGroup(): Promise<void> {
 // persist path M12 exists to prove. ModelEntityController::update replaces `screen` wholesale,
 // it does not deep-merge, so this must always spread the model's existing screen values and
 // override only the changed keys, or a drag silently wipes scale/rotate/z. See DECISIONS.md.
-async function updateScreen(modelId: number, patch: Partial<{ x: number; y: number; z: number; scale: number; scaleY: number; scaleZ: number; rotate: number }>): Promise<void> {
+async function updateScreen(
+  modelId: number,
+  patch: Partial<{ x: number; y: number; z: number; scale: number; scaleY: number; scaleZ: number; rotate: number; rotateX: number; rotateY: number }>,
+): Promise<void> {
   if (!layout.value) return;
   const model = models.value.find((m) => m.id === modelId);
   if (!model) return;
@@ -286,6 +295,58 @@ async function updateScreen(modelId: number, patch: Partial<{ x: number; y: numb
 // Corner grips on the 3D canvas. The canvas has already worked out the new scales and, when
 // "keep on the ground" is on, the anchor Y that plants the prop back on the lawn - resizing
 // about the centre otherwise drops the base by half of whatever height was added.
+/**
+ * Re-derives a model's position, size and angles from the file it was imported out of.
+ *
+ * Placement is worked out once, at import, and written into the model's `screen`. So every later
+ * improvement to how a file is read - measuring a run's real length instead of its shadow on the
+ * front wall, turning a run into the depth it has, taking the magnitude of a negative scale -
+ * reaches new imports only. A layout imported before the fix keeps the old answer forever, and
+ * there was no way to pick up the new one short of importing the whole show again and losing
+ * everything arranged by hand since.
+ *
+ * `raw_attrs` is lossless - it is xLights' own XML for this model, verbatim - so the derivation
+ * can simply be run again. Explicit rather than automatic: this overwrites whatever the model's
+ * position has been adjusted to, and doing that silently on load would undo somebody's afternoon.
+ */
+const recomputeMessage = ref("");
+
+async function recomputePlacement(modelId: number): Promise<void> {
+  const model = models.value.find((m) => m.id === modelId);
+  if (!model || !layout.value) return;
+  const attrs = model.raw_attrs ?? {};
+  if (Object.keys(attrs).length === 0) {
+    recomputeMessage.value = "This model wasn't imported from a file, so there's nothing to re-read.";
+    return;
+  }
+  let geo: ModelGeometry | null;
+  try {
+    geo = computeGeometryFromAttrs(model.type, attrs);
+  } catch {
+    geo = null;
+  }
+  // The same reading the importer would choose for this show, rather than a guess per model:
+  // the two readings differ by a factor of a model's node count, and picking one prop's answer
+  // in isolation is how a single model ends up thirty times the size of its neighbours.
+  const reading = chooseBoxedScaleReading(
+    models.value.filter((m) => m.supported).map((m) => ({ displayAs: m.type, attrs: m.raw_attrs ?? {} })),
+    NODE_SPACING,
+  ).reading;
+  const screen = screenFromAttrs(model.type, attrs, geo, NODE_SPACING, reading);
+  await updateScreen(modelId, {
+    x: screen.x,
+    y: screen.y,
+    z: screen.z,
+    scale: screen.scale,
+    scaleY: screen.scaleY,
+    scaleZ: screen.scaleZ,
+    rotate: screen.rotate,
+    rotateX: screen.rotateX,
+    rotateY: screen.rotateY,
+  });
+  recomputeMessage.value = `Re-read ${model.name} from the imported file.`;
+}
+
 function handleResize3D(modelId: number, screen: { scale: number; scaleY: number; scaleZ: number; y: number }): void {
   void updateScreen(modelId, screen);
 }
@@ -1190,6 +1251,14 @@ onUnmounted(() => {
                   @change="handlePositionField('rotate', ($event.target as HTMLInputElement).value)"
                 />
               </label>
+              <button
+                class="recompute-btn"
+                title="Work this model's position, size and angles out again from the file it was imported from. Replaces anything set by hand."
+                @click="recomputePlacement(selectedModel.id)"
+              >
+                Re-read placement from import
+              </button>
+              <p v-if="recomputeMessage" class="timing-note">{{ recomputeMessage }}</p>
               <button class="delete-btn" @click="handleDelete(selectedModel.id)">Delete model</button>
             </div>
 
@@ -1734,6 +1803,20 @@ header h1 {
 }
 .multi-list li {
   padding: 0.1rem 0;
+}
+.recompute-btn {
+  margin-top: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid #3a3a44;
+  border-radius: 3px;
+  background: #23232b;
+  color: #cfcfd8;
+  cursor: pointer;
+}
+.recompute-btn:hover {
+  border-color: #e8c468;
+  color: #e8c468;
 }
 .delete-btn {
   width: 100%;
