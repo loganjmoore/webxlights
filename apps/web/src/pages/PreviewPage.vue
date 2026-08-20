@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import type { AudioSeries } from "@webxlights/engine";
 import { api, type ModelGroupRecord, type ModelRecord, type SequenceBody } from "../lib/api";
 import { openPreviewChannel, postPreviewMessage, type PreviewMessage } from "../lib/previewChannel";
+import { playheadAt, shouldResync, type TransportAnchor } from "../lib/previewClock";
 import HousePreview from "../components/HousePreview.vue";
 
 // The popped-out house preview. It renders the same sequence the sequencer tab is editing and
@@ -33,6 +34,25 @@ const connected = ref(false);
 
 let channel: BroadcastChannel | null = null;
 let helloTimer: ReturnType<typeof setInterval> | null = null;
+
+// This window runs its own clock between messages (lib/previewClock.ts).
+//
+// It used to take the playhead straight from each transport message, which meant it only moved
+// while the sequencer tab was sending them - and the sequencer tab stops sending the moment you
+// switch to this one, because browsers pause requestAnimationFrame in a hidden tab. The tab
+// driving the clock goes to sleep exactly when the tab being watched needs it. Extrapolating here
+// and treating messages as corrections means the window you are actually looking at is the one
+// deciding when to draw.
+let anchor: TransportAnchor = { playheadMs: 0, at: 0, playing: false };
+let clockRaf: number | null = null;
+
+function runClock(): void {
+  const tick = (): void => {
+    if (anchor.playing) playheadMs.value = Math.round(playheadAt(anchor, performance.now(), durationMs.value));
+    clockRaf = requestAnimationFrame(tick);
+  };
+  clockRaf = requestAnimationFrame(tick);
+}
 
 function send(message: PreviewMessage): void {
   postPreviewMessage(channel, message);
@@ -84,8 +104,16 @@ function onMessage(e: MessageEvent<PreviewMessage>): void {
     }
   } else if (message.type === "transport") {
     connected.value = true;
-    playheadMs.value = message.playheadMs;
     playing.value = message.playing;
+    // Anchor the local clock to what the sequencer says, but only when it actually disagrees -
+    // re-anchoring on every message would snap the animation a few milliseconds either way many
+    // times a second, which reads as a stutter rather than as accuracy.
+    if (!message.playing || shouldResync(playheadMs.value, message.playheadMs, frameMs.value)) {
+      anchor = { playheadMs: message.playheadMs, at: performance.now(), playing: message.playing };
+      playheadMs.value = message.playheadMs;
+    } else {
+      anchor = { ...anchor, playing: message.playing };
+    }
   } else if (message.type === "audio") {
     audio.value = message.audio;
   }
@@ -98,9 +126,11 @@ onMounted(async () => {
   send({ type: "hello" });
   // The sequencer tab may be opened after this one - keep asking until it answers.
   helloTimer = setInterval(() => send({ type: "hello" }), 2000);
+  runClock();
 });
 
 onBeforeUnmount(() => {
+  if (clockRaf !== null) cancelAnimationFrame(clockRaf);
   if (helloTimer) clearInterval(helloTimer);
   channel?.removeEventListener("message", onMessage);
   channel?.close();
