@@ -948,9 +948,14 @@ function clearPlayRange(): void {
 }
 
 function onTimeUpdate(): void {
-  // Still wired up, because it is the only thing that fires after a seek while paused. During
-  // playback the frame loop below has usually already set the same value.
+  // Still wired up for two reasons. It is the only thing that fires after a seek while paused,
+  // and it is the only thing that fires at all once this tab is in the background: browsers pause
+  // requestAnimationFrame in a hidden tab, but the audio element keeps playing and keeps firing
+  // this. That makes it the correction the popped-out preview gets while somebody is watching
+  // that window instead of this one - the preview runs its own clock between these
+  // (lib/previewClock.ts), and without them it would free-run with nothing to check against.
   syncPlayheadFromAudio();
+  if (playing.value) broadcastTransport();
 }
 
 /**
