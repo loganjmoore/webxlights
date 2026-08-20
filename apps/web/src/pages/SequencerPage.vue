@@ -9,6 +9,7 @@ import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { parseMidi, parsePapagayo, type ParsedMidi } from "@webxlights/formats";
 import { ALL_TRACKS, describeMidiImport, midiTrackChoices, timingTrackFromMidi } from "../lib/midiTiming";
 import { describePapagayoImport, tracksFromPapagayo } from "../lib/papagayoTiming";
+import { breakdownPhrases, breakdownWords, cellsOf, phonemesTrackName, wordsTrackName } from "../lib/lyricBreakdown";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
 import { openPanelWindow, openPreviewChannel, postPreviewMessage, previewUrlFor, type PreviewMessage } from "../lib/previewChannel";
@@ -62,7 +63,7 @@ import { MAX_LAYERS, addLayer, canAddLayer, layerCount, layerOf, removeLayer } f
 import type { WindowTarget } from "../lib/windowShortcuts";
 import { describeCriteria, matchingEffectIds, type EffectCriteria } from "../lib/selectEffects";
 import { expandToMark, jumpTargetMs } from "../lib/expandEffect";
-import type { SequenceMetadata, SequenceRow } from "../lib/api";
+import type { SequenceMetadata, SequenceRow, TimingTrack } from "../lib/api";
 import { DEFAULT_ZOOM_INDEX, ZOOM_STEPS, clampZoomIndex, scrollLeftHolding, wheelScrollDelta, zoomIndexIn, zoomIndexOut } from "../lib/zoom";
 import {
   loadPerspectives,
@@ -619,6 +620,24 @@ const activeView = computed(() => views.value.find((v) => v.name === activeViewN
  */
 const expandedLayerKeys = ref<Set<string>>(new Set());
 
+/**
+ * Which group and model rows are open (manual: "Toggle Element Expand (to show models in group,
+ * strands, nodes, etc)").
+ *
+ * Rebuilding the row list is what actually adds or removes the nested rows, so this is bumped
+ * through `reloadRows` rather than read straight into `visibleRows` - the children have to be
+ * built from the model records, which `rows` is the only thing holding.
+ */
+const expandedElementKeys = ref<Set<string>>(new Set());
+
+function toggleRowExpanded(row: GridRow): void {
+  const key = `${row.elementType}:${row.elementId}:`;
+  const next = new Set(expandedElementKeys.value);
+  if (!next.delete(key)) next.add(key);
+  expandedElementKeys.value = next;
+  void loadRows();
+}
+
 function effectsForKey(row: GridRow): SequenceEffect[] {
   const found = store.body.rows.find(
     (r) => r.elementType === row.elementType && r.elementId === row.elementId && (r.subName ?? undefined) === row.subName,
@@ -641,7 +660,11 @@ function withLayerRows(row: GridRow): GridRow[] {
 }
 
 const visibleRows = computed(() => {
-  const shown = rows.value.filter((r) => !hiddenRowKeys.value.has(rowKey(r))).flatMap(withLayerRows);
+  // A nested row only shows when the row it hangs off is open. Checked against the parent's key
+  // rather than against a flag on the child, so opening a group and then a model inside it works
+  // without the two having to agree about each other.
+  const open = (r: GridRow): boolean => r.parentKey === undefined || expandedElementKeys.value.has(r.parentKey);
+  const shown = rows.value.filter((r) => open(r) && !hiddenRowKeys.value.has(rowKey(r))).flatMap(withLayerRows);
   const view = activeView.value;
   if (!view) return shown;
   // A view names its rows *in order*, so the grid follows the view rather than the layout. Rows
@@ -679,7 +702,9 @@ function strandRowsFor(model: ModelRecord): GridRow[] {
     elementType: "strand" as const,
     elementId: model.id,
     subName: spec.name,
-    name: `${model.name} / ${spec.name}`,
+    // Just the strand's own name: it is drawn indented under the model it belongs to, so
+    // repeating the model's name in every child row only makes the labels too long to read.
+    name: spec.name,
   }));
 }
 
@@ -694,20 +719,67 @@ async function loadRows(): Promise<void> {
   ]);
   // Sub-model rows sit directly under the model they belong to, which is where xLights puts
   // them and where anyone looking for "the star on the mega tree" will look for them.
-  rows.value = [
-    ...models.flatMap((m) => [
-      { elementType: "model" as const, elementId: m.id, name: m.name },
-      // "Click on the Model name in the sequencer to display the Strand names." Derived from the
-      // model's wiring rather than stored, so they can't go stale (engine/models/strands.ts).
-      ...strandRowsFor(m),
-      ...(m.sub_models ?? []).map((sm) => ({
-        elementType: "submodel" as const,
+  // Groups first and closed, then the models that aren't in any group. A real show has hundreds
+  // of models, strands and sub-models, and listing every one of them at once buries the group you
+  // meant to sequence somewhere in the middle. Double-clicking a name opens it (SequencerGrid's
+  // rowExpand), which is xLights' own "+".
+  //
+  // A model in two groups is listed under the first of them only. Listing it under both would put
+  // two rows on screen holding the same effects, since an effect belongs to the model rather than
+  // to the group it is being viewed through - and editing one while looking at the other is a
+  // worse confusion than having to remember which group a prop was filed under.
+  const groupOf = new Map<number, ModelGroupRecord>();
+  for (const g of groups) {
+    for (const member of g.members) if (!groupOf.has(member.id)) groupOf.set(member.id, g);
+  }
+
+  const childRowsFor = (m: ModelRecord, parentKey: string, depth: number): GridRow[] => [
+    // "Click on the Model name in the sequencer to display the Strand names." Derived from the
+    // model's wiring rather than stored, so they can't go stale (engine/models/strands.ts).
+    ...strandRowsFor(m).map((r) => ({ ...r, parentKey, depth })),
+    ...(m.sub_models ?? []).map((sm) => ({
+      elementType: "submodel" as const,
+      elementId: m.id,
+      subName: sm.name,
+      name: sm.name,
+      parentKey,
+      depth,
+    })),
+  ];
+
+  const modelRow = (m: ModelRecord, parentKey: string | undefined, depth: number): GridRow[] => {
+    const key = `model:${m.id}:`;
+    const children = childRowsFor(m, key, depth + 1);
+    return [
+      {
+        elementType: "model" as const,
         elementId: m.id,
-        subName: sm.name,
-        name: `${m.name} / ${sm.name}`,
-      })),
-    ]),
-    ...groups.map((g) => ({ elementType: "group" as const, elementId: g.id, name: g.name })),
+        name: m.name,
+        parentKey,
+        depth,
+        ...(children.length > 0 ? { expanded: expandedElementKeys.value.has(key) } : {}),
+      },
+      ...children,
+    ];
+  };
+
+  rows.value = [
+    ...groups.flatMap((g) => {
+      const key = `group:${g.id}:`;
+      const members = g.members
+        .map((member) => models.find((m) => m.id === member.id))
+        .filter((m): m is ModelRecord => !!m && groupOf.get(m.id)?.id === g.id);
+      return [
+        {
+          elementType: "group" as const,
+          elementId: g.id,
+          name: g.name,
+          ...(members.length > 0 ? { expanded: expandedElementKeys.value.has(key) } : {}),
+        },
+        ...members.flatMap((m) => modelRow(m, key, 1)),
+      ];
+    }),
+    ...models.filter((m) => !groupOf.has(m.id)).flatMap((m) => modelRow(m, undefined, 0)),
   ];
   modelRecords.value = models;
   groupRecords.value = groups;
@@ -2011,10 +2083,10 @@ function insertLayerAtSelection(side: "above" | "below"): void {
 function toggleElementExpand(): void {
   const row = selectedBodyRow();
   if (!row) return;
-  const key = rowKey(row);
-  const next = new Set(expandedLayerKeys.value);
-  if (!next.delete(key)) next.add(key);
-  expandedLayerKeys.value = next;
+  // Now that a group opens into its models and a model into its strands and sub-models, this key
+  // does what the manual says it does - "to show models in group, strands, nodes, etc" - rather
+  // than the layer expansion it was standing in for while everything was listed at once.
+  toggleRowExpanded({ elementType: row.elementType, elementId: row.elementId, name: "", subName: row.subName });
 }
 
 /**
@@ -2105,6 +2177,52 @@ function handleMarkDoubleClick(trackIndex: number, ms: number): void {
 // The Edit Label dialog. A mark's label is what the lyric and phrase tracks are made of, and what
 // the State and Piano effects read, so it has to be editable somewhere other than an import.
 const labelEdit = ref<{ trackIndex: number; index: number; ms: number; value: string } | null>(null);
+
+// Lyric tracks (manual: Sequencer > Singing Faces). Type a phrase onto a timing mark, break the
+// phrases into words, then the words into phonemes - three levels, each generated from the one
+// above it, with the phoneme level being what a Faces effect reads.
+//
+// The two buttons replace the track they would generate rather than adding a second copy, so
+// breaking down twice after editing a phrase updates the words instead of leaving both versions
+// in the list with no way to tell which is current.
+function hasTypedLabels(track: { labels?: string[] }): boolean {
+  return (track.labels ?? []).some((l) => l.trim().length > 0);
+}
+
+function replaceTrackNamed(name: string, track: TimingTrack): void {
+  const existing = store.body.timingTracks.findIndex((t) => t.name === name);
+  if (existing >= 0) store.deleteTimingTrack(existing);
+  store.addTimingTrack(track);
+}
+
+function doBreakdownPhrases(index: number): void {
+  const track = store.body.timingTracks[index];
+  if (!track) return;
+  const words = breakdownPhrases(track);
+  if (words.marks.length === 0) {
+    timingNotice.value = "Nothing to break down — type the lyrics onto the timing marks first.";
+    return;
+  }
+  replaceTrackNamed(words.name, words);
+  timingNotice.value = `Broke ${cellsOf(track).filter((c) => c.label.trim()).length} phrases into ${words.marks.length - 1} words.`;
+}
+
+function doBreakdownWords(index: number): void {
+  const track = store.body.timingTracks[index];
+  if (!track) return;
+  // Run against this track's own words when it is a phrase track that has already been broken
+  // down, and against the track itself when it is the word track - which is what "right click
+  // the timing track and select Breakdown Words" means once the words are the thing on screen.
+  const phraseName = track.name.endsWith(" — Words") ? track.name.slice(0, -" — Words".length) : track.name;
+  const wordsTrack = store.body.timingTracks.find((t) => t.name === wordsTrackName(phraseName)) ?? track;
+  const phonemes = breakdownWords(wordsTrack, phraseName);
+  if (phonemes.marks.length === 0) {
+    timingNotice.value = "No words to break down — run Breakdown Phrases first.";
+    return;
+  }
+  replaceTrackNamed(phonemesTrackName(phraseName), phonemes);
+  timingNotice.value = `Broke ${phonemes.marks.length - 1} phonemes out of ${wordsTrack.name}.`;
+}
 
 function commitLabelEdit(): void {
   const edit = labelEdit.value;
@@ -2245,6 +2363,20 @@ watch(sequenceId, async (id) => {
             Fixed
           </label>
           <span class="meta">{{ track.marks.length }} marks</span>
+          <button
+            title="Break each phrase in this track into words, in a track below it"
+            :disabled="!hasTypedLabels(track)"
+            @click="doBreakdownPhrases(i)"
+          >
+            Breakdown Phrases
+          </button>
+          <button
+            title="Break each word in this track into phonemes, for a Faces effect to sing"
+            :disabled="!hasTypedLabels(track)"
+            @click="doBreakdownWords(i)"
+          >
+            Breakdown Words
+          </button>
           <button title="Delete this timing track" @click="store.deleteTimingTrack(i)">×</button>
         </div>
         <p class="timing-note">
@@ -2991,6 +3123,7 @@ watch(sequenceId, async (id) => {
             @select-many="handleSelectMany"
             :selected-effect-ids="store.selectedEffectIds"
             @wheel="openWheel"
+            @row-expand="toggleRowExpanded"
             @place="handlePlace"
             @drop-effect="handleDropEffect"
             @move-many="handleMoves"

@@ -20,6 +20,19 @@ export interface GridRow {
    * interface and is what Collapse Layers goes back to.
    */
   layerIndex?: number;
+  /**
+   * The row this one is nested under - a group for its member models, a model for its strands and
+   * sub-models - or unset for a top-level row.
+   *
+   * Every model, strand and sub-model used to be listed at once, which on a real show is hundreds
+   * of rows before you have placed a single effect, and the group you actually wanted to sequence
+   * is somewhere in the middle of them.
+   */
+  parentKey?: string;
+  /** How deep to indent the label, so the nesting is visible rather than implied. */
+  depth?: number;
+  /** Set on a row that has children: true when they are showing. */
+  expanded?: boolean;
 }
 
 export type ContextMenuTarget =
@@ -82,6 +95,8 @@ const emit = defineEmits<{
   // Double-click on a timing mark. What it means is a preference (Play Timing / Edit Text), so
   // the grid reports the gesture and the page decides.
   markDoubleClick: [trackIndex: number, ms: number];
+  /** A group or model row was double-clicked: show or hide what is nested under it. */
+  rowExpand: [row: GridRow];
 }>();
 
 const DEFAULT_ROW_HEIGHT = 28;
@@ -276,7 +291,14 @@ function draw(): void {
 
     ctx.fillStyle = ui().rowHeadingText;
     ctx.font = "11px system-ui";
-    ctx.fillText(row.name, 8, y + height / 2 + 4, ROW_LABEL_WIDTH - 12);
+    // A twisty for anything with rows nested under it, and an indent for the nested rows, so the
+    // shape of the list is visible rather than something you have to remember.
+    const indent = 8 + (row.depth ?? 0) * 12;
+    if (row.expanded !== undefined) {
+      ctx.fillText(row.expanded ? "\u25be" : "\u25b8", indent, y + height / 2 + 4);
+    }
+    const labelX = indent + (row.expanded !== undefined ? 12 : 0);
+    ctx.fillText(row.name, labelX, y + height / 2 + 4, ROW_LABEL_WIDTH - labelX - 4);
 
     for (const effect of drawEffectsForRow(row)) {
       const x1 = msToX(effect.startMs);
@@ -528,6 +550,12 @@ function onDoubleClick(e: MouseEvent): void {
   // grid only says that it happened, and on which mark.
   if (hit.kind === "mark") {
     emit("markDoubleClick", hit.trackIndex, hit.ms);
+    return;
+  }
+  // Double-clicking a group or model's name opens it, the way the "+" does in xLights. On the
+  // label rather than on the grid, so it can't be confused with the effect wheel.
+  if (hit.kind === "row-label") {
+    if (hit.row.expanded !== undefined) emit("rowExpand", hit.row);
     return;
   }
   if (hit.kind !== "row-empty") return;

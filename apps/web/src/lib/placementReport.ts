@@ -20,6 +20,20 @@ import type { ModelRecord } from "./api";
 // assignments, controller names and start channels are not needed to diagnose a layout and
 // shouldn't be pasted into a chat or an issue.
 const PLACEMENT_ATTRS = [
+  // Shape attributes as well as placement ones. Where a model *is* only explains half of what it
+  // looks like; a tree that comes out the wrong way up is a question about TreeBottomTopRatio,
+  // and DisplayAs decides whether a matrix is read across or up. Without these the report can
+  // show a model perfectly placed and still not say why it is drawn the way it is.
+  "DisplayAs",
+  "NumStrings",
+  "parm1",
+  "NodesPerString",
+  "parm2",
+  "StrandsPerString",
+  "parm3",
+  "TreeType",
+  "TreeDegrees",
+  "TreeBottomTopRatio",
   "WorldPosX",
   "WorldPosY",
   "WorldPosZ",
