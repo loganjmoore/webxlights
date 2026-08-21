@@ -2,6 +2,13 @@
 
 return [
 
+    // The shader assistant. Absent in local development and in CI, which is why every path that
+    // needs it checks rather than assuming - a server without a key answers 503 and refunds,
+    // instead of throwing.
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services
