@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use Anthropic\Client;
-use RuntimeException;
+use App\Services\Shader\GeneratorDriver;
+use App\Services\Shader\Providers;
 
 /**
  * Turns a sentence into an ISF shader.
@@ -24,16 +24,6 @@ use RuntimeException;
  */
 class ShaderGenerator
 {
-    /**
-     * Models whose thinking is configured with adaptive thinking rather than a token budget.
-     *
-     * The request shape genuinely differs: a 4.6-or-later model rejects `budget_tokens` with a
-     * 400, and Haiku 4.5 rejects `effort` the same way. Sending one request shape to every model
-     * means whichever half is wrong fails outright, so the capability is checked rather than
-     * assumed.
-     */
-    private const ADAPTIVE_THINKING = ['claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-fable-5'];
-
     private const SYSTEM = <<<'PROMPT'
     You write ISF (Interactive Shader Format) fragment shaders for webXLights, a browser
     reimplementation of xLights that drives real Christmas light displays.
@@ -87,33 +77,38 @@ class ShaderGenerator
     zero. Always write a fully opaque alpha unless the user asked for transparency.
     PROMPT;
 
-    public function __construct(private ?Client $client = null) {}
-
     /**
-     * @param  string|null  $userKey  the caller's own API key, when they brought one
+     * Which provider and model a request should use.
+     *
+     * A caller with their own key may name their own provider - they are paying, so it is their
+     * choice - and otherwise the server's configuration decides.
      */
-    private function client(?string $userKey): Client
+    public function resolve(?string $providerName = null, ?string $model = null): array
     {
-        if ($this->client !== null) {
-            return $this->client;
-        }
-        // The caller's key wins over the server's. A self-hosted copy has no server key at all,
-        // and on the hosted site a user who brings their own is paying for their own usage - so
-        // in both cases the key they supplied is the one to use.
-        //
-        // Deliberately not cached on the instance: a per-request key must not leak into the next
-        // request's client, which in a long-lived worker would mean billing the wrong person.
-        $key = $userKey ?: config('services.anthropic.key');
-        if (! $key) {
-            throw new RuntimeException('The shader assistant needs an Anthropic API key. Add your own in Settings, or ask the server operator to configure one.');
-        }
+        $name = $providerName ?: config('services.shader.provider') ?: Providers::ANTHROPIC;
+        $preset = Providers::get($name);
 
-        return new Client(apiKey: $key);
+        return [
+            'provider' => $name,
+            'driver' => app($preset['driver']),
+            'model' => $model ?: config('services.shader.model') ?: $preset['model'],
+        ];
     }
 
     public function model(): string
     {
-        return config('services.anthropic.model') ?: 'claude-haiku-4-5';
+        return $this->resolve()['model'];
+    }
+
+    public function provider(): string
+    {
+        return $this->resolve()['provider'];
+    }
+
+    /** Whether this server can generate without the caller supplying anything. */
+    public function serverConfigured(): bool
+    {
+        return $this->resolve()['driver']->configured(null);
     }
 
     /**
@@ -126,6 +121,8 @@ class ShaderGenerator
         ?string $previousSource = null,
         ?string $repairing = null,
         ?string $userKey = null,
+        ?string $providerName = null,
+        ?string $modelName = null,
     ): array {
         $ask = "Write an ISF shader for a Christmas light display:\n\n{$description}";
         if ($previousSource !== null && $repairing !== null) {
@@ -145,41 +142,14 @@ class ShaderGenerator
             TEXT;
         }
 
-        $model = $this->model();
-        $params = [
-            'model' => $model,
-            'maxTokens' => 8000,
-            'system' => self::SYSTEM,
-            'messages' => [['role' => 'user', 'content' => $ask]],
-        ];
-        // Thinking is left off on the cheap models on purpose, and not only because they do not
-        // take the same parameter. Thinking tokens are billed as output, at the same rate as the
-        // shader itself, and they are the single largest thing on the bill - several times the
-        // cost of the shader they help produce. The compile-and-repair round the client already
-        // does buys back most of the accuracy for a fraction of that, because a repair is only
-        // paid for when the first draft actually failed.
-        if (in_array($model, self::ADAPTIVE_THINKING, true)) {
-            $params['thinking'] = ['type' => 'adaptive'];
-        }
-
-        $message = $this->client($userKey)->messages->create(...$params);
-
-        $text = '';
-        foreach ($message->content as $block) {
-            // Thinking blocks come first when adaptive thinking is on, so the text has to be
-            // picked out by type rather than by position.
-            if ($block->type === 'text') {
-                $text .= $block->text;
-            }
-        }
+        ['provider' => $provider, 'driver' => $driver, 'model' => $model] = $this->resolve($providerName, $modelName);
+        /** @var GeneratorDriver $driver */
+        $result = $driver->complete(self::SYSTEM, $ask, $model, $userKey);
+        $text = $result['text'];
 
         return [
             'source' => $this->unfence(trim($text)),
-            'usage' => [
-                'model' => $model,
-                'input_tokens' => $message->usage->inputTokens ?? null,
-                'output_tokens' => $message->usage->outputTokens ?? null,
-            ],
+            'usage' => ['provider' => $provider, 'model' => $model] + $result['usage'],
         ];
     }
 
