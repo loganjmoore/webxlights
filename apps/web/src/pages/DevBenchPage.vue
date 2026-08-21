@@ -13,7 +13,9 @@
 import { computed, nextTick, ref } from "vue";
 import SequencerGrid, { type GridRow } from "../components/SequencerGrid.vue";
 import HousePreview from "../components/HousePreview.vue";
+import Waveform from "../components/Waveform.vue";
 import { EFFECT_SCHEMAS, defaultParamsFor } from "@webxlights/engine";
+import type { PeakBucket } from "../lib/audio";
 import type { ModelRecord, SequenceBody, SequenceEffect } from "../lib/api";
 
 // Taken from the registry rather than hardcoded: schema keys are display names
@@ -162,6 +164,117 @@ function onDropEffect(row: GridRow, name: string, startMs: number): void {
 (window as unknown as { __runBench?: (n?: number) => Promise<void> }).__runBench = runBenchmark;
 (window as unknown as { __benchBody?: () => SequenceBody }).__benchBody = () => body.value;
 (window as unknown as { __setPending?: (n: string | null) => void }).__setPending = (n) => (pendingName.value = n);
+
+// ---- interaction benchmarks --------------------------------------------------------------
+//
+// The playhead sweep above measures playback; these measure what the sweep cannot - the costs
+// a person feels with the transport stopped: scrolling the timeline, zooming it, and dragging
+// an effect. The grid and waveform are mounted inside the same kind of shared horizontal
+// scroller SequencerPage uses, so scrollLeft means the same thing here as there.
+
+const pxPerMs = ref(0.01);
+// The 3D preview renders every rAF; under software GL that floors any frame-time measurement
+// at tens of milliseconds. The interaction benches pause it so they measure the grid, not it.
+const previewPaused = ref(false);
+const hScrollRef = ref<HTMLDivElement | null>(null);
+// Synthetic waveform peaks, enough buckets that the waveform has real work per draw.
+const peaks: PeakBucket[] = Array.from({ length: 4000 }, (_, i) => {
+  const v = 0.2 + 0.75 * Math.abs(Math.sin(i / 7) * Math.cos(i / 31));
+  return { min: -v, max: v };
+});
+
+const frame = (): Promise<number> => new Promise((resolve) => requestAnimationFrame(resolve));
+
+function summarise(samples: number[], extra: Record<string, unknown>): string {
+  const sorted = [...samples].sort((a, b) => a - b);
+  const mean = sorted.reduce((s, v) => s + v, 0) / sorted.length;
+  const out = JSON.stringify(
+    {
+      steps: sorted.length,
+      meanStepMs: +mean.toFixed(2),
+      p50StepMs: +(sorted[Math.floor(sorted.length * 0.5)] ?? 0).toFixed(2),
+      p95StepMs: +(sorted[Math.floor(sorted.length * 0.95)] ?? 0).toFixed(2),
+      ...extra,
+    },
+    null,
+    2,
+  );
+  result.value = out;
+  (window as unknown as { __benchResult?: string }).__benchResult = out;
+  return out;
+}
+
+/** Sweep scrollLeft across the timeline, measuring each step's full frame (scroll -> redraw). */
+async function runScrollBench(steps = 120): Promise<void> {
+  const el = hScrollRef.value;
+  if (!el) return;
+  const max = Math.max(1, el.scrollWidth - el.clientWidth);
+  const samples: number[] = [];
+  el.scrollLeft = 0;
+  await frame();
+  for (let i = 0; i < steps; i++) {
+    const t0 = performance.now();
+    el.scrollLeft = Math.floor((i / (steps - 1)) * max);
+    await frame();
+    await frame();
+    samples.push(performance.now() - t0);
+  }
+  summarise(samples.slice(5), { kind: "scroll", pxPerMs: pxPerMs.value, scrollWidth: el.scrollWidth });
+}
+
+/** Step the zoom through a range, measuring each relayout+redraw. */
+async function runZoomBench(steps = 40): Promise<void> {
+  const samples: number[] = [];
+  for (let i = 0; i < steps; i++) {
+    const t0 = performance.now();
+    pxPerMs.value = 0.01 * Math.pow(1.12, i % 20);
+    await nextTick();
+    await frame();
+    await frame();
+    samples.push(performance.now() - t0);
+  }
+  pxPerMs.value = 0.01;
+  await nextTick();
+  summarise(samples.slice(3), { kind: "zoom" });
+}
+
+/** Drag the first effect across the grid with synthetic pointer events, measuring each move. */
+async function runDragBench(moves = 120): Promise<void> {
+  const canvas = document.querySelector<HTMLCanvasElement>(".grid-canvas");
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const opts = (x: number, y: number) => ({
+    bubbles: true,
+    pointerId: 1,
+    clientX: rect.left + x,
+    clientY: rect.top + y,
+    button: 0,
+    buttons: 1,
+  });
+  // Row 0's first effect starts at t=0; grab it mid-body just under the ruler.
+  const startX = 150 + 20;
+  const y = 24 + 14;
+  canvas.dispatchEvent(new PointerEvent("pointerdown", opts(startX, y)));
+  const samples: number[] = [];
+  for (let i = 0; i < moves; i++) {
+    const t0 = performance.now();
+    canvas.dispatchEvent(new PointerEvent("pointermove", opts(startX + 2 + i * 3, y)));
+    await frame();
+    samples.push(performance.now() - t0);
+  }
+  canvas.dispatchEvent(new PointerEvent("pointerup", opts(startX + 2 + moves * 3, y)));
+  summarise(samples.slice(5), { kind: "drag", pxPerMs: pxPerMs.value });
+}
+
+(window as unknown as { __setPxPerMs?: (v: number) => Promise<void> }).__setPxPerMs = async (v) => {
+  pxPerMs.value = v;
+  await nextTick();
+  await frame();
+};
+(window as unknown as { __setPreviewPaused?: (v: boolean) => void }).__setPreviewPaused = (v) => (previewPaused.value = v);
+(window as unknown as { __runScrollBench?: (n?: number) => Promise<void> }).__runScrollBench = runScrollBench;
+(window as unknown as { __runZoomBench?: (n?: number) => Promise<void> }).__runZoomBench = runZoomBench;
+(window as unknown as { __runDragBench?: (n?: number) => Promise<void> }).__runDragBench = runDragBench;
 </script>
 
 <template>
@@ -178,22 +291,27 @@ function onDropEffect(row: GridRow, name: string, startMs: number): void {
     <pre class="result">{{ result }}</pre>
 
     <div class="preview-box">
-      <HousePreview :models="models" :body="body" :playhead-ms="playheadMs" :frame-ms="FRAME_MS" />
+      <HousePreview :models="models" :body="body" :playhead-ms="playheadMs" :frame-ms="FRAME_MS" :paused="previewPaused" />
     </div>
 
-    <SequencerGrid
-      :rows="rows"
-      :body="body"
-      :duration-ms="DURATION_MS"
-      :px-per-ms="0.01"
-      :playhead-ms="playheadMs"
-      :selected-effect-id="selectedEffectId"
-      :pending-effect-name="pendingName"
-      @select="(id: string | null) => (selectedEffectId = id)"
-      @move="onMove"
-      @place="onPlace"
-      @drop-effect="onDropEffect"
-    />
+    <!-- The same shared horizontal scroller SequencerPage wraps these in, so scroll and zoom
+         behave (and cost) here what they cost there. -->
+    <div ref="hScrollRef" class="h-scroll">
+      <Waveform :peaks="peaks" :duration-ms="DURATION_MS" :px-per-ms="pxPerMs" :playhead-ms="playheadMs" />
+      <SequencerGrid
+        :rows="rows"
+        :body="body"
+        :duration-ms="DURATION_MS"
+        :px-per-ms="pxPerMs"
+        :playhead-ms="playheadMs"
+        :selected-effect-id="selectedEffectId"
+        :pending-effect-name="pendingName"
+        @select="(id: string | null) => (selectedEffectId = id)"
+        @move="onMove"
+        @place="onPlace"
+        @drop-effect="onDropEffect"
+      />
+    </div>
   </div>
 </template>
 
@@ -202,6 +320,9 @@ function onDropEffect(row: GridRow, name: string, startMs: number): void {
   padding: 16px;
   color: #ddd;
   font: 13px system-ui;
+}
+.h-scroll {
+  overflow-x: auto;
 }
 .controls {
   display: flex;

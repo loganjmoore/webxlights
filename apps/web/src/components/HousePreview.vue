@@ -40,6 +40,11 @@ const props = defineProps<{
   // xLights' Sequence Settings > "Allow Blending Between Models". Off, a model's own effects
   // replace the group wherever they draw; on, they composite over it.
   blendBetweenModels?: boolean;
+  // True while this preview is hidden (the panel is popped out to its own window). The scene
+  // stays mounted so bringing it back is instant - a v-if here meant a full THREE + geometry +
+  // compose rebuild on every pop-in - but a hidden preview must cost nothing per frame, so
+  // paused gates both the colour pipeline and the render loop.
+  paused?: boolean;
 }>();
 
 const SEED = 12345;
@@ -190,7 +195,7 @@ function rebuildComposeCache(): void {
 }
 
 function updateColors(): void {
-  if (!points) return;
+  if (props.paused || !points) return;
   const colorAttr = points.geometry.getAttribute("color") as THREE.BufferAttribute;
   const arr = colorAttr.array as Float32Array;
 
@@ -309,8 +314,10 @@ function initScene(): void {
   updateColors();
 
   const animate = () => {
-    orbit?.update();
-    if (setup) setup.renderer.render(setup.scene, setup.camera);
+    if (!props.paused) {
+      orbit?.update();
+      if (setup) setup.renderer.render(setup.scene, setup.camera);
+    }
     rafId = requestAnimationFrame(animate);
   };
   animate();
@@ -336,6 +343,14 @@ onBeforeUnmount(() => {
 // change re-traversed the whole sequence body to decide whether it had changed too - affordable
 // four times a second, not sixty, and the playhead is the one that moves every frame.
 watch(() => props.playheadMs, updateColors);
+// Coming back from hidden repaints once at the current playhead, so the pop-in shows now, not
+// the frame from whenever it was popped out.
+watch(
+  () => props.paused,
+  (paused) => {
+    if (!paused) updateColors();
+  },
+);
 // The body watcher also refreshes the memoised compose inputs: they are derived from
 // the body, so anything that invalidates one invalidates the other.
 watch(

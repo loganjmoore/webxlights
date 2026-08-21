@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
 import type { PeakBucket } from "../lib/audio";
 import { rangeFromDrag } from "../lib/playRange";
@@ -37,7 +37,43 @@ const ROW_LABEL_WIDTH = 140; // stays aligned with SequencerGrid's row-label gut
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 // Full content width, same formula as SequencerGrid - both live inside the page's shared
 // .h-scroll wrapper so they scroll horizontally together, staying aligned at any zoom level.
+// The spacer div carries this width; the canvas itself is viewport-sized and rides the scroll
+// (see SequencerGrid's horizontal-virtualisation note - same costs, same fix).
 const totalWidth = computed(() => ROW_LABEL_WIDTH + props.durationMs * props.pxPerMs);
+const viewportWidth = ref(0);
+const canvasWidth = computed(() =>
+  viewportWidth.value > 0 ? Math.min(totalWidth.value, viewportWidth.value) : totalWidth.value,
+);
+
+let scrollLeft = 0;
+let hScrollEl: HTMLElement | null = null;
+let hScrollResize: ResizeObserver | null = null;
+
+function onHScroll(): void {
+  if (!hScrollEl || !canvasRef.value) return;
+  scrollLeft = hScrollEl.scrollLeft;
+  canvasRef.value.style.transform = `translateX(${scrollLeft}px)`;
+  draw();
+}
+
+function attachHScroll(): void {
+  let el: HTMLElement | null = canvasRef.value?.parentElement ?? null;
+  while (el) {
+    const overflowX = getComputedStyle(el).overflowX;
+    if (overflowX === "auto" || overflowX === "scroll") break;
+    el = el.parentElement;
+  }
+  hScrollEl = el;
+  if (!hScrollEl) return; // no horizontal scroller: full-width canvas, exactly as before
+  hScrollEl.addEventListener("scroll", onHScroll, { passive: true });
+  hScrollResize = new ResizeObserver(() => {
+    viewportWidth.value = hScrollEl?.clientWidth ?? 0;
+    draw();
+  });
+  hScrollResize.observe(hScrollEl);
+  viewportWidth.value = hScrollEl.clientWidth;
+  onHScroll();
+}
 
 // Assigning canvas.width/height reallocates and clears the backing store - the same cost
 // SequencerGrid's draw() documents avoiding. The playhead redraws this canvas every frame of
@@ -67,15 +103,23 @@ function draw(): void {
   ctx.fillStyle = ui().waveformBackground;
   ctx.fillRect(0, 0, rect.width, rect.height);
 
+  const view = scrollLeft;
   const mid = rect.height / 2;
   const widthPx = props.durationMs * props.pxPerMs;
   ctx.strokeStyle = ui().waveform;
   ctx.beginPath();
-  props.peaks.forEach((p, i) => {
-    const x = ROW_LABEL_WIDTH + (i / props.peaks.length) * widthPx;
+  // Only the peak buckets whose x lands inside the viewport - at deep zoom the full list is
+  // thousands of strokes for pixels nobody can see.
+  const count = props.peaks.length;
+  const bucketPx = count > 0 ? widthPx / count : 1;
+  const first = Math.max(0, Math.floor((view - ROW_LABEL_WIDTH) / Math.max(bucketPx, 1e-6)));
+  const last = Math.min(count, Math.ceil((view + rect.width - ROW_LABEL_WIDTH) / Math.max(bucketPx, 1e-6)) + 1);
+  for (let i = first; i < last; i++) {
+    const p = props.peaks[i]!;
+    const x = ROW_LABEL_WIDTH + i * bucketPx - view;
     ctx.moveTo(x, mid + p.min * mid * 0.9);
     ctx.lineTo(x, mid + p.max * mid * 0.9);
-  });
+  }
   ctx.stroke();
 
   // The play range, drawn under the playhead so the line stays readable over it.
@@ -83,14 +127,14 @@ function draw(): void {
   if (range && range.endMs > range.startMs) {
     ctx.fillStyle = "rgba(90, 160, 255, 0.22)";
     ctx.fillRect(
-      ROW_LABEL_WIDTH + range.startMs * props.pxPerMs,
+      ROW_LABEL_WIDTH + range.startMs * props.pxPerMs - view,
       0,
       (range.endMs - range.startMs) * props.pxPerMs,
       rect.height,
     );
     ctx.strokeStyle = "rgba(90, 160, 255, 0.8)";
     for (const edge of [range.startMs, range.endMs]) {
-      const x = ROW_LABEL_WIDTH + edge * props.pxPerMs;
+      const x = ROW_LABEL_WIDTH + edge * props.pxPerMs - view;
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, rect.height);
@@ -98,21 +142,30 @@ function draw(): void {
     }
   }
 
-  const px = ROW_LABEL_WIDTH + props.playheadMs * props.pxPerMs;
+  const px = ROW_LABEL_WIDTH + props.playheadMs * props.pxPerMs - view;
   ctx.strokeStyle = "#e74c3c";
   ctx.beginPath();
   ctx.moveTo(px, 0);
   ctx.lineTo(px, rect.height);
   ctx.stroke();
+
+  // The gutter, pinned: covers anything that slid under it, keeping the waveform's left edge
+  // aligned with the grid's label column below it.
+  if (view > 0) {
+    ctx.fillStyle = ui().waveformBackground;
+    ctx.fillRect(0, 0, ROW_LABEL_WIDTH, rect.height);
+  }
 }
 
 function msAt(e: PointerEvent | MouseEvent): number | null {
   const canvas = canvasRef.value;
   if (!canvas) return null;
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left - ROW_LABEL_WIDTH;
-  if (x < 0) return null;
-  return Math.max(0, Math.round(x / props.pxPerMs));
+  const local = e.clientX - rect.left;
+  // The gutter is pinned to the viewport now, so the dead zone is the local left edge; the
+  // moment under the pointer is the local position plus however far the timeline is scrolled.
+  if (local < ROW_LABEL_WIDTH) return null;
+  return Math.max(0, Math.round((local + scrollLeft - ROW_LABEL_WIDTH) / props.pxPerMs));
 }
 
 function onClick(e: MouseEvent): void {
@@ -222,8 +275,14 @@ function onPointerUp(e: PointerEvent): void {
 }
 
 onMounted(() => {
+  attachHScroll();
   draw();
   window.addEventListener("resize", draw);
+});
+onUnmounted(() => {
+  window.removeEventListener("resize", draw);
+  hScrollEl?.removeEventListener("scroll", onHScroll);
+  hScrollResize?.disconnect();
 });
 // flush: "post", for the same reason SequencerGrid's draw watcher says it: draw() reads
 // getBoundingClientRect(), which must run AFTER Vue applies the template's inline width. With
@@ -237,22 +296,24 @@ watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs, pro
 </script>
 
 <template>
-  <canvas
-    ref="canvasRef"
-    class="waveform"
-    :style="{
-      width: `${totalWidth}px`,
-      height: `${small ? WAVEFORM_HEIGHT_PX.small : WAVEFORM_HEIGHT_PX.full}px`,
-      cursor,
-    }"
-    @click="onClick"
-    @dblclick="onDoubleClick"
-    @contextmenu="onContextMenu"
-    @pointerdown="onPointerDown"
-    @pointermove="onPointerMove"
-    @pointerup="onPointerUp"
-    @pointercancel="onPointerUp"
-  ></canvas>
+  <div class="wave-spacer" :style="{ width: `${totalWidth}px` }">
+    <canvas
+      ref="canvasRef"
+      class="waveform"
+      :style="{
+        width: `${canvasWidth}px`,
+        height: `${small ? WAVEFORM_HEIGHT_PX.small : WAVEFORM_HEIGHT_PX.full}px`,
+        cursor,
+      }"
+      @click="onClick"
+      @dblclick="onDoubleClick"
+      @contextmenu="onContextMenu"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
+      @pointerup="onPointerUp"
+      @pointercancel="onPointerUp"
+    ></canvas>
+  </div>
 </template>
 
 <style scoped>
