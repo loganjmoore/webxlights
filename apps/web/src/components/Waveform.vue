@@ -212,7 +212,15 @@ onMounted(() => {
   draw();
   window.addEventListener("resize", draw);
 });
-watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs, props.playRange, props.small], draw, { deep: true });
+// flush: "post", for the same reason SequencerGrid's draw watcher says it: draw() reads
+// getBoundingClientRect(), which must run AFTER Vue applies the template's inline width. With
+// the default pre-flush, a zoom change drew the playhead at the new px-per-ms into a bitmap
+// still sized for the old width; the browser then stretched that bitmap to the new width,
+// sliding the red line away from the grid's - and while paused nothing redrew to correct it.
+watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs, props.playRange, props.small], draw, {
+  deep: true,
+  flush: "post",
+});
 </script>
 
 <template>
