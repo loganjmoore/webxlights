@@ -3,15 +3,17 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ControllerController;
 use App\Http\Controllers\LayoutController;
+use App\Http\Controllers\LayoutVersionController;
 use App\Http\Controllers\ModelEntityController;
 use App\Http\Controllers\ModelGroupController;
-use App\Http\Controllers\ViewObjectController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMemberController;
-use App\Http\Controllers\SequencerViewController;
 use App\Http\Controllers\SequenceController;
-use App\Http\Controllers\LayoutVersionController;
+use App\Http\Controllers\SequencerViewController;
 use App\Http\Controllers\SequenceVersionController;
+use App\Http\Controllers\ShaderController;
+use App\Http\Controllers\ShaderGenerationController;
+use App\Http\Controllers\ViewObjectController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -22,6 +24,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
 
     Route::prefix('v1')->group(function () {
+        // The shader library. Not scoped to a layout or a project, unlike everything else
+        // here: a shader is content one person makes and everyone can use.
+        Route::get('shaders', [ShaderController::class, 'index']);
+        Route::post('shaders', [ShaderController::class, 'store']);
+        Route::get('shaders/{shader}', [ShaderController::class, 'show']);
+        Route::patch('shaders/{shader}', [ShaderController::class, 'update']);
+        Route::delete('shaders/{shader}', [ShaderController::class, 'destroy']);
+        Route::post('shaders/{shader}/used', [ShaderController::class, 'used']);
+
+        // Rate limited on top of the credit cost. Credits stop a user spending more than they
+        // have; this stops a script spending a whole balance in a second and stops one account
+        // monopolising the upstream.
+        Route::post('shaders/generate', [ShaderGenerationController::class, 'generate'])
+            ->middleware('throttle:10,1');
+        Route::get('credits', [ShaderGenerationController::class, 'credits']);
+
         Route::apiResource('projects', ProjectController::class)->only(['index', 'store', 'show']);
         Route::get('projects/{project}/layouts', [LayoutController::class, 'index']);
 

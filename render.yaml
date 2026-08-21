@@ -42,6 +42,11 @@ services:
         value: database
       - key: QUEUE_CONNECTION
         value: database
+      # The shader assistant. Set manually in the dashboard rather than here, because it is a
+      # secret - and left unset the app still runs: generation answers 503 and refunds the
+      # credit, while every other part of the shader library works.
+      - key: ANTHROPIC_API_KEY
+        sync: false
       # R2 + SANCTUM_STATEFUL_DOMAINS are set manually in the Render dashboard
       # (bucket/domain don't exist until M0's provisioning step is approved).
 
