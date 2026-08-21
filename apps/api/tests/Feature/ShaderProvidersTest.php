@@ -166,6 +166,25 @@ class ShaderProvidersTest extends TestCase
         });
     }
 
+    public function test_an_openai_key_on_the_anthropic_provider_is_named_not_mumbled(): void
+    {
+        // Seen in production: SHADER_API_KEY set to an OpenAI key while SHADER_PROVIDER still
+        // said anthropic. Anthropic's 401 surfaced as "could not be reached", which points at
+        // the network instead of the settings. The driver now names the mismatch before dialing.
+        config([
+            'services.shader.provider' => 'anthropic',
+            'services.shader.key' => 'sk-proj-not-an-anthropic-key',
+            'services.shader.model' => null,
+        ]);
+
+        try {
+            app(ShaderGenerator::class)->generate('swirling fire');
+            $this->fail('expected the key/provider mismatch to be refused');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('SHADER_PROVIDER=openai', $e->getMessage());
+        }
+    }
+
     public function test_the_providers_own_error_reaches_the_caller(): void
     {
         Http::fake(['*' => Http::response(['error' => ['message' => 'Insufficient Balance']], 402)]);
