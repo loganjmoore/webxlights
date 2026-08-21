@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { compileCached, rgba, type RGBA } from "@webxlights/engine";
+import { compileCached, paletteColorValues, rgba, type RGBA } from "@webxlights/engine";
 
 // A shader, running.
 //
@@ -15,6 +15,8 @@ const props = withDefaults(
     height?: number;
     inputs?: Record<string, number | boolean | number[]>;
     palette?: RGBA[];
+    /** Colour-input names in declaration order, so the palette drives them the way xLights does. */
+    colorInputs?: string[];
     /** Paused cards cost nothing - a gallery of thirty running shaders would melt a laptop. */
     running?: boolean;
   }>(),
@@ -55,7 +57,9 @@ function draw(now: number): void {
     position01: 0,
     frameIndex: frame++,
     palette: props.palette ?? DEFAULT_PALETTE,
-    inputs: props.inputs ?? {},
+    inputs: props.colorInputs?.length
+      ? { ...(props.inputs ?? {}), ...paletteColorValues(props.colorInputs, props.palette ?? DEFAULT_PALETTE) }
+      : (props.inputs ?? {}),
   });
   if (!pixels) return;
 

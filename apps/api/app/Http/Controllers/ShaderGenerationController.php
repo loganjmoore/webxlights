@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Shader\Providers;
+use App\Services\Shader\RequestScreen;
 use App\Services\ShaderGenerator;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -56,6 +57,32 @@ class ShaderGenerationController extends Controller
             return response()->json(['message' => 'This server does not accept user-supplied API keys.'], 403);
         }
 
+        // Refuse before spending. The screen runs before the debit and before any provider is
+        // called, so a refused request costs nobody anything - not the user a credit, not the
+        // operator an API call. It applies to own-key callers too: their money, but still this
+        // endpoint's one job.
+        if ($refusal = app(RequestScreen::class)->refusalFor($data['description'])) {
+            return response()->json(['message' => $refusal, 'code' => 'off_topic'], 422);
+        }
+
+        // The daily cap, on top of credits and the per-minute throttle. Credits bound what a
+        // user can ever spend; the throttle stops a burst; this bounds the operator's worst-case
+        // *daily* bill at limit x users x cost-per-shader, which is the number the funding
+        // arithmetic in docs/SHADER-ASSISTANT-COST.md is built on. Only server-funded calls
+        // count - a caller on their own key is spending their own money.
+        if (! $ownKey && ($limit = (int) config('services.shader.daily_limit')) > 0) {
+            if ($this->generationsToday($user) >= $limit) {
+                return response()->json([
+                    'message' => "You have used today's {$limit} free generations. The limit resets at midnight UTC"
+                        .' - or add your own API key in Settings to keep going now.',
+                    'code' => 'daily_limit',
+                    'daily_limit' => $limit,
+                    'resets_at' => now('UTC')->addDay()->startOfDay()->toIso8601String(),
+                    'credits' => $user->credits,
+                ], 429);
+            }
+        }
+
         // Debited before the call, not after. The generation is the thing being paid for and it
         // costs real money the moment it is made, so a failure to bill has to stop the request
         // rather than be noticed afterwards. Refunded below if the call itself fails, which is
@@ -105,14 +132,35 @@ class ShaderGenerationController extends Controller
         ]);
     }
 
+    /**
+     * How many server-funded generations this user has made since midnight UTC.
+     *
+     * Counted from the ledger rather than a separate counter, so the cap and the bill can never
+     * disagree. A refunded generation gave the user nothing, so it gives them their daily slot
+     * back too.
+     */
+    private function generationsToday($user): int
+    {
+        $today = $user->creditTransactions()->where('created_at', '>=', now('UTC')->startOfDay());
+
+        return (clone $today)->where('reason', 'shader_generation')->count()
+            - (clone $today)->where('reason', 'refund')->count();
+    }
+
     /** The balance and the ledger behind it. */
     public function credits(Request $request)
     {
         $user = $request->user();
+        $limit = (int) config('services.shader.daily_limit');
 
         return response()->json([
             'credits' => $user->credits,
             'cost_per_generation' => self::COST,
+            // The daily cap, so the UI can say "n of m today" instead of surprising anyone
+            // with a 429. Zero means the operator turned the cap off.
+            'daily_limit' => $limit,
+            'used_today' => $limit > 0 ? max(0, $this->generationsToday($user)) : 0,
+            'resets_at' => now('UTC')->addDay()->startOfDay()->toIso8601String(),
             // What this server can do, so the UI can tell a self-hosted copy (no server key, so
             // the user must bring one) from the hosted site (credits, with BYO key as the way
             // to keep going for free) without being told which it is.

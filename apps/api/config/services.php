@@ -22,6 +22,11 @@ return [
         // zero-cost option would be unreachable because the key check would reject it.
         'local' => (bool) env('SHADER_LOCAL', false),
         'allow_user_keys' => (bool) env('SHADER_ALLOW_USER_KEYS', true),
+        // How many server-funded generations one user gets per UTC day, on top of the credit
+        // ledger and the per-minute throttle. 0 means uncapped. Bringing your own key bypasses
+        // it entirely - your key, your bill. The default's arithmetic is in
+        // docs/SHADER-ASSISTANT-COST.md; change it there too if you change it here.
+        'daily_limit' => (int) env('SHADER_DAILY_LIMIT', 20),
     ],
 
     /*

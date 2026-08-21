@@ -1,0 +1,36 @@
+{
+  "comment": "What people actually ask the shader assistant for. Each description is sent verbatim as the user's request; every generated shader is compiled in both dialects by check.mjs, and judged by eye at the three shapes below - a roofline that is one pixel tall, a tall thin mega-tree, and a square matrix. Results live in results/ next to this file, one JSON per run, so a prompt change can be compared against the last run rather than against memory.",
+  "shapes": [
+    { "name": "roofline", "width": 60, "height": 1 },
+    { "name": "megatree", "width": 16, "height": 50 },
+    { "name": "matrix", "width": 32, "height": 32 }
+  ],
+  "descriptions": [
+    { "id": "snow", "text": "gently falling snow" },
+    { "id": "fire", "text": "fire rising from the bottom" },
+    { "id": "candy-cane", "text": "candy cane stripes scrolling diagonally" },
+    { "id": "colour-wash", "text": "a smooth wash that fades between my colours" },
+    { "id": "twinkle", "text": "twinkling stars" },
+    { "id": "chase", "text": "a chase that runs along the roofline" },
+    { "id": "plasma", "text": "a swirling plasma" },
+    { "id": "rainbow", "text": "a rainbow sweeping across" },
+    { "id": "pulse", "text": "everything pulsing to a steady beat" },
+    { "id": "flag", "text": "an American flag waving" },
+    { "id": "fog", "text": "a spooky green fog drifting" },
+    { "id": "tunnel", "text": "a spinning tunnel you fly into" },
+    { "id": "waves", "text": "ocean waves rolling" },
+    { "id": "lava-lamp", "text": "slow lava lamp blobs" },
+    { "id": "alternate", "text": "alternating flashes between my first two colours" },
+    { "id": "matrix-rain", "text": "green streaks falling like digital rain" },
+    { "id": "breathe", "text": "a slow breathing glow" },
+    { "id": "fireworks", "text": "fireworks bursting" },
+    { "id": "candle", "text": "a warm candle flicker" },
+    { "id": "barber", "text": "a spinning barber pole" },
+    { "id": "ripples", "text": "raindrops making ripples" },
+    { "id": "aurora", "text": "aurora borealis curtains of light" },
+    { "id": "comet", "text": "a comet circling with a long tail" },
+    { "id": "sparkle", "text": "random sparkles over a solid colour" },
+    { "id": "checker", "text": "a two colour checkerboard sliding sideways" },
+    { "id": "sunrise", "text": "a sunrise slowly rising from the bottom" }
+  ]
+}

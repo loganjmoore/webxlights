@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { RenderBuffer } from "../src/renderBuffer";
 import { rgba } from "../src/color";
-import { renderShader } from "../src/effects/shader";
+import { paletteColorValues, renderShader } from "../src/effects/shader";
 import { clearShaderCache, setShaderHost, type ShaderFrameRequest, type ShaderHost } from "../src/shaderRuntime";
 
 // A stand-in for the GPU. The point of the host seam is that the engine can be exercised without
@@ -109,6 +109,47 @@ describe("Shader effect", () => {
     const palette = [rgba(255, 0, 0, 255), rgba(0, 255, 0, 255)];
     renderShader(new RenderBuffer(2, 2), palette, { source: "s" }, ctx(0));
     expect(seen[0]!.palette).toEqual(palette);
+  });
+
+  it("fills colour inputs from the palette in declaration order, wrapping - xLights' rule", () => {
+    const seen: ShaderFrameRequest[] = [];
+    setShaderHost(fakeHost((r) => solid(r, [1, 1, 1, 255]), seen));
+    const palette = [rgba(255, 0, 0, 255), rgba(0, 255, 0, 255)];
+    renderShader(
+      new RenderBuffer(2, 2),
+      palette,
+      {
+        source: "s",
+        // The stored DEFAULT values, which the palette must override - real xLights ignores a
+        // colour input's DEFAULT entirely (ShaderEffect.cpp, SHADER_PARM_COLOUR).
+        inputs: { colorA: [0, 0, 1, 1], colorB: [0, 0, 1, 1], colorC: [0, 0, 1, 1], speed: 2 },
+        colorInputs: ["colorA", "colorB", "colorC"],
+      },
+      ctx(0),
+    );
+    expect(seen[0]!.inputs.colorA).toEqual([1, 0, 0, 1]);
+    expect(seen[0]!.inputs.colorB).toEqual([0, 1, 0, 1]);
+    // Third input wraps back to the first palette colour.
+    expect(seen[0]!.inputs.colorC).toEqual([1, 0, 0, 1]);
+    // A non-colour input is left alone.
+    expect(seen[0]!.inputs.speed).toBe(2);
+  });
+
+  it("leaves colour inputs at their stored values when the palette is empty", () => {
+    const seen: ShaderFrameRequest[] = [];
+    setShaderHost(fakeHost((r) => solid(r, [1, 1, 1, 255]), seen));
+    renderShader(
+      new RenderBuffer(2, 2),
+      [],
+      { source: "s", inputs: { colorA: [0, 0, 1, 1] }, colorInputs: ["colorA"] },
+      ctx(0),
+    );
+    expect(seen[0]!.inputs.colorA).toEqual([0, 0, 1, 1]);
+  });
+
+  it("forces colour inputs opaque whatever the palette's alpha, as xLights does", () => {
+    const values = paletteColorValues(["c"], [rgba(10, 20, 30, 40)]);
+    expect(values.c).toEqual([10 / 255, 20 / 255, 30 / 255, 1]);
   });
 
   it("ignores a short buffer from a misbehaving host", () => {

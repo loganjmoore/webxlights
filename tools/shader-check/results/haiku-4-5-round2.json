@@ -1,0 +1,866 @@
+{
+  "summary": {
+    "label": "haiku-4-5-round2",
+    "backend": "claude-cli",
+    "model": "claude-haiku-4-5",
+    "ranAt": "2026-08-21T02:24:59.638Z",
+    "corpusSize": 26,
+    "generated": 26,
+    "firstDraftBothDialects": 26,
+    "afterOneRepairBothDialects": 26,
+    "repairRounds": 0,
+    "tokens": {
+      "input": 37532,
+      "output": 14582,
+      "calls": 26
+    },
+    "meanLatencyMs": 12186,
+    "note": "usage measured through the claude CLI: tools disabled, thinking off, shader SYSTEM prompt only; the CLI adds roughly 200 tokens of its own framing per call to input_tokens that the app's driver would not send"
+  },
+  "items": [
+    {
+      "id": "snow",
+      "description": "gently falling snow",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1441,
+            "output_tokens": 686
+          },
+          "ms": 12625
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Gently falling snow with twinkling lights\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"snowColor\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"skyColor\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.0, 0.1, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 2.0, \"DEFAULT\": 0.3 },\n    { \"NAME\": \"density\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 2.0, \"DEFAULT\": 0.8 }\n  ]\n}*/\n\nfloat hash(vec2 p) {\n  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);\n}\n\nfloat noise(vec2 p) {\n  vec2 i = floor(p);\n  vec2 f = fract(p);\n  f = f * f * (3.0 - 2.0 * f);\n  float a = hash(i);\n  float b = hash(i + vec2(1.0, 0.0));\n  float c = hash(i + vec2(0.0, 1.0));\n  float d = hash(i + vec2(1.0, 1.0));\n  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);\n}\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float yOffset = mod(TIME * speed, 2.0);\n  \n  vec2 snowUV = uv * vec2(8.0, 6.0);\n  snowUV.y += yOffset * 6.0;\n  \n  float snowNoise = noise(snowUV);\n  snowNoise += noise(snowUV * 2.0) * 0.5;\n  snowNoise = smoothstep(0.3, 0.7, snowNoise * density);\n  \n  float twinkle = 0.5 + 0.5 * sin(TIME * 3.0 + hash(floor(snowUV)) * 6.28);\n  snowNoise *= mix(0.5, 1.0, twinkle);\n  \n  vec3 col = mix(skyColor.rgb, snowColor.rgb, snowNoise);\n  \n  gl_FragColor = vec4(col, 1.0);\n}",
+      "firstDraft": {
+        "file": "snow.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "fire",
+      "description": "fire rising from the bottom",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1442,
+            "output_tokens": 659
+          },
+          "ms": 12965
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Fire rises from the bottom with flickering flames\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.5 },\n    { \"NAME\": \"scale\", \"TYPE\": \"float\", \"MIN\": 0.5, \"MAX\": 4.0, \"DEFAULT\": 2.0 },\n    { \"NAME\": \"colorHot\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.2, 0.0, 1.0] },\n    { \"NAME\": \"colorCool\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 0.0, 1.0] }\n  ]\n}*/\n\nfloat hash(float n) {\n  return fract(sin(n) * 43758.5453);\n}\n\nfloat noise(float x) {\n  float i = floor(x);\n  float f = fract(x);\n  f = f * f * (3.0 - 2.0 * f);\n  return mix(hash(i), hash(i + 1.0), f);\n}\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  float h = uv.y;\n  float w = uv.x;\n  \n  if (RENDERSIZE.y < 2.0) {\n    h = uv.x;\n    w = uv.y;\n  }\n  \n  float t = TIME * speed * 0.5;\n  float flame = noise(w * scale + t * 1.2) * noise(w * scale * 0.5 - t * 0.7);\n  flame += noise(w * scale * 2.0 + t * 0.9) * 0.5;\n  \n  float rise = (h - 0.2) * 4.0 + t * 0.8;\n  float lift = sin(rise + flame * 3.0) * 0.3 + 0.3;\n  \n  float intensity = smoothstep(0.0, 0.1, h) * smoothstep(1.0, 0.3, h);\n  intensity *= flame * lift * 1.5;\n  \n  vec3 fireColor = mix(colorCool.rgb, colorHot.rgb, smoothstep(0.2, 0.8, flame));\n  \n  gl_FragColor = vec4(fireColor * intensity, 1.0);\n}",
+      "firstDraft": {
+        "file": "fire.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "candy-cane",
+      "description": "candy cane stripes scrolling diagonally",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1447,
+            "output_tokens": 356
+          },
+          "ms": 10017
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Candy cane stripes scrolling diagonally across the display\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"stripeWidth\", \"TYPE\": \"float\", \"MIN\": 0.01, \"MAX\": 0.5, \"DEFAULT\": 0.1 },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.0 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float diagPos = uv.x + uv.y - TIME * speed * 0.5;\n  float stripe = fract(diagPos / (stripeWidth * 2.0));\n  float band = step(stripe, stripeWidth / (stripeWidth * 2.0));\n  \n  gl_FragColor = vec4(mix(colorA.rgb, colorB.rgb, band), 1.0);\n}",
+      "firstDraft": {
+        "file": "candy-cane.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "colour-wash",
+      "description": "a smooth wash that fades between my colours",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1446,
+            "output_tokens": 405
+          },
+          "ms": 10264
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Smooth fade between colors across the display\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 1.0, 0.0, 1.0] },\n    { \"NAME\": \"colorC\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.0, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.0 }\n  ]\n}*/\n\nvoid main() {\n  float phase = mod(TIME * speed * 0.5, 3.0);\n  \n  vec3 color;\n  if (phase < 1.0) {\n    color = mix(colorA.rgb, colorB.rgb, smoothstep(0.0, 1.0, phase));\n  } else if (phase < 2.0) {\n    color = mix(colorB.rgb, colorC.rgb, smoothstep(1.0, 2.0, phase));\n  } else {\n    color = mix(colorC.rgb, colorA.rgb, smoothstep(2.0, 3.0, phase));\n  }\n  \n  gl_FragColor = vec4(color, 1.0);\n}",
+      "firstDraft": {
+        "file": "colour-wash.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "twinkle",
+      "description": "twinkling stars",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1441,
+            "output_tokens": 686
+          },
+          "ms": 13696
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Twinkling stars scattered across the display\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"starColor\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"backgroundColor\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.0, 0.2, 1.0] },\n    { \"NAME\": \"twinklSpeed\", \"TYPE\": \"float\", \"MIN\": 0.5, \"MAX\": 4.0, \"DEFAULT\": 2.0 },\n    { \"NAME\": \"starDensity\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 2.0, \"DEFAULT\": 0.8 }\n  ]\n}*/\n\nfloat hash(vec2 p) {\n  float h = dot(p, vec2(127.1, 311.7));\n  return fract(sin(h) * 43758.5453123);\n}\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  vec2 gridUv = uv * starDensity * 8.0;\n  vec2 gridCell = floor(gridUv);\n  vec2 gridPos = fract(gridUv);\n  \n  float closestDist = 2.0;\n  float twinkle = 0.0;\n  \n  for (int dy = -1; dy <= 1; dy++) {\n    for (int dx = -1; dx <= 1; dx++) {\n      vec2 cell = gridCell + vec2(float(dx), float(dy));\n      vec2 cellSeed = cell + vec2(0.5);\n      \n      float randomX = hash(cellSeed * 1.23);\n      float randomY = hash(cellSeed * 4.56);\n      float randomTwinkle = hash(cellSeed * 7.89);\n      \n      vec2 starPos = vec2(randomX, randomY);\n      float dist = length(gridPos - starPos);\n      \n      if (dist < closestDist) {\n        closestDist = dist;\n        float phase = randomTwinkle * 6.28318 + TIME * twinklSpeed;\n        twinkle = sin(phase) * 0.5 + 0.5;\n        twinkle *= smoothstep(0.15, 0.0, dist);\n      }\n    }\n  }\n  \n  vec3 color = mix(backgroundColor.rgb, starColor.rgb, twinkle);\n  gl_FragColor = vec4(color, 1.0);\n}",
+      "firstDraft": {
+        "file": "twinkle.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "chase",
+      "description": "a chase that runs along the roofline",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1446,
+            "output_tokens": 357
+          },
+          "ms": 10452
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Chasing lights running continuously along the roofline\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 1.0, 0.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"width\", \"TYPE\": \"float\", \"MIN\": 0.02, \"MAX\": 0.3, \"DEFAULT\": 0.1 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float chase_pos = mod(uv.x - TIME * speed * 0.5, 1.0);\n  \n  float dist = abs(chase_pos - 0.5);\n  float light = smoothstep(width, 0.0, dist);\n  \n  vec3 color = mix(colorA.rgb, colorB.rgb, light);\n  \n  gl_FragColor = vec4(color, 1.0);\n}",
+      "firstDraft": {
+        "file": "chase.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "plasma",
+      "description": "a swirling plasma",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1442,
+            "output_tokens": 701
+          },
+          "ms": 13216
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Swirling plasma effect with animated color waves\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"colorC\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.5 },\n    { \"NAME\": \"scale\", \"TYPE\": \"float\", \"MIN\": 0.5, \"MAX\": 8.0, \"DEFAULT\": 3.0 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  // Center and scale coordinates\n  vec2 pos = (uv - 0.5) * scale;\n  \n  // Swirling motion using angle and radius\n  float angle = atan(pos.y, pos.x);\n  float radius = length(pos);\n  \n  // Create swirling waves\n  float swirl1 = sin(angle * 3.0 + TIME * speed - radius * 2.0);\n  float swirl2 = cos(angle * 2.0 - TIME * speed * 0.7 + radius * 1.5);\n  float swirl3 = sin(radius * 4.0 - angle + TIME * speed * 0.5);\n  \n  // Combine swirls into a single value\n  float pattern = (swirl1 + swirl2 + swirl3) * 0.333;\n  \n  // Map pattern to color ranges\n  float colorMix1 = fract(pattern + TIME * speed * 0.25);\n  float colorMix2 = fract(pattern - TIME * speed * 0.25);\n  \n  // Blend three colors based on pattern\n  vec3 col = mix(colorA.rgb, colorB.rgb, smoothstep(-1.0, 1.0, swirl1));\n  col = mix(col, colorC.rgb, smoothstep(-1.0, 1.0, swirl2));\n  \n  // Add brightness variation based on radius and time\n  float brightness = 0.5 + 0.5 * sin(radius * 3.0 + TIME * speed);\n  col *= brightness;\n  \n  gl_FragColor = vec4(col, 1.0);\n}",
+      "firstDraft": {
+        "file": "plasma.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "rainbow",
+      "description": "a rainbow sweeping across",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1442,
+            "output_tokens": 631
+          },
+          "ms": 12441
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Rainbow colors sweep horizontally across the display\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"width\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 2.0, \"DEFAULT\": 0.5 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float sweep = mod(uv.x + TIME * speed * 0.5 - uv.y * width, 1.0);\n  \n  vec3 col;\n  if (sweep < 0.166666) {\n    col = mix(vec3(1.0, 0.0, 0.0), vec3(1.0, 0.5, 0.0), sweep * 6.0);\n  } else if (sweep < 0.333333) {\n    col = mix(vec3(1.0, 0.5, 0.0), vec3(1.0, 1.0, 0.0), (sweep - 0.166666) * 6.0);\n  } else if (sweep < 0.5) {\n    col = mix(vec3(1.0, 1.0, 0.0), vec3(0.0, 1.0, 0.0), (sweep - 0.333333) * 6.0);\n  } else if (sweep < 0.666666) {\n    col = mix(vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), (sweep - 0.5) * 6.0);\n  } else if (sweep < 0.833333) {\n    col = mix(vec3(0.0, 0.0, 1.0), vec3(0.75, 0.0, 1.0), (sweep - 0.666666) * 6.0);\n  } else {\n    col = mix(vec3(0.75, 0.0, 1.0), vec3(1.0, 0.0, 0.0), (sweep - 0.833333) * 6.0);\n  }\n  \n  gl_FragColor = vec4(col, 1.0);\n}",
+      "firstDraft": {
+        "file": "rainbow.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "pulse",
+      "description": "everything pulsing to a steady beat",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1445,
+            "output_tokens": 505
+          },
+          "ms": 11529
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Lights pulse to a steady beat with color cycling\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 1.0, 0.0, 1.0] },\n    { \"NAME\": \"colorC\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.0, 1.0, 1.0] },\n    { \"NAME\": \"beatFrequency\", \"TYPE\": \"float\", \"MIN\": 0.5, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"sharpness\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 2.0, \"DEFAULT\": 1.0 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float beat = mod(TIME * beatFrequency, 3.0);\n  float pulse = sin(TIME * beatFrequency * 3.14159265359) * 0.5 + 0.5;\n  pulse = pow(pulse, sharpness);\n  \n  vec3 color;\n  if (beat < 1.0) {\n    color = mix(colorA.rgb, colorB.rgb, beat);\n  } else if (beat < 2.0) {\n    color = mix(colorB.rgb, colorC.rgb, beat - 1.0);\n  } else {\n    color = mix(colorC.rgb, colorA.rgb, beat - 2.0);\n  }\n  \n  color = mix(vec3(0.1), color, pulse);\n  \n  gl_FragColor = vec4(color, 1.0);\n}",
+      "firstDraft": {
+        "file": "pulse.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "flag",
+      "description": "an American flag waving",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1442,
+            "output_tokens": 641
+          },
+          "ms": 12568
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"American flag waving with stars and stripes\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"waveAmplitude\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 0.3, \"DEFAULT\": 0.1 },\n    { \"NAME\": \"waveFrequency\", \"TYPE\": \"float\", \"MIN\": 0.5, \"MAX\": 4.0, \"DEFAULT\": 2.0 },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 3.0, \"DEFAULT\": 1.0 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float wavePhase = TIME * speed;\n  float wave = sin(uv.y * waveFrequency * 3.14159 + wavePhase) * waveAmplitude;\n  float distortedX = uv.x + wave * (1.0 - uv.x);\n  \n  vec3 color = vec3(0.0);\n  \n  if (distortedX < 0.0) {\n    color = vec3(0.0);\n  } else if (distortedX < 0.2) {\n    float starY = uv.y * 9.0;\n    float starX = distortedX * 50.0;\n    float starPattern = mod(floor(starX) + floor(starY), 2.0);\n    float starDot = sin(starX * 3.14159) * sin(starY * 3.14159);\n    if (starPattern > 0.5 && starDot > 0.5) {\n      color = vec3(1.0, 1.0, 1.0);\n    } else {\n      color = vec3(0.0, 0.2, 0.5);\n    }\n  } else {\n    float stripeIndex = floor(uv.y * 13.0);\n    float isRed = mod(stripeIndex, 2.0);\n    if (isRed > 0.5) {\n      color = vec3(1.0, 0.0, 0.0);\n    } else {\n      color = vec3(1.0, 1.0, 1.0);\n    }\n  }\n  \n  gl_FragColor = vec4(color, 1.0);\n}",
+      "firstDraft": {
+        "file": "flag.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "fog",
+      "description": "a spooky green fog drifting",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1446,
+            "output_tokens": 619
+          },
+          "ms": 12436
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Spooky green fog drifting across the display\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"fogColor\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 1.0, 0.2, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"density\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 3.0, \"DEFAULT\": 1.5 },\n    { \"NAME\": \"scale\", \"TYPE\": \"float\", \"MIN\": 0.5, \"MAX\": 5.0, \"DEFAULT\": 2.0 }\n  ]\n}*/\n\nfloat hash(float n) {\n  return fract(sin(n) * 43758.5453123);\n}\n\nfloat noise(float x) {\n  float i = floor(x);\n  float f = fract(x);\n  f = f * f * (3.0 - 2.0 * f);\n  return mix(hash(i), hash(i + 1.0), f);\n}\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float fogEffect = 0.0;\n  float baseFreq = scale;\n  float amp = 1.0;\n  \n  for(int i = 0; i < 4; i++) {\n    float freq = baseFreq * pow(2.0, float(i));\n    float noiseSample = noise(uv.x * freq + TIME * speed * 0.5 - float(i) * 0.3);\n    fogEffect += noiseSample * amp;\n    amp *= 0.5;\n  }\n  \n  fogEffect = pow(fogEffect * density, 0.8);\n  fogEffect = clamp(fogEffect, 0.0, 1.0);\n  \n  float verticalGradient = smoothstep(1.2, -0.2, uv.y);\n  fogEffect *= verticalGradient;\n  \n  vec3 finalColor = mix(vec3(0.0, 0.0, 0.0), fogColor.rgb, fogEffect);\n  \n  gl_FragColor = vec4(finalColor, 1.0);\n}",
+      "firstDraft": {
+        "file": "fog.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "tunnel",
+      "description": "a spinning tunnel you fly into",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1443,
+            "output_tokens": 583
+          },
+          "ms": 11987
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"A spinning tunnel of colored lights that rotates around the center as you fly through it\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 1.0, 0.0, 1.0] },\n    { \"NAME\": \"colorC\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.0, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.5 },\n    { \"NAME\": \"segments\", \"TYPE\": \"float\", \"MIN\": 3.0, \"MAX\": 16.0, \"DEFAULT\": 8.0 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord - 0.5;\n  float angle = atan(uv.y, uv.x);\n  float radius = length(uv);\n  \n  float tunnelDepth = fract(radius * 3.0 - TIME * speed * 0.5);\n  float segmentAngle = fract((angle / 6.28318530718) + TIME * speed * 0.3);\n  float whichSegment = mod(floor(segmentAngle * segments), 3.0);\n  \n  float brightness = 1.0 - smoothstep(0.35, 0.5, radius);\n  brightness *= smoothstep(0.0, 0.1, tunnelDepth) * smoothstep(1.0, 0.85, tunnelDepth);\n  \n  vec3 col;\n  if (whichSegment < 1.0) {\n    col = colorA.rgb;\n  } else if (whichSegment < 2.0) {\n    col = colorB.rgb;\n  } else {\n    col = colorC.rgb;\n  }\n  \n  col *= brightness;\n  gl_FragColor = vec4(col, 1.0);\n}",
+      "firstDraft": {
+        "file": "tunnel.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "waves",
+      "description": "ocean waves rolling",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1440,
+            "output_tokens": 605
+          },
+          "ms": 12926
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Ocean waves rolling across the display with animated water motion\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorDeep\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.2, 0.6, 1.0] },\n    { \"NAME\": \"colorShallow\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.8, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"wavelength\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 3.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"waveHeight\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 1.0, \"DEFAULT\": 0.4 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  float height = RENDERSIZE.y;\n  \n  // For very short displays (roof line), use horizontal wave instead of vertical\n  float animCoord = (height < 2.0) ? uv.x : uv.y;\n  \n  // Create rolling wave using sine with horizontal scrolling\n  float wave = sin((animCoord - TIME * speed * 0.5) * wavelength * 6.28318) * waveHeight;\n  \n  // Add secondary wave for texture\n  float wave2 = sin((animCoord * 2.0 - TIME * speed * 0.3) * wavelength * 3.14159) * waveHeight * 0.5;\n  \n  // Combine waves\n  float totalWave = wave + wave2;\n  \n  // Map wave position to color: deep at bottom, shallow at top\n  float wavePos = (height < 2.0) ? (1.0 - uv.y) : uv.y;\n  float blendFactor = smoothstep(-0.3, 0.7, wavePos + totalWave);\n  \n  vec3 waterColor = mix(colorDeep.rgb, colorShallow.rgb, blendFactor);\n  \n  gl_FragColor = vec4(waterColor, 1.0);\n}",
+      "firstDraft": {
+        "file": "waves.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "lava-lamp",
+      "description": "slow lava lamp blobs",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1443,
+            "output_tokens": 772
+          },
+          "ms": 14723
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Slow-moving lava lamp blobs that rise and fall with organic motion\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 0.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 2.0, \"DEFAULT\": 0.5 },\n    { \"NAME\": \"scale\", \"TYPE\": \"float\", \"MIN\": 0.5, \"MAX\": 3.0, \"DEFAULT\": 1.5 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  // Handle tall vs short displays\n  float animCoord = uv.x;\n  if (RENDERSIZE.y < 2.0) {\n    animCoord = uv.x;\n  } else {\n    animCoord = uv.y;\n  }\n  \n  // Create multiple overlapping blob positions\n  float blob1 = sin(TIME * speed * 0.3 + uv.x * 3.0) * 0.5 + 0.5;\n  float blob2 = sin(TIME * speed * 0.25 - uv.x * 2.5 + 2.0) * 0.5 + 0.5;\n  float blob3 = sin(TIME * speed * 0.35 + uv.x * 2.0 + 4.0) * 0.5 + 0.5;\n  \n  // Distance to blob centers\n  float dist1 = abs(animCoord - blob1);\n  float dist2 = abs(animCoord - blob2);\n  float dist3 = abs(animCoord - blob3);\n  \n  // Smooth blob shapes with organic falloff\n  float radius = 0.15 / scale;\n  float blob = smoothstep(radius + 0.05, radius - 0.05, dist1)\n             + smoothstep(radius + 0.08, radius - 0.08, dist2) * 0.7\n             + smoothstep(radius + 0.06, radius - 0.06, dist3) * 0.6;\n  \n  blob = clamp(blob, 0.0, 1.0);\n  \n  // Color based on position and blob intensity\n  float colorMix = fract(animCoord * 2.0 + TIME * speed * 0.1);\n  vec3 color = mix(colorA.rgb, colorB.rgb, colorMix);\n  \n  // Blend with black background\n  vec3 finalColor = mix(vec3(0.0), color, blob);\n  \n  gl_FragColor = vec4(finalColor, 1.0);\n}",
+      "firstDraft": {
+        "file": "lava-lamp.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "alternate",
+      "description": "alternating flashes between my first two colours",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1446,
+            "output_tokens": 250
+          },
+          "ms": 9159
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Alternating flashes between two colors\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 1.0, 0.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 2.0 }\n  ]\n}*/\n\nvoid main() {\n  float flash = step(0.5, fract(TIME * speed * 0.5));\n  vec3 color = mix(colorA.rgb, colorB.rgb, flash);\n  gl_FragColor = vec4(color, 1.0);\n}",
+      "firstDraft": {
+        "file": "alternate.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "matrix-rain",
+      "description": "green streaks falling like digital rain",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1444,
+            "output_tokens": 571
+          },
+          "ms": 12466
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Green streaks fall like digital rain across the display\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"rainColor\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 1.0, 0.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.5 },\n    { \"NAME\": \"density\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 1.0, \"DEFAULT\": 0.6 },\n    { \"NAME\": \"streakLength\", \"TYPE\": \"float\", \"MIN\": 0.05, \"MAX\": 0.5, \"DEFAULT\": 0.2 }\n  ]\n}*/\n\nfloat hash(float n) {\n  return fract(sin(n * 43758.5453) * 43758.5453);\n}\n\nfloat hashVec(vec2 p) {\n  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);\n}\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float animY;\n  if (RENDERSIZE.y < 2.0) {\n    animY = mod(uv.x * 8.0 - TIME * speed, 1.0);\n  } else {\n    animY = mod(uv.y * 8.0 - TIME * speed, 1.0);\n  }\n  \n  float column = floor(uv.x * 16.0);\n  float seed = hash(column + 100.0);\n  \n  float offset = fract(seed * 12.34);\n  float activeColumn = step(density, fract(seed));\n  \n  float streak = smoothstep(0.0, streakLength * 0.5, animY) * \n                 smoothstep(streakLength * 1.5, streakLength, animY);\n  \n  float brightness = streak * activeColumn;\n  \n  gl_FragColor = vec4(rainColor.rgb * brightness, 1.0);\n}",
+      "firstDraft": {
+        "file": "matrix-rain.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "breathe",
+      "description": "a slow breathing glow",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1442,
+            "output_tokens": 349
+          },
+          "ms": 10493
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Slow breathing glow that pulses smoothly across the display\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"glowColor\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"breathRate\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 3.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"minBrightness\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 1.0, \"DEFAULT\": 0.2 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float breathe = sin(TIME * breathRate * 0.5) * 0.5 + 0.5;\n  breathe = mix(minBrightness, 1.0, breathe);\n  \n  float distance = length(uv - vec2(0.5, 0.5));\n  float glow = exp(-distance * distance * 3.0);\n  \n  float intensity = glow * breathe;\n  \n  gl_FragColor = vec4(glowColor.rgb * intensity, 1.0);\n}",
+      "firstDraft": {
+        "file": "breathe.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "fireworks",
+      "description": "fireworks bursting",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1441,
+            "output_tokens": 655
+          },
+          "ms": 13163
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Fireworks bursting outward from random points with fading trails\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"colorC\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 0.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 3.0, \"DEFAULT\": 1.5 },\n    { \"NAME\": \"scale\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 2.0, \"DEFAULT\": 1.0 }\n  ]\n}*/\n\nfloat hash(vec2 p) {\n  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);\n}\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  float t = TIME * speed;\n  vec3 finalColor = vec3(0.0);\n  \n  for (int i = 0; i < 8; i++) {\n    float idx = float(i);\n    vec2 center = vec2(hash(vec2(idx, 1.2)), hash(vec2(idx, 3.4)));\n    float burst_time = fract(t * 0.3 + idx * 0.125);\n    float burst_age = burst_time;\n    \n    vec2 diff = uv - center;\n    float dist = length(diff);\n    \n    float expand = burst_age * 0.5 * scale;\n    float trail = smoothstep(expand + 0.08, expand - 0.02, dist);\n    trail *= (1.0 - burst_age);\n    \n    vec3 burst_color = mix(colorA.rgb, mix(colorB.rgb, colorC.rgb, hash(vec2(idx, 5.6))), hash(vec2(idx, 7.8)));\n    finalColor += burst_color * trail;\n  }\n  \n  finalColor = clamp(finalColor, vec3(0.0), vec3(1.0));\n  gl_FragColor = vec4(finalColor, 1.0);\n}",
+      "firstDraft": {
+        "file": "fireworks.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "candle",
+      "description": "a warm candle flicker",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1443,
+            "output_tokens": 547
+          },
+          "ms": 12532
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Warm candle flicker with dancing orange and yellow flames\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.5, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 0.0, 1.0] },\n    { \"NAME\": \"flicker_speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 2.0 },\n    { \"NAME\": \"flicker_intensity\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 1.0, \"DEFAULT\": 0.6 }\n  ]\n}*/\n\nfloat pseudo_random(float x) {\n  return fract(sin(x * 12.9898) * 43758.5453);\n}\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float t = TIME * flicker_speed;\n  \n  float flicker1 = pseudo_random(floor(t) + 0.0);\n  float flicker2 = pseudo_random(floor(t) + 1.0);\n  float blend = fract(t);\n  float flicker = mix(flicker1, flicker2, smoothstep(0.0, 1.0, blend));\n  \n  float vertical_gradient = smoothstep(1.2, -0.2, uv.y);\n  \n  float intensity = mix(1.0 - flicker_intensity, 1.0, flicker);\n  intensity *= vertical_gradient;\n  intensity = smoothstep(0.1, 0.9, intensity);\n  \n  vec3 base_color = mix(colorA.rgb, colorB.rgb, flicker * 0.5 + 0.25);\n  vec3 final_color = base_color * intensity;\n  \n  gl_FragColor = vec4(final_color, 1.0);\n}",
+      "firstDraft": {
+        "file": "candle.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "barber",
+      "description": "a spinning barber pole",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1442,
+            "output_tokens": 445
+          },
+          "ms": 11466
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"A rotating diagonal stripe barber pole effect\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"stripeWidth\", \"TYPE\": \"float\", \"MIN\": 0.02, \"MAX\": 0.5, \"DEFAULT\": 0.15 },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.5 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  // Center coordinates\n  vec2 center = vec2(0.5, 0.5);\n  vec2 p = uv - center;\n  \n  // Convert to angle and distance\n  float angle = atan(p.y, p.x);\n  float dist = length(p);\n  \n  // Create diagonal stripes that rotate\n  float stripe = fract((angle / 3.14159265 + dist / stripeWidth + TIME * speed * 0.5) * 0.5);\n  \n  // Sharpen the stripe transition\n  float band = step(0.5, stripe);\n  \n  // Mix colors based on stripe\n  vec3 color = mix(colorA.rgb, colorB.rgb, band);\n  \n  gl_FragColor = vec4(color, 1.0);\n}",
+      "firstDraft": {
+        "file": "barber.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "ripples",
+      "description": "raindrops making ripples",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1443,
+            "output_tokens": 778
+          },
+          "ms": 14551
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Raindrops falling and creating expanding circular ripples on a surface\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.5, 1.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.2, 0.8, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.5 },\n    { \"NAME\": \"scale\", \"TYPE\": \"float\", \"MIN\": 0.5, \"MAX\": 8.0, \"DEFAULT\": 3.0 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  // Make the effect horizontal for thin displays\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  if (RENDERSIZE.y < 2.0) {\n    uv.y = 0.5;\n  }\n  \n  vec3 col = vec3(0.0);\n  \n  // Create multiple raindrop centers at different times\n  for (int i = 0; i < 12; i++) {\n    float idx = float(i);\n    \n    // Staggered raindrop positions and timings\n    float dropX = fract(idx * 0.083 + TIME * speed * 0.1);\n    float dropY = fract(idx * 0.167 - TIME * speed * 0.15);\n    \n    vec2 dropPos = vec2(dropX, dropY);\n    float dist = length(uv - dropPos);\n    \n    // Ripple wave: expands outward and fades\n    float rippleTime = fract((TIME * speed * 0.5) + idx * 0.2);\n    float rippleRadius = rippleTime * scale * 0.15;\n    float rippleWidth = 0.04;\n    \n    // Distance from the expanding circle\n    float wave = sin((dist - rippleRadius) * 20.0) * exp(-abs(dist - rippleRadius) * 8.0);\n    wave *= smoothstep(1.0, -0.2, rippleTime);\n    \n    // Add brightness at the raindrop center\n    float core = exp(-dist * dist * 25.0) * (1.0 - rippleTime);\n    \n    float intensity = max(wave, core * 0.5);\n    col += mix(colorA.rgb, colorB.rgb, rippleTime) * intensity;\n  }\n  \n  // Normalize and add slight glow\n  col = clamp(col, 0.0, 1.0);\n  col += vec3(0.1, 0.2, 0.3) * 0.15;\n  \n  gl_FragColor = vec4(col, 1.0);\n}",
+      "firstDraft": {
+        "file": "ripples.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "aurora",
+      "description": "aurora borealis curtains of light",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1445,
+            "output_tokens": 662
+          },
+          "ms": 13130
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Aurora borealis curtains of shimmering light waves\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 1.0, 0.5, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.5, 1.0, 1.0] },\n    { \"NAME\": \"colorC\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"waveCount\", \"TYPE\": \"float\", \"MIN\": 1.0, \"MAX\": 8.0, \"DEFAULT\": 3.0 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float tall = step(2.0, RENDERSIZE.y);\n  float x = mix(uv.x, uv.y, 1.0 - tall);\n  float y = mix(uv.y, uv.x, 1.0 - tall);\n  \n  float wave1 = sin(x * waveCount * 6.28318 + TIME * speed - y * 3.0) * 0.5 + 0.5;\n  float wave2 = sin(x * waveCount * 6.28318 + TIME * speed * 0.7 + 2.09439 - y * 2.5) * 0.5 + 0.5;\n  float wave3 = sin(x * waveCount * 6.28318 + TIME * speed * 0.5 + 4.18879 - y * 2.0) * 0.5 + 0.5;\n  \n  float shimmer = sin(TIME * speed * 3.0 + x * 4.0 + y * 8.0) * 0.25 + 0.75;\n  \n  vec3 col = mix(colorA.rgb, colorB.rgb, wave1);\n  col = mix(col, colorC.rgb, wave2 * 0.6);\n  col = col * (wave3 * 0.4 + 0.6) * shimmer;\n  \n  gl_FragColor = vec4(col, 1.0);\n}",
+      "firstDraft": {
+        "file": "aurora.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "comet",
+      "description": "a comet circling with a long tail",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1446,
+            "output_tokens": 710
+          },
+          "ms": 13888
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"A bright comet orbits in a circle leaving a fading tail behind it\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"cometColor\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 0.5, 1.0] },\n    { \"NAME\": \"tailColor\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.5, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"tailLength\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 2.0, \"DEFAULT\": 0.8 },\n    { \"NAME\": \"scale\", \"TYPE\": \"float\", \"MIN\": 0.3, \"MAX\": 2.0, \"DEFAULT\": 1.0 }\n  ]\n}*/\n\nvoid main() {\n  vec2 center = vec2(0.5, 0.5);\n  vec2 uv = isf_FragNormCoord;\n  \n  // Orbit radius\n  float radius = 0.35 * scale;\n  \n  // Comet position along orbit\n  float angle = TIME * speed * 2.0;\n  vec2 cometPos = center + vec2(cos(angle), sin(angle)) * radius;\n  \n  // Distance from current pixel to comet head\n  float distToComet = length(uv - cometPos);\n  \n  // Comet head glow\n  float cometGlow = exp(-distToComet * 25.0) * 0.8;\n  \n  // Tail: trace backwards along the orbit\n  float tailIntensity = 0.0;\n  for (int i = 1; i <= 16; i++) {\n    float traceAngle = angle - float(i) * 0.15 * tailLength;\n    vec2 tailPos = center + vec2(cos(traceAngle), sin(traceAngle)) * radius;\n    float distToTail = length(uv - tailPos);\n    float fade = exp(-float(i) * 0.3);\n    tailIntensity += exp(-distToTail * 15.0) * fade;\n  }\n  tailIntensity *= 0.5;\n  \n  // Blend comet head and tail\n  vec3 color = mix(tailColor.rgb, cometColor.rgb, cometGlow / (cometGlow + tailIntensity + 0.01));\n  float intensity = cometGlow + tailIntensity;\n  \n  gl_FragColor = vec4(color * intensity, 1.0);\n}",
+      "firstDraft": {
+        "file": "comet.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "sparkle",
+      "description": "random sparkles over a solid colour",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1444,
+            "output_tokens": 534
+          },
+          "ms": 12296
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Random sparkles twinkling over a solid color background\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"baseColor\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.2, 0.0, 1.0] },\n    { \"NAME\": \"sparkleColor\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"density\", \"TYPE\": \"float\", \"MIN\": 0.01, \"MAX\": 0.5, \"DEFAULT\": 0.1 },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.5, \"MAX\": 4.0, \"DEFAULT\": 2.0 }\n  ]\n}*/\n\nfloat hash(vec2 p) {\n  float h = dot(p, vec2(127.1, 311.7));\n  return fract(sin(h) * 43758.5453123);\n}\n\nfloat sparkle(vec2 uv, float t) {\n  vec2 i = floor(uv);\n  vec2 f = fract(uv);\n  \n  float h = hash(i + vec2(sin(t * speed * 0.5), cos(t * speed * 0.3)));\n  \n  if (h < density) {\n    float twinkle = abs(sin(t * speed * 3.14159));\n    twinkle *= smoothstep(0.7, 0.0, length(f - vec2(0.5)));\n    return twinkle;\n  }\n  \n  return 0.0;\n}\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  vec2 scaled = uv * 16.0;\n  \n  float spark = sparkle(scaled, TIME);\n  \n  vec3 color = mix(baseColor.rgb, sparkleColor.rgb, spark);\n  \n  gl_FragColor = vec4(color, 1.0);\n}",
+      "firstDraft": {
+        "file": "sparkle.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "checker",
+      "description": "a two colour checkerboard sliding sideways",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1446,
+            "output_tokens": 380
+          },
+          "ms": 10389
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Two-color checkerboard pattern sliding horizontally\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.0, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 1.0, 0.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"scale\", \"TYPE\": \"float\", \"MIN\": 1.0, \"MAX\": 16.0, \"DEFAULT\": 4.0 }\n  ]\n}*/\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  // Scale the checkerboard and apply horizontal sliding\n  vec2 grid = floor((uv * scale) + vec2(TIME * speed, 0.0));\n  \n  // Checkerboard pattern: alternate based on sum of grid coordinates\n  float checker = mod(grid.x + grid.y, 2.0);\n  \n  // Mix colors based on checkerboard pattern\n  vec3 color = mix(colorA.rgb, colorB.rgb, checker);\n  \n  gl_FragColor = vec4(color, 1.0);\n}",
+      "firstDraft": {
+        "file": "checker.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "sunrise",
+      "description": "a sunrise slowly rising from the bottom",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1444,
+            "output_tokens": 495
+          },
+          "ms": 11466
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"A sunrise glow slowly rising from the bottom of the display\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorLow\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.2, 0.0, 1.0] },\n    { \"NAME\": \"colorMid\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.8, 0.2, 1.0] },\n    { \"NAME\": \"colorHigh\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 0.8, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 2.0, \"DEFAULT\": 0.5 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float horizon = mod(TIME * speed * 0.3, 2.0);\n  if (horizon > 1.0) {\n    horizon = 2.0 - horizon;\n  }\n  \n  float riseHeight = -0.3 + horizon * 1.3;\n  float distFromHorizon = uv.y - riseHeight;\n  \n  float glow = smoothstep(-0.4, 0.6, distFromHorizon);\n  float topGradient = smoothstep(0.0, 0.8, distFromHorizon);\n  \n  vec3 color = mix(colorLow.rgb, colorMid.rgb, glow);\n  color = mix(color, colorHigh.rgb, topGradient * 0.6);\n  \n  float brightness = mix(0.3, 1.0, glow);\n  color = color * brightness;\n  \n  gl_FragColor = vec4(color, 1.0);\n}",
+      "firstDraft": {
+        "file": "sunrise.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    }
+  ],
+  "abuse": [
+    {
+      "id": "arithmetic",
+      "usage": {
+        "input_tokens": 1443,
+        "output_tokens": 311
+      },
+      "passedIsfGate": true,
+      "looksLikeProse": false
+    },
+    {
+      "id": "essay",
+      "usage": {
+        "input_tokens": 1448,
+        "output_tokens": 627
+      },
+      "passedIsfGate": true,
+      "looksLikeProse": false
+    },
+    {
+      "id": "translation",
+      "usage": {
+        "input_tokens": 1447,
+        "output_tokens": 436
+      },
+      "passedIsfGate": true,
+      "looksLikeProse": false
+    },
+    {
+      "id": "recipe",
+      "usage": {
+        "input_tokens": 1444,
+        "output_tokens": 447
+      },
+      "passedIsfGate": true,
+      "looksLikeProse": false
+    }
+  ]
+}
