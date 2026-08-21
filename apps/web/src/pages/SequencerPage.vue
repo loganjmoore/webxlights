@@ -3111,7 +3111,9 @@ watch(sequenceId, async (id) => {
 
     <div class="editor">
       <div class="timeline">
-        <div v-if="!previewPoppedOut" class="preview-wrap">
+        <!-- v-show, not v-if: popping the preview back in used to pay a full THREE + geometry +
+             compose-cache rebuild. Hidden, the component pauses itself and costs nothing. -->
+        <div v-show="!previewPoppedOut" class="preview-wrap">
           <HousePreview
             :models="modelRecords"
             :groups="groupRecords"
@@ -3120,6 +3122,7 @@ watch(sequenceId, async (id) => {
             :frame-ms="store.sequence?.frame_ms ?? 50"
             :audio="audioSeries ?? undefined"
             :blend-between-models="store.sequence?.blend_between_models === true"
+            :paused="previewPoppedOut"
           />
         </div>
         <div ref="hScrollRef" class="h-scroll" @wheel="onTimelineWheel">

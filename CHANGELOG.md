@@ -1,5 +1,13 @@
 # Changelog
 
+## The sequencer grid stops painting what nobody can see
+
+The grid and waveform canvases were as wide as the whole sequence — at a three-minute song zoomed to 0.35px/ms, a 63,140-pixel-wide bitmap. That has two costs and one outright failure. The costs: ~100MB of backing store between the two canvases, and a zoom step that reallocated and repainted all of it (195ms a step, measured). The failure: Chrome caps canvas dimensions at 32,767px, so past a modest zoom × duration product the backing store silently failed to allocate and the grid rendered *blank* — the deeper you zoomed, the less you saw.
+
+Both canvases are now viewport-sized. A spacer div keeps the scroll range, the canvas rides the horizontal scroll pinned by transform (CSS `position: sticky` can't pin against the page's scroller from inside the component's own vertical one), and every draw subtracts the scroll offset and culls what falls outside the viewport. Redrawing on scroll sounds like the expensive direction until you measure it: both components' scroll handlers together cost 0.15ms — the old way's "free" scrolling was compositing a bitmap that mostly failed to exist. Measured on the M9 budget (100 rows / 5k effects, preview paused): zoom steps 195ms → 43ms, drag steps 18.6ms → 9.6ms median, grid bitmap 44MB → 2.4MB at the same zoom, and no zoom level can blank the grid any more. The row-label gutter is repainted last, over anything scrolled beneath it, so labels now stay readable at any scroll position — the virtualization forced what was already good UX.
+
+The preview got the same treatment for a different verb: closing it unmounted the THREE.js scene — renderer, geometry, compiled shaders — and reopening rebuilt all of it from scratch. The popped-out preview now hides with `v-show` and a `paused` prop that stops the render loop and color updates but keeps the scene warm, so reopening is a style flip plus one repaint instead of a WebGL context negotiation.
+
 ## The render loop learns to stop re-doing its own past
 
 A CPU profile of the M9 bench put two thirds of a full render inside the layer compositor and the garbage collector at 11% — every node of every layer of every frame allocated a colour object in `blendPixel`, another in `getPixel`, a colours array per layer, and a buffer per layer per frame. The compositor now blends in place (`blendPixelInto`, all channels read before any are written so the output may alias an input), reads pixels without materialising objects, and reuses shape-keyed scratch buffers across frames. Same pixels — all 838 engine tests unchanged — at 2.7× the speed: the medium-show budget render went from 12.0s to 4.5s, GC from 11% to 3%.

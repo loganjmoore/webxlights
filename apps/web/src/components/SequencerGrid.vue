@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import type { RowElementType, SequenceBody, SequenceEffect } from "../lib/api";
 import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
 import { fadeDurationAt } from "../lib/effectFade";
@@ -118,6 +118,47 @@ const EFFECT_DRAG_MIME = "application/x-webxlights-effect-name";
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const scrollRef = ref<HTMLDivElement | null>(null);
 const scrollTop = ref(0);
+
+// Horizontal virtualisation, the same trick the rows already get vertically. The canvas used to
+// be as wide as the whole timeline - at deep zoom that is tens of thousands of pixels, which
+// costs a full-timeline repaint on every scroll step, drag move and playhead tick, allocates a
+// bitmap in the hundreds of megabytes, and silently blanks entirely past the browser's canvas
+// size cap (32,767px). Instead the canvas is viewport-sized, pinned to the visible slice of the
+// page's shared horizontal scroller by a translateX, and everything time-positioned is drawn
+// shifted by scrollLeft. The spacer keeps the full width, so scrolling itself is unchanged.
+// A welcome side effect: the row-label gutter is now genuinely pinned - it used to scroll away.
+const scrollLeft = ref(0);
+const viewportWidth = ref(0);
+let hScrollEl: HTMLElement | null = null;
+let hScrollResize: ResizeObserver | null = null;
+
+function onHScroll(): void {
+  if (!hScrollEl || !canvasRef.value) return;
+  scrollLeft.value = hScrollEl.scrollLeft;
+  // Manual sticky: CSS position:sticky can't pin against the *page's* horizontal scroller from
+  // inside this component's own vertical one, so the canvas rides the scroll by transform.
+  canvasRef.value.style.transform = `translateX(${hScrollEl.scrollLeft}px)`;
+  draw();
+}
+
+function attachHScroll(): void {
+  let el: HTMLElement | null = canvasRef.value?.parentElement ?? null;
+  while (el) {
+    const overflowX = getComputedStyle(el).overflowX;
+    if (overflowX === "auto" || overflowX === "scroll") break;
+    el = el.parentElement;
+  }
+  hScrollEl = el;
+  if (!hScrollEl) return; // mounted outside a horizontal scroller: full-width canvas, as before
+  hScrollEl.addEventListener("scroll", onHScroll, { passive: true });
+  hScrollResize = new ResizeObserver(() => {
+    viewportWidth.value = hScrollEl?.clientWidth ?? 0;
+    draw();
+  });
+  hScrollResize.observe(hScrollEl);
+  viewportWidth.value = hScrollEl.clientWidth;
+  onHScroll();
+}
 const hoverCursor = ref("crosshair");
 let dragState:
   | { kind: "place"; row: GridRow; startMs: number }
@@ -135,8 +176,12 @@ let dragState:
 
 // Full content width, not container width - at zoom > baseline this is wider than the
 // viewport on purpose; the parent page wraps this component in an overflow-x:auto element
-// so the extra width becomes reachable by scroll instead of clipped and unreachable.
+// so the extra width becomes reachable by scroll instead of clipped and unreachable. The
+// *spacer* carries this width; the canvas itself is only as wide as what can be seen.
 const totalWidth = computed(() => ROW_LABEL_WIDTH + props.durationMs * props.pxPerMs);
+const canvasWidth = computed(() =>
+  viewportWidth.value > 0 ? Math.min(totalWidth.value, viewportWidth.value) : totalWidth.value,
+);
 
 function effectsForRow(row: GridRow): SequenceEffect[] {
   const found = props.body.rows.find((r) => r.elementType === row.elementType && r.elementId === row.elementId);
@@ -283,26 +328,21 @@ function draw(): void {
   const firstRow = Math.max(0, Math.floor(scrollTop.value / height));
   const lastRow = Math.min(props.rows.length, Math.ceil((scrollTop.value + rowsAreaHeight) / height));
 
+  // Everything time-positioned is drawn shifted left by the horizontal scroll; anything that
+  // lands fully outside the viewport is skipped. The label gutter is painted after the effects,
+  // so blocks scrolled under it disappear beneath it rather than over it.
+  const view = scrollLeft.value;
+
   for (let i = firstRow; i < lastRow; i++) {
     const row = props.rows[i]!;
     const y = HEADER_HEIGHT + i * height - scrollTop.value;
     ctx.fillStyle = i % 2 === 0 ? ui().rowHeading : ui().rowHeadingSelected;
     ctx.fillRect(0, y, rect.width, height);
 
-    ctx.fillStyle = ui().rowHeadingText;
-    ctx.font = "11px system-ui";
-    // A twisty for anything with rows nested under it, and an indent for the nested rows, so the
-    // shape of the list is visible rather than something you have to remember.
-    const indent = 8 + (row.depth ?? 0) * 12;
-    if (row.expanded !== undefined) {
-      ctx.fillText(row.expanded ? "\u25be" : "\u25b8", indent, y + height / 2 + 4);
-    }
-    const labelX = indent + (row.expanded !== undefined ? 12 : 0);
-    ctx.fillText(row.name, labelX, y + height / 2 + 4, ROW_LABEL_WIDTH - labelX - 4);
-
     for (const effect of drawEffectsForRow(row)) {
-      const x1 = msToX(effect.startMs);
-      const x2 = msToX(effect.endMs);
+      const x1 = msToX(effect.startMs) - view;
+      const x2 = msToX(effect.endMs) - view;
+      if (x2 < 0 || x1 > rect.width) continue;
       const isReference = effect.id === props.selectedEffectId;
       const inBlock = isReference || (props.selectedEffectIds?.includes(effect.id) ?? false);
       ctx.fillStyle = inBlock ? ui().effectSelected : ui().effect;
@@ -325,6 +365,25 @@ function draw(): void {
     }
   }
 
+  // The label gutter, painted over whatever scrolled under it - pinned, the way the ruler is.
+  for (let i = firstRow; i < lastRow; i++) {
+    const row = props.rows[i]!;
+    const y = HEADER_HEIGHT + i * height - scrollTop.value;
+    ctx.fillStyle = i % 2 === 0 ? ui().rowHeading : ui().rowHeadingSelected;
+    ctx.fillRect(0, y, ROW_LABEL_WIDTH, height);
+
+    ctx.fillStyle = ui().rowHeadingText;
+    ctx.font = "11px system-ui";
+    // A twisty for anything with rows nested under it, and an indent for the nested rows, so the
+    // shape of the list is visible rather than something you have to remember.
+    const indent = 8 + (row.depth ?? 0) * 12;
+    if (row.expanded !== undefined) {
+      ctx.fillText(row.expanded ? "▾" : "▸", indent, y + height / 2 + 4);
+    }
+    const labelX = indent + (row.expanded !== undefined ? 12 : 0);
+    ctx.fillText(row.name, labelX, y + height / 2 + 4, ROW_LABEL_WIDTH - labelX - 4);
+  }
+
   // pinned timing-track ruler - always drawn at y=0..HEADER_HEIGHT regardless of scrollTop
   ctx.fillStyle = ui().timingTrackHeader;
   ctx.fillRect(0, 0, rect.width, HEADER_HEIGHT);
@@ -336,7 +395,8 @@ function draw(): void {
   // thing you would blame on the snapping being broken.
   const inForce = new Set(activeMarks());
   for (const ms of drawMarks) {
-    const x = msToX(ms);
+    const x = msToX(ms) - view;
+    if (x < ROW_LABEL_WIDTH - 4 || x > rect.width + 4) continue;
     const active = inForce.has(ms);
     ctx.globalAlpha = active ? 1 : 0.35;
     ctx.strokeStyle = ui().timingMark;
@@ -369,7 +429,7 @@ function draw(): void {
   ctx.stroke();
 
   // playhead
-  const px = msToX(props.playheadMs);
+  const px = msToX(props.playheadMs) - view;
   ctx.strokeStyle = "#e74c3c";
   ctx.beginPath();
   ctx.moveTo(px, 0);
@@ -382,8 +442,8 @@ function draw(): void {
   for (const ghost of ghosts) {
     const gy = HEADER_HEIGHT + ghost.rowIndex * height - scrollTop.value;
     if (gy + height < HEADER_HEIGHT || gy > rect.height) continue;
-    const gx1 = msToX(ghost.startMs);
-    const gx2 = msToX(ghost.endMs);
+    const gx1 = msToX(ghost.startMs) - view;
+    const gx2 = msToX(ghost.endMs) - view;
     // "Only the ghost outlines that would collide with an existing effect turn red" - so the
     // colour is the answer to "will this one drop", not decoration.
     ctx.strokeStyle = ghost.blocked ? "#e5534b" : "#8fe0a0";
@@ -397,7 +457,8 @@ function draw(): void {
   // The rubber band, over everything - it is a transient thing you are drawing right now, and
   // having it hide behind an effect would make it look like it had stopped following the pointer.
   if (dragState?.kind === "band" && dragState.dragging) {
-    const bx = Math.min(dragState.fromX, dragState.toX);
+    // Band coordinates are absolute timeline x (like every hit test); the paint is shifted.
+    const bx = Math.min(dragState.fromX, dragState.toX) - view;
     const by = Math.min(dragState.fromY, dragState.toY);
     const bw = Math.abs(dragState.toX - dragState.fromX);
     const bh = Math.abs(dragState.toY - dragState.fromY);
@@ -500,7 +561,8 @@ type HitResult =
   | { kind: "none" };
 
 function hitTest(x: number, y: number): HitResult {
-  if (x < ROW_LABEL_WIDTH) {
+  // x is absolute timeline space; the gutter is pinned to the viewport, so its test is local.
+  if (x - scrollLeft.value < ROW_LABEL_WIDTH) {
     if (y < HEADER_HEIGHT) return { kind: "none" };
     const row = props.rows[rowIndexAt(y)];
     return row ? { kind: "row-label", row } : { kind: "none" };
@@ -542,7 +604,7 @@ function onDoubleClick(e: MouseEvent): void {
   const canvas = canvasRef.value;
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
+  const x = e.clientX - rect.left + scrollLeft.value;
   const y = e.clientY - rect.top;
   const hit = hitTest(x, y);
   // xLights' Effects Grid > Double Click Mode: a double-click on a timing mark either plays that
@@ -567,7 +629,7 @@ function onContextMenu(e: MouseEvent): void {
   const canvas = canvasRef.value;
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
+  const x = e.clientX - rect.left + scrollLeft.value;
   const y = e.clientY - rect.top;
   const hit = hitTest(x, y);
 
@@ -588,7 +650,7 @@ function onPointerDown(e: PointerEvent): void {
   const canvas = canvasRef.value;
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
+  const x = e.clientX - rect.left + scrollLeft.value;
   const y = e.clientY - rect.top;
   const hit = hitTest(x, y);
 
@@ -651,7 +713,7 @@ function onPointerMove(e: PointerEvent): void {
   const canvas = canvasRef.value;
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
+  const x = e.clientX - rect.left + scrollLeft.value;
   const y = e.clientY - rect.top;
 
   if (!dragState) {
@@ -755,7 +817,7 @@ function onPointerUp(e: PointerEvent): void {
     const canvas = canvasRef.value;
     if (canvas) {
       const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
+      const x = e.clientX - rect.left + scrollLeft.value;
       const endMs = xToMs(x);
       const startMs = Math.min(dragState.startMs, endMs);
       const finalEnd = Math.max(dragState.startMs, endMs, startMs + 200);
@@ -781,7 +843,7 @@ function onDrop(e: DragEvent): void {
   const canvas = canvasRef.value;
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
+  const x = e.clientX - rect.left + scrollLeft.value;
   const y = e.clientY - rect.top;
   const hit = hitTest(x, y);
   if (hit.kind !== "row-empty") return; // dropping onto an existing effect/ruler is a no-op, not an overwrite
@@ -790,8 +852,14 @@ function onDrop(e: DragEvent): void {
 
 onMounted(() => {
   rebuildDrawIndex();
+  attachHScroll();
   draw();
   window.addEventListener("resize", draw);
+});
+onUnmounted(() => {
+  window.removeEventListener("resize", draw);
+  hScrollEl?.removeEventListener("scroll", onHScroll);
+  hScrollResize?.disconnect();
 });
 // flush: "post" - draw() reads getBoundingClientRect(), which must run after Vue applies
 // any template-derived inline sizing, not before (pre-flush default risks a stale 0px read
@@ -830,11 +898,11 @@ watch(
 
 <template>
   <div ref="scrollRef" class="grid-scroll-viewport" :style="{ height: `${VIEWPORT_HEIGHT}px` }" @scroll="onScroll">
-    <div class="grid-spacer" :style="{ height: `${rows.length * rowHeight}px` }">
+    <div class="grid-spacer" :style="{ height: `${rows.length * rowHeight}px`, width: `${totalWidth}px` }">
       <canvas
         ref="canvasRef"
         class="grid-canvas"
-        :style="{ width: `${totalWidth}px`, height: `${VIEWPORT_HEIGHT}px`, cursor: hoverCursor }"
+        :style="{ width: `${canvasWidth}px`, height: `${VIEWPORT_HEIGHT}px`, cursor: hoverCursor }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
