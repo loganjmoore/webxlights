@@ -43,14 +43,28 @@ class OpenAiCompatibleDriver implements GeneratorDriver
             $request = $request->withToken($resolved);
         }
 
-        $response = $request->post("{$base}/chat/completions", [
+        $payload = [
             'model' => $model,
             'max_tokens' => 8000,
             'messages' => [
                 ['role' => 'system', 'content' => $system],
                 ['role' => 'user', 'content' => $user],
             ],
-        ]);
+        ];
+
+        $response = $request->post("{$base}/chat/completions", $payload);
+
+        // OpenAI's newer models (the gpt-5 family among them) reject `max_tokens` and demand
+        // `max_completion_tokens`; almost every other OpenAI-compatible provider only knows
+        // `max_tokens`. Sending both is also an error. So the shared name goes first, and the
+        // one provider that objects tells us so and gets one retry with the name it asked for -
+        // which keeps this driver working across the whole compatible fleet without a
+        // per-provider capability table that would rot.
+        if ($response->failed() && str_contains((string) $response->body(), 'max_completion_tokens')) {
+            $payload['max_completion_tokens'] = $payload['max_tokens'];
+            unset($payload['max_tokens']);
+            $response = $request->post("{$base}/chat/completions", $payload);
+        }
 
         if ($response->failed()) {
             // The provider's own message, not a generic one: "insufficient balance" and "model

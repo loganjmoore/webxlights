@@ -106,19 +106,30 @@ function openAiBackend(baseUrl, model, keyEnv) {
   if (keyEnv && !key) throw new Error(`--key-env ${keyEnv} is not set`);
   return async (system, user) => {
     const started = Date.now();
-    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-      method: "POST",
-      headers: { "content-type": "application/json", ...(key ? { authorization: `Bearer ${key}` } : {}) },
-      body: JSON.stringify({
-        model,
-        max_tokens: 8000,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      }),
-    });
-    const body = await response.json();
+    const post = async (payload) => {
+      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(key ? { authorization: `Bearer ${key}` } : {}) },
+        body: JSON.stringify(payload),
+      });
+      return { response, body: await response.json() };
+    };
+    const payload = {
+      model,
+      max_tokens: 8000,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    };
+    let { response, body } = await post(payload);
+    // The same retry the app's driver makes: OpenAI's newer models reject max_tokens and want
+    // max_completion_tokens, while most other compatible providers only know max_tokens.
+    if (!response.ok && JSON.stringify(body).includes("max_completion_tokens")) {
+      payload.max_completion_tokens = payload.max_tokens;
+      delete payload.max_tokens;
+      ({ response, body } = await post(payload));
+    }
     if (!response.ok) throw new Error(body?.error?.message ?? body?.message ?? `HTTP ${response.status}`);
     const text = body?.choices?.[0]?.message?.content;
     if (typeof text !== "string" || text.trim() === "") throw new Error("empty response");

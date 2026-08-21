@@ -107,6 +107,36 @@ class ShaderProvidersTest extends TestCase
         });
     }
 
+    public function test_a_model_that_rejects_max_tokens_gets_one_retry_with_the_renamed_field(): void
+    {
+        // OpenAI's newer models (the gpt-5 family) refuse `max_tokens` and demand
+        // `max_completion_tokens`; nearly every other compatible provider only knows the old
+        // name. The driver leads with the shared name and retries once when told otherwise -
+        // found the hard way, when a freshly configured gpt-5-mini failed every generation.
+        Http::fakeSequence('api.openai.com/*')
+            ->push(['error' => ['message' => "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead."]], 400)
+            ->push([
+                'choices' => [['message' => ['content' => "/*{}*/\nvoid main(){}"]]],
+                'usage' => ['prompt_tokens' => 700, 'completion_tokens' => 400],
+            ]);
+        config([
+            'services.shader.provider' => 'openai',
+            'services.shader.base_url' => 'https://api.openai.com/v1',
+            'services.shader.key' => 'sk-openai',
+            'services.shader.model' => null,
+        ]);
+
+        $result = app(ShaderGenerator::class)->generate('swirling fire');
+
+        $this->assertStringContainsString('void main', $result['source']);
+        Http::assertSentCount(2);
+        Http::assertSent(function ($request) {
+            // The retry must carry the renamed field and not both - sending both is an error too.
+            return ! isset($request['max_completion_tokens'])
+                || (! isset($request['max_tokens']) && $request['max_completion_tokens'] === 8000);
+        });
+    }
+
     public function test_the_providers_own_error_reaches_the_caller(): void
     {
         Http::fake(['*' => Http::response(['error' => ['message' => 'Insufficient Balance']], 402)]);
