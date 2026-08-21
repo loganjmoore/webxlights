@@ -107,6 +107,35 @@ class ShaderProvidersTest extends TestCase
         });
     }
 
+    public function test_a_byo_provider_is_called_at_its_own_endpoint_whatever_the_server_uses(): void
+    {
+        // The server runs Anthropic (no base_url at all); the caller brings an OpenAI key and
+        // names OpenAI. Their call must go to api.openai.com - before this worked, "bring your
+        // own provider" only functioned when it happened to match the operator's, and failed
+        // with "No API endpoint is configured" otherwise.
+        Http::fake([
+            'api.openai.com/*' => Http::response([
+                'choices' => [['message' => ['content' => "/*{}*/\nvoid main(){}"]]],
+                'usage' => ['prompt_tokens' => 700, 'completion_tokens' => 400],
+            ]),
+        ]);
+        config([
+            'services.shader.provider' => 'anthropic',
+            'services.shader.base_url' => null,
+            'services.shader.key' => null,
+            'services.shader.model' => null,
+        ]);
+
+        $result = app(ShaderGenerator::class)->generate(
+            'swirling fire', null, null, 'sk-their-openai-key', 'openai', 'gpt-5-mini',
+        );
+
+        $this->assertStringContainsString('void main', $result['source']);
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.openai.com/v1/chat/completions'
+            && $request->hasHeader('Authorization', 'Bearer sk-their-openai-key')
+            && $request['model'] === 'gpt-5-mini');
+    }
+
     public function test_a_model_that_rejects_max_tokens_gets_one_retry_with_the_renamed_field(): void
     {
         // OpenAI's newer models (the gpt-5 family) refuse `max_tokens` and demand

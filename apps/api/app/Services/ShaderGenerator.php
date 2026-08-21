@@ -110,13 +110,25 @@ class ShaderGenerator
      */
     public function resolve(?string $providerName = null, ?string $model = null): array
     {
-        $name = $providerName ?: config('services.shader.provider') ?: Providers::ANTHROPIC;
+        $serverProvider = config('services.shader.provider') ?: Providers::ANTHROPIC;
+        $name = $providerName ?: $serverProvider;
         $preset = Providers::get($name);
+
+        // The endpoint follows the provider actually chosen for THIS call. A caller bringing
+        // their own key may name a provider the server is not configured for, and their request
+        // has to go to that provider's endpoint - the server's own base_url (which may carry an
+        // operator override, SHADER_BASE_URL) applies only when the server's own provider is the
+        // one being used. Without this, "bring your own provider" only worked when it happened
+        // to match the operator's.
+        $baseUrl = $name === $serverProvider
+            ? (config('services.shader.base_url') ?: $preset['base_url'])
+            : ($preset['base_url'] ?? config('services.shader.base_url'));
 
         return [
             'provider' => $name,
             'driver' => app($preset['driver']),
             'model' => $model ?: config('services.shader.model') ?: $preset['model'],
+            'base_url' => $baseUrl,
         ];
     }
 
@@ -167,9 +179,9 @@ class ShaderGenerator
             TEXT;
         }
 
-        ['provider' => $provider, 'driver' => $driver, 'model' => $model] = $this->resolve($providerName, $modelName);
+        ['provider' => $provider, 'driver' => $driver, 'model' => $model, 'base_url' => $baseUrl] = $this->resolve($providerName, $modelName);
         /** @var GeneratorDriver $driver */
-        $result = $driver->complete(self::SYSTEM, $ask, $model, $userKey);
+        $result = $driver->complete(self::SYSTEM, $ask, $model, $userKey, $baseUrl);
         $text = $result['text'];
 
         return [

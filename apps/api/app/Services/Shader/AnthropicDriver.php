@@ -34,8 +34,9 @@ class AnthropicDriver implements GeneratorDriver
         return (bool) ($key ?: config('services.shader.key'));
     }
 
-    public function complete(string $system, string $user, string $model, ?string $key): array
+    public function complete(string $system, string $user, string $model, ?string $key, ?string $baseUrl = null): array
     {
+        // $baseUrl is unused on purpose: the official SDK knows Anthropic's endpoint.
         $resolved = $key ?: config('services.shader.key');
         if (! $resolved) {
             throw new RuntimeException('No API key is configured for the shader assistant.');
