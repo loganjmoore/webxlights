@@ -1,6 +1,6 @@
 import { RenderBuffer } from "./renderBuffer";
-import { blendPixel, isCanvasMode, type BlendMode } from "./blend";
-import { bufferToNodeColors, nodeColorsToBuffer } from "./nodeMapping";
+import { blendPixel, blendPixelInto, isCanvasMode, type BlendMode } from "./blend";
+import { nodeColorsToBuffer } from "./nodeMapping";
 import { rgba, type RGBA } from "./color";
 import type { ModelGeometry } from "./models/types";
 
@@ -67,28 +67,66 @@ function positionForBlend(mode: BlendMode, geo: ModelGeometry, index: number): n
 // For layers that all use the Default style this is identical to the old path - blending is
 // per-pixel and the mapping is per-node, so blending before or after the mapping gives the same
 // answer when the mapping is shared.
-export function renderLayerStackToNodes(nodeCount: number, layers: NodeLayerSpec[]): RGBA[] {
+/**
+ * Reusable scratch for the compositor, owned by whoever renders repeatedly (a row sequencer, a
+ * playback loop) and threaded through renderLayerStackToNodes.
+ *
+ * A full render allocated a fresh buffer per layer per frame plus a colour object per node per
+ * layer, and the profile showed the garbage collector taking 11% of the whole render for it.
+ * Buffers are keyed by shape because layers with different render styles draw into differently
+ * shaped buffers; each is zeroed before reuse, which is cheaper than reallocating by the width
+ * of a typed-array fill.
+ */
+export interface LayerScratch {
+  buffers: Map<string, RenderBuffer>;
+}
+
+export function createLayerScratch(): LayerScratch {
+  return { buffers: new Map() };
+}
+
+export function renderLayerStackToNodes(nodeCount: number, layers: NodeLayerSpec[], scratch?: LayerScratch): RGBA[] {
   if (layers.length > MAX_LAYERS) throw new Error(`renderLayerStackToNodes: ${layers.length} layers exceeds the cap of ${MAX_LAYERS}`);
 
   const result: RGBA[] = new Array(nodeCount).fill(null).map(() => rgba(0, 0, 0, 0));
+  const fg = rgba(0, 0, 0, 0); // one reused read target - blendPixelInto copies what it needs
   for (const layer of layers) {
-    const buffer = new RenderBuffer(layer.geometry.width, layer.geometry.height);
+    const { width, height } = layer.geometry;
+    let buffer: RenderBuffer;
+    if (scratch) {
+      const key = `${width}x${height}`;
+      const kept = scratch.buffers.get(key);
+      if (kept) {
+        kept.clear();
+        buffer = kept;
+      } else {
+        buffer = new RenderBuffer(width, height);
+        scratch.buffers.set(key, buffer);
+      }
+    } else {
+      buffer = new RenderBuffer(width, height);
+    }
     // A Canvas layer is handed what the layers underneath it drew, rather than a blank buffer.
     // That is the whole mechanism behind the effects that modify the layer below - Kaleidoscope,
     // which the manual says "by itself does nothing", Warp and Adjust - and it is why they can't
     // be written as ordinary effects: an ordinary effect's buffer starts empty.
     if (isCanvasMode(layer.blendMode)) nodeColorsToBuffer(result, layer.geometry, buffer);
     layer.render(buffer);
-    const colors = bufferToNodeColors(buffer, layer.geometry);
+    // Reading each node's colour straight out of the buffer and blending in place, rather than
+    // materialising a colours array per layer - same values, none of the per-node allocations.
+    const nodes = layer.geometry.nodes;
+    const positional = layer.blendMode === "Bottom-Top" || layer.blendMode === "Left-Right";
     for (let i = 0; i < nodeCount; i++) {
-      const fg = colors[i];
-      if (!fg) continue;
-      result[i] = blendPixel(
+      const node = nodes[i];
+      if (!node) continue;
+      buffer.readInto(node.bufX, node.bufY, fg);
+      blendPixelInto(
         fg,
         result[i]!,
         layer.blendMode,
         layer.effectMixThreshold,
-        positionForBlend(layer.blendMode, layer.geometry, i),
+        positional ? positionForBlend(layer.blendMode, layer.geometry, i) : 0.5,
+        result[i]!,
       );
     }
   }

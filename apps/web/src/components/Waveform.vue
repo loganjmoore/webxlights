@@ -39,6 +39,13 @@ const canvasRef = ref<HTMLCanvasElement | null>(null);
 // .h-scroll wrapper so they scroll horizontally together, staying aligned at any zoom level.
 const totalWidth = computed(() => ROW_LABEL_WIDTH + props.durationMs * props.pxPerMs);
 
+// Assigning canvas.width/height reallocates and clears the backing store - the same cost
+// SequencerGrid's draw() documents avoiding. The playhead redraws this canvas every frame of
+// playback, and at deep zoom the canvas is tens of thousands of pixels wide, so an
+// unconditional realloc per tick is real money.
+let lastBackingW = 0;
+let lastBackingH = 0;
+
 function draw(): void {
   const canvas = canvasRef.value;
   if (!canvas) return;
@@ -47,8 +54,14 @@ function draw(): void {
 
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
+  const bw = Math.round(rect.width * dpr);
+  const bh = Math.round(rect.height * dpr);
+  if (bw !== lastBackingW || bh !== lastBackingH) {
+    canvas.width = bw;
+    canvas.height = bh;
+    lastBackingW = bw;
+    lastBackingH = bh;
+  }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   ctx.fillStyle = ui().waveformBackground;

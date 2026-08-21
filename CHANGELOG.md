@@ -1,5 +1,13 @@
 # Changelog
 
+## The render loop learns to stop re-doing its own past
+
+A CPU profile of the M9 bench put two thirds of a full render inside the layer compositor and the garbage collector at 11% — every node of every layer of every frame allocated a colour object in `blendPixel`, another in `getPixel`, a colours array per layer, and a buffer per layer per frame. The compositor now blends in place (`blendPixelInto`, all channels read before any are written so the output may alias an input), reads pixels without materialising objects, and reuses shape-keyed scratch buffers across frames. Same pixels — all 838 engine tests unchanged — at 2.7× the speed: the medium-show budget render went from 12.0s to 4.5s, GC from 11% to 3%.
+
+The bigger find was what live playback was doing: the preview called `renderRowAtMs` per frame, which replays every stateful effect from its start on every call — ten seconds into a long Meteors effect, *each frame* cost 483ms of replaying the previous ten seconds. `createRowPlayer` wraps the export's incremental sequencer for playback: quantised to the frame grid (so the many repaints inside one 50ms frame are free, and the screen shows exactly the export's frames), stepping O(1) per frame, rebuilding with a warm-up only on seeks. Steady-state: 1.16ms a frame, 400× faster.
+
+Making the player provably equivalent surfaced that it couldn't be — because the two paths already disagreed. The scrubbing path's replay never cleared its buffer between replayed frames, so every stateful effect accumulated ghost pixels as if its layer were Persistent; and the export sequencer, drawing one clean frame per call, dropped persistence from layers that *were* Persistent and stateful. Both halves fixed to mean what the layer setting says, pinned by equivalence tests sweeping player against pure path through seeks in both directions. The waveform also stops reallocating its (at deep zoom, tens of thousands of pixels wide) canvas backing store on every playhead tick, the same fix the grid already documented.
+
 ## The shader assistant learns to write for xLights too, and proves it
 
 The brief (docs/GOAL-shader-prompt.md) said the quiet part: every shader the assistant had made so far was a fork of the format. The prompt taught the model `PALETTE_AT()`, an invention of ours that real xLights has never heard of, so a "shader for xLights' own format" failed to link the moment anyone actually put one in xLights. This round makes the same file mean the same thing in both programs — and measures it instead of asserting it.
