@@ -8,6 +8,7 @@ import type { BlendMode } from "./blend";
 import { audioFrameAt, type AudioSeries } from "./audio";
 import { renderWithLayerSettings, type LayerSettings } from "./layerSettings";
 import { applyRenderStyle } from "./renderStyle";
+import { renderShader, type ShaderParams } from "./effects/shader";
 import { renderOn, type OnParams } from "./effects/on";
 import { renderBars, type BarsParams } from "./effects/bars";
 import { renderColorWash, type ColorWashParams } from "./effects/colorWash";
@@ -204,6 +205,11 @@ function renderStateless(
   const params = paramsAt(effect, positionInEffect01);
 
   switch (effect.name) {
+    case "Shader":
+      // Passed the frame length because a shader is written against wall-clock seconds, not
+      // against frame counts - the only effect here that needs to know the sequence's rate.
+      renderShader(buffer, palette, params as unknown as ShaderParams, ctx, extras.frameMs ?? 50);
+      break;
     case "State":
       renderState(buffer, palette, params as unknown as StateParams, ctx);
       break;

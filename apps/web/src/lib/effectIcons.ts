@@ -61,6 +61,7 @@ const ICONS: Record<string, string> = {
   State: `<rect x="3" y="6" width="8" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="13" y="12" width="8" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M11 9h2v6" fill="none" stroke="currentColor" stroke-width="1.2"/>`,
   Piano: `<rect x="3" y="6" width="18" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="7" y="6" width="2" height="7" fill="currentColor"/><rect x="11.5" y="6" width="2" height="7" fill="currentColor"/><rect x="16" y="6" width="2" height="7" fill="currentColor"/>`,
   Guitar: `<circle cx="10" cy="16" r="5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="16" r="1.6" fill="currentColor"/><path d="m13.5 12.5 6-9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`,
+  Shader: `<rect x="5" y="5" width="14" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7.5 14.5c1.5-4 3-4 4.5 0s3 4 4.5 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M9 2.5v2.5M15 2.5v2.5M9 19v2.5M15 19v2.5M2.5 9H5M2.5 15H5M19 9h2.5M19 15h2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>`,
   Faces: `<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="9" cy="10" r="1.3" fill="currentColor"/><circle cx="15" cy="10" r="1.3" fill="currentColor"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" fill="none" stroke="currentColor" stroke-width="1.4"/>`,
 };
 

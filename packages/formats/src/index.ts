@@ -3,3 +3,4 @@ export * from "./fseq";
 export * from "./xsq";
 export * from "./midi";
 export * from "./papagayo";
+export * from "./isf";
