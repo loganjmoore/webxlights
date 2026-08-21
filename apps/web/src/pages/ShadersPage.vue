@@ -135,12 +135,29 @@ async function generate(): Promise<void> {
       failure.value = "That API key was refused. Check it and try again.";
       showKeyPanel.value = true;
     } else {
-      failure.value = apiErr.message || "The assistant could not be reached.";
+      failure.value = serverMessage(apiErr) || "The assistant could not be reached.";
     }
     await refreshStatus();
   } finally {
     busy.value = false;
     stage.value = "";
+  }
+}
+
+/**
+ * The human sentence inside an API error.
+ *
+ * ApiError carries the raw response body; for this endpoint that is JSON whose `message` is
+ * written to be shown to a person - the scope refusal says what the assistant is for, the
+ * daily-limit message says when it resets. Showing the raw JSON would bury exactly the part
+ * that answers "so what do I do now".
+ */
+function serverMessage(err: ApiError): string {
+  try {
+    const parsed = JSON.parse(err.message) as { message?: string };
+    return typeof parsed.message === "string" ? parsed.message : err.message;
+  } catch {
+    return err.message;
   }
 }
 

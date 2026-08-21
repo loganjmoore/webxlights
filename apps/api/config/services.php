@@ -26,7 +26,7 @@ return [
         // ledger and the per-minute throttle. 0 means uncapped. Bringing your own key bypasses
         // it entirely - your key, your bill. The default's arithmetic is in
         // docs/SHADER-ASSISTANT-COST.md; change it there too if you change it here.
-        'daily_limit' => (int) env('SHADER_DAILY_LIMIT', 40),
+        'daily_limit' => (int) env('SHADER_DAILY_LIMIT', 20),
     ],
 
     /*

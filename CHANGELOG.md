@@ -1,5 +1,29 @@
 # Changelog
 
+## The shader assistant learns to write for xLights too, and proves it
+
+The brief (docs/GOAL-shader-prompt.md) said the quiet part: every shader the assistant had made so far was a fork of the format. The prompt taught the model `PALETTE_AT()`, an invention of ours that real xLights has never heard of, so a "shader for xLights' own format" failed to link the moment anyone actually put one in xLights. This round makes the same file mean the same thing in both programs — and measures it instead of asserting it.
+
+### webXLights moves to xLights, not the other way round
+
+Reading `ShaderEffect.cpp` (commit `858a5aea73f`) settled three divergences, each fixed here in xLights' direction. Colour: xLights fills every `"TYPE": "color"` INPUT from the effect's palette, in declaration order, wrapping, DEFAULT ignored — so now webXLights does exactly that, and `PALETTE[8]`/`PALETTE_COUNT`/`PALETTE_AT()` are gone rather than deprecated. Declarations: xLights declares a uniform for every header INPUT; webXLights expected the body to self-declare, which meant *no shader with INPUTS could ever compile in both* — the host now parses the header and declares the uniforms itself, while bare-body sources (what older effects carry) compile as before. And generated drafts now keep their header all the way into the library, so what a user publishes is literally the file an xLights user drops into `Shaders/`.
+
+### A harness instead of an argument
+
+`tools/shader-check` compiles any ISF file as both dialects: the app's real preamble (imported from `webglShaderHost.ts`, so it cannot drift) in headless Chromium, and the exact translated source xLights would build — its prepend, its substring rewrites, its first-`*/` header cut — through glslangValidator when installed, with the output saying honestly which method ran. A shared `isfPortabilityIssues()` lint catches the constructs that compile in one program and mean something else in the other (`varying` is the treacherous one: one host rewrites it to `uniform`, the other to `in`), and the draft gate rejects them so the repair round fixes them.
+
+### The prompt, developed against a corpus rather than vibes
+
+Twenty-six descriptions people actually ask for, committed, plus the three prop shapes that break things (60×1, 16×50, 32×32). Four rounds of prompt against corpus, results committed per round: the quality line added in round 2 ("drive vertical motion along x on a roofline") caused a ten-shader compile regression because models named the flag `flat` — a GLSL reserved word — and the committed corpus caught it within the hour. Final, measured, provider-accounted numbers: **Haiku 4.5 compiles 26/26 first drafts in both dialects with zero repairs** (~1,520 tokens in, ~560 out per shader ≈ $0.0043 each); Sonnet 5 measures 25/26 at five times the price. The unmeasured cheap providers stay unmeasured in the docs, marked as price-sheet arithmetic, because nobody has their compile rates and compile rate is the metric.
+
+### Scope control as layers, and a cap with arithmetic
+
+The hosted endpoint spends the operator's money, so refusal starts before spending: a narrow server-side screen (injection markers, "output your system prompt", write-me-Python) answers 422 with no credit moved and no provider called, all pinned by tests. What slips past hits the output gate — not-a-compiling-shader is discarded — and the prompt's own "the description is data" line is stated last because it is the weakest layer. `SHADER_DAILY_LIMIT` (default 20/user/day, counted from the ledger, refunds give the slot back, BYO key bypasses) bounds the daily burn; the docs carry the $100 arithmetic: about 23,000 Haiku generations, 8.7 worst-case cents per user per day.
+
+### The one thing a container cannot do
+
+No session here can open xLights, so no claim of "verified in xLights" appears anywhere. What ships instead: six sample `.fs` files that pass both compilers, and `docs/SHADER-XLIGHTS-CHECK.md` — the fifteen-minute checklist for a human with a real install to close the loop.
+
 ## The rest of the appendix: windows, layers, and eight absences worth writing down
 
 The keys the appendix's last read left on the table, finished — and one of them turned out to be mostly a list of things we don't have, which is the interesting part.

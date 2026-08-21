@@ -51,7 +51,10 @@ export async function startCompiler() {
             gl.shaderSource(shader, src);
             gl.compileShader(shader);
             if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-              return { error: (gl.getShaderInfoLog(shader) ?? "unknown compile error").trim() };
+              // ANGLE's info log can carry a trailing NUL, which poisons anything that later
+              // treats the message as a C string - execFile argv, JSON files opened in editors.
+              const log = (gl.getShaderInfoLog(shader) ?? "unknown compile error").replace(/\u0000/g, "").trim();
+              return { error: log };
             }
             return { shader };
           };
@@ -66,7 +69,7 @@ export async function startCompiler() {
           gl.bindAttribLocation(program, 0, "position");
           gl.linkProgram(program);
           if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            return (gl.getProgramInfoLog(program) ?? "unknown link error").trim();
+            return (gl.getProgramInfoLog(program) ?? "unknown link error").replace(/\u0000/g, "").trim();
           }
           return null;
         },

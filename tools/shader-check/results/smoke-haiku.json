@@ -1,0 +1,85 @@
+{
+  "summary": {
+    "label": "smoke-haiku",
+    "backend": "claude-cli",
+    "model": "claude-haiku-4-5",
+    "ranAt": "2026-08-21T02:09:04.618Z",
+    "corpusSize": 2,
+    "generated": 2,
+    "firstDraftBothDialects": 2,
+    "afterOneRepairBothDialects": 2,
+    "repairRounds": 0,
+    "tokens": {
+      "input": 2771,
+      "output": 1354,
+      "calls": 2
+    },
+    "meanLatencyMs": 13332,
+    "note": "usage measured through the claude CLI: tools disabled, thinking off, shader SYSTEM prompt only; the CLI adds roughly 200 tokens of its own framing per call to input_tokens that the app's driver would not send"
+  },
+  "items": [
+    {
+      "id": "snow",
+      "description": "gently falling snow",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1385,
+            "output_tokens": 717
+          },
+          "ms": 13654
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Gently falling snow with twinkling lights\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"snowColor\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"skyColor\", \"TYPE\": \"color\", \"DEFAULT\": [0.0, 0.0, 0.2, 1.0] },\n    { \"NAME\": \"fallSpeed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 2.0, \"DEFAULT\": 0.5 },\n    { \"NAME\": \"density\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 3.0, \"DEFAULT\": 1.0 }\n  ]\n}*/\n\nfloat hash(vec2 p) {\n  float h = dot(p, vec2(127.1, 311.7));\n  return fract(sin(h) * 43758.5453123);\n}\n\nfloat snowflake(vec2 uv, float time) {\n  vec2 id = floor(uv * density * 8.0);\n  vec2 pos = fract(uv * density * 8.0);\n  \n  float seed = hash(id);\n  float fallOffset = mod(time * fallSpeed * 0.3 + seed * 10.0, 2.0);\n  \n  float y = fract(pos.y + fallOffset);\n  float x = pos.x + sin(y * 6.28318 + seed * 6.28318) * 0.15;\n  \n  float dx = abs(fract(x) - 0.5);\n  float dy = abs(y - 0.5);\n  \n  float dist = length(vec2(dx, dy));\n  float flake = smoothstep(0.12, 0.02, dist);\n  \n  float twinkle = 0.5 + 0.5 * sin(time * 2.0 + seed * 6.28318);\n  flake *= mix(0.4, 1.0, twinkle);\n  \n  return flake;\n}\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float snow = 0.0;\n  for (int i = 0; i < 3; i++) {\n    snow += snowflake(uv + vec2(0.0, float(i) * 0.33), TIME) * 0.6;\n  }\n  \n  snow = min(snow, 1.0);\n  \n  vec3 finalColor = mix(skyColor.rgb, snowColor.rgb, snow);\n  \n  gl_FragColor = vec4(finalColor, 1.0);\n}",
+      "firstDraft": {
+        "file": "snow.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    },
+    {
+      "id": "fire",
+      "description": "fire rising from the bottom",
+      "calls": [
+        {
+          "round": "draft",
+          "usage": {
+            "input_tokens": 1386,
+            "output_tokens": 637
+          },
+          "ms": 13009
+        }
+      ],
+      "source": "/*{\n  \"DESCRIPTION\": \"Fire rising from the bottom with flickering red and orange flames\",\n  \"CREDIT\": \"webXLights shader assistant\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorHot\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 0.0, 1.0] },\n    { \"NAME\": \"colorCool\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.2, 0.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 4.0, \"DEFAULT\": 1.5 },\n    { \"NAME\": \"scale\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 }\n  ]\n}*/\n\nfloat hash(float x) {\n  return fract(sin(x * 73.156) * 43758.5453);\n}\n\nfloat noise(float x) {\n  float i = floor(x);\n  float f = fract(x);\n  float u = f * f * (3.0 - 2.0 * f);\n  return mix(hash(i), hash(i + 1.0), u);\n}\n\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  \n  float y = uv.y;\n  float x = uv.x;\n  \n  float t = TIME * speed;\n  float baseFlame = noise(x * scale * 3.0 + t * 0.7) * 0.5 + noise(x * scale * 7.0 + t * 1.3) * 0.3;\n  \n  float flameHeight = y - baseFlame * 0.4;\n  float flameIntensity = 1.0 - flameHeight * 1.2;\n  flameIntensity = max(0.0, flameIntensity);\n  flameIntensity *= flameIntensity;\n  \n  float flicker = noise(x * 2.0 + t * 3.5) * 0.3 + 0.7;\n  flameIntensity *= flicker;\n  \n  vec3 col = mix(colorCool.rgb, colorHot.rgb, flameIntensity * 0.8);\n  col *= flameIntensity;\n  \n  gl_FragColor = vec4(col, 1.0);\n}",
+      "firstDraft": {
+        "file": "fire.fs",
+        "xlightsMethod": "glslang-desktop-330",
+        "parse": {
+          "ok": true
+        },
+        "portability": [],
+        "webxlights": {
+          "ok": true
+        },
+        "xlights": {
+          "ok": true
+        }
+      },
+      "firstDraftOk": true,
+      "ok": true
+    }
+  ],
+  "abuse": null
+}

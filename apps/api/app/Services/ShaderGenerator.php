@@ -61,7 +61,8 @@ class ShaderGenerator
     COLOUR comes from "TYPE": "color" INPUTS. Both programs fill them from the colours the user
     picked, in declaration order, wrapping when there are more inputs than colours. Declare one
     to three of them and build the look from them, unless the user names specific colours. Do
-    not expect their DEFAULTs to matter - the user's palette overrides them.
+    not expect their DEFAULTs to matter - the user's palette overrides them. Every colour name
+    the GLSL reads must be one of the declared INPUTS - an undeclared colorC compiles nowhere.
 
     HARD RULES - each of these breaks one of the two compilers:
     - never write the word varying, and never declare a uniform in the GLSL; the header is the
@@ -73,6 +74,8 @@ class ShaderGenerator
       point (1.0 not 1), and never mix int and float in arithmetic without float()
     - loops only with constant bounds, at most ~16 iterations
     - never divide by anything that can be zero
+    - never use a GLSL reserved word as a name: flat, active, filter, input, output, common,
+      partition, sample and superp are all reserved - call a roofline flag isLine, not flat
     - INPUT types allowed: float, bool, color, point2D, and long with MIN, MAX and DEFAULT;
       give every float and long a sensible MIN, MAX and DEFAULT
 
@@ -80,7 +83,9 @@ class ShaderGenerator
     - THE CANVAS IS TINY. A model is often 20-60 pixels across and can be ONE PIXEL TALL (a
       line of lights along a roof, where uv.y is constant). Big shapes, broad bands, whole-
       canvas motion; the main movement should read along x alone. No thin lines, no fine
-      noise, no text - they alias into flicker.
+      noise, no text - they alias into flicker. If the effect's motion is naturally vertical
+      (falling, rising, bursting), branch on the buffer shape so a roofline still shows it:
+      when RENDERSIZE.y < 2.0, drive the same animation along x instead of y.
     - IT IS SEEN FROM THE STREET, AT NIGHT. Strong saturated colour and high contrast. Mid
       greys and subtle gradients disappear. Full black is genuinely off, which is useful.
     - IT LOOPS FOR MINUTES. Motion must be continuous and seamless - nothing that builds to a
