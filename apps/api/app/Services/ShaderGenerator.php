@@ -24,7 +24,15 @@ use RuntimeException;
  */
 class ShaderGenerator
 {
-    private const MODEL = 'claude-opus-5';
+    /**
+     * Models whose thinking is configured with adaptive thinking rather than a token budget.
+     *
+     * The request shape genuinely differs: a 4.6-or-later model rejects `budget_tokens` with a
+     * 400, and Haiku 4.5 rejects `effort` the same way. Sending one request shape to every model
+     * means whichever half is wrong fails outright, so the capability is checked rather than
+     * assumed.
+     */
+    private const ADAPTIVE_THINKING = ['claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-fable-5'];
 
     private const SYSTEM = <<<'PROMPT'
     You write ISF (Interactive Shader Format) fragment shaders for webXLights, a browser
@@ -81,17 +89,31 @@ class ShaderGenerator
 
     public function __construct(private ?Client $client = null) {}
 
-    private function client(): Client
+    /**
+     * @param  string|null  $userKey  the caller's own API key, when they brought one
+     */
+    private function client(?string $userKey): Client
     {
-        if ($this->client === null) {
-            $key = config('services.anthropic.key');
-            if (! $key) {
-                throw new RuntimeException('The shader assistant is not configured on this server.');
-            }
-            $this->client = new Client(apiKey: $key);
+        if ($this->client !== null) {
+            return $this->client;
+        }
+        // The caller's key wins over the server's. A self-hosted copy has no server key at all,
+        // and on the hosted site a user who brings their own is paying for their own usage - so
+        // in both cases the key they supplied is the one to use.
+        //
+        // Deliberately not cached on the instance: a per-request key must not leak into the next
+        // request's client, which in a long-lived worker would mean billing the wrong person.
+        $key = $userKey ?: config('services.anthropic.key');
+        if (! $key) {
+            throw new RuntimeException('The shader assistant needs an Anthropic API key. Add your own in Settings, or ask the server operator to configure one.');
         }
 
-        return $this->client;
+        return new Client(apiKey: $key);
+    }
+
+    public function model(): string
+    {
+        return config('services.anthropic.model') ?: 'claude-haiku-4-5';
     }
 
     /**
@@ -99,8 +121,12 @@ class ShaderGenerator
      * @param  string|null  $repairing  a compile error from a previous attempt, if this is a retry
      * @return array{source: string, usage: array}
      */
-    public function generate(string $description, ?string $previousSource = null, ?string $repairing = null): array
-    {
+    public function generate(
+        string $description,
+        ?string $previousSource = null,
+        ?string $repairing = null,
+        ?string $userKey = null,
+    ): array {
         $ask = "Write an ISF shader for a Christmas light display:\n\n{$description}";
         if ($previousSource !== null && $repairing !== null) {
             // A repair is a different job from a first draft, and saying so plainly beats
@@ -119,13 +145,24 @@ class ShaderGenerator
             TEXT;
         }
 
-        $message = $this->client()->messages->create(
-            model: self::MODEL,
-            maxTokens: 8000,
-            system: self::SYSTEM,
-            thinking: ['type' => 'adaptive'],
-            messages: [['role' => 'user', 'content' => $ask]],
-        );
+        $model = $this->model();
+        $params = [
+            'model' => $model,
+            'maxTokens' => 8000,
+            'system' => self::SYSTEM,
+            'messages' => [['role' => 'user', 'content' => $ask]],
+        ];
+        // Thinking is left off on the cheap models on purpose, and not only because they do not
+        // take the same parameter. Thinking tokens are billed as output, at the same rate as the
+        // shader itself, and they are the single largest thing on the bill - several times the
+        // cost of the shader they help produce. The compile-and-repair round the client already
+        // does buys back most of the accuracy for a fraction of that, because a repair is only
+        // paid for when the first draft actually failed.
+        if (in_array($model, self::ADAPTIVE_THINKING, true)) {
+            $params['thinking'] = ['type' => 'adaptive'];
+        }
+
+        $message = $this->client($userKey)->messages->create(...$params);
 
         $text = '';
         foreach ($message->content as $block) {
@@ -139,6 +176,7 @@ class ShaderGenerator
         return [
             'source' => $this->unfence(trim($text)),
             'usage' => [
+                'model' => $model,
                 'input_tokens' => $message->usage->inputTokens ?? null,
                 'output_tokens' => $message->usage->outputTokens ?? null,
             ],

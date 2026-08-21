@@ -12,21 +12,31 @@ class ShaderCreditsTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** A generator that answers without going near the network. */
-    private function fakeGenerator(string $source = "/*{}*/\nvoid main(){}"): void
+    /** A generator that answers without going near the network, and remembers the key it got. */
+    private function fakeGenerator(string $source = "/*{}*/\nvoid main(){}"): object
     {
-        $this->instance(ShaderGenerator::class, new class($source) extends ShaderGenerator
+        $fake = new class($source) extends ShaderGenerator
         {
+            public ?string $sawKey = null;
+
+            public bool $called = false;
+
             public function __construct(private string $answer)
             {
                 parent::__construct();
             }
 
-            public function generate(string $description, ?string $previousSource = null, ?string $repairing = null): array
+            public function generate(string $description, ?string $previousSource = null, ?string $repairing = null, ?string $userKey = null): array
             {
+                $this->called = true;
+                $this->sawKey = $userKey;
+
                 return ['source' => $this->answer, 'usage' => []];
             }
-        });
+        };
+        $this->instance(ShaderGenerator::class, $fake);
+
+        return $fake;
     }
 
     public function test_a_new_account_can_try_the_assistant_without_paying(): void
@@ -89,7 +99,7 @@ class ShaderCreditsTest extends TestCase
                 parent::__construct();
             }
 
-            public function generate(string $description, ?string $previousSource = null, ?string $repairing = null): array
+            public function generate(string $description, ?string $previousSource = null, ?string $repairing = null, ?string $userKey = null): array
             {
                 throw new RuntimeException('The shader assistant is not configured on this server.');
             }
@@ -143,5 +153,95 @@ class ShaderCreditsTest extends TestCase
     public function test_generation_requires_a_signed_in_user(): void
     {
         $this->postJson('/api/v1/shaders/generate', ['description' => 'x'])->assertUnauthorized();
+    }
+
+    public function test_a_user_who_brings_their_own_key_spends_no_credits(): void
+    {
+        $fake = $this->fakeGenerator();
+        $user = User::factory()->create(['credits' => 2]);
+
+        $response = $this->actingAs($user)
+            ->withHeader('X-Anthropic-Key', 'sk-ant-test-key')
+            ->postJson('/api/v1/shaders/generate', ['description' => 'aurora']);
+
+        // Their usage is billed to them by Anthropic, so it costs the operator nothing and
+        // therefore costs no credits. This is what lets the project be open source without the
+        // maintainer funding everybody's generations.
+        $response->assertOk()->assertJsonPath('charged', false)->assertJsonPath('credits', 2);
+        $this->assertSame(2, $user->fresh()->credits);
+        $this->assertDatabaseCount('credit_transactions', 0);
+        $this->assertSame('sk-ant-test-key', $fake->sawKey);
+    }
+
+    public function test_a_user_key_is_never_written_down(): void
+    {
+        $this->fakeGenerator();
+        $user = User::factory()->create(['credits' => 1]);
+        $key = 'sk-ant-secret-value';
+
+        $this->actingAs($user)
+            ->withHeader('X-Anthropic-Key', $key)
+            ->postJson('/api/v1/shaders/generate', ['description' => 'aurora'])
+            ->assertOk();
+
+        // Storing other people's API keys is a liability worth far more than the convenience of
+        // not re-pasting one, so nothing anywhere may come to hold it.
+        foreach (['users', 'credit_transactions', 'shaders'] as $table) {
+            foreach (\DB::table($table)->get() as $row) {
+                $this->assertStringNotContainsString($key, json_encode($row));
+            }
+        }
+    }
+
+    public function test_an_empty_balance_still_works_with_your_own_key(): void
+    {
+        $this->fakeGenerator();
+        $user = User::factory()->create(['credits' => 0]);
+
+        // Running out of credits is not the end of the assistant - it is the point at which you
+        // either buy some or bring your own key.
+        $this->actingAs($user)
+            ->withHeader('X-Anthropic-Key', 'sk-ant-test-key')
+            ->postJson('/api/v1/shaders/generate', ['description' => 'aurora'])
+            ->assertOk();
+    }
+
+    public function test_the_server_key_is_used_when_the_caller_brings_none(): void
+    {
+        $fake = $this->fakeGenerator();
+        $user = User::factory()->create(['credits' => 2]);
+
+        $this->actingAs($user)->postJson('/api/v1/shaders/generate', ['description' => 'aurora'])->assertOk();
+
+        $this->assertNull($fake->sawKey);
+        $this->assertSame(1, $user->fresh()->credits);
+    }
+
+    public function test_an_operator_can_refuse_to_proxy_user_keys(): void
+    {
+        config(['services.anthropic.allow_user_keys' => false]);
+        $this->fakeGenerator();
+        $user = User::factory()->create(['credits' => 5]);
+
+        $this->actingAs($user)
+            ->withHeader('X-Anthropic-Key', 'sk-ant-test-key')
+            ->postJson('/api/v1/shaders/generate', ['description' => 'aurora'])
+            ->assertForbidden();
+
+        // Refused before anything is charged.
+        $this->assertSame(5, $user->fresh()->credits);
+    }
+
+    public function test_the_client_can_tell_which_kind_of_server_it_is_talking_to(): void
+    {
+        config(['services.anthropic.key' => null]);
+        $user = User::factory()->create();
+
+        // A self-hosted copy has no server key, so the UI has to ask for one rather than offer
+        // credits. It finds that out from here instead of being configured to know.
+        $this->actingAs($user)->getJson('/api/v1/credits')
+            ->assertOk()
+            ->assertJsonPath('server_key_available', false)
+            ->assertJsonPath('accepts_user_keys', true);
     }
 }

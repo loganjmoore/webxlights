@@ -7,7 +7,21 @@ use Illuminate\Http\Request;
 use RuntimeException;
 use Throwable;
 
-// The shader assistant: a sentence in, an ISF shader out, one credit spent.
+// The shader assistant: a sentence in, an ISF shader out.
+//
+// Who pays decides almost everything about this endpoint, and there are two answers:
+//
+//   - the caller brought their own Anthropic key. Their usage is billed to them by Anthropic,
+//     costs the operator nothing, and so costs no credits. This is the only mode a self-hosted
+//     copy has, and it is why the project can be open source without the maintainer funding
+//     everybody's generations.
+//   - the caller used the server's key. That is real money out of the operator's account, so it
+//     costs a credit.
+//
+// A user's key is never written down. It arrives on the request, is used for that one call, and
+// is gone - not stored in the database, not logged, not cached on the service. The browser holds
+// it and sends it each time. Storing other people's API keys is a liability worth a great deal
+// more than the convenience of not re-pasting one.
 //
 // The generated shader is NOT saved here. It goes back to the browser, which compiles it on the
 // real GPU and only then offers to publish it. That split is deliberate - this server has no
@@ -28,15 +42,23 @@ class ShaderGenerationController extends Controller
         ]);
 
         $user = $request->user();
+        // A header rather than a body field, so a key cannot end up in a request log that
+        // records payloads, or in a URL, or in a bug report someone pastes with their sequence.
+        $userKey = trim((string) $request->header('X-Anthropic-Key', ''));
+        $ownKey = $userKey !== '';
+
+        if ($ownKey && ! config('services.anthropic.allow_user_keys')) {
+            return response()->json(['message' => 'This server does not accept user-supplied API keys.'], 403);
+        }
 
         // Debited before the call, not after. The generation is the thing being paid for and it
         // costs real money the moment it is made, so a failure to bill has to stop the request
         // rather than be noticed afterwards. Refunded below if the call itself fails, which is
         // the case where the user got nothing.
         $meta = ['description' => mb_substr($data['description'], 0, 200)];
-        if (! $user->moveCredits(-self::COST, 'shader_generation', $meta)) {
+        if (! $ownKey && ! $user->moveCredits(-self::COST, 'shader_generation', $meta)) {
             return response()->json([
-                'message' => 'You are out of credits.',
+                'message' => 'You are out of credits. Add your own Anthropic API key in Settings to keep generating.',
                 'credits' => $user->credits,
                 'code' => 'insufficient_credits',
             ], 402);
@@ -47,14 +69,19 @@ class ShaderGenerationController extends Controller
                 $data['description'],
                 $data['previous_source'] ?? null,
                 $data['compile_error'] ?? null,
+                $ownKey ? $userKey : null,
             );
         } catch (RuntimeException $e) {
             // Not configured, or refused. The user gets their credit back and a straight answer.
-            $user->moveCredits(self::COST, 'refund', [...$meta, 'error' => $e->getMessage()]);
+            if (! $ownKey) {
+                $user->moveCredits(self::COST, 'refund', [...$meta, 'error' => $e->getMessage()]);
+            }
 
             return response()->json(['message' => $e->getMessage(), 'credits' => $user->credits], 503);
         } catch (Throwable $e) {
-            $user->moveCredits(self::COST, 'refund', [...$meta, 'error' => class_basename($e)]);
+            if (! $ownKey) {
+                $user->moveCredits(self::COST, 'refund', [...$meta, 'error' => class_basename($e)]);
+            }
             report($e);
 
             return response()->json([
@@ -66,6 +93,7 @@ class ShaderGenerationController extends Controller
         return response()->json([
             'source' => $result['source'],
             'credits' => $user->credits,
+            'charged' => ! $ownKey,
             'usage' => $result['usage'],
         ]);
     }
@@ -78,6 +106,12 @@ class ShaderGenerationController extends Controller
         return response()->json([
             'credits' => $user->credits,
             'cost_per_generation' => self::COST,
+            // What this server can do, so the UI can tell a self-hosted copy (no server key, so
+            // the user must bring one) from the hosted site (credits, with BYO key as the way
+            // to keep going for free) without being told which it is.
+            'server_key_available' => (bool) config('services.anthropic.key'),
+            'accepts_user_keys' => (bool) config('services.anthropic.allow_user_keys'),
+            'model' => app(ShaderGenerator::class)->model(),
             'transactions' => $user->creditTransactions()
                 ->latest()
                 ->limit(50)
