@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { api, ApiError, type CreditStatus, type ShaderRecord } from "../lib/api";
 import { checkDraft, defaultInputs, suggestName } from "../lib/shaderDraft";
-import { forgetKey, loadKey, looksLikeKey, maskKey, saveKey } from "../lib/anthropicKey";
+import { forgetKey, loadKey, loadProvider, looksLikeKey, maskKey, saveKey, saveProvider } from "../lib/anthropicKey";
 import type { IsfShader } from "@webxlights/formats";
 import ShaderPreview from "../components/ShaderPreview.vue";
 import TabNav from "../components/TabNav.vue";
@@ -38,6 +38,16 @@ const notice = ref<string | null>(null);
 const userKey = ref(loadKey());
 const keyInput = ref("");
 const showKeyPanel = ref(false);
+// Which provider that key belongs to. A Claude key sent to DeepSeek is not a smaller problem
+// than no key at all, so the two are chosen and stored together.
+const stored = loadProvider();
+const keyProvider = ref(stored.provider ?? "anthropic");
+const keyModel = ref(stored.model ?? "");
+
+/** The credentials for a request: nothing at all unless the user actually has a key. */
+const credentials = computed(() =>
+  userKey.value ? { key: userKey.value, provider: keyProvider.value, model: keyModel.value || null } : undefined,
+);
 
 // A self-hosted copy has no server key, so its users must bring one. Discovered from the API
 // rather than configured into the build, so the same bundle serves both.
@@ -87,14 +97,14 @@ async function generate(): Promise<void> {
 
   try {
     stage.value = "Writing the shader…";
-    let result = await api.generateShader({ description }, userKey.value);
+    let result = await api.generateShader({ description }, credentials.value);
     let check = checkDraft(result.source);
 
     if (!check.ok && check.stage !== "unavailable") {
       stage.value = "It did not compile - sending the error back…";
       result = await api.generateShader(
         { description, previous_source: result.source, compile_error: check.error },
-        userKey.value,
+        credentials.value,
       );
       check = checkDraft(result.source);
     }
@@ -163,9 +173,11 @@ function storeKey(): void {
   const value = keyInput.value.trim();
   if (value === "") return;
   saveKey(value);
+  saveProvider(keyProvider.value, keyModel.value);
   userKey.value = value;
   keyInput.value = "";
-  notice.value = "Key saved in this browser. Generations are billed to your own Anthropic account.";
+  const label = status.value?.providers.find((p) => p.name === keyProvider.value)?.label ?? keyProvider.value;
+  notice.value = `Key saved in this browser. Generations go to ${label} and are billed to your own account.`;
 }
 
 function dropKey(): void {
@@ -223,14 +235,16 @@ onMounted(async () => {
 
       <p v-if="status" class="meter">
         <template v-if="usingOwnKey">
-          Using your own API key — billed to your Anthropic account, no credits used.
+          Using your own key at
+          <strong>{{ status.providers.find((p) => p.name === keyProvider)?.label ?? keyProvider }}</strong>
+          — billed to your own account, no credits used.
         </template>
         <template v-else-if="mustBringKey">
           This server has no assistant key configured. Add your own to generate shaders.
         </template>
         <template v-else>
           <strong>{{ status.credits }}</strong> credit{{ status.credits === 1 ? "" : "s" }} left
-          ({{ status.cost_per_generation }} per shader).
+          ({{ status.cost_per_generation }} per shader, written by {{ status.model }}).
         </template>
         <button class="link" @click="showKeyPanel = !showKeyPanel">
           {{ userKey ? "Change key" : "Use your own key" }}
@@ -240,17 +254,24 @@ onMounted(async () => {
       <div v-if="showKeyPanel" class="keys">
         <p class="note">
           Your key stays in this browser. It is sent with the generation request and never stored
-          on the server — so it will not follow you to another device.
+          on the server — so it will not follow you to another device. Pick whichever provider you
+          already have an account with; generations are billed to you and use no credits.
         </p>
         <div v-if="userKey" class="current">
           <code>{{ maskKey(userKey) }}</code>
           <button class="link" @click="dropKey">Remove</button>
         </div>
         <div class="row">
-          <input v-model="keyInput" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
+          <select v-model="keyProvider">
+            <option v-for="p in status?.providers ?? []" :key="p.name" :value="p.name">{{ p.label }}</option>
+          </select>
+          <input v-model="keyInput" type="password" placeholder="API key" autocomplete="off" spellcheck="false" />
           <button :disabled="keyInput.trim() === ''" @click="storeKey">Save</button>
         </div>
-        <p v-if="keyInput.trim() !== '' && !looksLikeKey(keyInput)" class="warn">
+        <div class="row">
+          <input v-model="keyModel" placeholder="Model (optional — the provider's default is used)" spellcheck="false" />
+        </div>
+        <p v-if="keyProvider === 'anthropic' && keyInput.trim() !== '' && !looksLikeKey(keyInput)" class="warn">
           That does not look like an Anthropic key, but it will be sent as typed.
         </p>
       </div>

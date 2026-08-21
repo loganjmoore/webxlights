@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Shader\Providers;
 use App\Services\ShaderGenerator;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -42,12 +43,16 @@ class ShaderGenerationController extends Controller
         ]);
 
         $user = $request->user();
-        // A header rather than a body field, so a key cannot end up in a request log that
-        // records payloads, or in a URL, or in a bug report someone pastes with their sequence.
-        $userKey = trim((string) $request->header('X-Anthropic-Key', ''));
+        // Headers rather than body fields, so a key cannot end up in a request log that records
+        // payloads, or in a URL, or in a bug report someone pastes with their sequence.
+        $userKey = trim((string) $request->header('X-Shader-Key', ''));
         $ownKey = $userKey !== '';
+        // A caller paying with their own key chooses their own provider and model - it is their
+        // bill. Ignored entirely when they are spending the operator's credits.
+        $userProvider = $ownKey ? ($request->header('X-Shader-Provider') ?: null) : null;
+        $userModel = $ownKey ? ($request->header('X-Shader-Model') ?: null) : null;
 
-        if ($ownKey && ! config('services.anthropic.allow_user_keys')) {
+        if ($ownKey && ! config('services.shader.allow_user_keys')) {
             return response()->json(['message' => 'This server does not accept user-supplied API keys.'], 403);
         }
 
@@ -70,6 +75,8 @@ class ShaderGenerationController extends Controller
                 $data['previous_source'] ?? null,
                 $data['compile_error'] ?? null,
                 $ownKey ? $userKey : null,
+                $userProvider,
+                $userModel,
             );
         } catch (RuntimeException $e) {
             // Not configured, or refused. The user gets their credit back and a straight answer.
@@ -109,9 +116,13 @@ class ShaderGenerationController extends Controller
             // What this server can do, so the UI can tell a self-hosted copy (no server key, so
             // the user must bring one) from the hosted site (credits, with BYO key as the way
             // to keep going for free) without being told which it is.
-            'server_key_available' => (bool) config('services.anthropic.key'),
-            'accepts_user_keys' => (bool) config('services.anthropic.allow_user_keys'),
+            'server_key_available' => app(ShaderGenerator::class)->serverConfigured(),
+            'accepts_user_keys' => (bool) config('services.shader.allow_user_keys'),
+            'provider' => app(ShaderGenerator::class)->provider(),
             'model' => app(ShaderGenerator::class)->model(),
+            // So a user bringing their own key can pick who to send it to. Names and labels
+            // only - never an endpoint or anyone's key.
+            'providers' => Providers::options(),
             'transactions' => $user->creditTransactions()
                 ->latest()
                 ->limit(50)

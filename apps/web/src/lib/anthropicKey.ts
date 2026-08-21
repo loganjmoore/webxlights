@@ -1,4 +1,7 @@
-// The user's own Anthropic key, held in this browser and nowhere else.
+// The user's own API key, held in this browser and nowhere else.
+//
+// Which provider it belongs to is stored beside it, because the two only mean anything together -
+// a Claude key sent to DeepSeek is not a smaller problem than no key at all.
 //
 // It is deliberately not sent to our own API to be stored, and there is no endpoint that would
 // accept it if it were. It goes out on the one request that needs it, as a header, and the only
@@ -13,6 +16,8 @@
 // tab is closed would not be used, and a feature nobody uses protects nobody.
 
 const STORAGE_KEY = "webxlights.anthropicKey";
+const PROVIDER_KEY = "webxlights.shaderProvider";
+const MODEL_KEY = "webxlights.shaderModel";
 
 /**
  * The browser's storage, if there is one.
@@ -56,6 +61,39 @@ export function saveKey(key: string): void {
 
 export function forgetKey(): void {
   saveKey("");
+  saveProvider("", "");
+}
+
+/**
+ * Which provider the stored key belongs to, and optionally which model.
+ *
+ * Kept beside the key because they only mean anything together: a Claude key sent to DeepSeek is
+ * not a smaller problem than no key at all. Both are just names - the endpoint they resolve to
+ * lives on the server, so nothing here has to be updated when a provider moves its URL.
+ */
+export function loadProvider(): { provider: string | null; model: string | null } {
+  try {
+    const store = storage();
+    return {
+      provider: store?.getItem(PROVIDER_KEY)?.trim() || null,
+      model: store?.getItem(MODEL_KEY)?.trim() || null,
+    };
+  } catch {
+    return { provider: null, model: null };
+  }
+}
+
+export function saveProvider(provider: string, model: string): void {
+  try {
+    const store = storage();
+    if (!store) return;
+    if (provider.trim() === "") store.removeItem(PROVIDER_KEY);
+    else store.setItem(PROVIDER_KEY, provider.trim());
+    if (model.trim() === "") store.removeItem(MODEL_KEY);
+    else store.setItem(MODEL_KEY, model.trim());
+  } catch {
+    // Same as saveKey: refusing to store is not a reason to fail the request.
+  }
 }
 
 /**

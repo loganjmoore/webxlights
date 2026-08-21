@@ -19,17 +19,23 @@ class ShaderCreditsTest extends TestCase
         {
             public ?string $sawKey = null;
 
+            public ?string $sawProvider = null;
+
             public bool $called = false;
 
-            public function __construct(private string $answer)
-            {
-                parent::__construct();
-            }
+            public function __construct(private string $answer) {}
 
-            public function generate(string $description, ?string $previousSource = null, ?string $repairing = null, ?string $userKey = null): array
-            {
+            public function generate(
+                string $description,
+                ?string $previousSource = null,
+                ?string $repairing = null,
+                ?string $userKey = null,
+                ?string $providerName = null,
+                ?string $modelName = null,
+            ): array {
                 $this->called = true;
                 $this->sawKey = $userKey;
+                $this->sawProvider = $providerName;
 
                 return ['source' => $this->answer, 'usage' => []];
             }
@@ -94,14 +100,15 @@ class ShaderCreditsTest extends TestCase
     {
         $this->instance(ShaderGenerator::class, new class extends ShaderGenerator
         {
-            public function __construct()
-            {
-                parent::__construct();
-            }
-
-            public function generate(string $description, ?string $previousSource = null, ?string $repairing = null, ?string $userKey = null): array
-            {
-                throw new RuntimeException('The shader assistant is not configured on this server.');
+            public function generate(
+                string $description,
+                ?string $previousSource = null,
+                ?string $repairing = null,
+                ?string $userKey = null,
+                ?string $providerName = null,
+                ?string $modelName = null,
+            ): array {
+                throw new RuntimeException('No API key is configured for the shader assistant.');
             }
         });
 
@@ -161,7 +168,7 @@ class ShaderCreditsTest extends TestCase
         $user = User::factory()->create(['credits' => 2]);
 
         $response = $this->actingAs($user)
-            ->withHeader('X-Anthropic-Key', 'sk-ant-test-key')
+            ->withHeader('X-Shader-Key', 'sk-ant-test-key')
             ->postJson('/api/v1/shaders/generate', ['description' => 'aurora']);
 
         // Their usage is billed to them by Anthropic, so it costs the operator nothing and
@@ -180,7 +187,7 @@ class ShaderCreditsTest extends TestCase
         $key = 'sk-ant-secret-value';
 
         $this->actingAs($user)
-            ->withHeader('X-Anthropic-Key', $key)
+            ->withHeader('X-Shader-Key', $key)
             ->postJson('/api/v1/shaders/generate', ['description' => 'aurora'])
             ->assertOk();
 
@@ -201,7 +208,7 @@ class ShaderCreditsTest extends TestCase
         // Running out of credits is not the end of the assistant - it is the point at which you
         // either buy some or bring your own key.
         $this->actingAs($user)
-            ->withHeader('X-Anthropic-Key', 'sk-ant-test-key')
+            ->withHeader('X-Shader-Key', 'sk-ant-test-key')
             ->postJson('/api/v1/shaders/generate', ['description' => 'aurora'])
             ->assertOk();
     }
@@ -219,12 +226,12 @@ class ShaderCreditsTest extends TestCase
 
     public function test_an_operator_can_refuse_to_proxy_user_keys(): void
     {
-        config(['services.anthropic.allow_user_keys' => false]);
+        config(['services.shader.allow_user_keys' => false]);
         $this->fakeGenerator();
         $user = User::factory()->create(['credits' => 5]);
 
         $this->actingAs($user)
-            ->withHeader('X-Anthropic-Key', 'sk-ant-test-key')
+            ->withHeader('X-Shader-Key', 'sk-ant-test-key')
             ->postJson('/api/v1/shaders/generate', ['description' => 'aurora'])
             ->assertForbidden();
 
@@ -234,7 +241,7 @@ class ShaderCreditsTest extends TestCase
 
     public function test_the_client_can_tell_which_kind_of_server_it_is_talking_to(): void
     {
-        config(['services.anthropic.key' => null]);
+        config(['services.shader.key' => null]);
         $user = User::factory()->create();
 
         // A self-hosted copy has no server key, so the UI has to ask for one rather than offer

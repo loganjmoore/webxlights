@@ -1,20 +1,26 @@
 <?php
 
+use App\Services\Shader\Providers;
+
 return [
 
     // The shader assistant. Absent in local development and in CI, which is why every path that
     // needs it checks rather than assuming - a server without a key answers 503 and refunds,
     // instead of throwing.
-    'anthropic' => [
-        'key' => env('ANTHROPIC_API_KEY'),
-        // Haiku is the default because generating a shader is a small, well-specified job and
-        // the bill is dominated by output tokens. A frontier model costs roughly an order of
-        // magnitude more per shader for a result the compile-and-repair loop mostly equalises,
-        // and the operator of a public instance is paying for every one.
-        'model' => env('SHADER_MODEL', 'claude-haiku-4-5'),
-        // Whether a user may send their own key with a request. On for the hosted site, where it
-        // is how someone keeps generating past their credits at their own expense; an operator
-        // who would rather not proxy other people's keys can turn it off.
+    // The shader assistant. Provider-agnostic on purpose: whoever runs a copy of this has
+    // whatever account they already have, not the one the maintainer chose. See
+    // app/Services/Shader/Providers.php for the names, docs/SHADER-ASSISTANT-COST.md for costs.
+    'shader' => [
+        'provider' => env('SHADER_PROVIDER', 'anthropic'),
+        // One key for whichever provider is selected. SHADER_API_KEY is the name to use;
+        // ANTHROPIC_API_KEY is read as well so an existing deployment keeps working.
+        'key' => env('SHADER_API_KEY', env('ANTHROPIC_API_KEY')),
+        // Empty means "use the provider preset's default", so setting a key is enough to start.
+        'model' => env('SHADER_MODEL'),
+        'base_url' => env('SHADER_BASE_URL', Providers::get(env('SHADER_PROVIDER', 'anthropic'))['base_url']),
+        // A model running on the operator's own machine needs no key. Without this, the
+        // zero-cost option would be unreachable because the key check would reject it.
+        'local' => (bool) env('SHADER_LOCAL', false),
         'allow_user_keys' => (bool) env('SHADER_ALLOW_USER_KEYS', true),
     ],
 

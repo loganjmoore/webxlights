@@ -142,7 +142,10 @@ export interface CreditStatus {
   /** False on a self-hosted copy: the user must bring their own key. */
   server_key_available: boolean;
   accepts_user_keys: boolean;
+  provider: string;
   model: string;
+  /** Names and labels only - never an endpoint or anyone's key. */
+  providers: Array<{ name: string; label: string }>;
   transactions: Array<{ amount: number; reason: string; balance_after: number; created_at: string }>;
 }
 
@@ -151,7 +154,7 @@ export interface GeneratedShader {
   credits: number;
   /** False when the caller's own key paid for it, so the UI can say so. */
   charged: boolean;
-  usage: { model?: string; input_tokens?: number | null; output_tokens?: number | null };
+  usage: { provider?: string; model?: string; input_tokens?: number | null; output_tokens?: number | null };
 }
 
 export interface ModelGroupRecord {
@@ -428,13 +431,22 @@ export const api = {
    */
   generateShader: (
     body: { description: string; previous_source?: string; compile_error?: string },
-    userKey?: string | null,
-  ) =>
-    request<GeneratedShader>("/v1/shaders/generate", {
+    credentials?: { key?: string | null; provider?: string | null; model?: string | null },
+  ) => {
+    const headers: Record<string, string> = {};
+    // The provider and model only travel with a key. Without one the server is spending its own
+    // money, and a header must not be able to redirect that somewhere the operator did not pick.
+    if (credentials?.key) {
+      headers["X-Shader-Key"] = credentials.key;
+      if (credentials.provider) headers["X-Shader-Provider"] = credentials.provider;
+      if (credentials.model) headers["X-Shader-Model"] = credentials.model;
+    }
+    return request<GeneratedShader>("/v1/shaders/generate", {
       method: "POST",
       body: JSON.stringify(body),
-      headers: userKey ? { "X-Anthropic-Key": userKey } : {},
-    }),
+      headers,
+    });
+  },
 
   listModelGroups: (layoutId: number) => request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups`),
   bulkUpsertModelGroups: (layoutId: number, groups: GroupUpsertPayload[]) =>

@@ -45,11 +45,16 @@ services:
       # The shader assistant. Set manually in the dashboard rather than here, because it is a
       # secret - and left unset the app still runs: generation answers 503 and refunds the
       # credit, while every other part of the shader library works.
-      - key: ANTHROPIC_API_KEY
+      # The shader assistant. Set manually in the dashboard rather than here, because it is a
+      # secret - and left unset the app still runs: generation answers 503 and refunds the
+      # credit, while every other part of the shader library works.
+      - key: SHADER_API_KEY
         sync: false
-      # Which model writes the shaders. Haiku by default: the bill is dominated by output
-      # tokens, and a frontier model costs roughly an order of magnitude more per shader for a
-      # result the compile-and-repair loop mostly equalises. See docs/SHADER-ASSISTANT-COST.md.
+      # Which provider writes the shaders, and with which model. Anthropic/Haiku by default;
+      # every other supported provider speaks one shared wire format, so switching is these two
+      # lines and a key. See docs/SHADER-ASSISTANT-COST.md for what each one costs.
+      - key: SHADER_PROVIDER
+        value: anthropic
       - key: SHADER_MODEL
         value: claude-haiku-4-5
       # R2 + SANCTUM_STATEFUL_DOMAINS are set manually in the Render dashboard
