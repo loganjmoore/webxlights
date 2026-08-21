@@ -47,6 +47,11 @@ services:
       # credit, while every other part of the shader library works.
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Which model writes the shaders. Haiku by default: the bill is dominated by output
+      # tokens, and a frontier model costs roughly an order of magnitude more per shader for a
+      # result the compile-and-repair loop mostly equalises. See docs/SHADER-ASSISTANT-COST.md.
+      - key: SHADER_MODEL
+        value: claude-haiku-4-5
       # R2 + SANCTUM_STATEFUL_DOMAINS are set manually in the Render dashboard
       # (bucket/domain don't exist until M0's provisioning step is approved).
 
