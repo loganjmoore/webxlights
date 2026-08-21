@@ -41,6 +41,16 @@ class AnthropicDriver implements GeneratorDriver
         if (! $resolved) {
             throw new RuntimeException('No API key is configured for the shader assistant.');
         }
+        // The most common misconfiguration seen in the wild: an OpenAI key (sk-proj-...) with
+        // SHADER_PROVIDER still set to anthropic. Anthropic's API answers 401 and the user sees
+        // a vague "could not be reached"; naming the actual problem turns a support thread into
+        // a settings change. Only the unambiguous prefix is checked - Anthropic's own keys are
+        // sk-ant-, and anything else is sent as given.
+        if (str_starts_with($resolved, 'sk-proj-')) {
+            throw new RuntimeException(
+                'The configured key looks like an OpenAI key, but the provider is Anthropic. Set SHADER_PROVIDER=openai (and SHADER_MODEL, e.g. gpt-5-mini) to match the key.',
+            );
+        }
         // Not cached on the instance: a per-request key must not leak into the next request's
         // client, which in a long-lived worker would mean billing the wrong person.
         $client = $this->client ?? new Client(apiKey: $resolved);
