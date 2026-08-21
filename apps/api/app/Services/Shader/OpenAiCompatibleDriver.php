@@ -27,9 +27,9 @@ class OpenAiCompatibleDriver implements GeneratorDriver
         return (bool) ($key ?: config('services.shader.key') ?: config('services.shader.local'));
     }
 
-    public function complete(string $system, string $user, string $model, ?string $key): array
+    public function complete(string $system, string $user, string $model, ?string $key, ?string $baseUrl = null): array
     {
-        $base = rtrim((string) config('services.shader.base_url'), '/');
+        $base = rtrim((string) ($baseUrl ?: config('services.shader.base_url')), '/');
         if ($base === '') {
             throw new RuntimeException('No API endpoint is configured for the shader assistant.');
         }
