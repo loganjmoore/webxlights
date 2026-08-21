@@ -33,6 +33,7 @@ import type { EffectParamValue, SequenceEffect } from "../lib/api";
 import ColorCurveEditor from "./ColorCurveEditor.vue";
 import PixelEditor from "./PixelEditor.vue";
 import { decodeImageForEffect } from "../lib/pictureImport";
+import ShaderPicker from "./ShaderPicker.vue";
 import SketchEditor from "./SketchEditor.vue";
 import ValueCurveEditor from "./ValueCurveEditor.vue";
 
@@ -87,6 +88,31 @@ async function pickImage(key: string, e: Event): Promise<void> {
   } catch {
     // A file picker is where the wrong file gets chosen; a throw here reaches the error overlay.
   }
+}
+
+// A Shader effect carries its shader's source and input values in its own params, so the
+// sequence renders without the library being reachable - see ShaderPicker for why.
+const shaderInputs = computed(() => {
+  const raw = props.effect?.params.inputs;
+  return raw && typeof raw === "object" && !Array.isArray(raw)
+    ? (raw as unknown as Record<string, number | boolean | number[]>)
+    : {};
+});
+
+function onPickShader(payload: {
+  source: string;
+  inputs: Record<string, number | boolean | number[]>;
+  shaderId: number;
+}): void {
+  if (!props.effect) return;
+  // All three in one update: source and inputs have to change together, or a frame renders the
+  // new shader with the previous shader's uniforms.
+  emit("update", {
+    ...props.effect.params,
+    source: payload.source,
+    inputs: payload.inputs as unknown as EffectParamValue,
+    shaderId: payload.shaderId,
+  });
 }
 
 function setParam(key: string, value: EffectParamValue): void {
@@ -640,6 +666,19 @@ function curveable(p: EffectParamSpec): boolean {
           </span>
         </label>
         <button v-if="subBufferTrimmed" class="reset-sub" @click="resetSubBuffer">Full buffer</button>
+      </CollapsibleSection>
+
+      <!-- A Shader effect's real controls come from the shader, not from the schema: its
+           parameters are whatever its author declared in the ISF header. The two schema params
+           below (speed, transparency) are ours and apply to every shader. -->
+      <CollapsibleSection v-if="effect.name === 'Shader'" title="Shader">
+        <ShaderPicker
+          :source="typeof effect.params.source === 'string' ? effect.params.source : undefined"
+          :inputs="shaderInputs"
+          :shader-id="typeof effect.params.shaderId === 'number' ? effect.params.shaderId : null"
+          @pick="onPickShader"
+          @set-inputs="(inputs) => setParam('inputs', inputs as unknown as EffectParamValue)"
+        />
       </CollapsibleSection>
 
       <div v-for="p in schema.params" :key="p.key" class="param">
