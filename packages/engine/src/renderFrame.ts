@@ -2,7 +2,7 @@ import type { RGBA } from "./color";
 import { rgba } from "./color";
 import { RenderBuffer } from "./renderBuffer";
 import type { ModelGeometry } from "./models/types";
-import { renderLayerStackToNodes, type NodeLayerSpec } from "./layerStack";
+import { createLayerScratch, renderLayerStackToNodes, type NodeLayerSpec } from "./layerStack";
 
 import type { BlendMode } from "./blend";
 import { audioFrameAt, type AudioSeries } from "./audio";
@@ -353,42 +353,53 @@ function renderStateful(
   const duration = effect.endMs - effect.startMs || 1;
   const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
 
+  // The replay exists to evolve the effect's state, not to paint history. Earlier frames
+  // therefore draw into a throwaway scratch and only the final frame draws into the real
+  // buffer - unless the layer is Persistent, in which case accumulating every frame IS the
+  // documented behaviour ("does not clear the display buffer before rendering each frame").
+  // Before this split, every stateful effect accumulated as if it were persistent, which is
+  // also why the preview disagreed with the export sequencer (which draws one frame per call):
+  // ghost pixels from replayed frames survived wherever the current frame didn't overwrite.
+  const persistent = effect.layer?.persistent === true;
+  const scratch = persistent || framesElapsed === 0 ? null : new RenderBuffer(buffer.width, buffer.height);
+  const target = (f: number): RenderBuffer => (persistent || f === framesElapsed ? buffer : scratch!);
+
   if (effect.name === "Fire") {
     const state = createFireState(buffer.width, buffer.height, seed);
     for (let f = 0; f <= framesElapsed; f++) {
       const position01 = Math.min(1, (f * frameMs) / duration);
       const params = paramsAt(effect, position01) as unknown as FireParams;
-      renderFire(buffer, params, { frameIndexInEffect: f, positionInEffect01: position01, seed }, state);
+      renderFire(target(f), params, { frameIndexInEffect: f, positionInEffect01: position01, seed }, state);
     }
   } else if (effect.name === "Meteors") {
     const state = createMeteorsState(seed);
     for (let f = 0; f <= framesElapsed; f++) {
       const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as MeteorsParams;
-      renderMeteors(buffer, palette, params, state);
+      renderMeteors(target(f), palette, params, state);
     }
   } else if (effect.name === "Snowflakes") {
     const state = createSnowflakesState(buffer.width, buffer.height, 5, seed);
     for (let f = 0; f <= framesElapsed; f++) {
       const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as SnowflakesParams;
-      renderSnowflakes(buffer, palette, params, state);
+      renderSnowflakes(target(f), palette, params, state);
     }
   } else if (effect.name === "Strobe") {
     const state = createStrobeState(seed);
     for (let f = 0; f <= framesElapsed; f++) {
       const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as StrobeParams;
-      renderStrobe(buffer, palette, params, state);
+      renderStrobe(target(f), palette, params, state);
     }
   } else if (effect.name === "Snow Storm") {
     const state = createSnowStormState(buffer.width, buffer.height, paramsAt(effect, 0) as unknown as SnowStormParams, seed);
     for (let f = 0; f <= framesElapsed; f++) {
       const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as SnowStormParams;
-      renderSnowStorm(buffer, palette, params, state);
+      renderSnowStorm(target(f), palette, params, state);
     }
   } else if (effect.name === "Life") {
     const state = createLifeState(buffer.width, buffer.height, paramsAt(effect, 0) as unknown as LifeParams, seed);
     for (let f = 0; f <= framesElapsed; f++) {
       const params = paramsAt(effect, Math.min(1, (f * frameMs) / duration)) as unknown as LifeParams;
-      renderLife(buffer, palette, params, state);
+      renderLife(target(f), palette, params, state);
     }
   } else if (effect.name === "Tendrils") {
     const state = createTendrilsState(buffer.width, buffer.height, paramsAt(effect, 0) as unknown as TendrilsParams, seed);
@@ -398,7 +409,7 @@ function renderStateful(
       // The music movements read the same offline analysis every other audio-reactive effect
       // does, at the frame being replayed rather than at the playhead - otherwise the whole
       // replayed history would be driven by one instant of the song.
-      renderTendrils(buffer, palette, params, state, audio ? audioFrameAt(audio, at) : undefined);
+      renderTendrils(target(f), palette, params, state, audio ? audioFrameAt(audio, at) : undefined);
     }
   }
 }
@@ -556,6 +567,75 @@ export interface RowSequencer {
   renderFrameAt(atMs: number): RGBA[];
 }
 
+export interface RowPlayer {
+  renderAt(atMs: number): RGBA[];
+}
+
+/**
+ * The live-playback wrapper over createRowSequencer.
+ *
+ * A preview that calls renderRowAtMs every frame pays O(elapsed) per frame for every stateful
+ * effect - renderStateful replays Fire or Meteors from the effect's start on each call, so a
+ * playhead deep into a long effect made every frame cost as much as an export of everything
+ * before it. This holds a sequencer and steps it instead:
+ *
+ *   - time is quantised to the frame grid, so the output matches the export's frames exactly
+ *     (the invariant this codebase guards hardest - screen and yard rendering the same show),
+ *     and the many repaint calls that land inside one frame return the same frame once;
+ *   - ordinary playback advances the sequencer one frame at a time - O(1) per frame;
+ *   - a seek (backwards, or a jump too big to be playback) rebuilds the sequencer and warms it
+ *     up from the start of the earliest active stateful or persistent effect. That warm-up
+ *     costs what a single renderRowAtMs call used to cost at that playhead - once, instead of
+ *     on every frame after it.
+ *
+ * Each call returns a fresh copy, because callers of renderRowAtMs are entitled to mutate what
+ * they get back (composeModel writes strand and sub-model colours into it) and the player's
+ * cached frame must not be what they scribble on.
+ */
+export function createRowPlayer(
+  row: RenderableRow,
+  frameMs: number,
+  seed: number,
+  palette: RGBA[],
+  audio?: AudioSeries,
+): RowPlayer {
+  // Beyond this a forward jump is a seek, not playback: stepping through it frame by frame
+  // would cost more than a rebuild-plus-warm-up bounded by the active effects' own length.
+  const MAX_STEP_FRAMES = 120;
+  let sequencer: RowSequencer | null = null;
+  let lastFrame = -1;
+  let lastColors: RGBA[] | null = null;
+
+  function warmStartFrame(targetFrame: number): number {
+    const atMs = targetFrame * frameMs;
+    let start = atMs;
+    for (const effect of row.effects) {
+      if (atMs >= effect.startMs && atMs < effect.endMs && (STATEFUL_EFFECTS.has(effect.name) || effect.layer?.persistent)) {
+        start = Math.min(start, effect.startMs);
+      }
+    }
+    return Math.max(0, Math.floor(start / frameMs));
+  }
+
+  return {
+    renderAt(atMs: number): RGBA[] {
+      const frame = Math.max(0, Math.floor(atMs / frameMs));
+      if (frame !== lastFrame || !lastColors) {
+        let from: number;
+        if (sequencer && frame > lastFrame && frame - lastFrame <= MAX_STEP_FRAMES) {
+          from = lastFrame + 1;
+        } else {
+          sequencer = createRowSequencer(row, frameMs, seed, palette, audio);
+          from = warmStartFrame(frame);
+        }
+        for (let f = from; f <= frame; f++) lastColors = sequencer.renderFrameAt(f * frameMs);
+        lastFrame = frame;
+      }
+      return lastColors!.map((c) => ({ r: c.r, g: c.g, b: c.b, a: c.a }));
+    },
+  };
+}
+
 // Sequential-sweep variant of renderRowAtMs for full exports (fseq render etc). renderRowAtMs
 // is correct for random-access scrubbing (a live preview seeking the playhead) but replays
 // every stateful effect (Fire/Meteors/Snowflakes/Strobe) from its start on every call - fine
@@ -578,6 +658,9 @@ export function createRowSequencer(
   // for a persistent layer's kept buffer - two different things that both live for as long as
   // the sequencer does and are both scoped to one layer.
   const statefulStates = new Map<number | string, unknown>();
+  // Compositor scratch, reused across every frame of the sweep - the sequencer renders
+  // thousands of frames, which is exactly the caller the scratch exists for.
+  const scratch = createLayerScratch();
 
   function renderFrameAt(atMs: number): RGBA[] {
     const activeWithIndex = row.effects
@@ -615,9 +698,7 @@ export function createRowSequencer(
                   statefulStates.set(key, kept);
                 }
                 renderStateless(kept, colors, effect, shownAt, seed, audio, { nodes: geometry.nodes, frameMs });
-                for (let y = 0; y < paint.height; y++) {
-                  for (let x = 0; x < paint.width; x++) paint.setPixel(x, y, kept.getPixel(x, y));
-                }
+                paint.copyFrom(kept);
               } else {
                 renderStateless(paint, colors, effect, shownAt, seed, audio, { nodes: geometry.nodes, frameMs });
               }
@@ -634,14 +715,14 @@ export function createRowSequencer(
       };
     });
 
-    return renderLayerStackToNodes(row.geometry.nodes.length, layers);
+    return renderLayerStackToNodes(row.geometry.nodes.length, layers, scratch);
   }
 
   return { renderFrameAt };
 }
 
 function renderStatefulIncremental(
-  buffer: RenderBuffer,
+  scratchBuffer: RenderBuffer,
   rowPalette: RGBA[],
   effect: RenderableEffect,
   atMs: number,
@@ -656,6 +737,22 @@ function renderStatefulIncremental(
   const framesElapsed = Math.max(0, Math.floor((atMs - effect.startMs) / frameMs));
   const position01 = Math.min(1, (framesElapsed * frameMs) / duration);
   const params = paramsAt(effect, position01);
+
+  // A Persistent stateful layer accumulates its frames, exactly as the scrubbing path's replay
+  // does for it: the per-frame scratch this function is handed is cleared between frames, so
+  // persistence needs its own kept buffer, drawn into every frame and copied out. Without this
+  // the export dropped persistence from any layer that was also stateful.
+  let buffer = scratchBuffer;
+  const persistent = effect.layer?.persistent === true;
+  if (persistent) {
+    const persistKey = `persistbuf:${key}`;
+    let kept = states.get(persistKey) as RenderBuffer | undefined;
+    if (!kept || kept.width !== scratchBuffer.width || kept.height !== scratchBuffer.height) {
+      kept = new RenderBuffer(scratchBuffer.width, scratchBuffer.height);
+      states.set(persistKey, kept);
+    }
+    buffer = kept;
+  }
 
   if (effect.name === "Fire") {
     let state = states.get(key) as ReturnType<typeof createFireState> | undefined;
@@ -710,4 +807,6 @@ function renderStatefulIncremental(
     }
     renderTendrils(buffer, palette, tendrilParams, state, audio ? audioFrameAt(audio, atMs) : undefined);
   }
+
+  if (persistent) scratchBuffer.copyFrom(buffer);
 }

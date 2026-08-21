@@ -9,11 +9,13 @@ import {
   nodeWorldOffset,
   planGroupRendering,
   scatterGroupColors,
-  renderRowAtMs,
+  createRowPlayer,
   transformedHalfExtents,
   type AudioSeries,
   type ModelGeometry,
+  type RenderableEffect,
   type RGBA,
+  type RowPlayer,
 } from "@webxlights/engine";
 import type { ModelGroupRecord, ModelRecord, SequenceBody } from "../lib/api";
 import { groupRenderSpecs } from "../lib/groupRendering";
@@ -128,6 +130,31 @@ interface ComposeInputs {
 let composeInputs: ComposeInputs[] = [];
 let groupJobs: ReturnType<typeof planGroupRendering> = [];
 
+// One RowPlayer per rendered row, keyed by the row's effects-array identity - the arrays are
+// memoised in composeInputs/groupJobs, so a key lives exactly as long as its row's inputs do
+// and every rebuild of those inputs retires the players with them.
+//
+// The player is the engine's answer to what made playback drag: renderRowAtMs replays every
+// stateful effect (Fire, Meteors, Snowflakes...) from the effect's start on each call, so a
+// playhead ten seconds into a long effect made *every frame* cost ten seconds of replay. The
+// player steps a sequencer instead - O(1) per frame during playback - and quantises to the
+// frame grid, which also makes the many repaints inside one 50ms frame free instead of full
+// re-renders.
+let players = new WeakMap<RenderableEffect[], RowPlayer>();
+
+function resetPlayers(): void {
+  players = new WeakMap();
+}
+
+function playerFor(geometry: ModelGeometry, effects: RenderableEffect[]): RowPlayer {
+  let player = players.get(effects);
+  if (!player) {
+    player = createRowPlayer({ geometry, effects }, props.frameMs, SEED, DEFAULT_PALETTE, props.audio);
+    players.set(effects, player);
+  }
+  return player;
+}
+
 function rebuildComposeCache(): void {
   // key -> effects, so a row lookup is a hash hit instead of a full-body scan.
   const byKey = new Map<string, SequenceBody["rows"][number]["effects"]>();
@@ -172,7 +199,7 @@ function updateColors(): void {
   // the point of a group render style - one buffer spanning several props.
   const groupBase = new Map<number, RGBA[]>();
   for (const job of groupJobs) {
-    const colors = renderRowAtMs(job.row, props.playheadMs, props.frameMs, SEED, DEFAULT_PALETTE, props.audio);
+    const colors = playerFor(job.row.geometry, job.row.effects).renderAt(props.playheadMs);
     scatterGroupColors(job, colors, groupBase);
   }
 
@@ -191,8 +218,7 @@ function updateColors(): void {
       subModels: inputs.subModels,
       groupBase: groupBase.get(entry.model.id),
       blendGroup: props.blendBetweenModels === true,
-      render: ((geometry, effects) =>
-        renderRowAtMs({ geometry, effects }, props.playheadMs, props.frameMs, SEED, DEFAULT_PALETTE, props.audio)) as RenderRow,
+      render: ((geometry, effects) => playerFor(geometry, effects).renderAt(props.playheadMs)) as RenderRow,
     });
 
     nodeColors.forEach((c, i) => {
@@ -332,8 +358,15 @@ watch(
 // `audio` arrives after the track is analysed, which is a repaint even at a stationary
 // playhead - without it a VU Meter sits dark until the next scrub. Watched by identity, not
 // deeply: the series is thousands of frames, and traversing it on every playhead tick would
-// cost more than the render it triggers.
-watch(() => props.audio, updateColors);
+// cost more than the render it triggers. The players captured the old (absent) audio when they
+// were built, so they retire with it.
+watch(
+  () => [props.audio, props.frameMs],
+  () => {
+    resetPlayers();
+    updateColors();
+  },
+);
 watch(
   () => props.models,
   () => {
