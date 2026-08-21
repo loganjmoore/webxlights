@@ -5,7 +5,7 @@
 // sequencer had no way back to the layout at all without going through the project list - so
 // moving between them meant navigating by browser history. They are one workflow, not three
 // destinations.
-defineProps<{ projectId: number | string; active: "layout" | "sequences" | "controllers" }>();
+defineProps<{ projectId: number | string; active: "layout" | "sequences" | "controllers" | "shaders" }>();
 </script>
 
 <template>
@@ -13,6 +13,7 @@ defineProps<{ projectId: number | string; active: "layout" | "sequences" | "cont
     <router-link :to="`/projects/${projectId}/layout`" :class="{ active: active === 'layout' }">Layout</router-link>
     <router-link :to="`/projects/${projectId}/sequences`" :class="{ active: active === 'sequences' }">Sequencer</router-link>
     <router-link :to="`/projects/${projectId}/controllers`" :class="{ active: active === 'controllers' }">Network</router-link>
+    <router-link :to="`/projects/${projectId}/shaders`" :class="{ active: active === 'shaders' }">Shaders</router-link>
   </nav>
 </template>
 

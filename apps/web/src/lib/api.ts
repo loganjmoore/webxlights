@@ -2,6 +2,7 @@ import type { EffectPreset } from "./effectPresets";
 import type { BackgroundImage } from "./backgroundImage";
 import type { SongBoundary } from "./songRegions";
 import type { BlendMode, ColorAdjust, FaceSpec, LayerSettings, PictureImage, StateSpec, StoredSwatch, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
+import type { IsfInput } from "@webxlights/formats";
 
 export class ApiError extends Error {
   status: number;
@@ -109,6 +110,48 @@ export interface ControllerUpsertPayload {
 export interface SequencerView {
   name: string;
   rowKeys: string[];
+}
+
+/** A shader in the library. `source` is GLSL; `inputs` the parsed ISF INPUTS. */
+export interface ShaderRecord {
+  id: number;
+  user_id: number | null;
+  name: string;
+  description: string | null;
+  source: string;
+  inputs: IsfInput[];
+  categories: string[];
+  is_public: boolean;
+  prompt: string | null;
+  ai_generated: boolean;
+  use_count: number;
+  created_at: string;
+  author?: { id: number; name: string } | null;
+}
+
+export interface ShaderPage {
+  data: ShaderRecord[];
+  current_page: number;
+  last_page: number;
+  total: number;
+}
+
+export interface CreditStatus {
+  credits: number;
+  cost_per_generation: number;
+  /** False on a self-hosted copy: the user must bring their own key. */
+  server_key_available: boolean;
+  accepts_user_keys: boolean;
+  model: string;
+  transactions: Array<{ amount: number; reason: string; balance_after: number; created_at: string }>;
+}
+
+export interface GeneratedShader {
+  source: string;
+  credits: number;
+  /** False when the caller's own key paid for it, so the UI can say so. */
+  charged: boolean;
+  usage: { model?: string; input_tokens?: number | null; output_tokens?: number | null };
 }
 
 export interface ModelGroupRecord {
@@ -345,6 +388,54 @@ export const api = {
   updateController: (controllerId: number, patch: Partial<ControllerUpsertPayload>) =>
     request<ControllerRecord>(`/v1/controllers/${controllerId}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteController: (controllerId: number) => request<void>(`/v1/controllers/${controllerId}`, { method: "DELETE" }),
+  // ---- Shader library -------------------------------------------------------------------
+  // Not scoped to a layout or a project: a shader is content one person makes and everyone can
+  // use, so it hangs off its author rather than off a show.
+  listShaders: (params: { q?: string; mine?: boolean; sort?: "recent" | "popular"; page?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.q) query.set("q", params.q);
+    if (params.mine) query.set("mine", "1");
+    if (params.sort) query.set("sort", params.sort);
+    if (params.page) query.set("page", String(params.page));
+    const suffix = query.toString();
+    return request<ShaderPage>(`/v1/shaders${suffix ? `?${suffix}` : ""}`);
+  },
+  getShader: (id: number) => request<ShaderRecord>(`/v1/shaders/${id}`),
+  createShader: (body: {
+    name: string;
+    description?: string | null;
+    source: string;
+    inputs?: IsfInput[];
+    categories?: string[];
+    is_public?: boolean;
+    prompt?: string | null;
+    ai_generated?: boolean;
+  }) => request<ShaderRecord>("/v1/shaders", { method: "POST", body: JSON.stringify(body) }),
+  updateShader: (id: number, patch: Partial<{ name: string; description: string | null; source: string; is_public: boolean }>) =>
+    request<ShaderRecord>(`/v1/shaders/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  deleteShader: (id: number) => request<void>(`/v1/shaders/${id}`, { method: "DELETE" }),
+  /** Records that a shader was put in a sequence - what "popular" ranks. */
+  markShaderUsed: (id: number) => request<{ use_count: number }>(`/v1/shaders/${id}/used`, { method: "POST" }),
+
+  creditStatus: () => request<CreditStatus>("/v1/credits"),
+
+  /**
+   * Asks the assistant for a shader.
+   *
+   * `userKey` travels in a header and is never stored anywhere - not by us, not by the API. It
+   * is the caller's own Anthropic key, and sending it means the generation is billed to them and
+   * costs no credits (lib/anthropicKey.ts).
+   */
+  generateShader: (
+    body: { description: string; previous_source?: string; compile_error?: string },
+    userKey?: string | null,
+  ) =>
+    request<GeneratedShader>("/v1/shaders/generate", {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: userKey ? { "X-Anthropic-Key": userKey } : {},
+    }),
+
   listModelGroups: (layoutId: number) => request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups`),
   bulkUpsertModelGroups: (layoutId: number, groups: GroupUpsertPayload[]) =>
     request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups/bulk`, { method: "POST", body: JSON.stringify({ groups }) }),
