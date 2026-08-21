@@ -6,6 +6,7 @@ import { createRowSequencer, renderRowAtMs, type RenderableEffect } from "../src
 import { CANVAS_ONLY_EFFECTS, EFFECT_SCHEMAS, defaultParamsFor } from "../src/effects/schema";
 import type { AudioSeries } from "../src/audio";
 import type { ValueCurve } from "../src/valueCurve";
+import { clearShaderCache, setShaderHost } from "../src/shaderRuntime";
 
 const RED = rgba(255, 0, 0, 255);
 const BLUE = rgba(0, 0, 255, 255);
@@ -122,7 +123,12 @@ describe("Effect registry", () => {
     // a definition on the *model*, so with nothing but their own defaults there is nothing to
     // light. Both get their own assertions below, with the definitions and labels that drive
     // them, rather than being exempted outright.
-    const needsContent = new Set(["Pictures", "State", "Faces", ...CANVAS_ONLY_EFFECTS]);
+    //
+    // Shader is excluded because it needs a GPU, which Node has not got. That is not a get-out:
+    // the whole point of this guard is to catch a schema whose name doesn't reach the
+    // renderFrame switch, so Shader gets that same assertion in the test below, with a stand-in
+    // host installed in place of the hardware.
+    const needsContent = new Set(["Pictures", "State", "Faces", "Shader", ...CANVAS_ONLY_EFFECTS]);
     const series: AudioSeries = { frameMs: 50, bandCount: 2, frames: [{ level: 1, bands: [1, 1] }] };
 
     for (const name of Object.keys(EFFECT_SCHEMAS)) {
@@ -130,6 +136,40 @@ describe("Effect registry", () => {
       const effect: RenderableEffect = { name, startMs: 0, endMs: 1000, params: defaultParamsFor(name) };
       const colors = renderRowAtMs({ geometry: matrix, effects: [effect] }, 400, 50, 42, PALETTE, series);
       expect(colors.some((c) => c.a > 0), `"${name}" rendered an empty frame with default params`).toBe(true);
+    }
+  });
+
+  it("Shader reaches the pipeline when a host can run it", () => {
+    // The half of the guard above that Node can't do with real hardware. A shader host is
+    // installed just for this, so what is being asserted is the wiring - schema name to
+    // renderFrame switch to effect - rather than anything about GLSL.
+    setShaderHost({
+      compile: () => ({
+        shader: {
+          render: (r) => {
+            const px = new Uint8ClampedArray(r.width * r.height * 4);
+            for (let i = 0; i < r.width * r.height; i++) {
+              px[i * 4] = 255;
+              px[i * 4 + 3] = 255;
+            }
+            return px;
+          },
+          dispose() {},
+        },
+      }),
+    });
+    try {
+      const effect: RenderableEffect = {
+        name: "Shader",
+        startMs: 0,
+        endMs: 1000,
+        params: { ...defaultParamsFor("Shader"), source: "void main(){}" },
+      };
+      const colors = renderRowAtMs({ geometry: matrix, effects: [effect] }, 400, 50, 42, PALETTE);
+      expect(colors.some((c) => c.a > 0)).toBe(true);
+    } finally {
+      setShaderHost(null);
+      clearShaderCache();
     }
   });
 

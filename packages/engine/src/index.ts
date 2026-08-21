@@ -88,3 +88,5 @@ export * from "./renderFrame";
 export * from "./valueCurve";
 export * from "./transition";
 export * from "./colorAdjust";
+export * from "./shaderRuntime";
+export * from "./effects/shader";

@@ -653,6 +653,18 @@ export const FACES_EFFECT_SCHEMA: EffectSchema = {
   ],
 };
 
+// The Shader effect's own controls. The shader's *own* inputs aren't here and can't be: they
+// come from the ISF header of whichever shader the user picked, so the props panel builds those
+// controls from the shader (isf.ts) rather than from a fixed table. These three are ours, and
+// apply to every shader whatever its author declared.
+export const SHADER_EFFECT_SCHEMA: EffectSchema = {
+  name: "Shader",
+  params: [
+    { key: "speed", label: "Speed", type: "floatSlider", min: 0, max: 5, step: 0.05, default: 1, valueCurve: true },
+    { key: "transparencyPct", label: "Transparency", type: "intSlider", min: 0, max: 100, default: 0, valueCurve: true },
+  ],
+};
+
 export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   On: ON_EFFECT_SCHEMA,
   Bars: BARS_EFFECT_SCHEMA,
@@ -702,6 +714,7 @@ export const EFFECT_SCHEMAS: Record<string, EffectSchema> = {
   Piano: PIANO_EFFECT_SCHEMA,
   Guitar: GUITAR_SCHEMA,
   Faces: FACES_EFFECT_SCHEMA,
+  Shader: SHADER_EFFECT_SCHEMA,
 };
 
 // Effects driven by the words on a timing track rather than by their own parameters. The props
