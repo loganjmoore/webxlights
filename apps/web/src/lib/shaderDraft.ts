@@ -1,4 +1,4 @@
-import { parseIsf, type IsfShader } from "@webxlights/formats";
+import { isfPortabilityIssues, parseIsf, type IsfShader } from "@webxlights/formats";
 import { getShaderHost } from "@webxlights/engine";
 
 // Checking a generated shader before anyone is offered the chance to publish it.
@@ -14,8 +14,11 @@ import { getShaderHost } from "@webxlights/engine";
 
 export type DraftCheck =
   | { ok: true; shader: IsfShader }
-  /** `stage` says whose error it is - the header we parse, or the GLSL the GPU compiles. */
-  | { ok: false; stage: "parse" | "compile" | "unavailable"; error: string };
+  /**
+   * `stage` says whose error it is - the header we parse, the GLSL the GPU compiles, or the
+   * xLights portability rules the file breaks even though it would run here.
+   */
+  | { ok: false; stage: "parse" | "compile" | "portability" | "unavailable"; error: string };
 
 /**
  * Parses an ISF file and compiles its GLSL.
@@ -32,6 +35,15 @@ export function checkDraft(text: string): DraftCheck {
     return { ok: false, stage: "parse", error: (err as Error).message };
   }
 
+  // A generated shader must open in real xLights, not just here - that is the point of using
+  // xLights' own format. A draft that would compile here but break there (varying, the old
+  // PALETTE_AT, a */ inside the header) is rejected so the repair round can fix it, the same
+  // as a compile error.
+  const issues = isfPortabilityIssues(text);
+  if (issues.length > 0) {
+    return { ok: false, stage: "portability", error: `This shader would not work in xLights: ${issues.join("; ")}` };
+  }
+
   const host = getShaderHost();
   if (!host) {
     // No WebGL2. Distinguished from a compile failure on purpose: the shader may be perfect and
@@ -39,7 +51,10 @@ export function checkDraft(text: string): DraftCheck {
     return { ok: false, stage: "unavailable", error: "This browser cannot compile shaders (no WebGL2)." };
   }
 
-  const result = host.compile(shader.source, "draft");
+  // The WHOLE file is compiled, header included, because the header is part of what compiles:
+  // the host declares a uniform for every INPUT (as real xLights does), so a wrong header is a
+  // compile error and must be caught here, not discovered on a light display.
+  const result = host.compile(text, "draft");
   if ("error" in result) return { ok: false, stage: "compile", error: result.error };
   result.shader.dispose();
   return { ok: true, shader };

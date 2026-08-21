@@ -1,4 +1,5 @@
 import type { CompiledShader, ShaderFrameRequest, ShaderHost } from "@webxlights/engine";
+import { parseIsf, type IsfInput } from "@webxlights/formats";
 
 // Runs ISF shaders on the GPU and hands the pixels back to the engine.
 //
@@ -16,7 +17,7 @@ import type { CompiledShader, ShaderFrameRequest, ShaderHost } from "@webxlights
 //
 // isf_FragNormCoord is the important one: it is the normalised pixel position nearly every ISF
 // shader is written in terms of, and RENDERSIZE the resolution it scales against.
-const ISF_PREAMBLE = `#version 300 es
+export const ISF_PREAMBLE = `#version 300 es
 precision highp float;
 
 uniform vec2 RENDERSIZE;
@@ -24,18 +25,16 @@ uniform float TIME;
 uniform float TIMEDELTA;
 uniform int FRAMEINDEX;
 uniform vec4 DATE;
-// The row's palette, so a shader can honour the colours the user picked rather than only the
-// ones its author hard-coded. Not part of ISF - a webXLights addition, and the reason a
-// generated shader can be told "use the sequence colours".
-uniform vec4 PALETTE[8];
-uniform int PALETTE_COUNT;
+// How many colours the user picked for this effect. Real xLights declares this for every shader
+// (ShaderEffect.cpp, prependText), so declaring it here keeps the two dialects the same. The
+// colours themselves arrive as the shader's own "TYPE": "color" INPUTS, filled from the palette
+// in declaration order - which is xLights' mechanism, and the portable one. The old webXLights
+// inventions PALETTE[8] / PALETTE_COUNT / PALETTE_AT() are gone on purpose: they never existed
+// in xLights, so a shader using them was a webXLights-only fork of the format.
+uniform int NUMCOLORS;
 
 in vec2 isf_FragNormCoord;
 out vec4 webxl_FragColor;
-
-vec4 PALETTE_AT(int i) {
-  return PALETTE[PALETTE_COUNT <= 0 ? 0 : int(mod(float(i), float(PALETTE_COUNT)))];
-}
 `;
 
 // ISF shaders are written against GLSL ES 1.00 - they say gl_FragColor and varying, and many
@@ -43,13 +42,77 @@ vec4 PALETTE_AT(int i) {
 // 3.00 sources (which would reject essentially every shader in the wild, and which an AI asked
 // for "an ISF shader" would not produce either), the ES 1.00 spellings are aliased onto the ES
 // 3.00 ones. This is the same trick ISF's own reference implementation uses.
-const COMPAT = `
+export const COMPAT = `
 #define gl_FragColor webxl_FragColor
 #define texture2D texture
 #define varying in
 `;
 
-const VERTEX = `#version 300 es
+/**
+ * The uniforms a shader's own INPUTS become - the same mapping real xLights applies
+ * (ShaderEffect.cpp ~line 1240): an ISF author declares inputs in the header and the host
+ * declares the uniforms, so the body just uses them. A "long" gets a uniform only under the
+ * same conditions xLights gives it one, because a shader that compiles here and not there is
+ * exactly the divergence this file exists to avoid.
+ */
+export function inputUniformDeclarations(inputs: IsfInput[]): string {
+  let out = "";
+  for (const input of inputs) {
+    switch (input.type) {
+      case "float":
+        out += `uniform float ${input.name};\n`;
+        break;
+      case "bool":
+      case "event":
+        out += `uniform bool ${input.name};\n`;
+        break;
+      case "long":
+        if (input.min !== undefined || (input.labels?.length && input.values?.length)) {
+          out += `uniform int ${input.name};\n`;
+        }
+        break;
+      case "point2D":
+        out += `uniform vec2 ${input.name};\n`;
+        break;
+      case "color":
+        out += `uniform vec4 ${input.name};\n`;
+        break;
+      case "image":
+        // xLights swaps an image input for its own texSampler; here it is an unbound sampler,
+        // which samples black - the shader compiles and runs, it just sees no picture.
+        out += `uniform sampler2D ${input.name};\n`;
+        break;
+    }
+  }
+  return out;
+}
+
+/**
+ * The full fragment source this host compiles - preamble, compat defines, input uniforms, body.
+ *
+ * Exported (and kept pure) so the compile harness in tools/shader-check can compile *exactly*
+ * what the app compiles, rather than a reimplementation that would drift.
+ *
+ * Accepts either a whole ISF file or a bare GLSL body. With a header, the INPUTS become uniform
+ * declarations exactly as xLights makes them - the body must NOT declare its own, in either
+ * program. A bare body (what effects saved before headers were kept hold) gets no declarations,
+ * which is what those sources were written against. The preamble is spliced in after any leading
+ * #version, because #version must be the first line of a GLSL source.
+ */
+export function webxlFragmentSource(source: string): string {
+  let body = source;
+  let declarations = "";
+  try {
+    const parsed = parseIsf(source);
+    body = parsed.source;
+    declarations = inputUniformDeclarations(parsed.inputs);
+  } catch {
+    // No ISF header: a bare body, compiled as it always was.
+  }
+  return `${ISF_PREAMBLE}${COMPAT}\n${declarations}${body.replace(/^\s*#version[^\n]*\n/, "")}`;
+}
+
+export const VERTEX = `#version 300 es
 precision highp float;
 in vec2 position;
 out vec2 isf_FragNormCoord;
@@ -60,8 +123,6 @@ void main() {
   gl_Position = vec4(position, 0.0, 1.0);
 }
 `;
-
-const MAX_PALETTE = 8;
 
 function compileStage(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader | string {
   const shader = gl.createShader(type);
@@ -78,6 +139,7 @@ function compileStage(gl: WebGL2RenderingContext, type: number, source: string):
 
 class GlShader implements CompiledShader {
   private uniforms = new Map<string, WebGLUniformLocation | null>();
+  private inputTypes: Map<string, number> | null = null;
   private pixels: Uint8ClampedArray | null = null;
   private size = { width: 0, height: 0 };
 
@@ -98,6 +160,26 @@ class GlShader implements CompiledShader {
     return this.uniforms.get(name) ?? null;
   }
 
+  /**
+   * The GL type of each active uniform, so an input is uploaded as what the program declared.
+   *
+   * Needed because the declaration comes from the ISF header, not from the value: a "long"
+   * input is an int uniform (the same as xLights declares) and a JS number sent with uniform1f
+   * to an int location is an INVALID_OPERATION that silently leaves the uniform at zero.
+   */
+  private typeOf(name: string): number | undefined {
+    if (!this.inputTypes) {
+      this.inputTypes = new Map();
+      const { gl, program } = this;
+      const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number;
+      for (let i = 0; i < count; i++) {
+        const info = gl.getActiveUniform(program, i);
+        if (info) this.inputTypes.set(info.name.replace(/\[0\]$/, ""), info.type);
+      }
+    }
+    return this.inputTypes.get(name);
+  }
+
   render(request: ShaderFrameRequest): Uint8ClampedArray | null {
     const { gl } = this;
     const { width, height } = request;
@@ -115,26 +197,19 @@ class GlShader implements CompiledShader {
     gl.uniform1i(this.location("FRAMEINDEX"), request.frameIndex);
     gl.uniform4f(this.location("DATE"), 0, 0, 0, request.timeSeconds);
 
-    const count = Math.min(request.palette.length, MAX_PALETTE);
-    if (count > 0) {
-      const flat = new Float32Array(MAX_PALETTE * 4);
-      for (let i = 0; i < count; i++) {
-        const c = request.palette[i]!;
-        flat[i * 4] = c.r / 255;
-        flat[i * 4 + 1] = c.g / 255;
-        flat[i * 4 + 2] = c.b / 255;
-        flat[i * 4 + 3] = c.a / 255;
-      }
-      gl.uniform4fv(this.location("PALETTE"), flat);
-    }
-    gl.uniform1i(this.location("PALETTE_COUNT"), count);
+    gl.uniform1i(this.location("NUMCOLORS"), request.palette.length);
 
     for (const [name, value] of Object.entries(request.inputs)) {
       const loc = this.location(name);
       if (!loc) continue; // an input the shader doesn't declare: harmless, skip it
-      if (typeof value === "boolean") gl.uniform1i(loc, value ? 1 : 0);
-      else if (typeof value === "number") gl.uniform1f(loc, value);
-      else if (Array.isArray(value)) {
+      const type = this.typeOf(name);
+      const scalar = typeof value === "boolean" ? (value ? 1 : 0) : typeof value === "number" ? value : null;
+      if (scalar !== null) {
+        // int and bool uniforms (long / bool / event inputs) take an integer upload; anything
+        // else scalar is a float.
+        if (type === gl.INT || type === gl.BOOL) gl.uniform1i(loc, Math.round(scalar));
+        else gl.uniform1f(loc, scalar);
+      } else if (Array.isArray(value)) {
         if (value.length >= 4) gl.uniform4f(loc, value[0]!, value[1]!, value[2]!, value[3]!);
         else if (value.length === 3) gl.uniform3f(loc, value[0]!, value[1]!, value[2]!);
         else if (value.length === 2) gl.uniform2f(loc, value[0]!, value[1]!);
@@ -227,11 +302,7 @@ export function createWebglShaderHost(): ShaderHost | null {
 
   return {
     compile(source: string) {
-      // The preamble is spliced in *after* any leading #version the author wrote, because
-      // #version must be the first line of a GLSL source and ISF files sometimes carry one.
-      const body = source.replace(/^\s*#version[^\n]*\n/, "");
-      const full = `${ISF_PREAMBLE}${COMPAT}\n${body}`;
-      const fragment = compileStage(gl, gl.FRAGMENT_SHADER, full);
+      const fragment = compileStage(gl, gl.FRAGMENT_SHADER, webxlFragmentSource(source));
       if (typeof fragment === "string") return { error: fragment };
 
       const program = gl.createProgram();

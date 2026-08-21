@@ -4,7 +4,7 @@ import { useRoute } from "vue-router";
 import { api, ApiError, type CreditStatus, type ShaderRecord } from "../lib/api";
 import { checkDraft, defaultInputs, suggestName } from "../lib/shaderDraft";
 import { forgetKey, loadKey, loadProvider, looksLikeKey, maskKey, saveKey, saveProvider } from "../lib/anthropicKey";
-import type { IsfShader } from "@webxlights/formats";
+import { colorInputNames, type IsfShader } from "@webxlights/formats";
 import ShaderPreview from "../components/ShaderPreview.vue";
 import TabNav from "../components/TabNav.vue";
 
@@ -119,7 +119,9 @@ async function generate(): Promise<void> {
       return;
     }
 
-    draft.value = { source: check.shader.source, shader: check.shader };
+    // The full ISF text, header and all - the header is what carries the INPUTS, and the file
+    // saved to the library has to be the file xLights could open.
+    draft.value = { source: result.source, shader: check.shader };
     draftName.value = suggestName(check.shader, description);
     draftPublic.value = true;
   } catch (err) {
@@ -281,7 +283,7 @@ onMounted(async () => {
 
       <!-- A draft: compiled, running, not yet saved -->
       <div v-if="draft" class="draft">
-        <ShaderPreview :source="draft.source" :inputs="defaultInputs(draft.shader)" />
+        <ShaderPreview :source="draft.source" :inputs="defaultInputs(draft.shader)" :color-inputs="colorInputNames(draft.shader.inputs)" />
         <div class="draft-form">
           <label>Name <input v-model="draftName" maxlength="120" /></label>
           <p v-if="draft.shader.description" class="desc">{{ draft.shader.description }}</p>
@@ -324,7 +326,7 @@ onMounted(async () => {
       <ul v-else class="grid">
         <li v-for="shader in shaders" :key="shader.id" class="card">
           <!-- Paused: thirty shaders running at once would melt a laptop. They start on hover. -->
-          <ShaderPreview :source="shader.source" :running="false" class="thumb" />
+          <ShaderPreview :source="shader.source" :running="false" :color-inputs="colorInputNames(shader.inputs ?? [])" class="thumb" />
           <div class="meta">
             <h3>{{ shader.name }}</h3>
             <p v-if="shader.description" class="desc">{{ shader.description }}</p>

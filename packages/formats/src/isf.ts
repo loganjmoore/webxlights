@@ -205,6 +205,81 @@ export function serializeIsf(shader: IsfShader): string {
   return `/*${JSON.stringify(header, null, 2)}*/\n${shader.source}`;
 }
 
+/**
+ * Things that would make this ISF file mean something different in real xLights.
+ *
+ * webXLights compiles as GLSL ES 3.00 in a browser; xLights compiles the same file as desktop
+ * `#version 330` after its own rewrites (ShaderEffect.cpp). Most differences are absorbed by the
+ * two preambles, but a few constructs compile fine here and break there - or worse, compile in
+ * both and mean two different programs. Each returned string is one such problem, written to be
+ * shown to a user or handed back to a generator for repair. An empty array does not prove the
+ * shader works in xLights - only compiling it there proves that - but a non-empty one proves it
+ * will not, or will not mean the same thing.
+ *
+ * Deliberately NOT part of parseIsf: importing a shader that only works here should succeed and
+ * render, because refusing files this app can run helps nobody. The gate belongs where shaders
+ * are *made* - the generation flow and the compile harness - not where they are read.
+ */
+export function isfPortabilityIssues(text: string): string[] {
+  const issues: string[] = [];
+
+  let header: { json: string; bodyAt: number };
+  try {
+    header = splitHeader(text);
+  } catch {
+    return issues; // not parseable as ISF at all: the parse stage reports that, not this one
+  }
+  const body = text.slice(header.bodyAt);
+
+  // xLights takes everything after the FIRST */ in the file (ShaderEffect.cpp ~line 1458), so a
+  // */ inside the header JSON makes it read the header's tail as GLSL. webXLights' brace-matching
+  // parser tolerates it, which is exactly why it has to be flagged here.
+  if (header.json.includes("*/")) {
+    issues.push('the header JSON contains "*/": xLights cuts the file at the first "*/" and would read the rest of the header as GLSL');
+  }
+
+  // xLights rewrites `varying ` to `uniform `; webXLights #defines it to `in`. The same source
+  // would compile to two different programs, so it must not appear at all.
+  if (/\bvarying\b/.test(body)) {
+    issues.push('uses "varying": xLights rewrites it to "uniform" and webXLights to "in", so the two programs would disagree - declare an INPUT or use a plain global instead');
+  }
+
+  // The old webXLights palette inventions. They never existed in xLights, so a shader using them
+  // fails to link there with an undeclared-identifier error.
+  const invented = body.match(/\b(PALETTE_AT|PALETTE_COUNT|PALETTE)\b/);
+  if (invented) {
+    issues.push(`uses ${invented[1]}, which exists only in old webXLights and not in xLights - use "TYPE": "color" INPUTS, which both fill from the user's palette`);
+  }
+
+  // Both hosts declare these; a shader declaring them again is a duplicate declaration in both.
+  const redeclared = body.match(
+    /\buniform\s+\w+\s+(TIME|TIMEDELTA|RENDERSIZE|FRAMEINDEX|DATE|NUMCOLORS|PASSINDEX)\b/,
+  );
+  if (redeclared) {
+    issues.push(`declares "uniform ... ${redeclared[1]}", which both hosts already declare - delete the declaration and just use it`);
+  }
+
+  // webXLights strips a leading #version before splicing its own; xLights prepends "#version
+  // 330" without stripping anything, so a #version in the body lands mid-file and fails there.
+  if (/^\s*#version\b/m.test(body)) {
+    issues.push("contains a #version directive: xLights prepends its own #version 330 and a second one mid-file is a compile error");
+  }
+
+  return issues;
+}
+
+/**
+ * The names of the colour inputs, in declaration order.
+ *
+ * Order is the contract: real xLights fills each `"TYPE": "color"` input from the effect's
+ * palette in the order they were declared, wrapping at the palette length, and webXLights does
+ * the same. Anything that needs to know which uniforms the palette drives derives it from here
+ * rather than re-reading the header, because at render time the header is already gone.
+ */
+export function colorInputNames(inputs: IsfInput[]): string[] {
+  return inputs.filter((i) => i.type === "color").map((i) => i.name);
+}
+
 /** The value an input starts at when a user drops the shader on a row and touches nothing. */
 export function defaultValueFor(input: IsfInput): number | boolean | number[] {
   if (input.default !== undefined) return input.default;

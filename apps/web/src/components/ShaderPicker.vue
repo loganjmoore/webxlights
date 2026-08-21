@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { api, type ShaderRecord } from "../lib/api";
-import type { IsfInput } from "@webxlights/formats";
+import { colorInputNames, type IsfInput } from "@webxlights/formats";
 import ShaderPreview from "./ShaderPreview.vue";
 
 // Choosing a shader for a Shader effect, and turning the knobs it declares.
@@ -20,10 +20,19 @@ const props = defineProps<{
   source?: string;
   inputs?: Record<string, number | boolean | number[]>;
   shaderId?: number | null;
+  /** Colour-input names in declaration order, saved on the effect so the palette can drive them. */
+  colorInputs?: string[];
 }>();
 
 const emit = defineEmits<{
-  pick: [payload: { source: string; inputs: Record<string, number | boolean | number[]>; shaderId: number }];
+  pick: [
+    payload: {
+      source: string;
+      inputs: Record<string, number | boolean | number[]>;
+      shaderId: number;
+      colorInputs: string[];
+    },
+  ];
   setInputs: [inputs: Record<string, number | boolean | number[]>];
 }>();
 
@@ -59,7 +68,10 @@ function pick(shader: ShaderRecord): void {
   chosen.value = shader;
   const inputs: Record<string, number | boolean | number[]> = {};
   for (const input of shader.inputs ?? []) inputs[input.name] = startingValue(input);
-  emit("pick", { source: shader.source, inputs, shaderId: shader.id });
+  // Colour inputs are driven by the row's palette at render time - xLights' rule - so their
+  // names travel with the effect. The starting values above still matter as the fallback when
+  // the palette is empty.
+  emit("pick", { source: shader.source, inputs, shaderId: shader.id, colorInputs: colorInputNames(shader.inputs ?? []) });
   browsing.value = false;
   // Popularity should rank what people actually put in shows, so it is counted here rather than
   // when a card is looked at. Failing to count must never block using the shader.
@@ -103,7 +115,7 @@ onMounted(() => {
 <template>
   <div class="shader-picker">
     <div v-if="source" class="current">
-      <ShaderPreview :source="source" :inputs="inputs" :width="40" :height="28" />
+      <ShaderPreview :source="source" :inputs="inputs" :color-inputs="colorInputs" :width="40" :height="28" />
       <div class="who">
         <strong>{{ chosen?.name ?? "Shader" }}</strong>
         <span v-if="chosen?.author" class="by">by {{ chosen.author.name }}</span>
@@ -144,6 +156,10 @@ onMounted(() => {
         />
         <span class="value">{{ Number(valueOf(input)).toFixed(input.type === 'long' ? 0 : 2) }}</span>
       </template>
+
+      <!-- Colour inputs follow the effect's palette, in declaration order - the same rule real
+           xLights applies - so there is nothing to edit here; the palette is the control. -->
+      <span v-else-if="input.type === 'color'" class="unsupported">set by the effect's colours</span>
 
       <span v-else class="unsupported">{{ input.type }} — not editable yet</span>
     </div>

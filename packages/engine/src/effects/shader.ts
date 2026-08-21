@@ -32,6 +32,16 @@ export interface ShaderParams {
    * reachable is a sequence that stops working the moment a shader is deleted or made private.
    */
   shaderId?: number | null;
+  /**
+   * The names of the shader's `"TYPE": "color"` INPUTS, in declaration order.
+   *
+   * Real xLights fills each declared colour input from the effect's palette, in the order they
+   * were declared, wrapping when there are more inputs than colours - the DEFAULT in the header
+   * is ignored (ShaderEffect.cpp, SHADER_PARM_COLOUR). Doing the same here is what makes "use
+   * the user's colours" mean one thing in both programs. Carried on the effect because at render
+   * time only the GLSL body is left and declaration order is not recoverable from it.
+   */
+  colorInputs?: string[];
 }
 
 /**
@@ -42,6 +52,21 @@ export interface ShaderParams {
  */
 function timeSecondsFor(ctx: FrameContext, frameMs: number, speed: number): number {
   return (ctx.frameIndexInEffect * frameMs * speed) / 1000;
+}
+
+/**
+ * What each colour input is worth, given the palette - xLights' rule exactly: declaration
+ * order, wrapping at the palette length, alpha forced opaque. An empty palette changes nothing,
+ * so the values already stored on the effect stand in.
+ */
+export function paletteColorValues(colorInputs: string[], palette: RGBA[]): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  if (palette.length === 0) return out;
+  colorInputs.forEach((name, i) => {
+    const c = palette[i % palette.length]!;
+    out[name] = [c.r / 255, c.g / 255, c.b / 255, 1];
+  });
+  return out;
 }
 
 export function renderShader(
@@ -68,7 +93,9 @@ export function renderShader(
     position01: ctx.positionInEffect01,
     frameIndex: ctx.frameIndexInEffect,
     palette,
-    inputs: params.inputs ?? {},
+    inputs: params.colorInputs?.length
+      ? { ...(params.inputs ?? {}), ...paletteColorValues(params.colorInputs, palette) }
+      : (params.inputs ?? {}),
   };
 
   const pixels = compiled.shader.render(request);

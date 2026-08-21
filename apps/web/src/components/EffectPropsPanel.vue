@@ -103,15 +103,17 @@ function onPickShader(payload: {
   source: string;
   inputs: Record<string, number | boolean | number[]>;
   shaderId: number;
+  colorInputs: string[];
 }): void {
   if (!props.effect) return;
-  // All three in one update: source and inputs have to change together, or a frame renders the
-  // new shader with the previous shader's uniforms.
+  // All of these in one update: source and inputs have to change together, or a frame renders
+  // the new shader with the previous shader's uniforms.
   emit("update", {
     ...props.effect.params,
     source: payload.source,
     inputs: payload.inputs as unknown as EffectParamValue,
     shaderId: payload.shaderId,
+    colorInputs: payload.colorInputs as unknown as EffectParamValue,
   });
 }
 
@@ -676,6 +678,7 @@ function curveable(p: EffectParamSpec): boolean {
           :source="typeof effect.params.source === 'string' ? effect.params.source : undefined"
           :inputs="shaderInputs"
           :shader-id="typeof effect.params.shaderId === 'number' ? effect.params.shaderId : null"
+          :color-inputs="Array.isArray(effect.params.colorInputs) ? (effect.params.colorInputs as unknown as string[]) : undefined"
           @pick="onPickShader"
           @set-inputs="(inputs) => setParam('inputs', inputs as unknown as EffectParamValue)"
         />
