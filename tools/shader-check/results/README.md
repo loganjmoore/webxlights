@@ -47,6 +47,36 @@ results file for those rows. Until then their costs in `docs/SHADER-ASSISTANT-CO
 price-sheet arithmetic at Haiku's measured token profile, clearly marked - their *compile
 rates* are unknown, and compile rate is what decides cost per working shader.
 
+## The deployed configuration: gpt-5-mini, measured 2026-08-21
+
+The operator funds the hosted assistant with an OpenAI key, so production runs
+`SHADER_PROVIDER=openai` / `SHADER_MODEL=gpt-5-mini` — and unlike the other non-Anthropic rows
+in the cost doc, this one has now been measured, with the shipped prompt (`fd63b6c73cbbd318`):
+
+| | gpt-5-mini |
+| --- | --- |
+| first-draft compile, both dialects | 23/26 (88%) |
+| after one repair | 25/26 (one `varying` user its repair did not fix) |
+| measured input tokens, whole corpus | 38,361 |
+| measured output tokens, whole corpus | **106,940** |
+| per draft | ~1,475 in / **~3,870 out** |
+| mean latency per call | **49 s** |
+
+Two things stand out, both consequences of it being a reasoning model whose thinking bills as
+output. Its output volume is ~7× Haiku's per shader — at any output price, that multiplies the
+cost per shader; no dollar figure is given here because OpenAI's current per-token prices were
+not re-checked at measurement time. And it takes ~49 s per generation against Haiku's ~13 s,
+which the user feels on every click. Compile quality is close (23–25/26 vs Haiku's 26/26).
+
+The run also caught a wire-format landmine before production did: gpt-5-mini rejects
+`max_tokens` outright and demands `max_completion_tokens`. The driver and this runner now lead
+with the shared name and retry once with the renamed field when a provider insists (#105) —
+without that, every production generation against this model failed before it began.
+
+Abuse gate cases on gpt-5-mini: three of four returned compiling shaders; the translation case
+returned something that failed the ISF gate and was discarded — both outcomes safe, no prose
+ever reaching a user.
+
 ## Abuse gate cases
 
 The four `expect: "gate"` cases from `abuse.json` (`what is 2+2`, an essay, a translation, a
