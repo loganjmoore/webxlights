@@ -2,6 +2,12 @@
 
 Hand this whole file to a fresh session. It is the brief, not the answer.
 
+This goal is done: the prompt, the harness and the bake-off are merged, and the compile
+problem it set out to solve is solved. Its successor is
+[GOAL-shader-library-50.md](GOAL-shader-library-50.md), which takes the shaders from
+"compiles" to "worth looking at". Read this file first for the xLights contract and the
+portable subset - that part is still the source of truth.
+
 ---
 
 ## The objective
