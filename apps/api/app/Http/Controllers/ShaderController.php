@@ -20,6 +20,10 @@ class ShaderController extends Controller
             'q' => ['nullable', 'string', 'max:200'],
             'mine' => ['nullable', 'boolean'],
             'sort' => ['nullable', 'in:recent,popular'],
+            // The library ships with 50 shaders, so browsing needs more than one long list:
+            // which kind of shader, and which category within it.
+            'kind' => ['nullable', 'in:all,builtin,community'],
+            'category' => ['nullable', 'string', 'max:60'],
         ]);
 
         $userId = $request->user()?->id;
@@ -29,6 +33,23 @@ class ShaderController extends Controller
             $query->where('user_id', $userId);
         } else {
             $query->visibleTo($userId);
+        }
+
+        // Built-ins are the shaders that ship with the app; community ones are what people made.
+        // Worth separating because they answer different questions - "what can this do?" versus
+        // "what has anyone made?" - and because 50 built-ins would otherwise bury every new
+        // user creation under the recency sort.
+        if (($data['kind'] ?? 'all') === 'builtin') {
+            $query->whereNotNull('builtin_key');
+        } elseif (($data['kind'] ?? 'all') === 'community') {
+            $query->whereNull('builtin_key');
+        }
+
+        if ($category = $data['category'] ?? null) {
+            // categories is a JSON array on both Postgres and SQLite. A LIKE over the encoded
+            // text is exact enough for a short, controlled vocabulary and works identically on
+            // both, which whereJsonContains does not.
+            $query->whereRaw('LOWER(categories) LIKE ?', ['%"'.strtolower(str_replace(['%', '_'], ['\%', '\_'], $category)).'"%']);
         }
 
         if ($term = $data['q'] ?? null) {
@@ -47,6 +68,7 @@ class ShaderController extends Controller
         }
 
         $query->orderByDesc(($data['sort'] ?? 'recent') === 'popular' ? 'use_count' : 'created_at');
+
 
         return response()->json($query->paginate(self::PER_PAGE));
     }

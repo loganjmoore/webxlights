@@ -1,0 +1,299 @@
+{
+  "$comment": "Gates for metrics.mjs. Every entry carries the failure it catches, because a threshold nobody can justify is a threshold nobody can argue with. These are a starting point, not gospel: a threshold that rejects something beautiful is wrong and should move, and one that passes red-dots-on-blue is too loose and should tighten. Any change belongs in docs/SHADER-LIBRARY.md with the reason and the date. Severity 'hard' means dead on arrival - regenerate, do not patch. Severity 'soft' means a reviewer must look at that shape.",
+  "calibratedAgainst": "tools/shader-check/results/haiku-4-5-round4 (26 shaders scored by eye in results/README.md, 2026-08-21)",
+  "calibratedOn": "2026-08-27",
+  "perShape": {
+    "meanBrightness": {
+      "min": 0.103,
+      "severity": "soft",
+      "why": "Mean drive level (max of R,G,B) over every frame and pixel. Below this the prop is mostly off, and from the street 'mostly off' reads as broken rather than as moody. Measured as drive level, not relative luminance: see the colour-space note at the top of metricsCore.mjs for why relative luminance would reject every saturated red and blue in the genre.",
+      "role": "gate",
+      "fitted": {
+        "keeps": "19/19",
+        "catches": "3/5",
+        "group": "2d",
+        "evidence": "separates good from bad in the calibration corpus"
+      },
+      "short": "too dark to read from the street"
+    },
+    "peakBrightness": {
+      "min": 0.715,
+      "severity": "soft",
+      "why": "Best 99th-percentile drive level across the loop. This is what makes a sparse effect legible: a comet is mostly black by design and its mean brightness is correctly low, but the head of it must actually be bright. Catches the fireworks failure - bursts present but too dim to read at night.",
+      "role": "gate",
+      "fitted": {
+        "keeps": "19/19",
+        "catches": "4/5",
+        "group": "2d",
+        "evidence": "separates good from bad in the calibration corpus"
+      },
+      "short": "nothing on this prop is actually bright"
+    },
+    "deadFrames": {
+      "max": 0.000001,
+      "severity": "soft",
+      "why": "Fraction of frames whose 90th-percentile drive level is under 0.25. A show that goes dark for two seconds looks like a fault, not an effect.",
+      "role": "gate",
+      "fitted": {
+        "keeps": "19/19",
+        "catches": "4/5",
+        "group": "2d",
+        "evidence": "separates good from bad in the calibration corpus"
+      }
+    },
+    "contrast": {
+      "min": 0.45,
+      "severity": "soft",
+      "why": "Best per-frame p95 minus p05 luminance across the loop. Lights are seen as points against night; without a bright-to-dark spread somewhere in the loop there is no shape to see.",
+      "role": "diagnostic",
+      "fitted": {
+        "keeps": "19/19",
+        "catches": "0/5",
+        "group": "2d",
+        "evidence": "no bad example in the calibration corpus exhibits this failure - set loose, unvalidated"
+      }
+    },
+    "chroma": {
+      "min": 0.345,
+      "severity": "soft",
+      "why": "Mean HSL saturation over lit pixels. Desaturated colour disappears at distance. Waived for shaders whose brief is deliberately monochrome or warm-white (monochromeByDesign).",
+      "role": "gate",
+      "fitted": {
+        "keeps": "19/19",
+        "catches": "1/5",
+        "group": "2d",
+        "evidence": "separates good from bad in the calibration corpus"
+      },
+      "short": "washed out"
+    },
+    "mudFraction": {
+      "max": 0.838,
+      "severity": "soft",
+      "why": "Lit pixels that are both desaturated (S < 0.25) and mid-bright (0.2 < L < 0.7). This is what mix() between two complementary palette colours produces in linear RGB, and it is the metric that catches the muddy-brown plasma failure.",
+      "role": "gate",
+      "fitted": {
+        "keeps": "19/19",
+        "catches": "0/5",
+        "group": "2d",
+        "evidence": "no bad example in the calibration corpus exhibits this failure - set loose, unvalidated"
+      },
+      "short": "muddy - complementary colours mixed through their midpoint"
+    },
+    "motionEnergy": {
+      "min": 0.00131,
+      "severity": "soft",
+      "why": "Mean absolute inter-frame RGB delta, adjacent frames. A floor only: below it nothing is happening between one frame and the next. There is deliberately NO ceiling here. The obvious candidate, candy-cane, sits at 0.333 and was scored 5/5 by eye - it shifts a quarter of a stripe per frame, which is fast but not unsafe - so a ceiling fitted to reject it would reject human-approved work. Genuine strobing is caught by strobeRate, which is a safety limit rather than a taste one.",
+      "role": "gate",
+      "fitted": {
+        "keeps": "19/19",
+        "catches": "2/5",
+        "group": "2d",
+        "evidence": "separates good from bad in the calibration corpus"
+      }
+    },
+    "slowMotionEnergy": {
+      "min": 0.0132,
+      "severity": "soft",
+      "role": "gate",
+      "short": "nothing changes over half a second",
+      "why": "Mean absolute RGB delta between frames half a second apart. The adjacent-frame delta cannot tell a deliberately slow drift - the aesthetic actually being aimed at - from a still image, because both move almost nothing in 50 ms. This can. It is the joint-strongest discriminator in the calibration corpus, and it is the metric that catches a shader which computes an animation and then discards it before it reaches gl_FragColor.",
+      "fitted": {
+        "keeps": "19/19",
+        "catches": "4/5",
+        "group": "2d",
+        "evidence": "separates good from bad in the calibration corpus"
+      }
+    },
+    "flowCoherence": {
+      "min": 0.6,
+      "severity": "soft",
+      "why": "Pearson correlation of luminance between consecutive frames. Per-pixel noise passes motionEnergy while scoring near zero here - this is the metric that separates flow from fizz.",
+      "role": "diagnostic",
+      "fitted": {
+        "keeps": "19/19",
+        "catches": "0/5",
+        "group": "2d",
+        "evidence": "no bad example in the calibration corpus exhibits this failure - set loose, unvalidated"
+      }
+    },
+    "strobeRate": {
+      "max": 3,
+      "severity": "hard",
+      "why": "Whole-canvas mean-luminance swings above 0.5, per second. This is the WCAG 2.3.1 photosensitivity limit, not a style preference. Over it is rejected regardless of how it looks.",
+      "role": "gate",
+      "short": "over the photosensitivity limit"
+    },
+    "aliasEnergy": {
+      "max": 0.0989,
+      "severity": "soft",
+      "why": "At 60x1 only: horizontally adjacent pixels differing by more than 0.5 luminance. On a real roofline each of those pairs is two neighbouring bulbs at opposite brightness, which reads as ugly flicker rather than as detail.",
+      "role": "gate",
+      "fitted": {
+        "keeps": "15/15",
+        "catches": "0/2",
+        "shape": "roofline-60x1",
+        "evidence": "no bad example in the calibration corpus exhibits this failure - set loose, unvalidated"
+      },
+      "short": "pixel-level flicker on a real roofline"
+    },
+    "rooflineLiveness": {
+      "min": 0.5,
+      "severity": "soft",
+      "why": "At 60x1 only: structure along x AND that structure changing over time, whichever is weaker. Catches the common failure where a vertical effect collapses on a one-pixel-tall buffer into a solid colour that merely cycles.",
+      "role": "diagnostic",
+      "fitted": {
+        "keeps": "15/15",
+        "catches": "0/2",
+        "shape": "roofline-60x1",
+        "evidence": "no bad example in the calibration corpus exhibits this failure - set loose, unvalidated"
+      }
+    },
+    "paletteFidelity": {
+      "min": 0.433,
+      "severity": "soft",
+      "why": "Fraction of lit, chromatic pixels whose hue is within 25 degrees of some regression-palette entry. A shader that hardcodes a rainbow when the user picked red and gold has ignored the user. Waived when the description names its own colours (namesOwnColours). Near-grey pixels are excluded, since the hue of a grey means nothing.",
+      "role": "gate",
+      "short": "ignoring the user's palette",
+      "fitted": {
+        "keeps": "19/19",
+        "catches": "1/5",
+        "group": "2d",
+        "evidence": "separates good from bad in the calibration corpus"
+      }
+    }
+  },
+  "library": {
+    "openingLuma": {
+      "min": 0.25,
+      "severity": "soft",
+      "why": "Mean drive level of the very first frame at the shader's own header DEFAULTs. Five of the previously scored 26 lost a point purely to opening near-black, which is the first thing a user ever sees."
+    },
+    "driftDelta": {
+      "max": 0.15,
+      "severity": "hard",
+      "why": "Worst relative change in meanLuma, contrast, chroma or motionEnergy between the 6 s window and the same measurements starting at 600 s and 36000 s. Catches float precision blow-up, monotone drift, and anything that quietly dies after ten minutes. Nothing else in the toolchain would ever notice."
+    },
+    "nanFraction": {
+      "max": 0,
+      "severity": "hard",
+      "why": "Pixels that are NaN or Inf. Requires a float render target to be measurable at all; on an 8-bit target it is reported as null rather than as a confident zero."
+    },
+    "distinctness": {
+      "min": 0.08,
+      "severity": "soft",
+      "why": "Minimum normalised distance between any two shaders' feature vectors. Fifty plasmas is not a library. Pairs under this must have one of the two changed or cut, and the closest pairs are reported every round."
+    }
+  },
+  "byShape": {
+    "roofline-60x1": {
+      "meanBrightness": {
+        "severity": "soft",
+        "why": "Mean drive level (max of R,G,B) over every frame and pixel. Below this the prop is mostly off, and from the street 'mostly off' reads as broken rather than as moody. Measured as drive level, not relative luminance: see the colour-space note at the top of metricsCore.mjs for why relative luminance would reject every saturated red and blue in the genre.",
+        "role": "gate",
+        "min": 0.224,
+        "fitted": {
+          "keeps": "15/15",
+          "catches": "2/2",
+          "group": "roofline",
+          "evidence": "separates good from bad in the calibration corpus"
+        }
+      },
+      "peakBrightness": {
+        "severity": "soft",
+        "why": "Best 99th-percentile drive level across the loop. This is what makes a sparse effect legible: a comet is mostly black by design and its mean brightness is correctly low, but the head of it must actually be bright. Catches the fireworks failure - bursts present but too dim to read at night.",
+        "role": "gate",
+        "min": 0.607,
+        "fitted": {
+          "keeps": "15/15",
+          "catches": "2/2",
+          "group": "roofline",
+          "evidence": "separates good from bad in the calibration corpus"
+        }
+      },
+      "deadFrames": {
+        "severity": "soft",
+        "why": "Fraction of frames whose 90th-percentile drive level is under 0.25. A show that goes dark for two seconds looks like a fault, not an effect.",
+        "role": "gate",
+        "max": 0.268,
+        "fitted": {
+          "keeps": "15/15",
+          "catches": "2/2",
+          "group": "roofline",
+          "evidence": "separates good from bad in the calibration corpus"
+        }
+      },
+      "chroma": {
+        "severity": "soft",
+        "why": "Mean HSL saturation over lit pixels. Desaturated colour disappears at distance. Waived for shaders whose brief is deliberately monochrome or warm-white (monochromeByDesign).",
+        "role": "gate",
+        "min": 0.0855,
+        "fitted": {
+          "keeps": "15/15",
+          "catches": "0/2",
+          "group": "roofline",
+          "evidence": "no bad example in the calibration corpus exhibits this failure - set loose, unvalidated"
+        }
+      },
+      "motionEnergy": {
+        "severity": "soft",
+        "why": "Mean absolute inter-frame RGB delta, adjacent frames. A floor only: below it nothing is happening between one frame and the next. There is deliberately NO ceiling here. The obvious candidate, candy-cane, sits at 0.333 and was scored 5/5 by eye - it shifts a quarter of a stripe per frame, which is fast but not unsafe - so a ceiling fitted to reject it would reject human-approved work. Genuine strobing is caught by strobeRate, which is a safety limit rather than a taste one.",
+        "role": "gate",
+        "min": 0,
+        "fitted": {
+          "keeps": "15/15",
+          "catches": "0/2",
+          "group": "roofline",
+          "evidence": "no bad example in the calibration corpus exhibits this failure - set loose, unvalidated"
+        }
+      },
+      "slowMotionEnergy": {
+        "severity": "soft",
+        "why": "Mean absolute RGB delta between frames half a second apart. The adjacent-frame delta cannot tell a deliberately slow drift - the aesthetic actually being aimed at - from a still image, because both move almost nothing in 50 ms. This can. It is the joint-strongest discriminator in the calibration corpus, and it is the metric that catches a shader which computes an animation and then discards it before it reaches gl_FragColor.",
+        "role": "gate",
+        "min": 0,
+        "fitted": {
+          "keeps": "15/15",
+          "catches": "0/2",
+          "group": "roofline",
+          "evidence": "no bad example in the calibration corpus exhibits this failure - set loose, unvalidated"
+        }
+      },
+      "paletteFidelity": {
+        "severity": "soft",
+        "why": "Fraction of lit, chromatic pixels whose hue is within 25 degrees of some regression-palette entry. A shader that hardcodes a rainbow when the user picked red and gold has ignored the user. Waived when the description names its own colours (namesOwnColours). Near-grey pixels are excluded, since the hue of a grey means nothing.",
+        "role": "gate",
+        "min": 0.0428,
+        "fitted": {
+          "keeps": "15/15",
+          "catches": "0/2",
+          "group": "roofline",
+          "evidence": "no bad example in the calibration corpus exhibits this failure - set loose, unvalidated"
+        }
+      },
+      "aliasEnergy": {
+        "severity": "soft",
+        "why": "At 60x1 only: horizontally adjacent pixels differing by more than 0.5 luminance. On a real roofline each of those pairs is two neighbouring bulbs at opposite brightness, which reads as ugly flicker rather than as detail.",
+        "role": "gate",
+        "max": 0.0989,
+        "fitted": {
+          "keeps": "15/15",
+          "catches": "0/2",
+          "group": "roofline",
+          "evidence": "no bad example in the calibration corpus exhibits this failure - set loose, unvalidated"
+        }
+      },
+      "rooflineLiveness": {
+        "severity": "soft",
+        "why": "At 60x1 only: structure along x AND that structure changing over time, whichever is weaker. Catches the common failure where a vertical effect collapses on a one-pixel-tall buffer into a solid colour that merely cycles.",
+        "role": "diagnostic",
+        "fitted": {
+          "keeps": "15/15",
+          "catches": "0/2",
+          "group": "roofline",
+          "evidence": "no bad example in the calibration corpus exhibits this failure - set loose, unvalidated"
+        }
+      }
+    }
+  },
+  "byShapeNote": "perShape is the 2D gate set, fitted at matrix-32x32 against the 32x32 human scores and applied to matrix-32x32, megatree-16x50 and screen-192x108. byShape['roofline-60x1'] overrides it with a set fitted against the roofline scores, because a 60x1 line is a different canvas that the corpus was scored on separately."
+}

@@ -1,0 +1,71 @@
+{
+  "$comment": "The 50 concepts the shipped library is built from. Each `text` is sent to the generator VERBATIM, exactly as typed here - the point is to test the generator and its prompt, not to hand-feed it GLSL. Ids are fixed so results files diff across rounds. Families exist so that coverage can be checked when a concept is swapped out; the brief allows up to 5 swaps, each with a recorded reason in docs/SHADER-LIBRARY.md.",
+  "flags": {
+    "monochromeByDesign": "Waives the chroma gate. The brief for this one really is a single hue or warm white, so low saturation is the ask rather than a washed-out failure.",
+    "namesOwnColours": "Waives the paletteFidelity gate. The description names specific colours, so rendering them instead of the user's arbitrary regression palette is obedience, not disobedience.",
+    "bestAt": "Set only after measurement, and only when a concept genuinely cannot be excellent at every shape. An honest bestAt is worth more than a shader that is mediocre everywhere. Null until a round proves otherwise."
+  },
+  "families": {
+    "light-show-canon": "What people actually ask a light-show tool for. These must be excellent; a library that fumbles candy-cane has failed at its own job.",
+    "motion-background": "The reference aesthetic: mesh gradients, chrome, iridescence, caustics, organic noise. Restraint in structure, boldness in colour.",
+    "natural": "Phenomena. The test is whether it reads as the thing rather than as an abstract field with the word attached.",
+    "geometric": "Built for props first. Bold, legible shapes that survive being 60 pixels wide and one pixel tall.",
+    "seasonal": "Occasion pieces. Most name their own colours, which is the point of them."
+  },
+  "descriptions": [
+    { "id": "candy-cane", "family": "light-show-canon", "namesOwnColours": true, "text": "red and white candy cane stripes spiralling slowly along the whole display" },
+    { "id": "rainbow-sweep", "family": "light-show-canon", "namesOwnColours": true, "text": "a smooth rainbow sweeping steadily across the display, deep saturated colour, no flicker" },
+    { "id": "comet-chase", "family": "light-show-canon", "text": "a bright comet with a long glowing tail chasing itself around the display, the head much brighter than the tail" },
+    { "id": "twinkle-field", "family": "light-show-canon", "text": "a field of stars twinkling softly at different times over a deep coloured background" },
+    { "id": "snowfall", "family": "light-show-canon", "text": "big soft snowflakes drifting gently downward against a dark winter sky" },
+    { "id": "firelight", "family": "light-show-canon", "text": "the warm flicker of firelight, deep orange and gold, restless but never strobing" },
+    { "id": "icicle-drip", "family": "light-show-canon", "text": "icicles hanging down with a bright drop occasionally running to the tip and falling" },
+    { "id": "starburst", "family": "light-show-canon", "text": "bright rays bursting outward from the centre and fading, one burst after another" },
+    { "id": "flag-wave", "family": "light-show-canon", "namesOwnColours": true, "text": "a red white and blue flag rippling in a steady breeze" },
+    { "id": "spin-tunnel", "family": "light-show-canon", "text": "a spiral tunnel turning slowly, pulling the eye into the middle of the display" },
+    { "id": "checker-slide", "family": "light-show-canon", "text": "big bold checkerboard squares sliding steadily sideways" },
+    { "id": "colour-wash", "family": "light-show-canon", "text": "the whole display washing slowly from one colour to the next, always bright, never muddy in between" },
+
+    { "id": "mesh-gradient", "family": "motion-background", "text": "a few soft colour poles drifting slowly through each other like a mesh gradient, no seams and no banding" },
+    { "id": "liquid-metal", "family": "motion-background", "text": "polished liquid metal with a bright specular highlight sweeping across a slowly warping surface" },
+    { "id": "iridescent-silk", "family": "motion-background", "text": "iridescent silk folding gently, the hue shifting with the angle of each fold" },
+    { "id": "caustics", "family": "motion-background", "text": "the bright wobbling caustics you see on the bottom of a swimming pool" },
+    { "id": "neuro-noise", "family": "motion-background", "text": "an organic network of connected glowing filaments, flowing and branching slowly" },
+    { "id": "metaballs", "family": "motion-background", "text": "big soft blobs drifting and merging into each other like a lava lamp, bright and saturated" },
+    { "id": "godrays", "family": "motion-background", "text": "shafts of light angling down through haze, drifting slowly, bright where they cross" },
+    { "id": "aurora-curtain", "family": "motion-background", "text": "curtains of aurora rippling slowly across the sky, green and violet, bright at the base" },
+    { "id": "ink-bloom", "family": "motion-background", "text": "a drop of coloured ink blooming outward through water, over and over" },
+    { "id": "plasma-storm", "family": "motion-background", "text": "a swirling plasma storm with bright cores and deep space between them, never grey or muddy" },
+    { "id": "voronoi-crystal", "family": "motion-background", "text": "crystal facets in a shifting cellular pattern, each cell lit differently, edges catching the light" },
+    { "id": "halftone-pulse", "family": "motion-background", "text": "a halftone dot pattern where the dots swell and shrink in waves across the display" },
+    { "id": "moire-drift", "family": "motion-background", "text": "two fine patterns sliding over each other making slow moire bands roll across the display" },
+    { "id": "kaleidoscope", "family": "motion-background", "text": "a kaleidoscope turning slowly, mirrored wedges of bright colour" },
+
+    { "id": "ocean-swell", "family": "natural", "text": "long ocean swells rolling steadily past, deep blue with bright crests" },
+    { "id": "rain-ripples", "family": "natural", "text": "raindrops landing on still water, each one sending out a ring of ripples" },
+    { "id": "lightning", "family": "natural", "namesOwnColours": true, "text": "distant lightning flashing behind clouds, brief white-blue flares over a dark sky, not fast enough to be uncomfortable" },
+    { "id": "lava-flow", "family": "natural", "text": "molten lava creeping downhill, bright orange cracks in a dark crust" },
+    { "id": "smoke-plume", "family": "natural", "text": "a plume of smoke curling upward and spreading out, lit from below" },
+    { "id": "sunrise", "family": "natural", "text": "a sunrise climbing slowly, deep orange at the horizon fading up into brighter sky" },
+    { "id": "cloud-drift", "family": "natural", "text": "soft clouds drifting slowly across a coloured sky, always well lit" },
+    { "id": "plankton-glow", "family": "natural", "text": "bioluminescent plankton lighting up in soft waves through dark water" },
+    { "id": "dust-storm", "family": "natural", "text": "a wall of dust rolling past, warm and grainy but never a still image" },
+    { "id": "ember-rise", "family": "natural", "text": "glowing embers rising slowly from a fire and fading as they go up" },
+
+    { "id": "vu-bars", "family": "geometric", "text": "a row of vu meter bars bouncing up and down at different heights" },
+    { "id": "radar-sweep", "family": "geometric", "text": "a radar line sweeping around the display leaving a fading trail behind it" },
+    { "id": "barber-spiral", "family": "geometric", "namesOwnColours": true, "text": "a barber pole of bold red and white diagonals turning steadily" },
+    { "id": "expanding-rings", "family": "geometric", "text": "bright rings expanding outward from the centre one after another and fading at the edge" },
+    { "id": "diagonal-wipe", "family": "geometric", "text": "a hard diagonal edge wiping one colour across the display and then the next" },
+    { "id": "pixel-cascade", "family": "geometric", "text": "blocks of colour cascading down the display in columns at different speeds" },
+    { "id": "accent-flash", "family": "geometric", "text": "a calm base colour with a bright accent flashing across it every couple of seconds" },
+    { "id": "marquee-chase", "family": "geometric", "text": "theatre marquee bulbs chasing around the edge of the display" },
+
+    { "id": "peppermint-swirl", "family": "seasonal", "namesOwnColours": true, "text": "a peppermint swirl of red and white turning slowly like a sweet wrapper" },
+    { "id": "warm-white-sparkle", "family": "seasonal", "monochromeByDesign": true, "namesOwnColours": true, "text": "classic warm white fairy lights sparkling gently, the way a tasteful house looks" },
+    { "id": "halloween-breath", "family": "seasonal", "namesOwnColours": true, "text": "orange and purple breathing slowly in and out, spooky but always bright enough to see" },
+    { "id": "heartbeat", "family": "seasonal", "namesOwnColours": true, "text": "a deep red heartbeat pulsing twice then resting, over and over" },
+    { "id": "independence-burst", "family": "seasonal", "namesOwnColours": true, "text": "red white and blue fireworks bursting over the display" },
+    { "id": "champagne-shimmer", "family": "seasonal", "monochromeByDesign": true, "namesOwnColours": true, "text": "champagne gold shimmering and rising like bubbles in a glass" }
+  ]
+}

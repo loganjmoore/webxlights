@@ -4,8 +4,9 @@
 //   node tools/shader-check/generate.mjs --backend claude-cli --model claude-haiku-4-5 --label haiku-4-5
 //   node tools/shader-check/generate.mjs --backend openai --base-url https://api.deepseek.com/v1 \
 //        --model deepseek-v4-flash --key-env DEEPSEEK_API_KEY --label deepseek
-//   ... --abuse            also runs the "gate" cases from abuse.json
-//   ... --only snow,fire   a subset, while iterating on the prompt
+//   ... --abuse                also runs the "gate" cases from abuse.json
+//   ... --only snow,fire       a subset, while iterating on the prompt
+//   ... --corpus library.json  the 50-concept library instead of the 26-item regression corpus
 //
 // For every corpus description: generate, compile in BOTH dialects (tools/shader-check/check.mjs),
 // and when the first draft fails, run exactly one repair round with the compiler's error - the
@@ -160,7 +161,11 @@ const backend =
     ? claudeCliBackend(model)
     : openAiBackend(arg("base-url") ?? "http://localhost:11434/v1", model, arg("key-env"));
 
-const corpus = JSON.parse(readFileSync(join(here, "corpus.json"), "utf8"));
+// Which description set to run. corpus.json is the 26-item compile regression that must never
+// get worse; library.json is the 50 concepts the shipped library is built from. Same runner for
+// both, so a library round is measured exactly like every committed round before it.
+const corpusName = arg("corpus", "corpus.json");
+const corpus = JSON.parse(readFileSync(join(here, corpusName), "utf8"));
 const descriptions = corpus.descriptions.filter((d) => !only || only.includes(d.id));
 const system = systemPrompt();
 
@@ -171,8 +176,10 @@ mkdirSync(shaderDir, { recursive: true });
 const items = [];
 console.log(`generating ${descriptions.length} shaders with ${backendName}/${model}...`);
 
-for (const { id, text } of descriptions) {
-  const item = { id, description: text, calls: [] };
+for (const { id, text, family, monochromeByDesign, namesOwnColours } of descriptions) {
+  // The waiver flags travel with the result so metrics.mjs can honour them without a second
+  // source of truth about which shaders are allowed to be monochrome or to name their own colours.
+  const item = { id, description: text, family, monochromeByDesign, namesOwnColours, calls: [] };
   items.push(item);
   try {
     const first = await backend(system, userMessage(text));
@@ -267,6 +274,7 @@ const summary = {
   // Which prompt these numbers belong to - a run is only comparable to another run of the
   // same prompt, and "the prompt at the time" is not something to remember.
   systemPromptSha256: createHash("sha256").update(system).digest("hex").slice(0, 16),
+  corpus: corpusName,
   corpusSize: descriptions.length,
   generated: generated.length,
   firstDraftBothDialects: items.filter((i) => i.firstDraftOk).length,

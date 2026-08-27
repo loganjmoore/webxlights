@@ -39,4 +39,11 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
   done
 fi
 
+# The shaders that ship with the app. Idempotent and keyed on a stable builtin_key, so running it
+# on every boot updates the library rather than duplicating it. It is here rather than in a
+# seeder because seeders never run in this container, and rather than in a one-shot migration
+# because a migration runs once and the library keeps changing. `|| true` because sample content
+# failing to publish must never take down a boot that is otherwise healthy.
+php artisan shaders:publish-builtins --no-interaction || true
+
 exec supervisord -c /etc/supervisord.conf

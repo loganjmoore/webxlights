@@ -849,6 +849,55 @@ of which would then be sitting in a chat log or a bug report.
 
 - **Synthetic `PointerEvent`s don't support real pointer capture, breaking `DragControls` verification, not `DragControls` itself**: automated live-testing 3D drag by calling `canvas.dispatchEvent(new PointerEvent(...))` hit a `DOMException` from `DragControls`' internal `setPointerCapture()` call, since a browser-dispatched synthetic event carries no genuine tracked pointer session for the capture API to attach to. A real mouse drag always has one and is unaffected - confirmed by stubbing `Element.prototype.setPointerCapture` to a no-op for the verification pass only, after which the drag worked and persisted correctly. Same lesson as M10's "browser automation's synthetic drag doesn't reliably reach canvas pointer handlers at some viewport sizes" note: prefer dispatching real `PointerEvent`s over the coarser `left_click_drag`-style helpers when verifying canvas/WebGL pointer interactions, and be ready to neutralize capture-API quirks that only matter for genuinely OS-tracked pointers.
 
+## Shipping the built-in shader library into every install
+
+The 50-shader library has to appear in the gallery on a fresh Docker deploy without anyone
+clicking generate. Two facts about this deployment, both checked against the repo rather than
+assumed, rule out the obvious mechanisms:
+
+- **`packages/` is not in the runtime image.** The `Dockerfile`'s final stage copies only
+  `--from=vendor /app` (which is `apps/api`) and `--from=web-build /repo/apps/web/dist`. The
+  `COPY packages/ packages/` on line 12 belongs to the web *build* stage and never reaches the
+  running container. So nothing at runtime can read `packages/shaders/library/*.fs` from disk.
+- **The container never runs a seeder.** `apps/api/docker/entrypoint.sh` runs
+  `php artisan migrate --force` on every boot and nothing else. A `DatabaseSeeder` entry would
+  work perfectly on a laptop and silently do nothing in production - the worst kind of wrong,
+  because it looks correct everywhere you would think to check it.
+
+So the mechanism is three pieces:
+
+1. The authored `.fs` files live in `packages/shaders/library/`, with the tooling and the tests.
+2. `tools/shader-check/bake-builtins.mjs` bakes them into
+   `apps/api/database/data/builtin-shaders.json`, which **is** inside the image. A test
+   (`tools/shader-check/bake-builtins.test.mjs`, run by `npm test` and therefore by CI)
+   regenerates and diffs, so the committed JSON can never drift from the shaders it came from.
+3. `php artisan shaders:publish-builtins` upserts that JSON into the `shaders` table, keyed on a
+   stable `builtin_key` (the file name), and the entrypoint runs it on every boot.
+
+**A boot-time command rather than the migration the brief suggested.** A migration runs once,
+ever, so an idempotent publishing migration would still need a *new* migration for every future
+library update, and the fiftieth would be indistinguishable from the first. The command is
+idempotent and re-runs on every deploy, so shipping a better `candy-cane` updates the row instead
+of duplicating it or being ignored. Only the schema change - adding `builtin_key` - is a
+migration, which is what migrations are for. It is `|| true` in the entrypoint: sample content
+failing to publish must never take down an otherwise healthy boot.
+
+Built-ins are authorless. `shaders.user_id` is already nullable so a published shader can outlive
+its author, and a built-in never had one - a fake user would show up as a person in the gallery.
+They are consequently immune to edit and delete for free: every write path checks
+`$shader->user_id === $request->user()->id`, and `null === <int>` is false for everybody. That is
+pinned by a test rather than left as a happy accident.
+
+`use_count` is never overwritten by a re-publish: how often people used a shader is a fact about
+this install, not about the library.
+
+For browsing at 50+ entries, the shader's family ("Light show", "Seasonal", ...) is folded into
+its existing `categories` array at bake time rather than given a column. The gallery already
+filters and searches on categories, so this costs no schema and no new query path; the ISF
+header's own `CATEGORIES` is almost always just `Generator`, which is true and useless for
+browsing.
+
+
 ## Deviation log
 
 - 2026-08-10: `composer create-project laravel/laravel` installs Laravel 13.x (goal prompt said "12.x-ish LTS"). Laravel 12 is not what `laravel/laravel` resolves to as of this date; using current stable 13 instead of pinning back to an EOL-adjacent 12.

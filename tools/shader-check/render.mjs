@@ -1,165 +1,170 @@
 #!/usr/bin/env node
-// Renders shaders at real prop sizes and saves a contact sheet, so "does it read at 60x1?"
-// is answered by looking rather than by hoping.
+// Renders shaders so a reviewer can actually judge them, rather than guess from three stills.
 //
-//   node tools/shader-check/render.mjs results/haiku-4-5/*.fs --out results/haiku-4-5-sheet
+//   node tools/shader-check/render.mjs shaders/*.fs --out sheets/
+//   ... --shapes roofline-60x1,matrix-32x32   a subset of the four
+//   ... --palette regression                  just one palette instead of both
+//   ... --frames 10                           filmstrip columns per shader
 //
-// One PNG per shape (roofline 60x1, megatree 16x50, matrix 32x32), each a grid of shaders by
-// time samples, scaled up nearest-neighbour - the same way the app's preview refuses to smooth,
-// because smoothing hides exactly the aliasing that ruins a prop.
+// Three things were wrong with the version this replaces, all found by using it:
 //
-// Colour inputs are filled from a fixed test palette (red, blue, gold, green) in declaration
-// order, wrapping - the rule both real programs apply - and every other input takes its header
-// DEFAULT, so what renders is what a user would first see.
+//   - it screenshotted `fullPage` on a fixed 1400x4000 viewport, so a two-shader run produced an
+//     image that was 90% empty background and a fifty-shader run was unusable. The page is now
+//     sized to its content and PAGED - eight shaders per sheet - so each row is big enough to
+//     judge.
+//   - it sampled THREE time points. Three stills cannot show whether motion flows or fizzes,
+//     which is most of what matters here, and they actively mislead: the round-4 `comet` reads as
+//     an orbiting comet in three stills and is provably a static ring. Every shader now gets a
+//     FILMSTRIP of evenly spaced frames across the 6 s loop.
+//   - it rendered against ONE fixed palette. That is right for regression comparability and wrong
+//     for judging beauty - it is half the reason the round-4 snow shader looked like red dots on
+//     blue. Both are now rendered: the fixed regression palette (proving the shader survives an
+//     arbitrary user palette) and the shader's own header DEFAULTs (showing the look its author
+//     intended). A shader good only under its own defaults has not solved the palette problem;
+//     one good only under the regression palette got lucky.
+//
+// The three prop shapes are unchanged from earlier rounds so this round's sheets stay comparable
+// to the committed ones; screen-192x108 is added as the fourth.
 
 import "./tsResolve.mjs";
 import { readFileSync, mkdirSync } from "node:fs";
 import { basename, join } from "node:path";
-import { chromium } from "playwright-core";
-import { existsSync } from "node:fs";
+import { SHAPES, REGRESSION_PALETTE, FPS, launchPage, installGl } from "./harness.mjs";
 
 const { parseIsf, defaultValueFor } = await import("../../packages/formats/src/isf.ts");
 const { webxlFragmentSource, VERTEX } = await import("../../apps/web/src/lib/webglShaderHost.ts");
 
-const SHAPES = [
-  { name: "roofline-60x1", width: 60, height: 1, scale: 12 },
-  { name: "megatree-16x50", width: 16, height: 50, scale: 8 },
-  { name: "matrix-32x32", width: 32, height: 32, scale: 10 },
-];
-const TIMES = [0.5, 3.0, 7.5];
-const PALETTE = [
-  [1, 0.15, 0.15, 1],
-  [0.15, 0.45, 1, 1],
-  [1, 0.8, 0.25, 1],
-  [0.25, 0.85, 0.45, 1],
-];
+const PER_SHEET = 8;   // shaders per PNG - any more and a row is too small to judge
+const LOOP_SECONDS = 6;
 
 const args = process.argv.slice(2);
-const outAt = args.indexOf("--out");
-const outDir = outAt >= 0 ? args[outAt + 1] : "tools/shader-check/render-out";
-const files = args.filter((a, i) => a !== "--out" && (outAt < 0 || i !== outAt + 1));
+const take = (flag, fallback = null) => {
+  const at = args.indexOf(flag);
+  if (at < 0) return fallback;
+  const v = args[at + 1];
+  args.splice(at, 2);
+  return v;
+};
+const outDir = take("--out", "tools/shader-check/render-out");
+const shapeFilter = take("--shapes")?.split(",");
+const paletteFilter = take("--palette")?.split(",");
+const columns = Number(take("--frames", "10"));
+const files = args.filter((a) => !a.startsWith("--"));
 if (files.length === 0) {
-  console.error("usage: node tools/shader-check/render.mjs file.fs [...] --out dir");
+  console.error("usage: node tools/shader-check/render.mjs file.fs [...] --out dir [--shapes a,b] [--palette regression|defaults] [--frames 10]");
   process.exit(2);
 }
 mkdirSync(outDir, { recursive: true });
 
+const shapes = SHAPES.filter((s) => !shapeFilter || shapeFilter.includes(s.name));
+const palettes = [
+  { name: "regression", label: "fixed regression palette (red, blue, gold, green) - survives an arbitrary user palette" },
+  { name: "defaults", label: "the shader's own header DEFAULTs - the look its author intended" },
+].filter((p) => !paletteFilter || paletteFilter.includes(p.name));
+
 const shaders = files.map((file) => {
   const text = readFileSync(file, "utf8");
-  let inputs = {};
+  const entry = { name: basename(file, ".fs"), fragment: webxlFragmentSource(text), colorCount: 0 };
+  const inputs = { regression: {}, defaults: {} };
   try {
     const parsed = parseIsf(text);
     const colorNames = parsed.inputs.filter((i) => i.type === "color").map((i) => i.name);
-    for (const input of parsed.inputs) inputs[input.name] = defaultValueFor(input);
-    colorNames.forEach((name, i) => (inputs[name] = PALETTE[i % PALETTE.length]));
+    entry.colorCount = colorNames.length;
+    for (const input of parsed.inputs) {
+      inputs.regression[input.name] = defaultValueFor(input);
+      inputs.defaults[input.name] = defaultValueFor(input);
+    }
+    colorNames.forEach((name, i) => (inputs.regression[name] = REGRESSION_PALETTE[i % REGRESSION_PALETTE.length]));
   } catch {
-    // no header: render with no inputs
+    // no header: render with no inputs, exactly as the app would
   }
-  return { name: basename(file, ".fs"), fragment: webxlFragmentSource(text), inputs };
+  entry.inputs = inputs;
+  return entry;
 });
 
-const browser = await chromium.launch({
-  executablePath: process.env.SHADER_CHECK_CHROMIUM ?? (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : undefined),
-  args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
-});
-const page = await browser.newPage({ viewport: { width: 1400, height: 4000 } });
-await page.setContent("<body style='background:#111;color:#ddd;font:12px monospace;margin:12px'></body>");
+const times = Array.from({ length: columns }, (_, i) => (i * LOOP_SECONDS) / columns);
 
-for (const shape of SHAPES) {
-  await page.evaluate(
-    ({ shaders, shape, TIMES, VERTEX }) => {
-      document.body.innerHTML = `<h3>${shape.name} - columns are TIME ${TIMES.join("s, ")}s</h3>`;
-      const gl = document.createElement("canvas").getContext("webgl2");
-      const makeStage = (type, src) => {
-        const s = gl.createShader(type);
-        gl.shaderSource(s, src);
-        gl.compileShader(s);
-        return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
-      };
-      const vertex = makeStage(gl.VERTEX_SHADER, VERTEX);
-      const buffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+const { browser, page } = await launchPage({ width: 1500, height: 1000 });
+await installGl(page, VERTEX);
 
-      for (const { name, fragment, inputs } of shaders) {
-        const row = document.createElement("div");
-        row.style.cssText = "display:flex;gap:8px;align-items:center;margin:6px 0";
-        const label = document.createElement("span");
-        label.textContent = name.padEnd(14);
-        label.style.width = "130px";
-        row.appendChild(label);
+let written = 0;
+for (const shape of shapes) {
+  for (const palette of palettes) {
+    for (let start = 0; start < shaders.length; start += PER_SHEET) {
+      const batch = shaders.slice(start, start + PER_SHEET);
+      const height = await page.evaluate(
+        ({ batch, shape, times, palette, loopSeconds, fps }) => {
+          const gl = window.__shaderGl;
+          document.body.style.cssText = "background:#0b0b0d;color:#e8e8ea;font:12px ui-monospace,monospace;margin:0;padding:16px";
+          document.body.innerHTML =
+            `<div style="font-size:15px;font-weight:600;margin-bottom:2px">${shape.name} &middot; ${palette.name}</div>` +
+            `<div style="opacity:.55;margin-bottom:14px">${palette.label} &mdash; ${times.length} frames evenly spaced across the ${loopSeconds}s loop, left to right</div>`;
 
-        const frag = makeStage(gl.FRAGMENT_SHADER, fragment);
-        if (!frag || !vertex) {
-          label.textContent += " (does not compile)";
-          document.body.appendChild(row);
-          continue;
-        }
-        const program = gl.createProgram();
-        gl.attachShader(program, vertex);
-        gl.attachShader(program, frag);
-        gl.bindAttribLocation(program, 0, "position");
-        gl.linkProgram(program);
-        gl.useProgram(program);
-        gl.enableVertexAttribArray(0);
-        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+          for (const sh of batch) {
+            const row = document.createElement("div");
+            row.style.cssText = "display:flex;gap:6px;align-items:center;margin:0 0 10px";
+            const label = document.createElement("div");
+            label.textContent = sh.name;
+            label.style.cssText = "width:150px;flex:none;opacity:.9";
+            row.appendChild(label);
 
-        const texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, shape.width, shape.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        const fb = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-        gl.viewport(0, 0, shape.width, shape.height);
-
-        const uni = (n) => gl.getUniformLocation(program, n);
-        for (const t of TIMES) {
-          gl.uniform2f(uni("RENDERSIZE"), shape.width, shape.height);
-          gl.uniform1f(uni("TIME"), t);
-          gl.uniform1f(uni("TIMEDELTA"), 1 / 20);
-          gl.uniform1i(uni("FRAMEINDEX"), Math.round(t * 20));
-          gl.uniform1i(uni("NUMCOLORS"), 4);
-          gl.uniform4f(uni("DATE"), 0, 0, 0, t);
-          for (const [n, v] of Object.entries(inputs)) {
-            const loc = uni(n);
-            if (!loc) continue;
-            if (typeof v === "boolean") gl.uniform1i(loc, v ? 1 : 0);
-            else if (typeof v === "number") {
-              // ints and floats both appear as numbers; try float, fall back to int on error
-              gl.uniform1f(loc, v);
-              if (gl.getError() !== gl.NO_ERROR) gl.uniform1i(loc, Math.round(v));
-            } else if (Array.isArray(v)) {
-              if (v.length >= 4) gl.uniform4f(loc, v[0], v[1], v[2], v[3]);
-              else if (v.length === 2) gl.uniform2f(loc, v[0], v[1]);
+            const built = gl.build(sh.fragment);
+            if (built.error) {
+              label.textContent = sh.name + "  (does not compile)";
+              label.style.color = "#ff6b6b";
+              document.body.appendChild(row);
+              continue;
             }
+            const frames = gl.frames(built.program, shape.width, shape.height, times, sh.inputs[palette.name], sh.colorCount || 4, fps);
+            for (const px of frames) {
+              const canvas = document.createElement("canvas");
+              canvas.width = shape.width;
+              canvas.height = shape.height;
+              // Nearest-neighbour on purpose: smoothing hides exactly the aliasing that ruins a
+              // prop, which is the thing these sheets exist to reveal.
+              canvas.style.cssText =
+                `width:${shape.width * shape.scale}px;height:${Math.max(shape.height * shape.scale, 10)}px;` +
+                "image-rendering:pixelated;border:1px solid #26262b;flex:none";
+              const ctx = canvas.getContext("2d");
+              const image = ctx.createImageData(shape.width, shape.height);
+              const isFloat = px instanceof Float32Array;
+              for (let y = 0; y < shape.height; y++) {
+                // GL rows are bottom-up, canvas rows are top-down.
+                const srcRow = (shape.height - 1 - y) * shape.width * 4;
+                for (let x = 0; x < shape.width * 4; x++) {
+                  const v = px[srcRow + x];
+                  image.data[y * shape.width * 4 + x] = isFloat ? Math.round(Math.min(1, Math.max(0, v || 0)) * 255) : v;
+                }
+              }
+              ctx.putImageData(image, 0, 0);
+              row.appendChild(canvas);
+            }
+            gl.release(built.program);
+            document.body.appendChild(row);
           }
-          gl.drawArrays(gl.TRIANGLES, 0, 6);
-          const pixels = new Uint8ClampedArray(shape.width * shape.height * 4);
-          gl.readPixels(0, 0, shape.width, shape.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+          // Measure the last row rather than trusting scrollHeight, which over-reports on a
+          // flex layout and leaves a band of empty background - the very thing that made the
+          // old sheets unusable.
+          const rows = document.body.querySelectorAll("div");
+          const last = rows[rows.length - 1];
+          return Math.ceil((last ? last.getBoundingClientRect().bottom : document.body.scrollHeight) + 16);
+        },
+        { batch, shape, times, palette, loopSeconds: LOOP_SECONDS, fps: FPS },
+      );
 
-          const canvas = document.createElement("canvas");
-          canvas.width = shape.width;
-          canvas.height = shape.height;
-          canvas.style.cssText = `width:${shape.width * shape.scale}px;height:${Math.max(shape.height * shape.scale, 8)}px;image-rendering:pixelated;border:1px solid #333`;
-          const ctx = canvas.getContext("2d");
-          const image = ctx.createImageData(shape.width, shape.height);
-          // flip: GL rows are bottom-up, canvas top-down
-          for (let y = 0; y < shape.height; y++) {
-            const src = (shape.height - 1 - y) * shape.width * 4;
-            image.data.set(pixels.subarray(src, src + shape.width * 4), y * shape.width * 4);
-          }
-          ctx.putImageData(image, 0, 0);
-          row.appendChild(canvas);
-        }
-        gl.deleteProgram(program);
-        document.body.appendChild(row);
-      }
-    },
-    { shaders, shape, TIMES, VERTEX },
-  );
-  const out = join(outDir, `${shape.name}.png`);
-  await page.screenshot({ path: out, fullPage: true });
-  console.log(`wrote ${out}`);
+      // Size the viewport to the content instead of screenshotting a fixed 4000px page: the old
+      // sheets were mostly empty background, which is what made them unusable at fifty shaders.
+      const width = 150 + times.length * (shape.width * shape.scale + 8) + 60;
+      await page.setViewportSize({ width: Math.min(Math.max(width, 700), 4000), height: Math.min(height, 4000) });
+      const page_n = Math.floor(start / PER_SHEET) + 1;
+      const pages = Math.ceil(shaders.length / PER_SHEET);
+      const suffix = pages > 1 ? `-${String(page_n).padStart(2, "0")}` : "";
+      const out = join(outDir, `${shape.name}-${palette.name}${suffix}.png`);
+      await page.screenshot({ path: out });
+      written++;
+      console.log(`wrote ${out}`);
+    }
+  }
 }
 await browser.close();
+console.log(`\n${written} sheet${written === 1 ? "" : "s"} in ${outDir}`);
