@@ -1,0 +1,39 @@
+{
+  "$comment": "The only human-scored shader set this project has: the 26 Haiku 4.5 round-4 shaders, scored by eye from contact sheets on 2026-08-21 and recorded in results/README.md. Thresholds are fitted against these rather than chosen by feel, so 'this threshold rejects beautiful work' becomes a checkable claim. 1 = wrong or invisible, 3 = recognisable, 5 = would ship. The four abuse-* files are excluded: they are gate probes, not shaders anyone asked for.",
+  "source": "tools/shader-check/results/README.md, 'Subjective quality, Haiku 4.5 round 4, scored by eye'",
+  "scoredOn": "2026-08-21",
+  "shaderDir": "tools/shader-check/results/haiku-4-5-round4",
+  "scores": {
+    "alternate": { "matrix-32x32": 5, "roofline-60x1": 5, "note": "exactly the ask, clean swaps" },
+    "aurora": { "matrix-32x32": 4, "roofline-60x1": 4, "note": "soft drifting curtains" },
+    "barber": { "matrix-32x32": 5, "roofline-60x1": 4, "note": "bold diagonals" },
+    "breathe": { "matrix-32x32": 4, "roofline-60x1": 4, "note": "smooth glow cycle" },
+    "candle": { "matrix-32x32": 4, "roofline-60x1": 3, "note": "warm flicker; reads as bands on the line" },
+    "candy-cane": { "matrix-32x32": 5, "roofline-60x1": 5, "note": "crisp moving stripes" },
+    "chase": { "matrix-32x32": 4, "roofline-60x1": 4, "note": "clear moving band" },
+    "checker": { "matrix-32x32": 5, "roofline-60x1": 5, "note": "crisp, slides as asked" },
+    "colour-wash": { "matrix-32x32": 4, "roofline-60x1": 4, "note": "clean whole-canvas fade" },
+    "comet": {
+      "matrix-32x32": 4,
+      "roofline-60x1": 3,
+      "note": "ring orbit at 32 squared; bright dot with tail on the line",
+      "disputed": "Provably static, so this score cannot be used to fit a motion threshold. brightness = max(cometTrail, tail * 0.6), and cometTrail = smoothstep(0.08, 0.0, d) while tail's spatial factor is smoothstep(0.06, 0.0, d) - the narrower band is <= the wider one everywhere, so tail * 0.6 can never exceed cometTrail and max() always returns the time-independent term. colour is time-independent too. Measured slowMotionEnergy is exactly 0 at every shape, which agrees. The orbit was computed and then discarded; three still frames of a ring cannot show that, which is precisely why filmstrips replaced them."
+    },
+    "fire": { "matrix-32x32": 2, "roofline-60x1": 3, "note": "too dark at defaults on 32 squared; roofline branch works" },
+    "fireworks": { "matrix-32x32": 2, "roofline-60x1": 2, "note": "bursts too dim at night-viewing contrast" },
+    "flag": { "matrix-32x32": 5, "roofline-60x1": 4, "note": "genuinely reads as a waving US flag" },
+    "fog": { "matrix-32x32": 2, "roofline-60x1": 2, "note": "drifting but dim - arguably faithful to fog" },
+    "lava-lamp": { "matrix-32x32": 2, "roofline-60x1": 3, "note": "blobs too dark at defaults" },
+    "matrix-rain": { "matrix-32x32": 4, "roofline-60x1": 3, "note": "falling streaks; x-fallback visible on the line" },
+    "plasma": { "matrix-32x32": 5, "roofline-60x1": 4, "note": "proper swirl" },
+    "pulse": { "matrix-32x32": 2, "roofline-60x1": 3, "note": "beats, but from near-black - low contrast at 32 squared" },
+    "rainbow": { "matrix-32x32": 5, "roofline-60x1": 5, "note": "full saturated sweep" },
+    "ripples": { "matrix-32x32": 5, "roofline-60x1": 3, "note": "concentric rings; sparse on the line" },
+    "snow": { "matrix-32x32": 4, "roofline-60x1": 4, "note": "drifting flakes, readable dashes on the line" },
+    "sparkle": { "matrix-32x32": 4, "roofline-60x1": 4, "note": "dense twinkle over base colour" },
+    "sunrise": { "matrix-32x32": 4, "roofline-60x1": 3, "note": "rising warm band" },
+    "tunnel": { "matrix-32x32": 5, "roofline-60x1": 3, "note": "strong spiral at 32 squared" },
+    "twinkle": { "matrix-32x32": 3, "roofline-60x1": 4, "note": "works, a little uniform" },
+    "waves": { "matrix-32x32": 4, "roofline-60x1": 4, "note": "rolling bands" }
+  }
+}

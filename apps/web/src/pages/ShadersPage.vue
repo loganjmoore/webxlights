@@ -18,9 +18,16 @@ const route = useRoute();
 const projectId = computed(() => route.params.projectId as string);
 
 const shaders = ref<ShaderRecord[]>([]);
+// The browsing vocabulary the built-in library is baked with (tools/shader-check/bake-builtins.mjs)
+// plus "Generator", which every ISF header carries.
+const CATEGORIES = ["Light show", "Motion background", "Natural", "Geometric", "Seasonal", "Generator"];
 const loading = ref(true);
 const search = ref("");
-const scope = ref<"all" | "mine">("all");
+// One control rather than two. The library ships with 50 built-ins, so "whose shaders am I
+// looking at" is now a real question - and separating them matters because 50 built-ins would
+// otherwise bury every new community creation under the recency sort.
+const scope = ref<"all" | "builtin" | "community" | "mine">("all");
+const category = ref("");
 const sort = ref<"recent" | "popular">("recent");
 const status = ref<CreditStatus | null>(null);
 
@@ -61,6 +68,8 @@ async function refresh(): Promise<void> {
     const page = await api.listShaders({
       q: search.value || undefined,
       mine: scope.value === "mine",
+      kind: scope.value === "builtin" || scope.value === "community" ? scope.value : "all",
+      category: category.value || undefined,
       sort: sort.value,
     });
     shaders.value = page.data;
@@ -68,6 +77,13 @@ async function refresh(): Promise<void> {
     loading.value = false;
   }
 }
+
+const emptyMessage = computed(() => {
+  if (scope.value === "mine") return "You have not made any shaders yet.";
+  if (search.value || category.value) return "Nothing matches that. Try a different search or category.";
+  if (scope.value === "community") return "Nobody has published a shader yet — generate the first one.";
+  return "No shaders yet — generate the first one.";
+});
 
 async function refreshStatus(): Promise<void> {
   try {
@@ -325,8 +341,14 @@ onMounted(async () => {
       <div class="filters">
         <input v-model="search" placeholder="Search shaders…" @keydown.enter="refresh" />
         <select v-model="scope" @change="refresh">
-          <option value="all">Everyone's</option>
+          <option value="all">All shaders</option>
+          <option value="builtin">Built-in</option>
+          <option value="community">Made by people</option>
           <option value="mine">Mine</option>
+        </select>
+        <select v-model="category" @change="refresh">
+          <option value="">Any category</option>
+          <option v-for="c in CATEGORIES" :key="c" :value="c">{{ c }}</option>
         </select>
         <select v-model="sort" @change="refresh">
           <option value="recent">Newest</option>
@@ -337,7 +359,7 @@ onMounted(async () => {
 
       <p v-if="loading" class="empty">Loading…</p>
       <p v-else-if="shaders.length === 0" class="empty">
-        {{ scope === "mine" ? "You have not made any shaders yet." : "No shaders yet — generate the first one." }}
+        {{ emptyMessage }}
       </p>
 
       <ul v-else class="grid">
@@ -345,10 +367,15 @@ onMounted(async () => {
           <!-- Paused: thirty shaders running at once would melt a laptop. They start on hover. -->
           <ShaderPreview :source="shader.source" :running="false" :color-inputs="colorInputNames(shader.inputs ?? [])" class="thumb" />
           <div class="meta">
-            <h3>{{ shader.name }}</h3>
+            <h3>
+              {{ shader.name }}
+              <!-- Built-ins ship with the app and have no author, so they are marked rather than
+                   attributed to "someone". -->
+              <span v-if="shader.builtin_key" class="badge">Built-in</span>
+            </h3>
             <p v-if="shader.description" class="desc">{{ shader.description }}</p>
             <p class="by">
-              {{ shader.author?.name ?? "someone" }}
+              {{ shader.builtin_key ? "Ships with webXLights" : (shader.author?.name ?? "someone") }}
               <span v-if="shader.use_count > 0">· used {{ shader.use_count }}×</span>
               <span v-if="!shader.is_public" class="private">· private</span>
             </p>
@@ -587,6 +614,19 @@ button.link.danger {
 }
 .private {
   color: #e8c468;
+}
+/* Quiet on purpose: it marks provenance, it is not a call to action. */
+.badge {
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid #3a3a45;
+  border-radius: 999px;
+  color: #9a9aa6;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 .owner-actions {
   margin-top: 0.3rem;

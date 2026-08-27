@@ -119,6 +119,25 @@ header defaults, TIME 0.5/3/7.5 s). 1 = wrong or invisible, 3 = recognisable, 5 
 | twinkle | 3 | 4 | works, a little uniform |
 | waves | 4 | 4 | rolling bands |
 
+### Three of these scores were later contradicted by measurement (2026-08-26)
+
+Scoring from three still frames turned out to hide things that only motion and time reveal. When
+`metrics.mjs` was calibrated against this table, it disagreed with it in three places, and in all
+three the table was wrong - see `docs/SHADER-LIBRARY.md` for the full evidence:
+
+- **`comet` (4/3) is provably static.** `max(cometTrail, tail * 0.6)` can never select the
+  animated term, because `tail`'s spatial factor `smoothstep(0.06, 0.0, d)` is <= `cometTrail`'s
+  `smoothstep(0.08, 0.0, d)` everywhere. Measured inter-frame difference is exactly 0.0 at every
+  shape and timestamp. The orbit is computed and then discarded. It is marked `disputed` in
+  `calibration.json` and excluded from threshold fitting.
+- **`snow` (4/4) and `sparkle` (4/4) degrade after ten hours.** Both drive a
+  `fract(sin(h) * 43758.5)` hash straight off `TIME`. At `TIME` 36000, `snow` loses half its
+  contrast (0.424 -> 0.220) and four fifths of its motion (0.146 -> 0.030): the flakes stop
+  moving. `rainbow`, which uses only simple periodic functions, is stable to 0.002.
+
+None of this is a criticism of the scoring - it is the reason `render.mjs` now emits filmstrips
+instead of three stills, and the reason `driftDelta` exists.
+
 Mean **3.9 at 32×32, 3.6 at 60×1**. The recurring failure mode is not wrong shapes but **too
 little brightness at header defaults** (fire, fireworks, fog, lava-lamp, pulse - 5 of 26 score
 2 somewhere). That is a prompt-tuning target for a future round ("start bright; a shader that

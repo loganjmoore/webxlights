@@ -122,6 +122,8 @@ export interface ShaderRecord {
   inputs: IsfInput[];
   categories: string[];
   is_public: boolean;
+  /** Set only on the shaders that ship with the app; null for anything a person made. */
+  builtin_key: string | null;
   prompt: string | null;
   ai_generated: boolean;
   use_count: number;
@@ -394,12 +396,24 @@ export const api = {
   // ---- Shader library -------------------------------------------------------------------
   // Not scoped to a layout or a project: a shader is content one person makes and everyone can
   // use, so it hangs off its author rather than off a show.
-  listShaders: (params: { q?: string; mine?: boolean; sort?: "recent" | "popular"; page?: number } = {}) => {
+  listShaders: (
+    params: {
+      q?: string;
+      mine?: boolean;
+      sort?: "recent" | "popular";
+      page?: number;
+      /** Shaders that ship with the app, shaders people made, or both. */
+      kind?: "all" | "builtin" | "community";
+      category?: string;
+    } = {},
+  ) => {
     const query = new URLSearchParams();
     if (params.q) query.set("q", params.q);
     if (params.mine) query.set("mine", "1");
     if (params.sort) query.set("sort", params.sort);
     if (params.page) query.set("page", String(params.page));
+    if (params.kind && params.kind !== "all") query.set("kind", params.kind);
+    if (params.category) query.set("category", params.category);
     const suffix = query.toString();
     return request<ShaderPage>(`/v1/shaders${suffix ? `?${suffix}` : ""}`);
   },
