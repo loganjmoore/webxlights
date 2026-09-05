@@ -7,6 +7,11 @@ updates:
     groups:
       npm:
         patterns: ["*"]
+    # TypeScript majors land before typescript-eslint supports them, and one version in the group
+    # outside the linter's peer range fails the whole group's install. Bumped by hand instead.
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: composer
     directory: /apps/api
     schedule:
@@ -27,3 +32,6 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # php:8.5 tags as a minor but the opcache extension does not build on it yet (#115, #123).
+      - dependency-name: php
+        update-types: ["version-update:semver-minor"]
