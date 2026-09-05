@@ -290,6 +290,21 @@ function dropKey(): void {
   notice.value = "Key removed from this browser.";
 }
 
+/**
+ * The shader as an ISF `.fs` file, which is the format xLights' Shader effect loads: drop it in
+ * the show folder's Shaders directory and pick it in the effect. The source already carries
+ * the ISF header and is checked against xLights' dialect, so the file is the source as is.
+ */
+function downloadFs(name: string, source: string): void {
+  const blob = new Blob([source], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name.trim().replace(/[^a-z0-9._ -]/gi, "_") || "shader"}.fs`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function remove(shader: ShaderRecord): Promise<void> {
   if (!window.confirm(`Delete "${shader.name}"? Sequences already using it keep their copy.`)) return;
   await api.deleteShader(shader.id);
@@ -410,6 +425,7 @@ onMounted(async () => {
             <button class="primary" :disabled="busy" @click="publish">Save</button>
             <button :disabled="busy" @click="draft = null">Discard</button>
             <button :disabled="busy" @click="generate">Try again</button>
+            <button :disabled="busy" title="Save as an ISF .fs file for the Shader effect in desktop xLights" @click="downloadFs(draftName, draft.source)">Download for xLights</button>
           </div>
         </div>
       </div>
@@ -483,11 +499,14 @@ onMounted(async () => {
               <span v-if="shader.use_count > 0">· used {{ shader.use_count }}×</span>
               <span v-if="!shader.is_public" class="private">· private</span>
             </p>
-            <div v-if="shader.user_id && status" class="owner-actions">
-              <button class="link" @click="togglePublic(shader)">
-                {{ shader.is_public ? "Make private" : "Share" }}
-              </button>
-              <button class="link danger" @click="remove(shader)">Delete</button>
+            <div class="owner-actions">
+              <button class="link" title="Save as an ISF .fs file. Put it in your show folder's Shaders directory and pick it in xLights' Shader effect." @click="downloadFs(shader.name, shader.source)">Download for xLights</button>
+              <template v-if="shader.user_id && status">
+                <button class="link" @click="togglePublic(shader)">
+                  {{ shader.is_public ? "Make private" : "Share" }}
+                </button>
+                <button class="link danger" @click="remove(shader)">Delete</button>
+              </template>
             </div>
           </div>
         </li>
