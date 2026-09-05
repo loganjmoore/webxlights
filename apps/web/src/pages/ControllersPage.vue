@@ -5,6 +5,7 @@ import MenuButton from "../components/MenuButton.vue";
 import { useRoute } from "vue-router";
 import { api, type ControllerProtocol, type ControllerRecord, type ControllerUpsertPayload, type ModelRecord } from "../lib/api";
 import ControllerVisualiser from "../components/ControllerVisualiser.vue";
+import ModalPanel from "../components/ModalPanel.vue";
 import { applyChainPatches, type ChainPatch } from "../lib/controllerChain";
 import { channelCountForModel } from "../lib/fseqExport";
 
@@ -23,6 +24,10 @@ const chaining = ref(false);
  * returned - a chain of six models is six small PATCHes, and waiting on all of them before
  * moving anything on screen would make the drop feel like it missed.
  */
+// The visualiser is a working surface, so it gets a window of its own rather than a strip
+// under the table: controllers down one side, the models still to place down the other.
+const showVisualiser = ref(false);
+
 async function applyPatches(patches: ChainPatch[]): Promise<void> {
   if (patches.length === 0 || layoutId.value === null) return;
   const before = models.value;
@@ -118,7 +123,18 @@ onMounted(load);
           { label: 'Null (channels with no output)', run: () => addController('null', 'Null') },
         ]"
       />
+      <button type="button" class="visualiser-button" title="Chain models onto controllers by dragging" @click="showVisualiser = true">Visualiser</button>
     </header>
+
+    <ModalPanel v-if="showVisualiser" id="controller-visualiser" full title="Controller visualiser" @close="showVisualiser = false">
+      <ControllerVisualiser
+        :controllers="controllers"
+        :models="models"
+        :channel-count-for="channelCountForModel"
+        :saving="chaining"
+        @patches="applyPatches"
+      />
+    </ModalPanel>
     <p v-if="error" class="error">{{ error }}</p>
 
     <div class="body">
@@ -153,13 +169,6 @@ onMounted(load);
           </tr>
         </tbody>
       </table>
-      <ControllerVisualiser
-        :controllers="controllers"
-        :models="models"
-        :channel-count-for="channelCountForModel"
-        :saving="chaining"
-        @patches="applyPatches"
-      />
       </div>
 
       <aside v-if="selected" class="props-panel">
