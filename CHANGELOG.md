@@ -1,5 +1,11 @@
 # Changelog
 
+## The layout palette drags the same way, and the library reaches thirty
+
+The Layout page's model palette was the last native HTML5 drag in the app. It now uses the same pointer-captured gesture as the effect palette: the type lifts under the pointer, the proxy turns green over the ground plane, Escape cancels, and release creates the model where the ray meets the plane. `LayoutCanvas3D` exposes one method (`worldAt`) instead of owning a drop handler, so the palette knows nothing about cameras. Verified live: a Star dropped on the 3D canvas landed at the pointer and appeared in the model list.
+
+Ten more built-in shaders: barber spiral, diagonal wipe, accent flash, peppermint swirl, warm white sparkle, halloween breath, independence burst, champagne shimmer, ocean swell and rain ripples. Thirty of thirty compile in both dialects, clear every fitted gate at all four shapes, and the closest pair is 0.09 apart. Tuned from the contact sheets: a wipe whose "hard edge" was three pixels of gradient, fireworks that were too dim between bursts, and a sparkle that read as sand.
+
 ## A menu bar, panels you can pin, and a shader library that actually exists
 
 The sequencer's header had become twenty-two buttons in two wrapping rows, every panel and every export at the same weight, and the tab strip that moved between Layout, Sequencer, Network and Shaders sat in a different place on every page. Now one app bar (`AppBar.vue`) runs across every project page - wordmark, the four workspaces, Docs, log out - and the sequencer's toolbar is one row: transport, undo, zoom and view, then two desktop-style menus (`MenuButton.vue`). **Windows** lists every panel with a tick on the open ones and the key that also opens it; **Sequence** holds settings, preferences, snapshot and export. The Controllers page's three "Add" buttons became one "Add controller" menu. `TabNav.vue` is gone.

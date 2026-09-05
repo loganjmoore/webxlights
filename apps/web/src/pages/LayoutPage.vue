@@ -37,6 +37,8 @@ import { loadPreferences } from "../lib/preferences";
 import { buildPlacementReport, copyOrDownloadReport } from "../lib/placementReport";
 import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
+
+const canvasRef = ref<InstanceType<typeof LayoutCanvas3D> | null>(null);
 import ModelPalette from "../components/ModelPalette.vue";
 import AppBar from "../components/AppBar.vue";
 import { NODE_SPACING } from "../lib/worldUnits";
@@ -470,7 +472,7 @@ function nextNameForType(type: string): string {
   return `${prefix}${max + 1}`;
 }
 
-// Dropped from ModelPalette.vue via LayoutCanvas's dragover/drop handlers. raw_attrs stays {}
+// Dropped from ModelPalette.vue onto the ground plane (LayoutCanvas3D's worldAt). raw_attrs stays {}
 // deliberately - computeGeometryFromAttrs (packages/engine) already has a sensible fallback
 // default for every draggable type, so an empty bag renders exactly like a real xLights
 // "place with defaults" model would, ready to resize via the position panel below.
@@ -1332,7 +1334,7 @@ onUnmounted(() => {
         </div>
       </aside>
       <div class="canvas-wrap">
-        <ModelPalette />
+        <ModelPalette :target="(x, y) => canvasRef?.worldAt(x, y) ?? null" @create="handleCreate" />
         <div class="canvas-area">
           <!--
             The house photo sits behind the 2D canvas rather than being drawn into it: the canvas
@@ -1348,6 +1350,7 @@ onUnmounted(() => {
             alt=""
           />
           <LayoutCanvas3D
+            ref="canvasRef"
             :models="previewModels"
             :view-objects="viewObjects"
             :selected-model-id="selectedModelId"

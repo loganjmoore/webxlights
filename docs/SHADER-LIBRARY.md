@@ -1,10 +1,10 @@
 # The built-in shader library
 
-Status on 2026-09-04: **twenty of the fifty concepts are shipped**, hand-authored rather than
+Status on 2026-09-04: **thirty of the fifty concepts are shipped**, hand-authored rather than
 generated, because no machine that has worked on this has held model credentials. Every one of
-the twenty compiles in both dialects (`check.mjs`, xLights via glslang), clears every fitted gate
+the thirty compiles in both dialects (`check.mjs`, xLights via glslang), clears every fitted gate
 at all four shapes (`metrics.mjs`), survives the ten-hour drift check, and is no near-duplicate of
-another (`closestPairs` minimum 0.097). They were reviewed by eye from `render.mjs` contact
+another (`closestPairs` minimum 0.09). They were reviewed by eye from `render.mjs` contact
 sheets at 32x32 and tuned where the numbers passed and the picture did not. See the hand-edit
 log below for what that changed.
 
@@ -246,7 +246,7 @@ The machinery is tested (`metricsCore.test.mjs`) and prints automatically from `
 
 ## Hand-edit log
 
-The twenty shipped shaders were written by hand, so this log records what the *measurement* and
+The thirty shipped shaders were written by hand, so this log records what the *measurement* and
 the *eye* changed after the first draft of each - the things a prompt would have to say to get
 them right first time. Each is now a line in `SYSTEM`.
 
