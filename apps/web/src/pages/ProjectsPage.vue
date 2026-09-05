@@ -79,8 +79,9 @@ async function createProject(): Promise<void> {
   const project = await projects.create(newName.value.trim());
   newName.value = "";
   showNew.value = false;
-  // A new project's first job is a layout: there is nothing to sequence until there are models.
-  router.push(`/projects/${project.id}/layout`);
+  // Stays on the list: the new card appears where the others are, which is the confirmation.
+  // Where to go next (layout first, usually) is the user's choice from the card.
+  packageMessage.value = `Created ${project.name}`;
 }
 
 async function openShare(projectId: number): Promise<void> {
