@@ -495,7 +495,7 @@ onMounted(async () => {
             </h3>
             <p v-if="shader.description" class="desc">{{ shader.description }}</p>
             <p class="by">
-              {{ shader.builtin_key ? "Ships with webXLights" : (shader.author?.name ?? "someone") }}
+              {{ shader.builtin_key ? "Ships with pixl" : (shader.author?.name ?? "someone") }}
               <span v-if="shader.use_count > 0">· used {{ shader.use_count }}×</span>
               <span v-if="!shader.is_public" class="private">· private</span>
             </p>

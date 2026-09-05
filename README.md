@@ -1,6 +1,6 @@
 # webXLights
 
-Browser-based clone of xLights, licensed under the GPL-3.0 like xLights itself (see [LICENSE](LICENSE)). The public site lives in `apps/web/public/site/` and is served at `/`, `/features`, `/why`, `/xlights`, `/self-hosting` and `/about` by nginx. See [ROADMAP.md](ROADMAP.md) for milestones, [DECISIONS.md](DECISIONS.md) for the locked stack, [DESIGN.md](DESIGN.md) for the interface rules, and [SECURITY.md](SECURITY.md) for the security model and how to report a problem.
+Browser-based clone of xLights, licensed under the GPL-3.0 like xLights itself (see [LICENSE](LICENSE)). The hosted copy is called **pixl** and lives at [pixl.community](https://pixl.community); webXLights stays the name of the code. The public site lives in `apps/web/public/site/` and is served at `/`, `/features`, `/why`, `/xlights`, `/self-hosting` and `/about` by nginx. See [ROADMAP.md](ROADMAP.md) for milestones, [DECISIONS.md](DECISIONS.md) for the locked stack, [DESIGN.md](DESIGN.md) for the interface rules, and [SECURITY.md](SECURITY.md) for the security model and how to report a problem.
 
 ## Local dev
 

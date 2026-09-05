@@ -3,32 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Self-host webXLights</title>
-<meta name="description" content="How to run webXLights on your own machine or server: the pieces, the Docker image, the Render blueprint, the optional AI keys, and the GPL-3.0 licence.">
-<link rel="canonical" href="https://webxlights-web.onrender.com/self-hosting">
+<title>Self-host pixl</title>
+<meta name="description" content="How to run pixl on your own machine or server: the pieces, the Docker image, the Render blueprint, the optional AI keys, and the GPL-3.0 licence.">
+<link rel="canonical" href="https://pixl.community/self-hosting">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="stylesheet" href="/site/site.css">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="webXLights">
-<meta property="og:title" content="Self-host webXLights">
-<meta property="og:description" content="How to run webXLights on your own machine or server: the pieces, the Docker image, the Render blueprint, the optional AI keys, and the GPL-3.0 licence.">
-<meta property="og:url" content="https://webxlights-web.onrender.com/self-hosting">
-<meta property="og:image" content="https://webxlights-web.onrender.com/site/img/sequencer.png">
+<meta property="og:site_name" content="pixl">
+<meta property="og:title" content="Self-host pixl">
+<meta property="og:description" content="How to run pixl on your own machine or server: the pieces, the Docker image, the Render blueprint, the optional AI keys, and the GPL-3.0 licence.">
+<meta property="og:url" content="https://pixl.community/self-hosting">
+<meta property="og:image" content="https://pixl.community/site/img/sequencer.png">
 <meta name="twitter:card" content="summary_large_image">
 
 </head>
 <body>
 <header class="site-head"><div class="wrap">
-<a class="wordmark" href="/">webX<span>Lights</span></a>
+<a class="wordmark" href="/">pixl</a>
 <nav class="site-nav" aria-label="Site"><a href="/features">Features</a><a href="/why">Why</a><a href="/xlights">xLights</a><a href="/self-hosting" aria-current="page">Self-host</a><a href="/about">About</a><a href="/docs">Docs</a></nav>
 <a class="btn primary" href="/auth">Open the app</a>
 </div></header>
 <main class="wrap">
 
-<div class="hero"><h1>Run your own webXLights</h1><p class="lede">Open source, GPL-3.0. Run it on a laptop, a home server, or a host of your choosing.</p></div>
+<div class="hero"><h1>Run your own pixl</h1><p class="lede">Open source, GPL-3.0. Run it on a laptop, a home server, or a host of your choosing.</p></div>
 <section class="first"><div class="prose">
 <h2>What it is made of</h2>
-<p>A Vue app (the sequencer, layout and previews, all in the browser) and a Laravel API (accounts, projects, sequences, audio, the shader assistant, lyric timing) behind Postgres. One Docker image holds both behind nginx. The <a href="https://github.com/loganjmoore/webxlights">repository</a> has the details; this is the short version.</p>
+<p>A Vue app (the sequencer, layout and previews, all in the browser) and a Laravel API (accounts, projects, sequences, audio, the shader assistant, lyric timing) behind Postgres. One Docker image holds both behind nginx. The <a href="https://github.com/loganjmoore/webxlights">webXLights repository</a> has the details; this is the short version.</p>
 <h2>On your own machine</h2>
 <pre><code>git clone https://github.com/loganjmoore/webxlights.git
 cd webxlights
@@ -51,7 +51,7 @@ docker run -p 10000:10000 -e APP_KEY=... -e DB_URL=postgres://... webxlights</co
 </tbody></table>
 <p>Without a key, each feature says so in the app and everything else works.</p>
 <h2>Licence</h2>
-<p>webXLights is licensed under the <a href="https://github.com/loganjmoore/webxlights/blob/main/LICENSE">GNU General Public License v3.0</a>, the same licence as xLights. You may run it, study it, change it and share it, and changes you distribute stay under the same licence. Security reports go to the address in <a href="https://github.com/loganjmoore/webxlights/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+<p>The code behind pixl, webXLights, is licensed under the <a href="https://github.com/loganjmoore/webxlights/blob/main/LICENSE">GNU General Public License v3.0</a>, the same licence as xLights. You may run it, study it, change it and share it, and changes you distribute stay under the same licence. Security reports go to the address in <a href="https://github.com/loganjmoore/webxlights/blob/main/SECURITY.md">SECURITY.md</a>.</p>
 </div></section>
 
 </main>
@@ -61,7 +61,7 @@ docker run -p 10000:10000 -e APP_KEY=... -e DB_URL=postgres://... webxlights</co
 <a href="https://github.com/loganjmoore/webxlights/blob/main/SECURITY.md">Security</a>
 <a href="/docs">Docs</a>
 <a href="https://xlights.org">xLights desktop</a>
-<span class="fine">webXLights is an independent open source project. It is not affiliated with or endorsed by the xLights project; xLights is a trademark of its authors.</span>
+<span class="fine">pixl is the hosted home of webXLights, an independent open source project. It is not affiliated with or endorsed by the xLights project; xLights is a trademark of its authors.</span>
 </div></footer>
 </body>
 </html>

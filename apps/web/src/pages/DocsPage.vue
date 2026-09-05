@@ -30,7 +30,7 @@ function isAudioReactive(name: string): boolean {
 
     <section id="import">
       <h2>Import guide</h2>
-      <p>Get an existing xLights show into webXLights:</p>
+      <p>Get an existing xLights show into pixl:</p>
       <ol>
         <li>
           <strong>Layout.</strong> In your project's Layout page, click "Import xlights_rgbeffects.xml" and pick that file from your xLights show
@@ -39,11 +39,11 @@ function isAudioReactive(name: string): boolean {
         </li>
         <li>
           <strong>Sequence.</strong> From the Sequences page, click "Import .xsq" and pick a rendered <code>.xsq</code> file. Model rows are matched
-          to your layout by exact name; unmatched names and effects webXLights doesn't fully translate yet are both listed in the import summary
+          to your layout by exact name; unmatched names and effects pixl doesn't fully translate yet are both listed in the import summary
           rather than dropped without a trace.
         </li>
         <li>
-          <strong>Audio.</strong> webXLights doesn't store audio server-side yet, so re-select the original audio file the first time you open an
+          <strong>Audio.</strong> pixl doesn't store audio server-side yet, so re-select the original audio file the first time you open an
           imported (or any) sequence — the waveform and playback pick up from there.
         </li>
       </ol>

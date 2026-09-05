@@ -1,5 +1,9 @@
 # Changelog
 
+## The hosted copy is called pixl
+
+The instance at pixl.community, and everything a person sees on it, now says **pixl**: the marketing pages, the wordmark in the app bar and on the sign-in screen, the welcome card, the browser tab, the placement report and the messages that name the product. The code keeps its name: the repository, the packages, the Docker image, the fseq producer tag and the file formats are still webXLights, and the site's footer and self-hosting page say so. Canonical URLs, Open Graph URLs, the sitemap and robots.txt point at pixl.community; `render.yaml` sets `APP_NAME` and `APP_URL` to match. Not done here: the four screenshots on the site still show the old wordmark, and the Render dashboard still needs the custom domain attached and added to `SANCTUM_STATEFUL_DOMAINS`.
+
 ## A shared sequence library
 
 A **Library** tab beside Shaders: sequences people have shared, searchable, newest or most used first, each card saying how long it is, whether the audio came with it, and the names and types of the models it was written for. **Use on my layout** opens the same mapping dialog an xsq import uses - which of your models takes which of theirs, which timing tracks to bring - and the copy lands in your project and opens in the sequencer, where the preview draws it on your own show. Effects come across as they are, same engine, same parameters, with fresh ids. Share your own from the sequencer's Sequence menu: a title, a description, and a snapshot of the sequence with your model names attached, so editing afterwards changes nothing in the library. Only the publisher can take an entry down; copies people already made stay theirs.

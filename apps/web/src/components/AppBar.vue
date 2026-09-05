@@ -35,7 +35,7 @@ async function logout(): Promise<void> {
 
 <template>
   <header class="app-bar">
-    <router-link to="/projects" class="wordmark" title="All projects">webX<span>Lights</span></router-link>
+    <router-link to="/projects" class="wordmark" title="All projects">pixl</router-link>
     <router-link v-if="projectId !== undefined" :to="`/projects/${projectId}/sequences`" class="crumb" title="This project">
       <span class="sep" aria-hidden="true">/</span>{{ project?.name ?? "…" }}
     </router-link>
@@ -74,9 +74,6 @@ async function logout(): Promise<void> {
   text-decoration: none;
   letter-spacing: -0.01em;
   white-space: nowrap;
-}
-.wordmark span {
-  color: var(--accent);
 }
 .crumb {
   color: var(--text);
