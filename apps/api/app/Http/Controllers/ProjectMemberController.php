@@ -28,7 +28,7 @@ class ProjectMemberController extends Controller
         ]);
 
         $user = User::where('email', $data['email'])->first();
-        abort_unless($user, 404, 'No webXLights user with that email');
+        abort_unless($user, 404, 'No pixl user with that email');
         abort_if($user->id === $project->owner_id, 422, 'Owner already has full access');
 
         $member = $project->members()->updateOrCreate(

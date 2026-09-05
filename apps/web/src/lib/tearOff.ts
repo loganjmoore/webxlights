@@ -30,7 +30,7 @@ export function useTearOff(title: () => string) {
     }
     blocked.value = false;
     const doc = w.document;
-    doc.title = `${title()} · webXLights`;
+    doc.title = `${title()} · pixl`;
     doc.documentElement.style.colorScheme = "dark";
     // The new document starts blank; it gets the app's stylesheets, cloned, so a scoped style or
     // a dev-server-injected one comes along.

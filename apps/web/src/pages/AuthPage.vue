@@ -27,7 +27,7 @@ async function submit(): Promise<void> {
 <template>
   <div class="auth-shell">
     <main class="auth">
-      <h1>webX<span>Lights</span></h1>
+      <h1>pixl</h1>
       <p class="tagline">Browser-based xLights-compatible show designer</p>
       <div class="tabs">
         <button :class="{ active: mode === 'login' }" @click="mode = 'login'">Log in</button>
@@ -76,9 +76,6 @@ async function submit(): Promise<void> {
   font-weight: 600;
   color: #fff;
   letter-spacing: -0.01em;
-}
-.auth h1 span {
-  color: #e8c468;
 }
 .tagline {
   margin: 0.35rem 0 1.5rem;

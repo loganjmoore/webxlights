@@ -20,18 +20,17 @@ services:
       - key: AUDIO_STORAGE_PATH
         value: /var/data/audio
       - key: APP_NAME
-        value: webXLights
+        value: pixl
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
         value: false
       - key: APP_KEY
         generateValue: true
+      # The custom domain. Attach pixl.community to this service in the Render dashboard, and
+      # add it to SANCTUM_STATEFUL_DOMAINS there too, or the login cookie will not be accepted.
       - key: APP_URL
-        fromService:
-          type: web
-          name: webxlights-web
-          property: host
+        value: https://pixl.community
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_URL

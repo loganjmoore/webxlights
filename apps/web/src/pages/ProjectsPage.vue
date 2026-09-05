@@ -98,7 +98,7 @@ async function invite(): Promise<void> {
     members.value = [...members.value.filter((m) => m.user.id !== member.user.id), member];
     inviteEmail.value = "";
   } catch {
-    shareError.value = "Couldn't add that person — check the email is a registered webXLights account.";
+    shareError.value = "Couldn't add that person — check the email is a registered pixl account.";
   }
 }
 
@@ -142,7 +142,7 @@ async function loadSampleProject(): Promise<void> {
       <!-- The first thing a new account sees: three ways in, the sample first because it is the
            one that shows what the app is before asking for a single file. -->
       <section v-if="projects.projects.length === 0 && !showNew" class="welcome">
-        <h2>Welcome to webXLights</h2>
+        <h2>Welcome to pixl</h2>
         <p>
           A show is a project: a layout of your props, the sequences you make for them, and the
           controllers that drive them. Start with the sample show to see all three working, or

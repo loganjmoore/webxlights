@@ -121,7 +121,7 @@ export function buildPlacementReport(models: ModelRecord[]): string {
   const typeSummary = [...byType.entries()].sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t}=${n}`).join(", ");
 
   return [
-    `webXLights placement report`,
+    `pixl placement report`,
     `models=${models.length} | applied: boxed=${counts.boxed} twoPoint=${counts.twoPoint} threePoint=${counts.threePoint} polyLine=${counts.polyLine}`,
     `types: ${typeSummary}`,
     `(pos/scale/rot are what the importer derived; "raw" is what xLights wrote; rendered is the`,
