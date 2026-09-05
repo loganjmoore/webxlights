@@ -57,8 +57,9 @@ page, not in the app bar. Anything with more than six actions collapses into a l
 ## Panels
 
 A settings pane opens as a dialog over the page. Drag it by its title bar and it floats where you
-put it; pin it and it stays open while you work on the grid underneath. Its position is
-remembered per panel. Panels with a window route can be torn off into their own browser window.
+put it; drag its corner to size it; pin it and it stays open while you work on the grid
+underneath. Its position is remembered per panel. Any panel can be torn off into its own browser
+window or tab from its title bar, and closing that window brings it back.
 
 ## Motion
 

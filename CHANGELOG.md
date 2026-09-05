@@ -1,5 +1,11 @@
 # Changelog
 
+## Any panel can be torn off into its own window, and comes back when it closes
+
+Every settings panel now has three window controls in its title bar: tear off, pin, close. Tear off moves the panel into a browser window of its own (shift-click for a tab): not a copy rendered from a second route, but the very same DOM nodes teleported into the new document, so the panel keeps its state, its store and whatever you had half-typed, and nothing inside it had to change. Verified in real Chrome: the Models panel left the main page, appeared in the new window with its rows, a checkbox clicked there changed the main page's grid, and closing the window brought the panel back where it was. A blocked popup says so in the title bar. Panels are also resizable from their corner whether centred or floating.
+
+The Preferences panel lost its duplicated heading, its cramped shortcut list, and a now-redundant "open in its own window" button for the video export; the video export section's heading and note are styled by the component itself, so they look the same in the panel and in a window.
+
 ## The library is complete: fifty of fifty
 
 Fifty built-ins exposed a gap the gallery had quietly had all along: the API pages at 24 and nothing on the page could reach page two. The gallery and the sequencer's shader picker now append a page at a time behind a "Show 24 more of 50" button.

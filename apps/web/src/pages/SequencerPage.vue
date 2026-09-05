@@ -2041,8 +2041,8 @@ const windowsMenu = computed<MenuItem[]>(() => [
     disabled: !store.sequence,
     run: togglePreviewWindow,
   },
-  // ponytail: only panels with a window route can be torn off; the rest are inlined in this
-  // page and share its store. Add a PanelWindowPage case per panel as each is extracted.
+  // Every panel can be torn off from its own title bar (ModalPanel.vue); this one is listed
+  // here as well because it is the panel people most often want on a second screen.
   {
     label: "Video export in its own window",
     disabled: !store.sequence,
@@ -2709,7 +2709,6 @@ watch(sequenceId, async (id) => {
 
     <ModalPanel v-if="showPrefsPanel" id="prefs" title="Preferences" @close="showPrefsPanel = false">
       <div class="models-panel">
-      <div class="models-panel-head"><h2>Preferences</h2></div>
       <p class="timing-note">
         These are yours, not the show's — they're kept in this browser rather than saved with the
         project, so two people editing the same sequence don't change each other's settings.
@@ -2761,14 +2760,6 @@ watch(sequenceId, async (id) => {
         </li>
       </ul>
 
-      <div class="models-panel-actions">
-        <button
-          title="Tear this panel off into its own window"
-          @click="openPanelWindow(route.params.projectId as string, sequenceId, 'video')"
-        >
-          Open in its own window
-        </button>
-      </div>
       <ModelVideoExport
         :models="modelRecords"
         :body="store.body"
@@ -3533,6 +3524,7 @@ watch(sequenceId, async (id) => {
 .models-panel-actions {
   display: flex;
   gap: 0.4rem;
+  margin: 0.5rem 0 1rem;
 }
 .models-panel ul {
   list-style: none;
@@ -3584,16 +3576,18 @@ header button.active {
 }
 .shortcut-list {
   list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 12rem;
+  margin: 0 0 0.6rem;
+  padding: 0 0.25rem 0 0;
+  max-height: 16rem;
   overflow: auto;
+  border-bottom: 1px solid var(--border);
 }
 .shortcut-list li {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.3rem;
+  padding: 0.1rem 0;
 }
 /* A changed binding is worth seeing at a glance - it is the one that won't match the manual. */
 .shortcut-list label.changed {

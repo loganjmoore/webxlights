@@ -133,6 +133,20 @@ async function exportVideo(): Promise<void> {
 </template>
 
 <style scoped>
+/* This lives inside the Preferences panel and in its own window; both need the same quiet
+   section heading and note, so they are styled here rather than borrowed from the page. */
+.models-panel-head h2 {
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0.4rem;
+  color: var(--text-muted);
+  font-weight: normal;
+}
+.timing-note {
+  margin: 0 0 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
 .video-export {
   display: flex;
   flex-direction: column;

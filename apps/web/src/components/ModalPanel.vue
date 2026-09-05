@@ -7,14 +7,18 @@ let zCounter = 100;
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { clampToViewport, loadPlacement, savePlacement } from "../lib/panelPositions";
 
-// A settings pane as a dialog over the page - one you can move, pin and tear off.
+// A settings pane as a dialog over the page - one you can move, resize, pin and tear off.
 //
 // It opens centred with a backdrop, the way a dialog should. Drag it by its title bar and it
-// goes where you put it. Pin it and the backdrop goes away: the panel floats where it is while
-// the grid underneath stays live, which is how xLights' docked windows behave and what "I want
-// the Models list open while I sequence" actually needs. Where it was left is remembered per
-// panel (lib/panelPositions.ts). Panels with a window route offer to open in their own browser
-// window as well, for the second monitor.
+// goes where you put it; drag its corner and it is the size you want. Pin it and the backdrop
+// goes away: the panel floats where it is while the grid underneath stays live, which is how
+// xLights' docked windows behave and what "I want the Models list open while I sequence"
+// actually needs. Where it was left is remembered per panel (lib/panelPositions.ts).
+//
+// Tear it off and it moves into a browser window (or tab) of its own. Not a copy: the very same
+// DOM nodes, teleported into the other window's document, so it keeps every bit of state and
+// reactivity it had - the sequencer store, the inputs half-typed - without any of the panel's
+// code knowing it moved. Close that window and the panel comes back where it was.
 //
 // Teleported to <body> so a panel can't be clipped by whatever it happens to be declared inside -
 // the sequencer's panels sit inside a flex column with `overflow: hidden`.
@@ -24,8 +28,6 @@ const props = defineProps<{
   wide?: boolean;
   /** Remember where this panel was left. Without one, it opens centred every time. */
   id?: string;
-  /** Opens this panel in its own browser window (lib/previewChannel.ts' openPanelWindow). */
-  popout?: () => void;
 }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -49,7 +51,9 @@ function raise(): void {
 }
 
 const style = computed(() =>
-  floating.value ? { left: `${position.value.x}px`, top: `${position.value.y}px`, zIndex: zIndex.value } : { zIndex: zIndex.value },
+  floating.value && !popped.value
+    ? { left: `${position.value.x}px`, top: `${position.value.y}px`, zIndex: zIndex.value }
+    : { zIndex: zIndex.value },
 );
 
 function remember(): void {
@@ -73,9 +77,70 @@ function togglePin(): void {
 
 /** Double-click the title: back to the middle, forgotten. The way out of a corner. */
 function recenter(): void {
+  if (popped.value) return;
   floating.value = false;
   pinned.value = false;
   remember();
+}
+
+// ---- its own window ------------------------------------------------------------------------
+
+/** The window this panel lives in when torn off, and where Teleport sends it. */
+const popup = ref<Window | null>(null);
+const popped = computed(() => popup.value !== null);
+const teleportTo = ref<string | HTMLElement>("body");
+const popupBlocked = ref(false);
+
+/**
+ * Moves the panel into a window of its own. Shift-click for a tab instead.
+ *
+ * The new document starts blank; it gets the app's stylesheets (cloned, so a scoped style or a
+ * dev-server-injected one comes along) and then the panel's own nodes. Closing the window is
+ * the way back: `pagehide` fires and the panel returns to this page.
+ */
+function popOut(e: MouseEvent): void {
+  if (popup.value) {
+    popup.value.focus();
+    return;
+  }
+  const name = `webxlights-panel-${props.id ?? props.title}`;
+  const features = e.shiftKey ? "" : "width=640,height=760,popup=yes";
+  const w = window.open("", name, features);
+  if (!w) {
+    // A popup blocker. Say so rather than doing nothing.
+    popupBlocked.value = true;
+    return;
+  }
+  popupBlocked.value = false;
+  const doc = w.document;
+  doc.title = `${props.title} · webXLights`;
+  doc.documentElement.style.colorScheme = "dark";
+  for (const node of document.querySelectorAll('style, link[rel="stylesheet"]')) {
+    const clone = node.cloneNode(true) as HTMLStyleElement | HTMLLinkElement;
+    // A relative href resolved against about:blank goes nowhere; the property is absolute.
+    if (clone instanceof HTMLLinkElement) clone.href = (node as HTMLLinkElement).href;
+    doc.head.appendChild(clone);
+  }
+  doc.body.style.margin = "0";
+  doc.body.style.background = "var(--bg-panel, #16161c)";
+  w.addEventListener("pagehide", rejoin);
+  popup.value = w;
+  teleportTo.value = doc.body;
+}
+
+/** The window closed (or is closing): the panel comes home. */
+function rejoin(): void {
+  const w = popup.value;
+  if (!w) return;
+  w.removeEventListener("pagehide", rejoin);
+  popup.value = null;
+  teleportTo.value = "body";
+}
+
+function closePopup(): void {
+  const w = popup.value;
+  rejoin();
+  if (w && !w.closed) w.close();
 }
 
 // ---- dragging the title bar ----------------------------------------------------------------
@@ -83,7 +148,7 @@ function recenter(): void {
 let drag: { pointerId: number; startX: number; startY: number; originX: number; originY: number; moved: boolean } | null = null;
 
 function onHeadPointerDown(e: PointerEvent): void {
-  if (e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
+  if (popped.value || e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
   raise();
   const rect = panelRef.value?.getBoundingClientRect();
   if (!rect) return;
@@ -118,8 +183,8 @@ function onHeadPointerUp(e: PointerEvent): void {
 function onKeydown(e: KeyboardEvent): void {
   // Escape closes, and stops there: the sequencer binds most of the keyboard, and a dialog that
   // let those keys through would place effects behind itself while you were typing in it. A
-  // pinned panel is a tool window, not a dialog - it stays until you close it.
-  if (e.key !== "Escape" || pinned.value) return;
+  // pinned or torn-off panel is a tool window, not a dialog - it stays until you close it.
+  if (e.key !== "Escape" || pinned.value || popped.value) return;
   e.stopPropagation();
   emit("close");
 }
@@ -139,28 +204,32 @@ onMounted(async () => {
     { width: window.innerWidth, height: window.innerHeight },
   );
 });
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKeydown, true);
+  // The page is going away, or the panel was closed from the page: its window goes too.
+  closePopup();
+});
 </script>
 
 <template>
-  <Teleport to="body">
-    <!-- Pinned: no backdrop, the page underneath is live. Otherwise clicking the backdrop closes;
-         clicking inside must not, or every click in the panel would shut it - `.self` is what
-         distinguishes the two. -->
-    <div class="modal-backdrop" :class="{ pinned }" :style="{ zIndex }" @click.self="pinned || emit('close')">
+  <Teleport :to="teleportTo">
+    <!-- Pinned: no backdrop, the page underneath is live. Torn off: the window is the panel.
+         Otherwise clicking the backdrop closes; clicking inside must not, or every click in the
+         panel would shut it - `.self` is what distinguishes the two. -->
+    <div class="modal-backdrop" :class="{ pinned, popped }" :style="{ zIndex }" @click.self="pinned || popped || emit('close')">
       <div
         ref="panelRef"
         class="modal-panel"
-        :class="{ wide, floating, pinned }"
+        :class="{ wide, floating: floating && !popped, pinned, popped }"
         :style="style"
         role="dialog"
-        :aria-modal="!pinned"
+        :aria-modal="!pinned && !popped"
         :aria-label="title"
         @pointerdown="raise"
       >
         <header
           class="modal-head"
-          title="Drag to move. Double-click to put it back in the middle."
+          :title="popped ? '' : 'Drag to move. Double-click to put it back in the middle.'"
           @pointerdown="onHeadPointerDown"
           @pointermove="onHeadPointerMove"
           @pointerup="onHeadPointerUp"
@@ -169,17 +238,29 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
         >
           <h2>{{ title }}</h2>
           <div class="modal-tools">
+            <span v-if="popupBlocked" class="blocked">Your browser blocked the window</span>
             <button
-              v-if="popout"
+              v-if="!popped"
               type="button"
               class="tool"
-              title="Open in its own window"
+              title="Open in its own window (shift-click for a tab). Close that window to bring it back."
               aria-label="Open in its own window"
-              @click="popout()"
+              @click="popOut"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg>
             </button>
             <button
+              v-else
+              type="button"
+              class="tool"
+              title="Bring this panel back into the main window"
+              aria-label="Bring back"
+              @click="closePopup"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 7 7 17M15 17H7V9" /></svg>
+            </button>
+            <button
+              v-if="!popped"
               type="button"
               class="tool"
               :class="{ on: pinned }"
@@ -190,7 +271,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
             >
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6" /></svg>
             </button>
-            <button type="button" class="tool close" title="Close (Esc)" aria-label="Close" @click="emit('close')">
+            <button type="button" class="tool close" title="Close (Esc)" aria-label="Close" @click="closePopup(); emit('close')">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
             </button>
           </div>
@@ -225,6 +306,14 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   pointer-events: none;
   animation: none;
 }
+/* Torn off: the window is the panel, so there is nothing to centre in or dim. */
+.modal-backdrop.popped {
+  position: static;
+  display: block;
+  padding: 0;
+  background: none;
+  animation: none;
+}
 .modal-panel {
   display: flex;
   flex-direction: column;
@@ -239,6 +328,10 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   pointer-events: auto;
   overflow: hidden;
   text-align: left;
+  /* A panel can be sized like a window, centred or floating. Native, and it costs nothing. */
+  resize: both;
+  min-width: 320px;
+  min-height: 120px;
 }
 .modal-panel.wide {
   width: min(900px, 100%);
@@ -246,13 +339,19 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
 .modal-panel.floating {
   position: fixed;
   max-height: calc(100vh - 16px);
-  /* A floating panel can be sized like a window. Native, and it costs nothing. */
-  resize: both;
-  min-width: 320px;
-  min-height: 120px;
 }
 .modal-panel.pinned {
   border-color: var(--accent);
+}
+.modal-panel.popped {
+  width: 100%;
+  max-height: none;
+  height: 100vh;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  resize: none;
+  min-width: 0;
 }
 .modal-head {
   display: flex;
@@ -268,6 +367,9 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
 .modal-head:active {
   cursor: grabbing;
 }
+.popped .modal-head {
+  cursor: default;
+}
 .modal-head h2 {
   margin: 0;
   font-size: 0.9rem;
@@ -276,7 +378,13 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
 }
 .modal-tools {
   display: flex;
+  align-items: center;
   gap: 0.15rem;
+}
+.blocked {
+  font-size: 0.7rem;
+  color: var(--danger);
+  margin-right: 0.4rem;
 }
 .tool {
   display: inline-flex;
@@ -313,5 +421,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
 .modal-body {
   overflow-y: auto;
   padding: 0.9rem;
+  flex: 1;
+  min-height: 0;
 }
 </style>
