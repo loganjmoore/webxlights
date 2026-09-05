@@ -1,10 +1,10 @@
 # The built-in shader library
 
-Status on 2026-09-04: **thirty of the fifty concepts are shipped**, hand-authored rather than
+Status on 2026-09-04: **forty of the fifty concepts are shipped**, hand-authored rather than
 generated, because no machine that has worked on this has held model credentials. Every one of
-the thirty compiles in both dialects (`check.mjs`, xLights via glslang), clears every fitted gate
+the forty compiles in both dialects (`check.mjs`, xLights via glslang), clears every fitted gate
 at all four shapes (`metrics.mjs`), survives the ten-hour drift check, and is no near-duplicate of
-another (`closestPairs` minimum 0.09). They were reviewed by eye from `render.mjs` contact
+another (`closestPairs` minimum 0.084). They were reviewed by eye from `render.mjs` contact
 sheets at 32x32 and tuned where the numbers passed and the picture did not. See the hand-edit
 log below for what that changed.
 
@@ -246,7 +246,7 @@ The machinery is tested (`metricsCore.test.mjs`) and prints automatically from `
 
 ## Hand-edit log
 
-The thirty shipped shaders were written by hand, so this log records what the *measurement* and
+The forty shipped shaders were written by hand, so this log records what the *measurement* and
 the *eye* changed after the first draft of each - the things a prompt would have to say to get
 them right first time. Each is now a line in `SYSTEM`.
 
@@ -266,6 +266,11 @@ them right first time. Each is now a line in `SYSTEM`.
   (3px columns, short blocks) passed the gates and looked like noise at 32x32. Fewer, bigger.
   `snowfall` then failed `peakBrightness` at 192x108 because a 1.8px flake on a 108-tall canvas
   is a speck; flake size now scales with the canvas.
+- **Statistically alike, visually not.** `ember-rise` measured 0.057 from `radar-sweep` and
+  `cloud-drift` 0.058 from `peppermint-swirl` - under the 0.08 distinctness floor, though no
+  eye would confuse them. The feature vector sees brightness, contrast and motion statistics,
+  not subjects. Both were pushed apart (ember: brighter, faster, whiter-hot; clouds: darker sky,
+  whiter cloud) rather than the floor being lowered, which is the rule.
 - **Slow paths drift.** `metaballs` failed `driftDelta` (hard) at 17%: with blob paths on
   0.2 to 0.6 rad/s, a 6-second window at 600 s and at 36000 s simply saw different arrangements.
   Doubling the rates fixed it. Not decay, but the gate cannot tell, and faster was better anyway.

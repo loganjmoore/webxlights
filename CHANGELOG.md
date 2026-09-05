@@ -1,5 +1,9 @@
 # Changelog
 
+## Forty built-in shaders
+
+Ten more: icicle drip, kaleidoscope, lightning, sunrise, ember rise, lava flow, halftone pulse, caustics, cloud drift and god rays. Forty of forty compile in both dialects and clear every fitted gate at every shape; the closest pair is 0.084 apart. The distinctness gate earned its place this round: it flagged ember rise as statistically too close to radar sweep and cloud drift too close to peppermint swirl - pairs no eye would confuse - and both were pushed apart (a brighter, faster ember field; a darker sky under whiter clouds) rather than the gate being loosened. The other by-eye tune was a kaleidoscope whose cells were too small to read at 32x32.
+
 ## The layout palette drags the same way, and the library reaches thirty
 
 The Layout page's model palette was the last native HTML5 drag in the app. It now uses the same pointer-captured gesture as the effect palette: the type lifts under the pointer, the proxy turns green over the ground plane, Escape cancels, and release creates the model where the ray meets the plane. `LayoutCanvas3D` exposes one method (`worldAt`) instead of owning a drop handler, so the palette knows nothing about cameras. Verified live: a Star dropped on the 3D canvas landed at the pointer and appeared in the model list.
