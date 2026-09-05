@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import EffectContextMenu from "../components/EffectContextMenu.vue";
+import { isTypingTarget } from "../lib/commands";
 import { useRoute } from "vue-router";
 import {
   chooseBoxedScaleReading,
@@ -103,6 +105,85 @@ function isExpanded(model: ModelRecord): boolean {
   return selectedModelId.value === model.id;
 }
 const renamingModelId = ref<number | null>(null);
+
+// Undo for the layout. Every change to where a model sits or what it is called remembers what it
+// replaced, and undo writes that back through the same endpoint - so what you see after Ctrl+Z is
+// what the server has, not a local guess.
+type LayoutEdit = { modelId: number; screen?: { before: ModelRecord["screen"]; after: ModelRecord["screen"] }; name?: { before: string; after: string } };
+const undoStack = ref<LayoutEdit[]>([]);
+const redoStack = ref<LayoutEdit[]>([]);
+async function applyEdit(edit: LayoutEdit, direction: "before" | "after"): Promise<void> {
+  if (!layout.value) return;
+  const patch = edit.screen ? { screen: edit.screen[direction] } : edit.name ? { name: edit.name[direction] } : null;
+  if (!patch) return;
+  const updated = await api.updateModel(layout.value.id, edit.modelId, patch);
+  const idx = models.value.findIndex((m) => m.id === edit.modelId);
+  if (idx !== -1) models.value[idx] = updated;
+}
+async function undoLayout(): Promise<void> {
+  const edit = undoStack.value.pop();
+  if (!edit) return;
+  await applyEdit(edit, "before");
+  redoStack.value.push(edit);
+}
+async function redoLayout(): Promise<void> {
+  const edit = redoStack.value.pop();
+  if (!edit) return;
+  await applyEdit(edit, "after");
+  undoStack.value.push(edit);
+}
+function remember(edit: LayoutEdit): void {
+  undoStack.value.push(edit);
+  if (undoStack.value.length > 100) undoStack.value.shift();
+  redoStack.value = [];
+}
+function onLayoutKey(e: KeyboardEvent): void {
+  if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z" || isTypingTarget(e.target)) return;
+  e.preventDefault();
+  void (e.shiftKey ? redoLayout() : undoLayout());
+}
+
+// The right-click menu on a model in the canvas.
+const contextMenu = ref<{ x: number; y: number; modelId: number } | null>(null);
+const MODEL_MENU = [
+  { label: "Align with ground", action: "ground" },
+  { label: "Reset rotation", action: "rotation" },
+  { label: "Rename", action: "rename" },
+  { label: "Delete", action: "delete" },
+];
+function onModelMenu(action: string): void {
+  const id = contextMenu.value?.modelId;
+  contextMenu.value = null;
+  if (id === undefined) return;
+  const model = models.value.find((m) => m.id === id);
+  if (!model) return;
+  if (action === "ground") canvasRef.value?.alignToGround(id);
+  else if (action === "rotation") void updateScreen(id, { rotate: 0, rotateX: 0, rotateY: 0 });
+  else if (action === "rename") startRename(model);
+  else if (action === "delete") void handleDelete(id);
+}
+
+// The sidebar's width is yours to set: drag its edge. Remembered per browser.
+const SIDEBAR_KEY = "webxlights.layoutSidebarWidth";
+const sidebarWidth = ref(Number(typeof localStorage === "undefined" ? 0 : localStorage.getItem(SIDEBAR_KEY)) || 240);
+let sidebarDrag: { pointerId: number; startX: number; startWidth: number } | null = null;
+function onSplitterDown(e: PointerEvent): void {
+  sidebarDrag = { pointerId: e.pointerId, startX: e.clientX, startWidth: sidebarWidth.value };
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+}
+function onSplitterMove(e: PointerEvent): void {
+  if (!sidebarDrag || e.pointerId !== sidebarDrag.pointerId) return;
+  sidebarWidth.value = Math.max(180, Math.min(560, sidebarDrag.startWidth + e.clientX - sidebarDrag.startX));
+}
+function onSplitterUp(e: PointerEvent): void {
+  if (!sidebarDrag || e.pointerId !== sidebarDrag.pointerId) return;
+  sidebarDrag = null;
+  try {
+    localStorage.setItem(SIDEBAR_KEY, String(sidebarWidth.value));
+  } catch {
+    // Private browsing: the width just isn't remembered.
+  }
+}
 const renameValue = ref("");
 
 // M15.5: Model Groups editor - previously import-only (bulkUpsertModelGroups, resolves
@@ -289,9 +370,11 @@ async function updateScreen(
   if (!layout.value) return;
   const model = models.value.find((m) => m.id === modelId);
   if (!model) return;
+  const before = { ...model.screen };
   const updated = await api.updateModel(layout.value.id, modelId, { screen: { ...model.screen, ...patch } });
   const idx = models.value.findIndex((m) => m.id === modelId);
   if (idx !== -1) models.value[idx] = updated;
+  remember({ modelId, screen: { before, after: { ...updated.screen } } });
 }
 
 // Corner grips on the 3D canvas. The canvas has already worked out the new scales and, when
@@ -682,6 +765,7 @@ async function commitRename(model: ModelRecord): Promise<void> {
   const updated = await api.updateModel(layout.value.id, model.id, { name });
   const idx = models.value.findIndex((m) => m.id === model.id);
   if (idx !== -1) models.value[idx] = updated;
+  remember({ modelId: model.id, name: { before: model.name, after: name } });
 }
 function cancelRename(): void {
   renamingModelId.value = null;
@@ -902,6 +986,15 @@ function startSnapshotTimer(): void {
   }, minutes * 60_000);
 }
 
+// Clicking a model on the canvas brings its row into view in the list; clicking the row selects
+// it on the canvas (selectedIds is what both read).
+watch(selectedModelId, (id) => {
+  if (id === null) return;
+  void nextTick(() => document.getElementById(`model-${id}`)?.scrollIntoView({ block: "nearest" }));
+});
+onMounted(() => window.addEventListener("keydown", onLayoutKey));
+onUnmounted(() => window.removeEventListener("keydown", onLayoutKey));
+
 onMounted(async () => {
   await loadLayout();
   lastSnapshotFingerprint = layoutFingerprint();
@@ -921,6 +1014,14 @@ onUnmounted(() => {
     <AppBar :project-id="projectId" active="layout" />
     <header class="page-toolbar">
       <h1>Layout</h1>
+      <div class="group">
+        <button class="icon" :disabled="undoStack.length === 0" title="Undo (Ctrl+Z)" aria-label="Undo" @click="undoLayout">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5M4 12h10a5 5 0 0 1 0 10h-3" /></svg>
+        </button>
+        <button class="icon" :disabled="redoStack.length === 0" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" @click="redoLayout">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 7 5 5-5 5M20 12H10a5 5 0 0 0 0 10h3" /></svg>
+        </button>
+      </div>
       <label class="btn">
         {{ importing ? "Importing..." : "Import xlights_rgbeffects.xml" }}
         <input type="file" accept=".xml" @change="handleFileChange" :disabled="importing" hidden />
@@ -937,7 +1038,7 @@ onUnmounted(() => {
     <p v-if="viewObjectsError" class="view-objects-error">{{ viewObjectsError }}</p>
     <p v-if="reportMessage" class="import-message">{{ reportMessage }}</p>
     <div class="body">
-      <aside class="model-list">
+      <aside class="model-list" :style="{ width: `${sidebarWidth}px` }">
         <div class="tabs">
           <button :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">Models <span class="count">{{ models.length }}</span></button>
           <button :class="{ active: activeTab === 'groups' }" @click="activeTab = 'groups'">Groups <span class="count">{{ groups.length }}</span></button>
@@ -1125,6 +1226,7 @@ onUnmounted(() => {
         <ul>
           <li
             v-for="m in filteredModels"
+            :id="`model-${m.id}`"
             :key="m.id"
             :class="{ unsupported: !m.supported, selected: selectedIds.includes(m.id) }"
             @click="selectFromList(m, $event)"
@@ -1332,6 +1434,14 @@ onUnmounted(() => {
           <p v-else class="multi-hint">None yet.</p>
         </div>
       </aside>
+      <div
+        class="splitter"
+        title="Drag to resize the panel"
+        @pointerdown="onSplitterDown"
+        @pointermove="onSplitterMove"
+        @pointerup="onSplitterUp"
+        @pointercancel="onSplitterUp"
+      ></div>
       <div class="canvas-wrap">
         <ModelPalette :target="(x, y) => canvasRef?.worldAt(x, y) ?? null" @create="handleCreate" />
         <div class="canvas-area">
@@ -1357,6 +1467,15 @@ onUnmounted(() => {
             @move="handleMove3D"
             @create="handleCreate"
             @resize="handleResize3D"
+            @contextmenu="(id, x, y) => (contextMenu = { modelId: id, x, y })"
+          />
+          <EffectContextMenu
+            v-if="contextMenu"
+            :x="contextMenu.x"
+            :y="contextMenu.y"
+            :items="MODEL_MENU"
+            @action="onModelMenu"
+            @close="contextMenu = null"
           />
         </div>
       </div>
@@ -1524,8 +1643,34 @@ onUnmounted(() => {
   display: flex;
   min-height: 0;
 }
+.splitter {
+  width: 6px;
+  flex: none;
+  cursor: col-resize;
+  background: transparent;
+  border-right: 1px solid var(--border);
+  touch-action: none;
+}
+.splitter:hover {
+  background: var(--bg-hover);
+}
+.page-toolbar button.icon {
+  width: 30px;
+  padding: 0;
+  justify-content: center;
+}
+.page-toolbar button.icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .model-list {
-  width: 220px;
+  width: 240px;
+  flex: none;
   overflow-y: auto;
   padding: 0.75rem;
   border-right: 1px solid #333;

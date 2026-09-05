@@ -1,5 +1,13 @@
 # Changelog
 
+## Layout: undo, steadier resizing, a context menu, and a list that follows the canvas
+
+The Layout page has Undo and Redo (buttons in the toolbar, Cmd/Ctrl+Z and Shift+Z) for moves, resizes, rotations and renames, so a slip with the mouse is one key away from gone. The resize grips are the same nine pixels on screen at every zoom - they used to be sized in world units and vanished when you zoomed out - and dragging one is damped: the size follows the pointer at a gentler curve (`resizeModel.ts`, `RESIZE_DAMPING`) measured from where you grabbed, so the first few pixels are a small change instead of a lurch to gigantic. The model list's width is a splitter you drag (180 to 560px, remembered). Clicking a model on the canvas highlights its row and scrolls it into view; clicking a row selects it on the canvas.
+
+Right-click a model for a context menu: **Align with ground** (the model's bottom lands on the ground plane), Reset rotation, Rename, Delete. Verified in real Chrome: the menu opens on the hit model, the selection stays after the right button is released (a right-click used to clear it on release), Align with ground moved a star from y=300 to rest on the ground, undo put a moved model back, the splitter resized the list, and a canvas click lit the matching row.
+
+The sequencer takes the same periodic snapshots the layout does (every N minutes when the sequence changed, per the Preferences setting), so the snapshot list has something to restore to even if nobody pressed Snapshot.
+
 ## A controller visualiser, shader favourites, a monthly allowance, and Sonnet 5
 
 The Controllers page has the visualiser xLights users expect: every controller as a row, its models chained along it in channel order, and a tray of models that are on no controller yet. Drag a model onto a controller and it joins the end of the chain; drop it between two others and everything after shuffles along; drag it back to the tray and it comes off. A model that will not fit is refused before the drop, with the row turning red and saying how many channels are free. The arithmetic (`lib/controllerChain.ts`) is tested on its own; the page writes only the models that actually moved and shows the result before the writes land. Verified in real Chrome: chaining onto two controllers, reordering, taking one off, and a 768-channel matrix correctly refused by a 600-channel controller.

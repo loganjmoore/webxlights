@@ -8,6 +8,15 @@ export interface ResizeInput {
   /** Distance from the model's centre to the pointer, in world units, on each axis. */
   halfWidthWorld: number;
   halfHeightWorld: number;
+  /**
+   * The same distances at the moment the grip was grabbed. When given, the resize is relative
+   * to them - the prop grows by the ratio of "pointer now" to "pointer at grab" - rather than
+   * the pointer's absolute distance setting the size outright. Absolute sizing is what made a
+   * small prop leap: its grip sits a fixed minimum distance out, so the first pixel of movement
+   * already implied a size many times the real one.
+   */
+  grabHalfWidthWorld?: number;
+  grabHalfHeightWorld?: number;
   /** The model's half-extents at scale 1, in local units. */
   unitHalfWidth: number;
   unitHalfHeight: number;
@@ -16,6 +25,8 @@ export interface ResizeInput {
   /** The scales the drag started from, so a uniform resize has a baseline to grow against. */
   startScale: number;
   startScaleZ: number;
+  /** The Y scale the drag started from; defaults to startScale. Only the relative path reads it. */
+  startScaleY?: number;
   uniform: boolean;
 }
 
@@ -32,10 +43,27 @@ export interface ResizeResult {
  */
 export const MIN_SCALE = 0.001;
 
+/**
+ * How much of the pointer's travel becomes size. Below 1 the prop grows more slowly than the
+ * hand moves, which is what makes a resize controllable: at 1, doubling the grip's distance
+ * doubles the prop; at 0.6 it takes about three times the distance.
+ */
+export const RESIZE_DAMPING = 0.6;
+
 export function resizeFromCorner(input: ResizeInput): ResizeResult {
   const { unitsPerLocal, startScale, startScaleZ, uniform } = input;
-  const scaleX = Math.max(input.halfWidthWorld / (input.unitHalfWidth * unitsPerLocal), MIN_SCALE);
-  const scaleY = Math.max(input.halfHeightWorld / (input.unitHalfHeight * unitsPerLocal), MIN_SCALE);
+  let scaleX: number;
+  let scaleY: number;
+  if (input.grabHalfWidthWorld !== undefined && input.grabHalfHeightWorld !== undefined) {
+    const startY = input.startScaleY ?? startScale;
+    const rx = Math.pow(Math.max(input.halfWidthWorld, 1e-6) / Math.max(input.grabHalfWidthWorld, 1e-6), RESIZE_DAMPING);
+    const ry = Math.pow(Math.max(input.halfHeightWorld, 1e-6) / Math.max(input.grabHalfHeightWorld, 1e-6), RESIZE_DAMPING);
+    scaleX = Math.max(startScale * rx, MIN_SCALE);
+    scaleY = Math.max(startY * ry, MIN_SCALE);
+  } else {
+    scaleX = Math.max(input.halfWidthWorld / (input.unitHalfWidth * unitsPerLocal), MIN_SCALE);
+    scaleY = Math.max(input.halfHeightWorld / (input.unitHalfHeight * unitsPerLocal), MIN_SCALE);
+  }
 
   if (uniform) {
     // The axis that moved furthest wins, so a drag that is mostly sideways still grows the whole
