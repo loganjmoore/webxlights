@@ -261,13 +261,13 @@ onMounted(load);
       @cancel="pendingImport = null"
       @confirm="confirmImport"
     />
-    <header>
+    <header class="page-toolbar">
       <h1>Sequences</h1>
-      <label class="import-btn">
+      <label class="btn">
         {{ importing ? "Importing..." : "Import .xsq" }}
         <input type="file" accept=".xsq" @change="importXsq" :disabled="importing" hidden />
       </label>
-      <label class="import-btn" title="Turn an .xsq into an .fseq without creating a sequence">
+      <label class="btn" title="Turn an .xsq into an .fseq without creating a sequence">
         {{ converting ? "Converting..." : "Convert .xsq → .fseq" }}
         <input type="file" accept=".xsq" @change="convertXsqToFseq" :disabled="converting" hidden />
       </label>
@@ -322,37 +322,6 @@ onMounted(load);
   min-height: 100vh;
   background: #0d0d11;
   color: #ddd;
-}
-header {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid #333;
-  background: #16161c;
-}
-header a {
-  color: #e8c468;
-}
-header h1 {
-  font-size: 1.1rem;
-  margin: 0;
-  color: #ddd;
-  font-weight: 600;
-}
-.import-btn {
-  margin-left: auto;
-  cursor: pointer;
-  padding: 0.4rem 0.85rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  background: #1e1e26;
-  color: #ddd;
-}
-.import-btn:hover {
-  border-color: #e8c468;
-  color: #e8c468;
 }
 .import-message {
   font-size: 0.8rem;

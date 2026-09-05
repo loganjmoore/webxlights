@@ -70,6 +70,79 @@ code {
   outline-offset: 1px;
 }
 
+/* The page toolbar (DESIGN.md > Navigation). Every project page has exactly one, directly under
+   the app bar: the page's name on the left, then its actions in the order you use them, then
+   status on the right. Same height, same controls, same place on every page. */
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.75rem;
+  min-height: 48px;
+  padding: 0.4rem 0.75rem;
+  box-sizing: border-box;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--sans);
+  text-align: left;
+}
+.page-toolbar h1 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0.25rem 0 0;
+  color: var(--text);
+  white-space: nowrap;
+}
+.page-toolbar .group {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.page-toolbar .status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.page-toolbar button,
+.page-toolbar .btn,
+.page-toolbar select {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 0.65rem;
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+  white-space: nowrap;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.page-toolbar button:hover:not(:disabled),
+.page-toolbar .btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.page-toolbar button:disabled {
+  color: var(--text-dim);
+  cursor: default;
+}
+.page-toolbar .primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.page-toolbar .primary:hover:not(:disabled) {
+  color: var(--accent-ink);
+  filter: brightness(1.05);
+}
+
 #app {
   width: 100%;
   text-align: center;

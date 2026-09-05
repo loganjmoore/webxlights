@@ -291,14 +291,9 @@ onMounted(async () => {
 <template>
   <div class="page">
     <AppBar :project-id="projectId" active="shaders" />
-    <header class="head">
-      <div>
-        <h1>Shaders</h1>
-        <p class="sub">
-          GLSL effects that run on your props. Describe one and the assistant writes it, or use
-          something someone else made.
-        </p>
-      </div>
+    <header class="page-toolbar">
+      <h1>Shaders</h1>
+      <span class="sub">GLSL effects that run on your props. Describe one and the assistant writes it, or use something someone else made.</span>
     </header>
 
     <!-- The assistant -->
@@ -478,32 +473,23 @@ onMounted(async () => {
   text-align: left;
 }
 /* The app bar spans the window; everything under it sits in a reading column. */
-.page > :not(:first-child) {
+.page > :not(:first-child):not(.page-toolbar) {
   max-width: 1100px;
   margin-left: auto;
   margin-right: auto;
   padding-left: 1.2rem;
   padding-right: 1.2rem;
 }
-.page > .head {
-  padding-top: 1rem;
-}
-.head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-h1 {
-  margin: 0;
-  font-size: 1.3rem;
+.page > .assistant {
+  margin-top: 1.25rem;
 }
 .sub {
-  margin: 0.25rem 0 0;
-  color: #9a9aa6;
-  font-size: 0.85rem;
-  max-width: 52ch;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .assistant {
   background: #1a1a21;

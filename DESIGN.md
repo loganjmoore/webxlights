@@ -49,10 +49,18 @@ System sans (`system-ui`), one family. Fixed rem scale, tight ratio:
 
 ## Navigation
 
-One app bar on every project page: wordmark (home), the four workspaces as tabs (Layout,
-Sequencer, Network, Shaders), then Docs and the account on the right. Page actions live in the
-page, not in the app bar. Anything with more than six actions collapses into a labelled menu
-(`MenuButton`), grouped the way a desktop menu bar would group them.
+Two rows, on every page, always in the same place:
+
+1. The **app bar** (`AppBar.vue`): wordmark (home), the four workspaces as tabs (Layout,
+   Sequencer, Network, Shaders), then Docs and the account on the right. It never carries page
+   actions.
+2. The **page toolbar** (`.page-toolbar`, global): the page's name first, then its actions in the
+   order you use them, then status on the right. 48px, one control style. Anything with more
+   than six actions collapses into a labelled menu (`MenuButton`), grouped the way a desktop
+   menu bar would group them.
+
+Nothing else sits above the content. A page that needs a third strip (the effect palette, the
+model palette) puts it under the toolbar, full width, in the panel colour.
 
 ## Panels
 

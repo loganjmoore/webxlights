@@ -1,5 +1,9 @@
 # Changelog
 
+## One chrome on every page
+
+Every page now has the same two rows at the top, in the same place, at the same height: the app bar (wordmark, the four workspaces, Docs, account) and a page toolbar with the page's name first, then its actions in the order you use them, then status on the right. The toolbar is one global pattern (`.page-toolbar` in `style.css`) rather than six pages each drawing their own header, which is how the Layout, Sequences, Controllers, Shaders, Sequencer, Projects and Docs pages had come to differ in padding, alignment, button size, and where the actions sat. The Shaders page's paragraph of introduction became one line in its toolbar; the Docs page lost a "back to projects" link the wordmark already is. The Layout sidebar's three tabs became a segmented control with count badges instead of three buttons wrapping their "(758)" onto a second line. Verified by screenshotting the top of all seven pages at 1440 and 1024 wide and comparing them side by side.
+
 ## Any panel can be torn off into its own window, and comes back when it closes
 
 Every settings panel now has three window controls in its title bar: tear off, pin, close. Tear off moves the panel into a browser window of its own (shift-click for a tab): not a copy rendered from a second route, but the very same DOM nodes teleported into the new document, so the panel keeps its state, its store and whatever you had half-typed, and nothing inside it had to change. Verified in real Chrome: the Models panel left the main page, appeared in the new window with its rows, a checkbox clicked there changed the main page's grid, and closing the window brought the panel back where it was. A blocked popup says so in the title bar. Panels are also resizable from their corner whether centred or floating.

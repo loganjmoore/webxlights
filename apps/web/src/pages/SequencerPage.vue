@@ -2407,7 +2407,7 @@ watch(sequenceId, async (id) => {
 <template>
   <main class="sequencer-page">
     <AppBar :project-id="route.params.projectId as string" active="sequences" />
-    <header class="toolbar">
+    <header class="page-toolbar toolbar">
       <h1 :title="store.sequence?.name">{{ store.sequence?.name }}</h1>
       <div class="group transport">
         <button :disabled="!audioLoaded" :title="playing ? 'Pause (Space)' : 'Play (Space)'" @click="togglePlay">
@@ -2451,6 +2451,7 @@ watch(sequenceId, async (id) => {
         <button title="Command palette (Ctrl+Shift+K)" @click="paletteOpen = true">⌘K</button>
       </div>
       <div class="status">
+        <span class="save-status">{{ store.saveStatus }}</span>
         <span v-if="analyzingAudio" class="analyzing">Analyzing audio…</span>
         <span v-if="exportError" class="export-error">{{ exportError }}</span>
         <!-- A range you can't see the edges of is a range you can't get rid of, and shift-dragging
@@ -2468,7 +2469,6 @@ watch(sequenceId, async (id) => {
           {{ currentRegion.name }}
         </button>
       </div>
-      <span class="save-status">{{ store.saveStatus }}</span>
     </header>
 
     <!-- xLights' Edit Label dialog, reached by double-clicking a mark with Double Click Mode set
@@ -3350,33 +3350,11 @@ watch(sequenceId, async (id) => {
 .sequencer-page a {
   color: #e8c468;
 }
-.toolbar {
-  padding: 0.4rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  row-gap: 0.3rem;
-  column-gap: 0.75rem;
-  background: var(--bg-panel);
-  text-align: left;
-}
 .toolbar h1 {
-  font-size: 0.95rem;
-  margin: 0 0.25rem 0 0;
-  color: var(--text);
-  font-weight: 600;
   max-width: 18rem;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.group {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-.toolbar button,
 .fpp-row button,
 .history-panel button,
 .conflict-banner button {
@@ -3389,31 +3367,15 @@ watch(sequenceId, async (id) => {
   color: var(--text);
   cursor: pointer;
 }
-.toolbar button:hover:not(:disabled),
 .fpp-row button:hover:not(:disabled),
 .history-panel button:hover:not(:disabled),
 .conflict-banner button:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
-.toolbar button:disabled {
-  color: var(--text-dim);
-  cursor: default;
-}
 .toolbar select {
-  padding: 0.3rem 0.4rem;
-  font-size: 0.8rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--bg-control);
-  color: var(--text);
   max-width: 12rem;
-}
-.status {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  min-width: 0;
+  padding-right: 0.3rem;
 }
 .region-chip {
   font-size: 0.7rem !important;
@@ -3441,9 +3403,6 @@ watch(sequenceId, async (id) => {
   gap: 0.25rem;
 }
 .save-status {
-  margin-left: auto;
-  font-size: 0.75rem;
-  color: #666;
   text-transform: capitalize;
 }
 .export-error {

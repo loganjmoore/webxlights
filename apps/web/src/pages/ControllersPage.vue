@@ -70,7 +70,7 @@ onMounted(load);
 <template>
   <main class="controllers-page">
     <AppBar :project-id="projectId" active="controllers" />
-    <header>
+    <header class="page-toolbar">
       <h1>Controllers</h1>
       <MenuButton
         label="Add controller"
@@ -202,20 +202,6 @@ onMounted(load);
 }
 .controllers-page a {
   color: #e8c468;
-}
-header {
-  padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid #333;
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  background: #16161c;
-}
-header h1 {
-  font-size: 1.1rem;
-  margin: 0;
-  color: #ddd;
-  font-weight: 600;
 }
 .error {
   margin: 0;

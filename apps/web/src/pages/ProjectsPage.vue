@@ -108,7 +108,7 @@ async function loadSampleProject(): Promise<void> {
 <template>
   <main class="projects">
     <AppBar />
-    <header class="page-header">
+    <header class="page-toolbar">
       <h1>Your projects</h1>
     </header>
     <form @submit.prevent="createProject">
@@ -167,28 +167,10 @@ async function loadSampleProject(): Promise<void> {
   color: #ddd;
   font-family: system-ui, sans-serif;
 }
-.projects > :not(:first-child) {
+.projects > :not(:first-child):not(.page-toolbar) {
   max-width: 560px;
   margin-left: auto;
   margin-right: auto;
-}
-.page-header {
-  max-width: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
-  padding: 0.85rem 1.25rem;
-  border-bottom: 1px solid #333;
-  background: #16161c;
-  margin: 0;
-}
-.page-header h1 {
-  font-size: 1.15rem;
-  margin: 0;
-  color: #fff;
-  font-weight: 600;
 }
 form {
   display: flex;
