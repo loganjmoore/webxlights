@@ -1,7 +1,9 @@
 # Build context: repo root. Serves the Vue SPA + Laravel API from one Render web service
 # (DECISIONS.md: "Static SPA served by the same Laravel container").
 
-FROM node:26-alpine AS web-build
+# Pinned to the major CI tests on (.github/workflows/ci.yml). Dependabot bumped this to 26
+# once; nothing tested it, so the pin is deliberate and Dependabot is told not to.
+FROM node:22-alpine AS web-build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
@@ -19,7 +21,9 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
 COPY apps/api/ ./
 RUN composer dump-autoload --optimize --no-dev
 
-FROM php:8.5-fpm-alpine
+# 8.4 is the locked runtime (DECISIONS.md). Dependabot's bump to 8.5 broke the image build:
+# docker-php-ext-install opcache fails there, and it took production down until it was reverted.
+FROM php:8.4-fpm-alpine
 RUN apk add --no-cache nginx supervisor postgresql-dev \
     && docker-php-ext-install pdo_pgsql opcache
 

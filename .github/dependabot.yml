@@ -22,3 +22,8 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # A new PHP or Node major is a decision, not an update: the runtime is locked in DECISIONS.md
+    # and the image build is the only thing that tests it. Patch and minor tags still come through.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
