@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a2601a45970a0871cffb4cbaeea33867",
+    "content-hash": "b799c94da37eeaeca239687d56840b2a",
     "packages": [
         {
             "name": "anthropic-ai/sdk",
-            "version": "v0.43.0",
+            "version": "v0.46.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/anthropics/anthropic-sdk-php.git",
-                "reference": "475a13451a04e91fd6de235c7b9609cb7c082d92"
+                "reference": "93aa419595dceeb7062292e09406b4e2a63b96e1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/anthropics/anthropic-sdk-php/zipball/475a13451a04e91fd6de235c7b9609cb7c082d92",
-                "reference": "475a13451a04e91fd6de235c7b9609cb7c082d92",
+                "url": "https://api.github.com/repos/anthropics/anthropic-sdk-php/zipball/93aa419595dceeb7062292e09406b4e2a63b96e1",
+                "reference": "93aa419595dceeb7062292e09406b4e2a63b96e1",
                 "shasum": ""
             },
             "require": {
@@ -65,9 +65,9 @@
             "description": "Anthropic PHP SDK",
             "support": {
                 "issues": "https://github.com/anthropics/anthropic-sdk-php/issues",
-                "source": "https://github.com/anthropics/anthropic-sdk-php/tree/v0.43.0"
+                "source": "https://github.com/anthropics/anthropic-sdk-php/tree/v0.46.0"
             },
-            "time": "2026-08-20T18:20:25+00:00"
+            "time": "2026-09-01T18:08:37+00:00"
         },
         {
             "name": "brick/math",
