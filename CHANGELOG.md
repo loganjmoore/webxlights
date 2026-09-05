@@ -1,5 +1,11 @@
 # Changelog
 
+## Automatic lyric timing
+
+Sequencer > Timing tracks has **Auto lyrics**: paste the lyrics, one line per phrase, press *Time the lyrics*, and the song is listened to for where each word is sung. The result is the three tracks a Papagayo import would make - Lyrics, Words and Phonemes - with the phonemes from the CMU Pronouncing Dictionary rather than from spelling, and a *Download .xtiming* button that saves them as an xLights timing file for the desktop app. This is what autolyrics.lightingfanatics.com does for xLights users, built in; like that tool it gets most of the way and expects you to nudge a few marks. How it works, what to set (`LYRICS_API_KEY`, 20 listens a month per person by default) and its limits are in `docs/AUTO-LYRICS.md`.
+
+The server sends the stored audio to a speech-to-text model with word timestamps (OpenAI whisper-1 by default, the lyrics as its prompt), looks the lyric words up in the dictionary, and stores the result for the browser to poll. The browser lines the heard words up with the pasted ones (a longest-common-subsequence match, so a misheard word costs only itself), spreads the unheard ones across the gap their neighbours leave, and never lets time run backwards. The matching, the ARPAbet-to-mouth-shape mapping and the xtiming writer are tested on their own. Verified end to end in real Chrome against a stand-in transcription service: two lines and ten words timed, nine heard and one placed, all ten with dictionary shapes, and the `.xtiming` downloaded with its three layers.
+
 ## Shaders download for desktop xLights
 
 Every shader card, and a freshly generated draft, has **Download for xLights**: it saves the shader as an ISF `.fs` file, the format xLights' Shader effect loads. Put the file in your show folder's `Shaders` directory and pick it in the effect's file chooser. Nothing is converted: the library's sources already carry the ISF header and are checked against xLights' GLSL dialect by the shader harness, so the file on disk is the shader as the gallery runs it. Verified in real Chrome: the button on a gallery card produced `Ink Bloom.fs`, which passes the harness in both the webXLights and xLights dialects.

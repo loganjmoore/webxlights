@@ -8,6 +8,7 @@ use App\Http\Controllers\ModelEntityController;
 use App\Http\Controllers\ModelGroupController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMemberController;
+use App\Http\Controllers\LyricAlignmentController;
 use App\Http\Controllers\SequenceController;
 use App\Http\Controllers\SequencerViewController;
 use App\Http\Controllers\SequenceVersionController;
@@ -72,6 +73,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('sequences/{sequence}/body', [SequenceController::class, 'updateBody']);
         Route::post('sequences/{sequence}/audio', [SequenceController::class, 'uploadAudio']);
         Route::get('sequences/{sequence}/audio', [SequenceController::class, 'audio']);
+        // Automatic lyric timing. Each listen is a paid call, so a burst is stopped at the door.
+        Route::post('sequences/{sequence}/lyrics', [LyricAlignmentController::class, 'store'])->middleware('throttle:6,1');
+        Route::get('sequences/{sequence}/lyrics', [LyricAlignmentController::class, 'latest']);
 
         Route::get('layouts/{layout}/versions', [LayoutVersionController::class, 'index']);
         Route::post('layouts/{layout}/versions', [LayoutVersionController::class, 'store']);

@@ -67,6 +67,11 @@ services:
       # are not counted against it.
       - key: SHADER_MONTHLY_LIMIT
         value: "100"
+      # Automatic lyric timing (OpenAI whisper-1 word timestamps). Set the key in the dashboard.
+      - key: LYRICS_API_KEY
+        sync: false
+      - key: LYRICS_MONTHLY_LIMIT
+        value: "20"
       # R2 + SANCTUM_STATEFUL_DOMAINS are set manually in the Render dashboard
       # (bucket/domain don't exist until M0's provisioning step is approved).
 

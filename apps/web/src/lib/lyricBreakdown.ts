@@ -108,8 +108,12 @@ export function breakdownPhrase(text: string, startMs: number, endMs: number): C
 
 /** The phonemes of a word, laid out across the word's own span. */
 export function breakdownWord(word: string, startMs: number, endMs: number): Cell[] {
-  const phonemes = phonemesForWord(word);
-  return slice(phonemes, startMs, endMs).map((cell, i) => ({ ...cell, label: phonemes[i]! }));
+  return cellsForPhonemes(phonemesForWord(word), startMs, endMs);
+}
+
+/** A given list of mouth shapes laid across a span - for shapes that came from a dictionary. */
+export function cellsForPhonemes(phonemes: string[], startMs: number, endMs: number): Cell[] {
+  return slice(phonemes, startMs, endMs);
 }
 
 /** Every cell of a track: mark `i` runs to mark `i + 1`, carrying label `i`. */

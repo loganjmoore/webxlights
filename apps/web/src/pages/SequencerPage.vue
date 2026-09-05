@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { CANVAS_ONLY_EFFECTS, EFFECT_SCHEMAS, computeGeometryFromAttrs, defaultParamsFor, detectOnsets, estimateTempo, mouthNames, strandCount, strandSpecs, type AudioSeries, type OnsetBand, type BlendMode, type ColorAdjust, type LayerSettings, type StoredSwatch, type TransitionSpec } from "@webxlights/engine";
-import { api, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequencerView, type SequenceEffect, type SequenceVersion } from "../lib/api";
+import { api, ApiError, type LyricAlignmentRecord, type ControllerRecord, type EffectParamValue, type ModelRecord, type ModelGroupRecord, type SequencerView, type SequenceEffect, type SequenceVersion } from "../lib/api";
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
@@ -10,6 +10,8 @@ import { parseMidi, parsePapagayo, type ParsedMidi } from "@webxlights/formats";
 import { ALL_TRACKS, describeMidiImport, midiTrackChoices, timingTrackFromMidi } from "../lib/midiTiming";
 import { describePapagayoImport, tracksFromPapagayo } from "../lib/papagayoTiming";
 import { breakdownPhrases, breakdownWords, cellsOf, phonemesTrackName, wordsTrackName } from "../lib/lyricBreakdown";
+import { alignLyrics, lyricTimingTracks } from "../lib/lyricAlign";
+import { downloadXtiming } from "../lib/xtimingExport";
 import { effectIcon } from "../lib/effectIcons";
 import { filterRanked, isDefaultStrandName } from "../lib/listFilter";
 import { useTearOff } from "../lib/tearOff";
@@ -209,6 +211,87 @@ async function pickMidiFile(e: Event): Promise<void> {
 // choice the manual's own dialog offers is the frame offset, and it is next to the picker.
 const papagayoOffsetFrames = ref(0);
 const papagayoMessage = ref("");
+
+// Automatic lyric timing (Sequencer > Timing tracks > Auto lyrics). The server listens to the
+// song; the browser polls, then lines the heard words up with the pasted lyrics and makes the
+// same three tracks a Papagayo import would (lib/lyricAlign.ts).
+const LYRICS_TRACK = "Lyrics";
+const lyricsText = ref("");
+const lyricsBusy = ref(false);
+const lyricsMessage = ref("");
+let lyricsPoll: ReturnType<typeof setTimeout> | undefined;
+
+function applyLyricAlignment(record: LyricAlignmentRecord): void {
+  if (!record.result) return;
+  const alignment = alignLyrics(record.lyrics, record.result.words, store.sequence?.duration_ms);
+  const tracks = lyricTimingTracks(LYRICS_TRACK, alignment, record.result.pronunciations);
+  for (const track of tracks) replaceTrackNamed(track.name, track);
+  const total = alignment.words.length;
+  const known = alignment.words.filter((w) => record.result!.pronunciations[w.key]).length;
+  lyricsMessage.value =
+    `Timed ${alignment.phrases.length} lines and ${total} words; ${alignment.heard} of the words were heard in the song and the rest were placed between them. ` +
+    `${known} words' mouth shapes came from the dictionary. Play it through and nudge any mark that is off - this gets most of the way, not all of it.`;
+}
+
+async function pollLyrics(): Promise<void> {
+  clearTimeout(lyricsPoll);
+  try {
+    const record = await api.latestLyricAlignment(sequenceId.value);
+    if (!record) return;
+    if (record.status === "done") {
+      lyricsBusy.value = false;
+      applyLyricAlignment(record);
+    } else if (record.status === "failed") {
+      lyricsBusy.value = false;
+      lyricsMessage.value = record.error ?? "The listen failed.";
+    } else {
+      lyricsBusy.value = true;
+      lyricsMessage.value = record.status === "running" ? "Listening to the song… a few minutes for a full-length track." : "Queued…";
+      lyricsPoll = setTimeout(() => void pollLyrics(), 4000);
+    }
+  } catch (err) {
+    lyricsBusy.value = false;
+    lyricsMessage.value = err instanceof Error ? err.message : "Couldn't check on the timing.";
+  }
+}
+
+async function timeLyrics(): Promise<void> {
+  if (!lyricsText.value.trim()) {
+    lyricsMessage.value = "Paste the lyrics first, one line per phrase.";
+    return;
+  }
+  lyricsBusy.value = true;
+  lyricsMessage.value = "Sending the song off to be listened to…";
+  try {
+    await api.alignLyrics(sequenceId.value, lyricsText.value);
+    lyricsPoll = setTimeout(() => void pollLyrics(), 3000);
+  } catch (err) {
+    lyricsBusy.value = false;
+    let message = err instanceof Error ? err.message : "Couldn't start the timing.";
+    if (err instanceof ApiError) {
+      try {
+        message = (JSON.parse(err.message) as { message?: string }).message ?? message;
+      } catch {
+        // Not JSON; the text stands.
+      }
+    }
+    lyricsMessage.value = message;
+  }
+}
+
+/** The lyric tracks as an xLights .xtiming, for the desktop app's Import Timing Track. */
+function downloadLyricsXtiming(): void {
+  const layers = [LYRICS_TRACK, wordsTrackName(LYRICS_TRACK), phonemesTrackName(LYRICS_TRACK)]
+    .map((name) => store.body.timingTracks.find((t) => t.name === name))
+    .filter((t): t is NonNullable<typeof t> => !!t)
+    .map((t) => cellsOf(t).filter((c) => c.label.trim().length > 0));
+  if (layers.length === 0) {
+    lyricsMessage.value = "No lyric tracks to export yet.";
+    return;
+  }
+  downloadXtiming(`${store.sequence?.name ?? "sequence"} lyrics`, layers);
+}
+onBeforeUnmount(() => clearTimeout(lyricsPoll));
 
 async function pickPapagayoFile(e: Event): Promise<void> {
   const input = e.target as HTMLInputElement;
@@ -2686,6 +2769,21 @@ watch(sequenceId, async (id) => {
         <label class="midi-field">Offset <input v-model.number="papagayoOffsetFrames" type="number" step="1" /> frames</label>
       </div>
       <p v-if="papagayoMessage" class="timing-note">{{ papagayoMessage }}</p>
+
+      <h3 class="timing-heading">Auto lyrics</h3>
+      <p class="timing-note">
+        Paste the lyrics, one line per phrase, and the song is listened to for where each word is
+        sung. You get three tracks — Lyrics, Words and Phonemes — the phonemes from the CMU
+        Pronouncing Dictionary. It gets most of the way there; play it through and nudge what is off.
+      </p>
+      <textarea v-model="lyricsText" class="lyrics-box" rows="6" placeholder="Jingle bells, jingle bells&#10;Jingle all the way…" :disabled="lyricsBusy"></textarea>
+      <div class="timing-row">
+        <button type="button" :disabled="lyricsBusy || !store.sequence?.audio_filename" :title="store.sequence?.audio_filename ? 'Listen to the song and time these lyrics' : 'Upload the song first'" @click="timeLyrics">
+          {{ lyricsBusy ? "Listening…" : "Time the lyrics" }}
+        </button>
+        <button type="button" title="Save the lyric tracks as an xLights .xtiming file" @click="downloadLyricsXtiming">Download .xtiming</button>
+      </div>
+      <p v-if="lyricsMessage" class="timing-note">{{ lyricsMessage }}</p>
       </div>
     </ModalPanel>
 
@@ -3710,6 +3808,24 @@ header button.active {
 .fpp-panel,
 .timing-panel {
   font-size: 0.85rem;
+}
+.timing-heading {
+  margin: 1rem 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.lyrics-box {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
 }
 .timing-note {
   margin: 0 0 0.5rem;

@@ -923,6 +923,10 @@ Credits were a balance that hit zero and stayed there; the operator wanted peopl
 
 xLights chains models on a port so each starts where the previous ends. Our data model has a per-model `controller_offset`, which someone may have hand-placed to match a physical port. The visualiser repacks the target chain contiguously on every drop, which discards hand-made gaps on that controller. That is the trade: a visualiser whose drops did not chain would not be a visualiser. Gaps on controllers you did not drop onto are untouched, and the "auto start channels" allocator on the Layout page still never moves an existing assignment.
 
+## Lyric timing listens on the web service, and the lyrics are the truth
+
+The transcription runs after the response in the web process (`dispatchAfterResponse`), not on the worker: the sequence audio is on the web service's local disk, which the worker cannot read, and the browser has to poll either way. Moving audio to shared storage is the upgrade if a second web instance ever appears. The heard transcript is treated as a clock, never as the words: the pasted lyrics keep their spelling and line breaks and only borrow times, so a misheard word cannot end up on a face. Phonemes come from the CMU dictionary (BSD) on the server and fall back to the existing letter-based shapes in the browser, so no word ever produces an empty cell - the failure xLights users have to notice by eye.
+
 ## Deviation log
 
 - 2026-08-10: `composer create-project laravel/laravel` installs Laravel 13.x (goal prompt said "12.x-ish LTS"). Laravel 12 is not what `laravel/laravel` resolves to as of this date; using current stable 13 instead of pinning back to an EOL-adjacent 12.
