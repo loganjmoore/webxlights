@@ -1619,10 +1619,11 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.3rem;
-  padding: 0.25rem 0.3rem;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.25rem 0.15rem;
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   white-space: nowrap;
   color: var(--text-muted);
   background: transparent;
