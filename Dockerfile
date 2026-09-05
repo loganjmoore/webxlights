@@ -1,7 +1,7 @@
 # Build context: repo root. Serves the Vue SPA + Laravel API from one Render web service
 # (DECISIONS.md: "Static SPA served by the same Laravel container").
 
-FROM node:22-alpine AS web-build
+FROM node:26-alpine AS web-build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
