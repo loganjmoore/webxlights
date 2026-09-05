@@ -12,6 +12,7 @@ import { describePapagayoImport, tracksFromPapagayo } from "../lib/papagayoTimin
 import { breakdownPhrases, breakdownWords, cellsOf, phonemesTrackName, wordsTrackName } from "../lib/lyricBreakdown";
 import { effectIcon } from "../lib/effectIcons";
 import { filterRanked, isDefaultStrandName } from "../lib/listFilter";
+import { useTearOff } from "../lib/tearOff";
 import ModalPanel from "../components/ModalPanel.vue";
 import MenuButton, { type MenuItem } from "../components/MenuButton.vue";
 import AppBar from "../components/AppBar.vue";
@@ -1120,6 +1121,10 @@ function handlePlace(row: GridRow, startMs: number, endMs: number): void {
 // The existing arm-then-drag-on-the-grid gesture (which sizes the effect in one motion) is
 // untouched and still the way to place a specific length.
 const gridRef = ref<InstanceType<typeof SequencerGrid> | null>(null);
+
+// The effect settings panel can leave the page for a window of its own - a second monitor is
+// where a sequencer's inspector belongs. While it is away the grid takes its width.
+const propsWindow = useTearOff(() => "Effect settings");
 const tileDrag = ref<{
   name: string;
   x: number;
@@ -3379,7 +3384,30 @@ watch(sequenceId, async (id) => {
           />
         </div>
       </div>
-      <aside class="props">
+      <aside class="props" :class="{ away: propsWindow.popped.value }">
+        <div v-if="propsWindow.popped.value" class="props-away">
+          <span>Effect settings is in its own window.</span>
+          <button type="button" @click="propsWindow.closePopup()">Bring it back</button>
+        </div>
+        <Teleport :to="propsWindow.teleportTo.value" :disabled="!propsWindow.popped.value">
+        <div class="props-body" :class="{ popped: propsWindow.popped.value }">
+        <header class="props-head">
+          <h2>Effect settings</h2>
+          <span v-if="propsWindow.blocked.value" class="props-blocked">Your browser blocked the window</span>
+          <button
+            v-if="!propsWindow.popped.value"
+            type="button"
+            class="props-tool"
+            title="Open in its own window (shift-click for a tab). Close that window to bring it back."
+            aria-label="Open effect settings in its own window"
+            @click="propsWindow.popOut($event, { width: 360, height: 820 })"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg>
+          </button>
+          <button v-else type="button" class="props-tool" title="Bring this panel back into the main window" aria-label="Bring back" @click="propsWindow.closePopup()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 7 7 17M15 17H7V9" /></svg>
+          </button>
+        </header>
         <EffectPropsPanel
           :effect="selectedEffect"
           :timing-track-names="timingTrackNames"
@@ -3395,6 +3423,8 @@ watch(sequenceId, async (id) => {
           @update-transition="handleTransitionUpdate"
           @update-layer="handleLayerUpdate"
         />
+        </div>
+        </Teleport>
       </aside>
     </div>
 
@@ -3692,14 +3722,14 @@ header button.active {
   color: #aaa;
 }
 .palette {
-  padding: 0.4rem 0.75rem 0.3rem;
+  padding: 0.25rem 0.75rem 0.2rem;
   border-bottom: 1px solid var(--border);
   text-align: left;
 }
 .palette-tiles {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.2rem;
+  gap: 0.1rem;
 }
 /* A tile is a picture with its name under it, so the row you reach for is a toolbox rather than
    a line of glyphs you have to hover to decode. Fixed width, so forty-eight of them make an even
@@ -3709,8 +3739,8 @@ header button.active {
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  width: 52px;
-  padding: 4px 2px 3px;
+  width: 44px;
+  padding: 2px 1px;
   border: 1px solid transparent;
   border-radius: var(--radius);
   background: transparent;
@@ -3721,13 +3751,13 @@ header button.active {
   transition: background 120ms ease-out, color 120ms ease-out, transform 120ms ease-out;
 }
 .palette-tiles .effect-tile svg {
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   pointer-events: none;
 }
 .tile-label {
   max-width: 100%;
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
@@ -3781,7 +3811,93 @@ header button.active {
 }
 .props {
   width: 240px;
-  border-left: 1px solid #333;
+  border-left: 1px solid var(--border);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+/* While the panel is in its own window, its column shrinks to a note and the grid takes the rest. */
+.props.away {
+  width: 160px;
+}
+.props-away {
+  padding: 0.9rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.props-away button {
+  padding: 0.3rem 0.6rem;
+  font: inherit;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
+  cursor: pointer;
+}
+.props-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.props-body.popped {
+  height: 100vh;
+  overflow-y: auto;
+  font-family: var(--sans);
+}
+.props-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+  z-index: 1;
+}
+.props-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.props-blocked {
+  font-size: 0.65rem;
+  color: var(--danger);
+}
+.props-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.props-tool svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.props-tool:hover {
+  color: var(--text);
+  background: var(--bg-hover);
 }
 </style>

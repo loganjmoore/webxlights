@@ -1,5 +1,11 @@
 # Changelog
 
+## The effect settings panel tears off too, and the palette takes less room
+
+The docked effect settings panel beside the grid has the same tear-off control as the dialogs: a click opens it in a separate Chrome window (shift-click for a tab), the grid takes the width it leaves behind, and closing that window brings it back. The mechanism moved out of the dialog component into `lib/tearOff.ts` so both share it. Verified in real Chrome: the panel and its controls appeared in the new window, the main page showed the "in its own window" note with a wider grid, and closing the window returned the panel.
+
+The effect palette's tiles are smaller - 44px wide with 16px glyphs - so the strip takes about a third less height.
+
 ## Panels that fit, lists you can type into, and a drop that always lets go
 
 Every panel is now at most seven tenths of the window tall; the body scrolls inside it, and the grid underneath stays in view. The list panels - Models, the Views row picker, Effect presets - have a typeahead at the top: results are ranked closest first (exact name, then names starting with what you typed, then names containing it, then initials in order), so "tree" puts Tree above Mega Tree above Street Lights and the exact name lands at the top. The Models list hides numbered strands by default - a 16-strand matrix was sixteen rows of "Strand N" nobody sequences - and a "Show everything" switch brings them back; a strand someone has named is always listed.
