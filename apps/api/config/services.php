@@ -10,6 +10,16 @@ return [
     // The shader assistant. Provider-agnostic on purpose: whoever runs a copy of this has
     // whatever account they already have, not the one the maintainer chose. See
     // app/Services/Shader/Providers.php for the names, docs/SHADER-ASSISTANT-COST.md for costs.
+    // Automatic lyric timing: a speech-to-text endpoint that returns word timestamps, in
+    // OpenAI's /audio/transcriptions shape. Off until a key is set.
+    'lyrics' => [
+        'key' => env('LYRICS_API_KEY', env('OPENAI_API_KEY')),
+        'base_url' => env('LYRICS_BASE_URL', 'https://api.openai.com/v1'),
+        'model' => env('LYRICS_MODEL', 'whisper-1'),
+        // Server-funded listens per person per month; 0 means uncapped.
+        'monthly_limit' => (int) env('LYRICS_MONTHLY_LIMIT', 20),
+    ],
+
     'shader' => [
         'provider' => env('SHADER_PROVIDER', 'anthropic'),
         // One key for whichever provider is selected. SHADER_API_KEY is the name to use;

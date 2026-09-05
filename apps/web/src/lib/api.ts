@@ -277,6 +277,22 @@ export interface SequenceRow {
   effects: SequenceEffect[];
 }
 
+/** One automatic lyric timing: what the server heard in the song, once it has listened. */
+export interface LyricAlignmentRecord {
+  id: number;
+  status: "queued" | "running" | "done" | "failed";
+  lyrics: string;
+  result: {
+    words: { text: string; start: number; end: number }[];
+    language: string | null;
+    model: string;
+    /** ARPAbet for each lyric word the dictionary knows, keyed by the normalised word. */
+    pronunciations: Record<string, string[]>;
+  } | null;
+  error: string | null;
+  created_at: string | null;
+}
+
 export interface TimingTrack {
   name: string;
   marks: number[];
@@ -481,6 +497,11 @@ export const api = {
       headers,
     });
   },
+
+  // Automatic lyric timing: paste the lyrics, poll until the server has listened to the song.
+  alignLyrics: (sequenceId: number, lyrics: string) =>
+    request<LyricAlignmentRecord>(`/v1/sequences/${sequenceId}/lyrics`, { method: "POST", body: JSON.stringify({ lyrics }) }),
+  latestLyricAlignment: (sequenceId: number) => request<LyricAlignmentRecord | null>(`/v1/sequences/${sequenceId}/lyrics`),
 
   listModelGroups: (layoutId: number) => request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups`),
   bulkUpsertModelGroups: (layoutId: number, groups: GroupUpsertPayload[]) =>
