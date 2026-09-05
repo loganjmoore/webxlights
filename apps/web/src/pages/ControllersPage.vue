@@ -260,20 +260,27 @@ onMounted(load);
 .props-panel {
   width: 280px;
   flex-shrink: 0;
-  border-left: 1px solid #333;
-  background: #16161c;
+  border-left: 1px solid var(--border);
+  background: var(--bg-panel);
   padding: 1rem;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  text-align: left;
   gap: 0.85rem;
 }
 .props-panel label {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 0.3rem;
   font-size: 0.75rem;
-  color: #aaa;
+  color: var(--text-muted);
+}
+.props-panel label > input,
+.props-panel label > select {
+  width: 100%;
+  box-sizing: border-box;
 }
 .props-panel input,
 .props-panel select {

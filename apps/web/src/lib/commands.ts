@@ -334,9 +334,11 @@ export function buildCommands(ctx: CommandContext): Command[] {
       id: "view.palette",
       label: "Command palette",
       group: "View",
-      keyLabel: "Ctrl+Shift+K",
+      // xLights' own key is Ctrl+Shift+K; every other tool on the web answers to Cmd+K or
+      // Ctrl+K, and that is what people press. Both work.
+      keyLabel: "Ctrl+K",
       run: ctx.openPalette,
-      matches: (e) => mod(e) && Boolean(e.shiftKey) && e.key.toLowerCase() === "k",
+      matches: (e) => mod(e) && e.key.toLowerCase() === "k",
     },
 
     // In the palette but with no key of their own: the palette is meant to reach everything, and

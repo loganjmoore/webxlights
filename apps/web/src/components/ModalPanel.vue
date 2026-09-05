@@ -6,6 +6,7 @@ let zCounter = 100;
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { clampToViewport, loadPlacement, savePlacement } from "../lib/panelPositions";
+import { useTearOff } from "../lib/tearOff";
 
 // A settings pane as a dialog over the page - one you can move, resize, pin and tear off.
 //
@@ -15,10 +16,8 @@ import { clampToViewport, loadPlacement, savePlacement } from "../lib/panelPosit
 // xLights' docked windows behave and what "I want the Models list open while I sequence"
 // actually needs. Where it was left is remembered per panel (lib/panelPositions.ts).
 //
-// Tear it off and it moves into a browser window (or tab) of its own. Not a copy: the very same
-// DOM nodes, teleported into the other window's document, so it keeps every bit of state and
-// reactivity it had - the sequencer store, the inputs half-typed - without any of the panel's
-// code knowing it moved. Close that window and the panel comes back where it was.
+// Tear it off and it moves into a browser window (or tab) of its own (lib/tearOff.ts). Close
+// that window and the panel comes back where it was.
 //
 // Teleported to <body> so a panel can't be clipped by whatever it happens to be declared inside -
 // the sequencer's panels sit inside a flex column with `overflow: hidden`.
@@ -83,65 +82,9 @@ function recenter(): void {
   remember();
 }
 
-// ---- its own window ------------------------------------------------------------------------
+// ---- its own window (lib/tearOff.ts) ---------------------------------------------------------
 
-/** The window this panel lives in when torn off, and where Teleport sends it. */
-const popup = ref<Window | null>(null);
-const popped = computed(() => popup.value !== null);
-const teleportTo = ref<string | HTMLElement>("body");
-const popupBlocked = ref(false);
-
-/**
- * Moves the panel into a window of its own. Shift-click for a tab instead.
- *
- * The new document starts blank; it gets the app's stylesheets (cloned, so a scoped style or a
- * dev-server-injected one comes along) and then the panel's own nodes. Closing the window is
- * the way back: `pagehide` fires and the panel returns to this page.
- */
-function popOut(e: MouseEvent): void {
-  if (popup.value) {
-    popup.value.focus();
-    return;
-  }
-  const name = `webxlights-panel-${props.id ?? props.title}`;
-  const features = e.shiftKey ? "" : "width=640,height=760,popup=yes";
-  const w = window.open("", name, features);
-  if (!w) {
-    // A popup blocker. Say so rather than doing nothing.
-    popupBlocked.value = true;
-    return;
-  }
-  popupBlocked.value = false;
-  const doc = w.document;
-  doc.title = `${props.title} · webXLights`;
-  doc.documentElement.style.colorScheme = "dark";
-  for (const node of document.querySelectorAll('style, link[rel="stylesheet"]')) {
-    const clone = node.cloneNode(true) as HTMLStyleElement | HTMLLinkElement;
-    // A relative href resolved against about:blank goes nowhere; the property is absolute.
-    if (clone instanceof HTMLLinkElement) clone.href = (node as HTMLLinkElement).href;
-    doc.head.appendChild(clone);
-  }
-  doc.body.style.margin = "0";
-  doc.body.style.background = "var(--bg-panel, #16161c)";
-  w.addEventListener("pagehide", rejoin);
-  popup.value = w;
-  teleportTo.value = doc.body;
-}
-
-/** The window closed (or is closing): the panel comes home. */
-function rejoin(): void {
-  const w = popup.value;
-  if (!w) return;
-  w.removeEventListener("pagehide", rejoin);
-  popup.value = null;
-  teleportTo.value = "body";
-}
-
-function closePopup(): void {
-  const w = popup.value;
-  rejoin();
-  if (w && !w.closed) w.close();
-}
+const { popped, teleportTo, blocked: popupBlocked, popOut, closePopup } = useTearOff(() => props.id ?? props.title);
 
 // ---- dragging the title bar ----------------------------------------------------------------
 
@@ -204,11 +147,7 @@ onMounted(async () => {
     { width: window.innerWidth, height: window.innerHeight },
   );
 });
-onBeforeUnmount(() => {
-  window.removeEventListener("keydown", onKeydown, true);
-  // The page is going away, or the panel was closed from the page: its window goes too.
-  closePopup();
-});
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
 </script>
 
 <template>

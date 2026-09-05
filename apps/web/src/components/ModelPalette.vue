@@ -36,6 +36,7 @@ let pointer: { id: number; type: string; startX: number; startY: number; el: HTM
 
 function onPointerDown(e: PointerEvent, type: string): void {
   if (e.button !== 0) return;
+  if (e.pointerType === "mouse") e.preventDefault();
   const el = e.currentTarget as HTMLElement;
   pointer = { id: e.pointerId, type, startX: e.clientX, startY: e.clientY, el, started: false };
   el.setPointerCapture(e.pointerId);
@@ -100,6 +101,7 @@ function finish(): void {
       class="palette-item"
       :class="{ lifted: drag?.type === type }"
       :title="`Drag onto the layout to place a ${type}`"
+      @dragstart.prevent
       @pointerdown="onPointerDown($event, type)"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
@@ -134,6 +136,7 @@ function finish(): void {
   color: var(--text);
   touch-action: none;
   user-select: none;
+  -webkit-user-drag: none;
 }
 .palette-item:hover {
   border-color: var(--accent);
