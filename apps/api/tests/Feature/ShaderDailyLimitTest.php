@@ -60,8 +60,8 @@ class ShaderDailyLimitTest extends TestCase
         $response->assertStatus(429)->assertJsonPath('code', 'daily_limit');
         // The refusal says when to come back - a limit with no reset time reads as a ban.
         $this->assertNotNull($response->json('resets_at'));
-        // Refused before anything moved: two paid generations, not three, and no third API call.
-        $this->assertSame(8, $user->fresh()->credits);
+        // Refused before anything moved: two counted generations, not three, and no third API call.
+        $this->assertSame(10, $user->fresh()->credits);
         $this->assertSame(2, $fake->calls);
     }
 

@@ -2475,15 +2475,22 @@ watch(sequenceId, async (id) => {
     <header class="page-toolbar toolbar">
       <h1 :title="store.sequence?.name">{{ store.sequence?.name }}</h1>
       <div class="group transport">
-        <button :disabled="!audioLoaded" :title="playing ? 'Pause (Space)' : 'Play (Space)'" @click="togglePlay">
-          {{ playing ? "Pause" : "Play" }}
+        <button class="icon" :disabled="!audioLoaded" :title="playing ? 'Pause (Space)' : 'Play (Space)'" :aria-label="playing ? 'Pause' : 'Play'" @click="togglePlay">
+          <svg v-if="playing" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM13 5h3v14h-3z" fill="currentColor" stroke="none" /></svg>
+          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none" /></svg>
         </button>
-        <button :disabled="!audioLoaded" title="Stop" @click="stop">Stop</button>
+        <button class="icon" :disabled="!audioLoaded" title="Stop" aria-label="Stop" @click="stop">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none" /></svg>
+        </button>
         <span class="time" :title="`Time shown as ${prefs.timeFormat}`">{{ playheadLabel }}</span>
       </div>
       <div class="group">
-        <button :disabled="!store.canUndo" title="Undo (Ctrl+Z)" @click="store.undo">Undo</button>
-        <button :disabled="!store.canRedo" title="Redo (Ctrl+Y)" @click="store.redo">Redo</button>
+        <button class="icon" :disabled="!store.canUndo" title="Undo (Ctrl+Z)" aria-label="Undo" @click="store.undo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5M4 12h10a5 5 0 0 1 0 10h-3" /></svg>
+        </button>
+        <button class="icon" :disabled="!store.canRedo" title="Redo (Ctrl+Y)" aria-label="Redo" @click="store.redo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 7 5 5-5 5M20 12H10a5 5 0 0 0 0 10h3" /></svg>
+        </button>
       </div>
       <div class="group">
         <select v-model.number="zoomLevel" title="Zoom. Ctrl+wheel over the grid, double-click the waveform to zoom in, shift+double-click to zoom out, right-click the waveform to reset.">
@@ -3462,6 +3469,21 @@ watch(sequenceId, async (id) => {
 }
 .sequencer-page a {
   color: #e8c468;
+}
+/* Transport and undo are pictures, the way every editor draws them; the name is the tooltip. */
+.toolbar button.icon {
+  width: 30px;
+  padding: 0;
+  justify-content: center;
+}
+.toolbar button.icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .toolbar h1 {
   max-width: 18rem;

@@ -915,6 +915,14 @@ The `target` field (matrix / line / tree / any) is one validated enum on the req
 
 The CSP is the load-bearing decision: the app runs strangers' GLSL on the GPU by design, so it must never run strangers' JavaScript. `script-src 'self'` with no inline and no third-party hosts is achievable because Vue's production build emits no inline script and the app loads nothing from a CDN. `style-src` keeps `'unsafe-inline'` because Vue binds style attributes; `connect-src` is open because FPP Connect posts to a controller at an address only the user knows. Verified by serving the production build with nginx's exact headers and driving the sequencer, layout and shaders pages: no violation. Audio uploads gained an extension allow-list and `nosniff` on the way back out, since a stored `.html` served from this origin would have been script running as the app regardless of CSP-on-HTML... which nginx does apply, but belt and braces. Login and register are throttled per IP; the shader payload arrays are bounded; cookies are `Secure` + `Lax` in production. Deliberately not done: `Password::uncompromised()` (a network call to a third party on every registration), CORS lockdown (the framework default already refuses credentials cross-origin), and rate-limiting shader saves (authenticated, cheap, and nothing to exhaust).
 
+## The monthly allowance replaces the credit balance as the gate
+
+Credits were a balance that hit zero and stayed there; the operator wanted people to be able to keep using the assistant, within a bound. A monthly allowance is that bound: 100 server-funded generations per person per calendar month, reset on the 1st, bring-your-own-key not counted. The ledger stays exactly as it was - every generation is a row, refunds are rows - because it is the audit trail, and `moveCredits` still locks the user row so two clicks cannot both count as one. The rows simply carry amount 0 now. The credit column is kept but no longer read for permission; dropping it would be a migration that gains nothing. The daily cap stays available (`SHADER_DAILY_LIMIT`) but defaults to off.
+
+## Chaining in the visualiser repacks from zero
+
+xLights chains models on a port so each starts where the previous ends. Our data model has a per-model `controller_offset`, which someone may have hand-placed to match a physical port. The visualiser repacks the target chain contiguously on every drop, which discards hand-made gaps on that controller. That is the trade: a visualiser whose drops did not chain would not be a visualiser. Gaps on controllers you did not drop onto are untouched, and the "auto start channels" allocator on the Layout page still never moves an existing assignment.
+
 ## Deviation log
 
 - 2026-08-10: `composer create-project laravel/laravel` installs Laravel 13.x (goal prompt said "12.x-ish LTS"). Laravel 12 is not what `laravel/laravel` resolves to as of this date; using current stable 13 instead of pinning back to an EOL-adjacent 12.

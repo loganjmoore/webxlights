@@ -125,6 +125,8 @@ export interface ShaderRecord {
   inputs: IsfInput[];
   categories: string[];
   is_public: boolean;
+  /** Whether the caller keeps this shader in their own collection. */
+  favourited?: boolean;
   /** Set only on the shaders that ship with the app; null for anything a person made. */
   builtin_key: string | null;
   prompt: string | null;
@@ -144,6 +146,10 @@ export interface ShaderPage {
 export interface CreditStatus {
   credits: number;
   cost_per_generation: number;
+  /** The free allowance per calendar month; 0 means the operator turned the cap off. */
+  monthly_limit?: number;
+  used_this_month?: number;
+  month_resets_at?: string;
   /** False on a self-hosted copy: the user must bring their own key. */
   server_key_available: boolean;
   accepts_user_keys: boolean;
@@ -414,11 +420,14 @@ export const api = {
       /** Shaders that ship with the app, shaders people made, or both. */
       kind?: "all" | "builtin" | "community";
       category?: string;
+      /** Only the caller's own collection. */
+      favourites?: boolean;
     } = {},
   ) => {
     const query = new URLSearchParams();
     if (params.q) query.set("q", params.q);
     if (params.mine) query.set("mine", "1");
+    if (params.favourites) query.set("favourites", "1");
     if (params.sort) query.set("sort", params.sort);
     if (params.page) query.set("page", String(params.page));
     if (params.kind && params.kind !== "all") query.set("kind", params.kind);
@@ -440,6 +449,8 @@ export const api = {
   updateShader: (id: number, patch: Partial<{ name: string; description: string | null; source: string; is_public: boolean }>) =>
     request<ShaderRecord>(`/v1/shaders/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteShader: (id: number) => request<void>(`/v1/shaders/${id}`, { method: "DELETE" }),
+  favouriteShader: (id: number) => request<{ favourited: boolean }>(`/v1/shaders/${id}/favourite`, { method: "POST" }),
+  unfavouriteShader: (id: number) => request<{ favourited: boolean }>(`/v1/shaders/${id}/favourite`, { method: "DELETE" }),
   /** Records that a shader was put in a sequence - what "popular" ranks. */
   markShaderUsed: (id: number) => request<{ use_count: number }>(`/v1/shaders/${id}/used`, { method: "POST" }),
 

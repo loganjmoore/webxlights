@@ -4,12 +4,47 @@ import AppBar from "../components/AppBar.vue";
 import MenuButton from "../components/MenuButton.vue";
 import { useRoute } from "vue-router";
 import { api, type ControllerProtocol, type ControllerRecord, type ControllerUpsertPayload, type ModelRecord } from "../lib/api";
+import ControllerVisualiser from "../components/ControllerVisualiser.vue";
+import { applyChainPatches, type ChainPatch } from "../lib/controllerChain";
+import { channelCountForModel } from "../lib/fseqExport";
 
 const route = useRoute();
 const projectId = computed(() => Number(route.params.projectId));
 
 const controllers = ref<ControllerRecord[]>([]);
 const models = ref<ModelRecord[]>([]); // to derive each controller's assigned-models list
+const layoutId = ref<number | null>(null);
+const chaining = ref(false);
+
+/**
+ * A drop in the visualiser: the chain arithmetic said which models move; this writes them.
+ *
+ * The page shows the result before the writes land, then reconciles with what the server
+ * returned - a chain of six models is six small PATCHes, and waiting on all of them before
+ * moving anything on screen would make the drop feel like it missed.
+ */
+async function applyPatches(patches: ChainPatch[]): Promise<void> {
+  if (patches.length === 0 || layoutId.value === null) return;
+  const before = models.value;
+  models.value = applyChainPatches(models.value, patches);
+  chaining.value = true;
+  error.value = "";
+  try {
+    for (const p of patches) {
+      const updated = await api.updateModel(layoutId.value, p.modelId, {
+        controller_id: p.controller_id,
+        controller_offset: p.controller_offset,
+        channel_count: p.channel_count ?? undefined,
+      });
+      models.value = models.value.map((m) => (m.id === updated.id ? updated : m));
+    }
+  } catch (err) {
+    models.value = before;
+    error.value = err instanceof Error ? `Couldn't move that model: ${err.message}` : "Couldn't move that model";
+  } finally {
+    chaining.value = false;
+  }
+}
 const selectedId = ref<number | null>(null);
 const error = ref("");
 
@@ -20,7 +55,10 @@ async function load(): Promise<void> {
   controllers.value = await api.listControllers(projectId.value);
   const layouts = await api.listLayouts(projectId.value);
   const layout = layouts[0];
-  if (layout) models.value = await api.listModels(layout.id);
+  if (layout) {
+    layoutId.value = layout.id;
+    models.value = await api.listModels(layout.id);
+  }
 }
 
 // "Add Ethernet" defaults to DDP, not E1.31 - the reference screenshot's own new-controller
@@ -84,6 +122,7 @@ onMounted(load);
     <p v-if="error" class="error">{{ error }}</p>
 
     <div class="body">
+      <div class="left">
       <table class="controller-table">
         <thead>
           <tr>
@@ -114,6 +153,14 @@ onMounted(load);
           </tr>
         </tbody>
       </table>
+      <ControllerVisualiser
+        :controllers="controllers"
+        :models="models"
+        :channel-count-for="channelCountForModel"
+        :saving="chaining"
+        @patches="applyPatches"
+      />
+      </div>
 
       <aside v-if="selected" class="props-panel">
         <label>
@@ -174,7 +221,7 @@ onMounted(load);
           <ul v-if="assignedModels.length">
             <li v-for="m in assignedModels" :key="m.id">{{ m.name }} <span class="offset">offset {{ m.controller_offset }}</span></li>
           </ul>
-          <p v-else class="empty">None yet — assign from the Layout page's model list.</p>
+          <p v-else class="empty">None yet — drag models onto this controller in the visualiser.</p>
         </div>
 
         <button class="delete-btn" @click="removeSelected">Delete</button>
@@ -216,10 +263,16 @@ onMounted(load);
   display: flex;
   min-height: 0;
 }
-.controller-table {
+.left {
   flex: 1;
-  align-self: flex-start;
+  min-width: 0;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.controller-table {
+  width: 100%;
+  flex: none;
   border-collapse: collapse;
   font-size: 0.85rem;
 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## A controller visualiser, shader favourites, a monthly allowance, and Sonnet 5
+
+The Controllers page has the visualiser xLights users expect: every controller as a row, its models chained along it in channel order, and a tray of models that are on no controller yet. Drag a model onto a controller and it joins the end of the chain; drop it between two others and everything after shuffles along; drag it back to the tray and it comes off. A model that will not fit is refused before the drop, with the row turning red and saying how many channels are free. The arithmetic (`lib/controllerChain.ts`) is tested on its own; the page writes only the models that actually moved and shows the result before the writes land. Verified in real Chrome: chaining onto two controllers, reordering, taking one off, and a 768-channel matrix correctly refused by a 600-channel controller.
+
+Shaders can be starred. A star on each card, a "My favourites" scope on the gallery, and a ★ filter in the sequencer's shader picker, so the ones you keep coming back to are one click away. The API keeps one row per person per shader; the flag on each record is per caller. Gallery thumbnails render at 96×64 instead of 48×32 - still the nearest-neighbour "what the lights will do" preview, just twice the detail on a card that is four times that size.
+
+The shader assistant's free use is now a monthly allowance of 100 generations per signed-in person (`SHADER_MONTHLY_LIMIT`), in place of the credit balance that ran out and stayed out. Every server-funded generation is still a ledger row, so the count and any bill cannot disagree, and a failed call gives the slot back; bringing your own key is not counted. The meter says "83 of 100 free shaders left this month". The default model is Claude Sonnet 5, on Anthropic, in both the provider preset and the blueprint.
+
+Play, Stop, Undo and Redo are icon buttons with tooltips. The controller properties panel's labels are left-aligned.
+
 ## The effect settings panel tears off too, and the palette takes less room
 
 The docked effect settings panel beside the grid has the same tear-off control as the dialogs: a click opens it in a separate Chrome window (shift-click for a tab), the grid takes the width it leaves behind, and closing that window brings it back. The mechanism moved out of the dialog component into `lib/tearOff.ts` so both share it. Verified in real Chrome: the panel and its controls appeared in the new window, the main page showed the "in its own window" note with a wider grid, and closing the window returned the panel.

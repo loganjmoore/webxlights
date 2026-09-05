@@ -108,4 +108,31 @@ class ShaderLibraryTest extends TestCase
         $this->assertSame('Loved', $names->first());
         $this->assertContains('Quiet', $names->all());
     }
+
+    public function test_a_person_keeps_their_own_collection_of_favourites(): void
+    {
+        $me = User::factory()->create();
+        $someone = User::factory()->create();
+        $theirs = $this->shader($someone, ['name' => 'Theirs']);
+        $mine = $this->shader($me, ['name' => 'Mine']);
+
+        $this->actingAs($me)->postJson("/api/v1/shaders/{$theirs->id}/favourite")->assertOk()->assertJsonPath('favourited', true);
+        // Twice is still once.
+        $this->actingAs($me)->postJson("/api/v1/shaders/{$theirs->id}/favourite")->assertOk();
+
+        $list = $this->actingAs($me)->getJson('/api/v1/shaders?favourites=1')->assertOk();
+        $list->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Theirs')->assertJsonPath('data.0.favourited', true);
+
+        // The flag is per person: the author does not see my star on their own shader.
+        $this->actingAs($someone)->getJson('/api/v1/shaders')->assertOk()
+            ->assertJsonPath('data.0.favourited', false);
+
+        $this->actingAs($me)->deleteJson("/api/v1/shaders/{$theirs->id}/favourite")->assertOk()->assertJsonPath('favourited', false);
+        $this->actingAs($me)->getJson('/api/v1/shaders?favourites=1')->assertOk()->assertJsonCount(0, 'data');
+
+        // A private shader of someone else's cannot be starred.
+        $private = $this->shader($someone, ['name' => 'Secret', 'is_public' => false]);
+        $this->actingAs($me)->postJson("/api/v1/shaders/{$private->id}/favourite")->assertNotFound();
+        $this->assertSame('Mine', $mine->name);
+    }
 }

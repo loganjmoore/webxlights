@@ -32,7 +32,7 @@ class Providers
             self::ANTHROPIC => [
                 'driver' => AnthropicDriver::class,
                 'base_url' => null,
-                'model' => 'claude-haiku-4-5',
+                'model' => 'claude-sonnet-5',
                 'label' => 'Anthropic (Claude)',
             ],
             'openai' => [

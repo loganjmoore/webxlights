@@ -29,7 +29,23 @@ const search = ref("");
 // One control rather than two. The library ships with 50 built-ins, so "whose shaders am I
 // looking at" is now a real question - and separating them matters because 50 built-ins would
 // otherwise bury every new community creation under the recency sort.
-const scope = ref<"all" | "builtin" | "community" | "mine">("all");
+const scope = ref<"all" | "builtin" | "community" | "mine" | "favourites">("all");
+
+/**
+ * Star or unstar, shown at once and confirmed after. A star is a small thing to wait for a
+ * round trip on, and the server's answer is what the card ends up showing either way.
+ */
+async function toggleFavourite(shader: ShaderRecord): Promise<void> {
+  const was = shader.favourited === true;
+  shader.favourited = !was;
+  try {
+    const result = was ? await api.unfavouriteShader(shader.id) : await api.favouriteShader(shader.id);
+    shader.favourited = result.favourited;
+    if (scope.value === "favourites" && !result.favourited) shaders.value = shaders.value.filter((s) => s.id !== shader.id);
+  } catch {
+    shader.favourited = was;
+  }
+}
 const category = ref("");
 const sort = ref<"recent" | "popular">("recent");
 const status = ref<CreditStatus | null>(null);
@@ -109,6 +125,7 @@ function listParams(page: number) {
   return {
     q: search.value || undefined,
     mine: scope.value === "mine",
+    favourites: scope.value === "favourites",
     kind: scope.value === "builtin" || scope.value === "community" ? scope.value : ("all" as const),
     category: category.value || undefined,
     sort: sort.value,
@@ -131,6 +148,7 @@ async function loadMore(): Promise<void> {
 
 const emptyMessage = computed(() => {
   if (scope.value === "mine") return "You have not made any shaders yet.";
+  if (scope.value === "favourites") return "Nothing starred yet. Star a shader and it collects here.";
   if (search.value || category.value) return "Nothing matches that. Try a different search or category.";
   if (scope.value === "community") return "Nobody has published a shader yet — generate the first one.";
   return "No shaders yet — generate the first one.";
@@ -193,10 +211,10 @@ async function generate(): Promise<void> {
     draftPublic.value = true;
   } catch (err) {
     const apiErr = err as ApiError;
-    if (apiErr.status === 402) {
+    if (apiErr.status === 402 || apiErr.status === 429) {
       failure.value = mustBringKey.value
         ? "This server has no assistant configured."
-        : "You are out of credits. Add your own Anthropic API key below to keep generating - it stays in this browser.";
+        : serverMessage(apiErr) || "You have used this month's free generations. Add your own API key below to keep going - it stays in this browser.";
       showKeyPanel.value = true;
     } else if (apiErr.status === 401 || apiErr.status === 403) {
       failure.value = "That API key was refused. Check it and try again.";
@@ -337,10 +355,11 @@ onMounted(async () => {
         <template v-else-if="mustBringKey">
           This server has no assistant key configured. Add your own to generate shaders.
         </template>
-        <template v-else>
-          <strong>{{ status.credits }}</strong> credit{{ status.credits === 1 ? "" : "s" }} left
-          ({{ status.cost_per_generation }} per shader, written by {{ status.model }}).
+        <template v-else-if="status.monthly_limit">
+          <strong>{{ Math.max(0, status.monthly_limit - (status.used_this_month ?? 0)) }}</strong> of {{ status.monthly_limit }} free shaders left this month,
+          written by {{ status.model }}.
         </template>
+        <template v-else>Free to generate, written by {{ status.model }}.</template>
         <button class="link" @click="showKeyPanel = !showKeyPanel">
           {{ userKey ? "Change key" : "Use your own key" }}
         </button>
@@ -404,6 +423,7 @@ onMounted(async () => {
           <option value="all">All shaders</option>
           <option value="builtin">Built-in</option>
           <option value="community">Made by people</option>
+          <option value="favourites">My favourites</option>
           <option value="mine">Mine</option>
         </select>
         <select v-model="category" @change="refresh">
@@ -435,8 +455,21 @@ onMounted(async () => {
             :source="shader.source"
             :running="hoveredId === shader.id"
             :color-inputs="colorInputNames(shader.inputs ?? [])"
+            :width="96"
+            :height="64"
             class="thumb"
           />
+          <button
+            type="button"
+            class="star"
+            :class="{ on: shader.favourited }"
+            :title="shader.favourited ? 'In your favourites. Click to remove.' : 'Add to your favourites'"
+            :aria-pressed="shader.favourited === true"
+            aria-label="Favourite"
+            @click.stop="toggleFavourite(shader)"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.5 2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.8l6.1-.7z" /></svg>
+          </button>
           <div class="meta">
             <h3>
               {{ shader.name }}
@@ -549,6 +582,43 @@ onMounted(async () => {
 .chip:hover {
   color: var(--accent);
   border-color: var(--accent);
+}
+.card {
+  position: relative;
+}
+/* The star sits on the thumbnail's corner: off until you mean it, gold when you do. */
+.star {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.star svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.star:hover {
+  color: var(--accent);
+}
+.star.on {
+  color: var(--accent);
+}
+.star.on svg {
+  fill: currentColor;
 }
 .more {
   display: block;

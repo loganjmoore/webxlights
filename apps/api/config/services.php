@@ -26,7 +26,11 @@ return [
         // ledger and the per-minute throttle. 0 means uncapped. Bringing your own key bypasses
         // it entirely - your key, your bill. The default's arithmetic is in
         // docs/SHADER-ASSISTANT-COST.md; change it there too if you change it here.
-        'daily_limit' => (int) env('SHADER_DAILY_LIMIT', 20),
+        'daily_limit' => (int) env('SHADER_DAILY_LIMIT', 0),
+        // How many server-funded generations one user gets per calendar month (UTC). This is the
+        // allowance a signed-in person gets for free; the credit ledger records each one but no
+        // longer gates them. 0 means uncapped. Your own key bypasses it - your key, your bill.
+        'monthly_limit' => (int) env('SHADER_MONTHLY_LIMIT', 100),
     ],
 
     /*
