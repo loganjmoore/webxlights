@@ -13,7 +13,7 @@ import { useProjectsStore } from "../stores/projects";
 
 const props = defineProps<{
   projectId?: number | string;
-  active?: "layout" | "sequences" | "controllers" | "shaders";
+  active?: "layout" | "sequences" | "controllers" | "shaders" | "library";
 }>();
 
 const auth = useAuthStore();
@@ -44,6 +44,7 @@ async function logout(): Promise<void> {
       <router-link :to="`/projects/${projectId}/sequences`" :class="{ active: active === 'sequences' }">Sequencer</router-link>
       <router-link :to="`/projects/${projectId}/controllers`" :class="{ active: active === 'controllers' }">Network</router-link>
       <router-link :to="`/projects/${projectId}/shaders`" :class="{ active: active === 'shaders' }">Shaders</router-link>
+      <router-link :to="`/projects/${projectId}/library`" :class="{ active: active === 'library' }">Library</router-link>
     </nav>
     <div class="right">
       <slot />
