@@ -23,7 +23,7 @@ RUN composer dump-autoload --optimize --no-dev
 
 # 8.4 is the locked runtime (DECISIONS.md). Dependabot's bump to 8.5 broke the image build:
 # docker-php-ext-install opcache fails there, and it took production down until it was reverted.
-FROM php:8.4-fpm-alpine
+FROM php:8.5-fpm-alpine
 RUN apk add --no-cache nginx supervisor postgresql-dev \
     && docker-php-ext-install pdo_pgsql opcache
 
