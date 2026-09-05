@@ -14,7 +14,10 @@ class SequenceController extends Controller
     {
         $this->authorizeProject($request, $project);
 
-        return $project->sequences()->latest()->get();
+        // Without the body: a list is names and sizes, and a show's bodies run to megabytes.
+        return $project->sequences()
+            ->latest('updated_at')
+            ->get(['id', 'project_id', 'name', 'frame_ms', 'duration_ms', 'audio_filename', 'sequence_type', 'created_at', 'updated_at']);
     }
 
     public function store(Request $request, Project $project)

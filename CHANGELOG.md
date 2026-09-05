@@ -1,5 +1,13 @@
 # Changelog
 
+## The first page, and the page where you pick a file
+
+The page after login was a text box and a list of underlined names. It is a home now: **Projects** as a grid of cards, each saying how many sequences it holds and when it was last touched, opening to its sequences with one click and to Layout, Sequences or Network from its footer, with Share and Export behind a small menu. "New project" is a button that asks for a name when you want one, not a form that is always there. A brand-new account gets a welcome that explains what a project is and offers the three ways in - the sample show first, because it shows what the app is before asking for a single file - and tells someone coming from xLights where their two files go.
+
+The Sequences page was a "New sequence" form sitting above a list of links. It is a file list now: name, length, frame rate, audio file or "animated", when it was last edited, and Open, sorted by most recently edited. "New sequence" is a dialog (the same movable, tear-off panel the sequencer uses) with the audio file first, since the file is what a sequence is made from. The list endpoint stopped sending every sequence's whole body just to draw names.
+
+The app bar now says which project you are in: `webXLights / jinglebells`, and the name is the way back to that project's sequences. The sequencer grid and the layout canvas are untouched.
+
 ## One chrome on every page
 
 Every page now has the same two rows at the top, in the same place, at the same height: the app bar (wordmark, the four workspaces, Docs, account) and a page toolbar with the page's name first, then its actions in the order you use them, then status on the right. The toolbar is one global pattern (`.page-toolbar` in `style.css`) rather than six pages each drawing their own header, which is how the Layout, Sequences, Controllers, Shaders, Sequencer, Projects and Docs pages had come to differ in padding, alignment, button size, and where the actions sat. The Shaders page's paragraph of introduction became one line in its toolbar; the Docs page lost a "back to projects" link the wordmark already is. The Layout sidebar's three tabs became a segmented control with count badges instead of three buttons wrapping their "(758)" onto a second line. Verified by screenshotting the top of all seven pages at 1440 and 1024 wide and comparing them side by side.

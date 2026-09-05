@@ -121,7 +121,7 @@ onBeforeUnmount(() => {
     :aria-expanded="open"
     @click="toggle"
   >
-    {{ label }}<span class="caret" aria-hidden="true">▾</span>
+    {{ label }}<span v-if="label !== '⋯'" class="caret" aria-hidden="true">▾</span>
   </button>
   <Teleport to="body">
     <ul

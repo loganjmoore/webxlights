@@ -59,7 +59,8 @@ Two rows, on every page, always in the same place:
    than six actions collapses into a labelled menu (`MenuButton`), grouped the way a desktop
    menu bar would group them.
 
-Nothing else sits above the content. A page that needs a third strip (the effect palette, the
+The app bar also names the project you are in, after the wordmark, as the way back to its
+sequences. Nothing else sits above the content. A page that needs a third strip (the effect palette, the
 model palette) puts it under the toolbar, full width, in the panel colour.
 
 ## Panels
@@ -68,6 +69,14 @@ A settings pane opens as a dialog over the page. Drag it by its title bar and it
 put it; drag its corner to size it; pin it and it stays open while you work on the grid
 underneath. Its position is remembered per panel. Any panel can be torn off into its own browser
 window or tab from its title bar, and closing that window brings it back.
+
+## Home and lists
+
+The first page is a grid of project cards, not a form. A card says what a project holds and when
+it was last touched, opens to the work with one click, and keeps its rarer actions behind a small
+menu. A list of files is a table sorted by most recently edited, with one primary action per
+row. Making a new thing is a dialog you ask for, never a form that sits above the things that
+exist. An empty page teaches: what this thing is, and the two or three ways to get one.
 
 ## Motion
 

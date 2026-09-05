@@ -35,6 +35,9 @@ export interface Project {
   name: string;
   owner_id: number;
   created_at: string;
+  updated_at?: string;
+  /** How many sequences it holds; the home page shows it on the card. */
+  sequences_count?: number;
 }
 
 export interface User {
@@ -330,6 +333,9 @@ export interface SequenceSummary {
   name: string;
   frame_ms: number;
   duration_ms: number;
+  audio_filename?: string | null;
+  sequence_type?: "media" | "animated";
+  updated_at?: string;
 }
 
 export interface SequenceVersion {

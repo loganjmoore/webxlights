@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
+import { useProjectsStore } from "../stores/projects";
 
 // The one bar every project page shares: where you are, where else you can go, who you are.
 //
@@ -9,13 +11,21 @@ import { useAuthStore } from "../stores/auth";
 // button that only existed on the project list. Navigation that moves around is navigation you
 // have to look for; this stays put, and page actions live in the page below it.
 
-defineProps<{
+const props = defineProps<{
   projectId?: number | string;
   active?: "layout" | "sequences" | "controllers" | "shaders";
 }>();
 
 const auth = useAuthStore();
 const router = useRouter();
+const projects = useProjectsStore();
+
+// Which project you are in, said in words. The four tabs say where in the project you are; the
+// name says which one, and it is the way back to its sequences and to the list of all of them.
+const project = computed(() => (props.projectId === undefined ? null : projects.projects.find((p) => p.id === Number(props.projectId)) ?? null));
+onMounted(() => {
+  if (props.projectId !== undefined && projects.projects.length === 0) void projects.fetchAll();
+});
 
 async function logout(): Promise<void> {
   await auth.logout();
@@ -26,6 +36,9 @@ async function logout(): Promise<void> {
 <template>
   <header class="app-bar">
     <router-link to="/projects" class="wordmark" title="All projects">webX<span>Lights</span></router-link>
+    <router-link v-if="projectId !== undefined" :to="`/projects/${projectId}/sequences`" class="crumb" title="This project">
+      <span class="sep" aria-hidden="true">/</span>{{ project?.name ?? "…" }}
+    </router-link>
     <nav v-if="projectId !== undefined" class="tabs" aria-label="Workspaces">
       <router-link :to="`/projects/${projectId}/layout`" :class="{ active: active === 'layout' }">Layout</router-link>
       <router-link :to="`/projects/${projectId}/sequences`" :class="{ active: active === 'sequences' }">Sequencer</router-link>
@@ -63,6 +76,22 @@ async function logout(): Promise<void> {
 }
 .wordmark span {
   color: var(--accent);
+}
+.crumb {
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: -0.5rem;
+}
+.crumb:hover {
+  color: var(--accent);
+}
+.sep {
+  color: var(--text-dim);
+  margin-right: 0.5rem;
 }
 .tabs {
   display: flex;
