@@ -1,5 +1,9 @@
 # Changelog
 
+## The controller visualiser has a window of its own
+
+The visualiser moved out from under the controller table into its own window: a **Visualiser** button in the Controllers toolbar opens it at nearly the whole screen (the one exception to the seven-tenths rule, because it is a surface you work on rather than a dialog you answer), draggable, pinnable and able to pop out into a separate Chrome window like every other panel. Controllers run down the left in the order people number them (2 before 10), the models not yet on a controller run down the right, each side scrolling on its own, with a search box at the top of the models that narrows the list as you type - exact name first, then names starting with it, then names containing it. Drag from one side to the other to chain; drag back to take off. Verified in real Chrome: the window opened at 1404×866 in a 1440×900 viewport, "star" narrowed the tray to Star-1, Star-1 chained onto the first controller and came back off, and no drag proxy was left behind.
+
 ## Automatic lyric timing
 
 Sequencer > Timing tracks has **Auto lyrics**: paste the lyrics, one line per phrase, press *Time the lyrics*, and the song is listened to for where each word is sung. The result is the three tracks a Papagayo import would make - Lyrics, Words and Phonemes - with the phonemes from the CMU Pronouncing Dictionary rather than from spelling, and a *Download .xtiming* button that saves them as an xLights timing file for the desktop app. This is what autolyrics.lightingfanatics.com does for xLights users, built in; like that tool it gets most of the way and expects you to nudge a few marks. How it works, what to set (`LYRICS_API_KEY`, 20 listens a month per person by default) and its limits are in `docs/AUTO-LYRICS.md`.

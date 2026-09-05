@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import type { ControllerRecord, ModelRecord } from "../lib/api";
 import { chainOn, placeInChain, removeFromChain, type ChainPatch } from "../lib/controllerChain";
 import { unassignedModels } from "../lib/controllerLayout";
+import { filterRanked } from "../lib/listFilter";
 
 // xLights' controller visualiser: every controller as a row, the models chained along it in
 // channel order, and a tray of models that are not on any controller yet.
@@ -20,9 +21,13 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ patches: [patches: ChainPatch[]] }>();
 
-const tray = computed(() => unassignedModels(props.models));
+const query = ref("");
+const unassigned = computed(() => unassignedModels(props.models));
+/** The tray, narrowed as you type: exact name first, then names starting with it, then containing it. */
+const tray = computed(() => filterRanked(unassigned.value, query.value, (m) => m.name));
+// Sorted the way people number them: Controller 2 before Controller 10.
 const chains = computed(() =>
-  props.controllers.map((controller) => {
+  [...props.controllers].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })).map((controller) => {
     const chain = chainOn(props.models, controller.id);
     const used = chain.reduce((sum, m) => sum + Math.max(1, m.channel_count ?? props.channelCountFor(m)), 0);
     return { controller, chain, used, over: Math.max(0, used - controller.channel_count) };
@@ -136,32 +141,7 @@ function insertionAt(controllerId: number, index: number): boolean {
 
 <template>
   <section class="visualiser" aria-label="Controller visualiser">
-    <div class="tray" data-tray :class="{ over: drag?.target?.kind === 'tray' }">
-      <div class="tray-head">
-        <h2>Not on a controller</h2>
-        <span class="hint">Drag a model onto a controller. Drag it back here to take it off.</span>
-      </div>
-      <div class="chips">
-        <button
-          v-for="m in tray"
-          :key="m.id"
-          type="button"
-          class="chip"
-          :class="{ lifted: drag?.model.id === m.id }"
-          :title="`${m.name} · ${countOf(m)} channels`"
-          @dragstart.prevent
-          @pointerdown="onPointerDown($event, m)"
-          @pointermove="onPointerMove"
-          @pointerup="onPointerUp"
-          @pointercancel="finish"
-        >
-          <span class="chip-name">{{ m.name }}</span>
-          <span class="chip-meta">{{ countOf(m) }} ch</span>
-        </button>
-        <span v-if="tray.length === 0" class="empty">Every model is on a controller.</span>
-      </div>
-    </div>
-
+    <div class="column controllers">
     <div
       v-for="row in chains"
       :key="row.controller.id"
@@ -206,6 +186,35 @@ function insertionAt(controllerId: number, index: number): boolean {
       </div>
     </div>
     <p v-if="controllers.length === 0" class="empty">Add a controller to start chaining models onto it.</p>
+    </div>
+
+    <div class="column tray" data-tray :class="{ over: drag?.target?.kind === 'tray' }">
+      <div class="tray-head">
+        <h2>Not on a controller</h2>
+        <span class="hint">Drag a model onto a controller. Drag it back here to take it off.</span>
+      </div>
+      <input v-model="query" class="search" type="search" placeholder="Find a model…" aria-label="Find a model" />
+      <div class="chips">
+        <button
+          v-for="m in tray"
+          :key="m.id"
+          type="button"
+          class="chip"
+          :class="{ lifted: drag?.model.id === m.id }"
+          :title="`${m.name} · ${countOf(m)} channels`"
+          @dragstart.prevent
+          @pointerdown="onPointerDown($event, m)"
+          @pointermove="onPointerMove"
+          @pointerup="onPointerUp"
+          @pointercancel="finish"
+        >
+          <span class="chip-name">{{ m.name }}</span>
+          <span class="chip-meta">{{ countOf(m) }} ch</span>
+        </button>
+        <span v-if="unassigned.length === 0" class="empty">Every model is on a controller.</span>
+        <span v-else-if="tray.length === 0" class="empty">No model matches “{{ query }}”.</span>
+      </div>
+    </div>
   </section>
 
   <Teleport to="body">
@@ -216,13 +225,46 @@ function insertionAt(controllerId: number, index: number): boolean {
 </template>
 
 <style scoped>
+/* Controllers down the left, the models still to place down the right; each side scrolls on its
+   own so a model at the bottom of the list can be dragged onto a controller at the top. */
 .visualiser {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1rem;
+  height: 100%;
+  min-height: 0;
+  padding: 0.75rem 1rem 1rem;
+  box-sizing: border-box;
+  text-align: left;
+  font-family: var(--sans);
+}
+.column {
+  min-height: 0;
+  overflow-y: auto;
+}
+.controllers {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 1rem 1.25rem 2rem;
-  text-align: left;
-  font-family: var(--sans);
+}
+.tray .chips {
+  align-content: flex-start;
+}
+.search {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.5rem;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--bg-control);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.search:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 .tray,
 .strip {
@@ -245,9 +287,13 @@ function insertionAt(controllerId: number, index: number): boolean {
 .tray-head,
 .strip-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.75rem;
+  gap: 0.25rem 0.75rem;
   margin-bottom: 0.5rem;
+}
+.tray-head h2 {
+  white-space: nowrap;
 }
 h2 {
   margin: 0;

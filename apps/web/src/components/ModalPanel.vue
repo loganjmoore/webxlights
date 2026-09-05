@@ -25,6 +25,8 @@ import { useTearOff } from "../lib/tearOff";
 const props = defineProps<{
   title: string;
   wide?: boolean;
+  /** Nearly the whole window: for a working surface like the controller visualiser, not a form. */
+  full?: boolean;
   /** Remember where this panel was left. Without one, it opens centred every time. */
   id?: string;
 }>();
@@ -159,7 +161,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
       <div
         ref="panelRef"
         class="modal-panel"
-        :class="{ wide, floating: floating && !popped, pinned, popped }"
+        :class="{ wide, full, floating: floating && !popped, pinned, popped }"
         :style="style"
         role="dialog"
         :aria-modal="!pinned && !popped"
@@ -279,6 +281,13 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
   position: fixed;
   max-height: 70vh;
 }
+/* The one exception to seven tenths: a surface you work on, not a dialog you answer. */
+.modal-panel.full,
+.modal-panel.full.floating {
+  width: calc(100vw - 2rem);
+  height: calc(100vh - 2rem);
+  max-height: calc(100vh - 2rem);
+}
 .modal-panel.pinned {
   border-color: var(--accent);
 }
@@ -356,6 +365,9 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
 }
 .tool.close:hover {
   color: var(--danger);
+}
+.modal-panel.full .modal-body {
+  padding: 0;
 }
 .modal-body {
   overflow-y: auto;
