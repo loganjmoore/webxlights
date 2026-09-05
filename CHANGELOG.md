@@ -1,5 +1,11 @@
 # Changelog
 
+## Panels that fit, lists you can type into, and a drop that always lets go
+
+Every panel is now at most seven tenths of the window tall; the body scrolls inside it, and the grid underneath stays in view. The list panels - Models, the Views row picker, Effect presets - have a typeahead at the top: results are ranked closest first (exact name, then names starting with what you typed, then names containing it, then initials in order), so "tree" puts Tree above Mega Tree above Street Lights and the exact name lands at the top. The Models list hides numbered strands by default - a 16-strand matrix was sixteen rows of "Strand N" nobody sequences - and a "Show everything" switch brings them back; a strand someone has named is always listed.
+
+A palette drop could get stuck with the lifted tile still on screen: the release handler ran the placement before the cleanup, so anything that went wrong in between left the drag armed, and a release the tile never heard about (the window losing focus, capture taken away) had no fallback. The cleanup is now unconditional, the drop reads the pointer's final position, and window-level release and blur handlers end the drag when the tile's own cannot. The layout's model palette got the same treatment. Verified in real Chrome: drops onto a row, the far end of a row, the ruler, and off the grid all release cleanly.
+
 ## The first page, and the page where you pick a file
 
 The page after login was a text box and a list of underlined names. It is a home now: **Projects** as a grid of cards, each saying how many sequences it holds and when it was last touched, opening to its sequences with one click and to Layout, Sequences or Network from its footer, with Share and Export behind a small menu. "New project" is a button that asks for a name when you want one, not a form that is always there. A brand-new account gets a welcome that explains what a project is and offers the three ways in - the sample show first, because it shows what the app is before asking for a single file - and tells someone coming from xLights where their two files go.

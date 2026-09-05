@@ -318,9 +318,9 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   width: min(560px, 100%);
-  /* Never taller than the window: the body scrolls instead, so a long list can't put the close
-     button somewhere unreachable. */
-  max-height: 100%;
+  /* Never taller than seven tenths of the window: the body scrolls instead, so a long list can't
+     put the close button somewhere unreachable, and the grid underneath stays in view. */
+  max-height: min(70vh, 100%);
   background: var(--bg-panel);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-panel);
@@ -338,7 +338,7 @@ onBeforeUnmount(() => {
 }
 .modal-panel.floating {
   position: fixed;
-  max-height: calc(100vh - 16px);
+  max-height: 70vh;
 }
 .modal-panel.pinned {
   border-color: var(--accent);

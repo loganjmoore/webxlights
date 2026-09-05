@@ -48,17 +48,23 @@ function onPointerMove(e: PointerEvent): void {
     pointer.started = true;
     document.body.classList.add("dragging-tile");
     window.addEventListener("keydown", onKey, true);
+    // Ends that arrive when capture is lost - see SequencerPage.vue's palette for the reasoning.
+    window.addEventListener("pointerup", onPointerUp, true);
+    window.addEventListener("blur", finish);
   }
   drag.value = { type: pointer.type, x: e.clientX, y: e.clientY, over: props.target(e.clientX, e.clientY) !== null };
 }
 
 function onPointerUp(e: PointerEvent): void {
   if (!pointer || e.pointerId !== pointer.id) return;
-  if (pointer.started) {
-    const spot = props.target(e.clientX, e.clientY);
-    if (spot) emit("create", pointer.type, spot.x, spot.y);
+  try {
+    if (pointer.started) {
+      const spot = props.target(e.clientX, e.clientY);
+      if (spot) emit("create", pointer.type, spot.x, spot.y);
+    }
+  } finally {
+    finish();
   }
-  finish();
 }
 
 function onKey(e: KeyboardEvent): void {
@@ -68,11 +74,20 @@ function onKey(e: KeyboardEvent): void {
 }
 
 function finish(): void {
-  if (pointer) pointer.el.releasePointerCapture?.(pointer.id);
+  const p = pointer;
+  if (p) {
+    try {
+      if (p.el.hasPointerCapture?.(p.id)) p.el.releasePointerCapture(p.id);
+    } catch {
+      // Already released.
+    }
+  }
   pointer = null;
   drag.value = null;
   document.body.classList.remove("dragging-tile");
   window.removeEventListener("keydown", onKey, true);
+  window.removeEventListener("pointerup", onPointerUp, true);
+  window.removeEventListener("blur", finish);
 }
 </script>
 
