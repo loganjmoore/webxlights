@@ -19,7 +19,7 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
 COPY apps/api/ ./
 RUN composer dump-autoload --optimize --no-dev
 
-FROM php:8.4-fpm-alpine
+FROM php:8.5-fpm-alpine
 RUN apk add --no-cache nginx supervisor postgresql-dev \
     && docker-php-ext-install pdo_pgsql opcache
 
