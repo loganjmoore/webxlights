@@ -34,6 +34,7 @@ class ShaderDailyLimitTest extends TestCase
                 ?string $userKey = null,
                 ?string $providerName = null,
                 ?string $modelName = null,
+                ?string $target = null,
             ): array {
                 $this->calls++;
 

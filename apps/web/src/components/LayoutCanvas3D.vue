@@ -18,7 +18,6 @@ const emit = defineEmits<{
 }>();
 
 // Must match ModelPalette.vue's dragstart payload exactly.
-const MODEL_DRAG_MIME = "application/x-webxlights-model-type";
 
 const PICK_DEPTH = 12; // flat 2D models get a thin box for raycasting, not zero-volume
 const CLICK_SLOP = 4; // px of pointer travel still counted as a click rather than a drag
@@ -469,17 +468,24 @@ function rayOnDepthPlane(ray: THREE.Ray, depth: number): THREE.Vector3 | null {
  * plane is edge-on or behind the viewer - is ignored rather than guessed at, because the guess
  * would put a model somewhere the user cannot see it.
  */
-function onDrop(e: DragEvent): void {
-  const type = e.dataTransfer?.getData(MODEL_DRAG_MIME);
-  if (!type || !setup) return;
+/**
+ * Where a viewport point lands on the ground plane, for a palette drag (ModelPalette.vue).
+ *
+ * Null when the point is outside the canvas or the ray misses the plane - possible when the
+ * camera has been orbited until the plane is edge-on or behind the viewer - because the guess
+ * would put a model somewhere the user cannot see it.
+ */
+function worldAt(clientX: number, clientY: number): { x: number; y: number } | null {
+  if (!setup) return null;
   const rect = setup.renderer.domElement.getBoundingClientRect();
-  const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
+  const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(ndc, setup.camera);
   const hit = rayOnDepthPlane(raycaster.ray, 0);
-  if (!hit) return;
-  emit("create", type, hit.x, hit.y);
+  return hit ? { x: hit.x, y: hit.y } : null;
 }
+defineExpose({ worldAt });
 
 function projectToScreen(p: THREE.Vector3): THREE.Vector2 | null {
   if (!setup) return null;
@@ -757,7 +763,7 @@ watch(() => props.selectedModelId, updateSelectionHighlight);
 </script>
 
 <template>
-  <div class="layout-canvas-3d-wrap" @dragover.prevent @drop.prevent="onDrop">
+  <div class="layout-canvas-3d-wrap">
     <div ref="containerRef" class="layout-canvas-3d"></div>
     <div class="view-hud">
       <span class="axis-hint" :class="{ active: zAxisMode }">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppBar from "../components/AppBar.vue";
 import { AUDIO_REACTIVE_EFFECTS, EFFECT_SCHEMAS, TRANSITION_TYPES, VALUE_CURVE_TYPES } from "@webxlights/engine";
 
 const effectNames = Object.keys(EFFECT_SCHEMAS);
@@ -22,8 +23,8 @@ function isAudioReactive(name: string): boolean {
 
 <template>
   <main class="docs">
-    <header>
-      <router-link to="/projects">&larr; Projects</router-link>
+    <AppBar />
+    <header class="page-toolbar">
       <h1>Docs</h1>
     </header>
 
@@ -118,19 +119,8 @@ function isAudioReactive(name: string): boolean {
   color: #ccc;
   line-height: 1.55;
 }
-.docs > header {
-  max-width: none;
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  padding: 0.85rem 1.25rem;
-  background: #16161c;
-  border-bottom: 1px solid #333;
+.docs > .page-toolbar {
   margin: 0 0 2rem;
-}
-.docs > header a {
-  color: #e8c468;
-  font-size: 0.9rem;
 }
 .docs > section {
   max-width: 720px;

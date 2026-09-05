@@ -41,6 +41,8 @@ class ShaderGenerationController extends Controller
             // A repair round: the shader that failed and what the compiler said about it.
             'previous_source' => ['nullable', 'string', 'max:100000'],
             'compile_error' => ['nullable', 'string', 'max:8000'],
+            // Which prop it is for, so the assistant designs for that shape first.
+            'target' => ['nullable', 'in:matrix,line,tree,any'],
         ]);
 
         $user = $request->user();
@@ -104,6 +106,7 @@ class ShaderGenerationController extends Controller
                 $ownKey ? $userKey : null,
                 $userProvider,
                 $userModel,
+                $data['target'] ?? null,
             );
         } catch (RuntimeException $e) {
             // Not configured, or refused. The user gets their credit back and a straight answer.

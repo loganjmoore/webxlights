@@ -35,6 +35,9 @@ export interface Project {
   name: string;
   owner_id: number;
   created_at: string;
+  updated_at?: string;
+  /** How many sequences it holds; the home page shows it on the card. */
+  sequences_count?: number;
 }
 
 export interface User {
@@ -150,6 +153,9 @@ export interface CreditStatus {
   providers: Array<{ name: string; label: string }>;
   transactions: Array<{ amount: number; reason: string; balance_after: number; created_at: string }>;
 }
+
+/** Where a generated shader will mostly be shown; the assistant designs for that shape first. */
+export type ShaderTarget = "matrix" | "line" | "tree" | "any";
 
 export interface GeneratedShader {
   source: string;
@@ -327,6 +333,9 @@ export interface SequenceSummary {
   name: string;
   frame_ms: number;
   duration_ms: number;
+  audio_filename?: string | null;
+  sequence_type?: "media" | "animated";
+  updated_at?: string;
 }
 
 export interface SequenceVersion {
@@ -444,7 +453,7 @@ export const api = {
    * costs no credits (lib/anthropicKey.ts).
    */
   generateShader: (
-    body: { description: string; previous_source?: string; compile_error?: string },
+    body: { description: string; previous_source?: string; compile_error?: string; target?: ShaderTarget },
     credentials?: { key?: string | null; provider?: string | null; model?: string | null },
   ) => {
     const headers: Record<string, string> = {};

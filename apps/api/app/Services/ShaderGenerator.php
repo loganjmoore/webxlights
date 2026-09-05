@@ -38,15 +38,25 @@ class ShaderGenerator
       "CREDIT": "webXLights shader assistant",
       "CATEGORIES": ["Generator"],
       "INPUTS": [
-        { "NAME": "colorA", "TYPE": "color", "DEFAULT": [1.0, 0.0, 0.0, 1.0] },
-        { "NAME": "colorB", "TYPE": "color", "DEFAULT": [0.0, 1.0, 0.0, 1.0] },
-        { "NAME": "speed", "TYPE": "float", "MIN": 0.0, "MAX": 4.0, "DEFAULT": 1.0 }
+        { "NAME": "colorA", "TYPE": "color", "DEFAULT": [1.0, 0.1, 0.1, 1.0] },
+        { "NAME": "colorB", "TYPE": "color", "DEFAULT": [0.1, 0.4, 1.0, 1.0] },
+        { "NAME": "speed", "TYPE": "float", "MIN": 0.1, "MAX": 4.0, "DEFAULT": 1.0 },
+        { "NAME": "count", "TYPE": "float", "MIN": 1.0, "MAX": 8.0, "DEFAULT": 3.0 }
       ]
     }*/
     void main() {
       vec2 uv = isf_FragNormCoord;
-      float band = step(fract(uv.x - TIME * speed * 0.25), 0.5);
-      gl_FragColor = vec4(mix(colorA.rgb, colorB.rgb, band), 1.0);
+      // Aspect-correct, centred coordinates: a circle stays a circle on a wide prop.
+      vec2 p = (uv - 0.5) * vec2(RENDERSIZE.x / max(RENDERSIZE.y, 1.0), 1.0);
+      float t = mod(TIME * speed, 100.0);
+      float d = length(p);
+      // Rings expanding outward; the wave is what moves, and it reaches gl_FragColor.
+      float ring = fract(d * count - t * 0.5);
+      float band = smoothstep(0.55, 0.45, ring) * smoothstep(0.05, 0.15, ring);
+      // Colour comes from the palette in flat bands, never a muddy midpoint.
+      vec3 col = mix(colorA.rgb, colorB.rgb, step(0.5, fract(d * count * 0.5 - t * 0.25)));
+      // The gaps are true black: the negative space is what makes the rings read as rings.
+      gl_FragColor = vec4(col * band, 1.0);
     }
 
     Declared for you by both hosts - use them, NEVER redeclare them:
@@ -79,17 +89,37 @@ class ShaderGenerator
     - INPUT types allowed: float, bool, color, point2D, and long with MIN, MAX and DEFAULT;
       give every float and long a sensible MIN, MAX and DEFAULT
 
-    These shaders run on light displays, not monitors. That changes what works:
-    - THE CANVAS IS TINY. A model is often 20-60 pixels across and can be ONE PIXEL TALL (a
-      line of lights along a roof, where uv.y is constant). Big shapes, broad bands, whole-
-      canvas motion; the main movement should read along x alone. No thin lines, no fine
-      noise, no text - they alias into flicker. If the effect's motion is naturally vertical
-      (falling, rising, bursting), branch on the buffer shape so a roofline still shows it:
-      when RENDERSIZE.y < 2.0, drive the same animation along x instead of y.
-    - IT IS SEEN FROM THE STREET, AT NIGHT. Strong saturated colour and high contrast. Mid
-      greys and subtle gradients disappear. Full black is genuinely off, which is useful.
-    - IT LOOPS FOR MINUTES. Motion must be continuous and seamless - nothing that builds to a
-      climax and stops, no dependence on starting exactly at TIME 0.
+    RULES THAT KEEP IT ALIVE - each of these was found by measuring shaders that looked fine:
+    - the value you animate must reach gl_FragColor. A tail computed and then discarded by a
+      max() that can never select it is a still image; check that TIME changes the output
+    - never feed TIME straight into a hash or a high-frequency sin. Wrap it first:
+      float t = mod(TIME * speed, 100.0); after ten hours a raw TIME loses its float precision
+      and the motion quietly stops
+    - open bright: at your header DEFAULTs the very first frame must be well lit. The first
+      frame is the thumbnail, and a black thumbnail is a shader nobody clicks
+
+    DESIGN FOR THE MATRIX FIRST. The main canvas is a matrix or a panel of 16 to 64 pixels a
+    side, seen from the street at night as points of light. What works there:
+    - decide the ONE thing the viewer should see - rings, a comet, a flag, falling blocks -
+      and make that the whole picture. A shader that is "noise plus colour" is worth nothing
+    - two layers, no more: a slow large-scale field that carries the look, and one faster
+      accent (a sweep, a sparkle, a pulse) that gives it life. Motion must be continuous
+    - shapes are BIG. Bands, rings, blobs and stripes that are 4 to 12 pixels wide at 32x32.
+      Edges are crisp: smoothstep over 0.05 to 0.15 of the canvas, never a whole-canvas
+      gradient. Fine detail, thin lines and per-pixel noise alias into fizz
+    - colour is FLAT and SATURATED, taken straight from the palette inputs: choose colorA
+      here and colorB there with step() or a narrow smoothstep(). Never mix() two palette
+      colours through their midpoint across a wide gradient - red into green through mud is
+      the most common failure. Blend through black (fade) or through white (flash) instead
+    - use true black as negative space: 15 to 40 percent of the canvas dark makes the lit
+      shapes read as shapes. But the shapes themselves are at full brightness - a dim, tasteful
+      effect is invisible from the kerb
+    - use aspect-corrected coordinates for anything round or diagonal:
+      vec2 p = (uv - 0.5) * vec2(RENDERSIZE.x / max(RENDERSIZE.y, 1.0), 1.0);
+    - keep the line alive too. A roofline is ONE PIXEL TALL (RENDERSIZE.y < 2.0, uv.y constant).
+      When the natural motion is vertical (falling, rising, bursting), branch on the shape and
+      drive the same animation along x instead: bool isLine = RENDERSIZE.y < 2.0;
+    - it loops for minutes: seamless, no build-up to a climax, no dependence on TIME 0
 
     Expose 2-5 INPUTS for what a user would actually turn: speed, scale, how many, how sharp.
     Prefer cheap, well-defined arithmetic: sin, cos, fract, mod, smoothstep, mix, length.
@@ -149,8 +179,22 @@ class ShaderGenerator
     }
 
     /**
+     * Where the shader will mostly be shown, as the sentence the model is told.
+     *
+     * The system prompt designs for the matrix first and keeps the line alive; this lets a user
+     * who knows they are sequencing a roofline say so, which changes what "excellent" means.
+     */
+    public const TARGETS = [
+        'matrix' => 'It will mostly be shown on a matrix or panel around 32 by 32 pixels. Make it excellent there first.',
+        'line' => 'It will mostly be shown on a line of lights - a roofline, 60 pixels wide and one pixel tall - so all the motion must read along x.',
+        'tree' => 'It will mostly be shown on a mega tree - tall and narrow, about 16 pixels wide and 50 tall - so vertical motion and spirals read best.',
+        'any' => 'It will be shown on many kinds of prop, so it must read on a matrix, on a single line of lights, and on a tall narrow tree.',
+    ];
+
+    /**
      * @param  string  $description  what the user asked for
      * @param  string|null  $repairing  a compile error from a previous attempt, if this is a retry
+     * @param  string|null  $target  one of TARGETS' keys, or null for 'any'
      * @return array{source: string, usage: array}
      */
     public function generate(
@@ -160,8 +204,10 @@ class ShaderGenerator
         ?string $userKey = null,
         ?string $providerName = null,
         ?string $modelName = null,
+        ?string $target = null,
     ): array {
-        $ask = "Write an ISF shader for a Christmas light display:\n\n{$description}";
+        $where = self::TARGETS[$target ?? 'any'] ?? self::TARGETS['any'];
+        $ask = "Write an ISF shader for a Christmas light display:\n\n{$description}\n\n{$where}";
         if ($previousSource !== null && $repairing !== null) {
             // A repair is a different job from a first draft, and saying so plainly beats
             // re-asking the original question and hoping for a different answer. The compile

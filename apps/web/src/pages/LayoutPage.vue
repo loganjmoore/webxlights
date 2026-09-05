@@ -37,8 +37,10 @@ import { loadPreferences } from "../lib/preferences";
 import { buildPlacementReport, copyOrDownloadReport } from "../lib/placementReport";
 import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
+
+const canvasRef = ref<InstanceType<typeof LayoutCanvas3D> | null>(null);
 import ModelPalette from "../components/ModelPalette.vue";
-import TabNav from "../components/TabNav.vue";
+import AppBar from "../components/AppBar.vue";
 import { NODE_SPACING } from "../lib/worldUnits";
 
 // The canvases' local-unit-to-world factor, the same value the importer places against
@@ -470,7 +472,7 @@ function nextNameForType(type: string): string {
   return `${prefix}${max + 1}`;
 }
 
-// Dropped from ModelPalette.vue via LayoutCanvas's dragover/drop handlers. raw_attrs stays {}
+// Dropped from ModelPalette.vue onto the ground plane (LayoutCanvas3D's worldAt). raw_attrs stays {}
 // deliberately - computeGeometryFromAttrs (packages/engine) already has a sensible fallback
 // default for every draggable type, so an empty bag renders exactly like a real xLights
 // "place with defaults" model would, ready to resize via the position panel below.
@@ -916,16 +918,14 @@ onUnmounted(() => {
 
 <template>
   <main class="layout-page">
-    <header>
-      <router-link to="/projects" class="projects-link">&larr; Projects</router-link>
-      <TabNav :project-id="projectId" active="layout" />
+    <AppBar :project-id="projectId" active="layout" />
+    <header class="page-toolbar">
       <h1>Layout</h1>
-      <label class="import-btn">
+      <label class="btn">
         {{ importing ? "Importing..." : "Import xlights_rgbeffects.xml" }}
         <input type="file" accept=".xml" @change="handleFileChange" :disabled="importing" hidden />
       </label>
       <button
-        class="report-btn"
         :disabled="models.length === 0"
         title="Copy what xLights wrote and what the importer derived, for every model"
         @click="copyPlacementReport"
@@ -939,10 +939,10 @@ onUnmounted(() => {
     <div class="body">
       <aside class="model-list">
         <div class="tabs">
-          <button :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">Models ({{ models.length }})</button>
-          <button :class="{ active: activeTab === 'groups' }" @click="activeTab = 'groups'">Groups ({{ groups.length }})</button>
-          <button :class="{ active: activeTab === 'controllers' }" @click="activeTab = 'controllers'">
-            Controllers ({{ controllers.length }}){{ collisionCount ? " ⚠" : "" }}
+          <button :class="{ active: activeTab === 'models' }" @click="activeTab = 'models'">Models <span class="count">{{ models.length }}</span></button>
+          <button :class="{ active: activeTab === 'groups' }" @click="activeTab = 'groups'">Groups <span class="count">{{ groups.length }}</span></button>
+          <button :class="{ active: activeTab === 'controllers' }" :title="collisionCount ? 'Some models share channels' : ''" @click="activeTab = 'controllers'">
+            Controllers <span class="count" :class="{ warn: collisionCount }">{{ controllers.length }}</span>
           </button>
         </div>
 
@@ -1333,7 +1333,7 @@ onUnmounted(() => {
         </div>
       </aside>
       <div class="canvas-wrap">
-        <ModelPalette />
+        <ModelPalette :target="(x, y) => canvasRef?.worldAt(x, y) ?? null" @create="handleCreate" />
         <div class="canvas-area">
           <!--
             The house photo sits behind the 2D canvas rather than being drawn into it: the canvas
@@ -1349,6 +1349,7 @@ onUnmounted(() => {
             alt=""
           />
           <LayoutCanvas3D
+            ref="canvasRef"
             :models="previewModels"
             :view-objects="viewObjects"
             :selected-model-id="selectedModelId"
@@ -1473,19 +1474,6 @@ onUnmounted(() => {
 .layout-page a {
   color: #e8c468;
 }
-header {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #333;
-  display: flex;
-  align-items: baseline;
-  gap: 1rem;
-  background: #16161c;
-}
-header h1 {
-  color: #ddd;
-  font-size: 1.1rem;
-  margin: 0;
-}
 .view-toggle {
   display: flex;
   gap: 0.25rem;
@@ -1517,19 +1505,6 @@ header h1 {
   background: #e8c468;
   color: #111;
   border-color: #e8c468;
-}
-.import-btn {
-  cursor: pointer;
-  padding: 0.4rem 0.8rem;
-  border: 1px solid #555;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  color: #ddd;
-}
-.report-btn {
-  font: inherit;
-  font-size: 0.8rem;
-  padding: 0.3rem 0.6rem;
 }
 .import-message {
   margin: 0;
@@ -1629,25 +1604,52 @@ header h1 {
   color: #666;
   font-size: 0.8rem;
 }
+/* One segmented control, never wrapping: the count is a small badge, not part of the name. */
 .tabs {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.15rem;
   margin-bottom: 0.6rem;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
 }
 .tabs button {
   flex: 1;
-  padding: 0.3rem 0.4rem;
-  font-size: 0.75rem;
-  color: #999;
-  background: #1a1a20;
-  border: 1px solid #333;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.25rem 0.15rem;
+  font: inherit;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 3px;
   cursor: pointer;
 }
+.tabs button:hover {
+  color: var(--text);
+}
 .tabs button.active {
-  color: #e8c468;
-  border-color: #e8c468;
-  background: #2c2712;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.tabs .count {
+  font-size: 0.65rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.tabs button.active .count {
+  background: rgba(0, 0, 0, 0.15);
+}
+.tabs .count.warn {
+  background: var(--danger);
+  color: #fff;
 }
 .new-group-btn {
   width: 100%;

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import TabNav from "../components/TabNav.vue";
+import AppBar from "../components/AppBar.vue";
+import ModalPanel from "../components/ModalPanel.vue";
+import { relativeTime } from "../lib/relativeTime";
 import { useRoute, useRouter } from "vue-router";
 import { parseXsq } from "@webxlights/formats";
 import { describeMapping, mapXsqToBody } from "../lib/xsqConvert";
@@ -25,6 +27,14 @@ const router = useRouter();
 const projectId = computed(() => Number(route.params.projectId));
 
 const sequences = ref<SequenceSummary[]>([]);
+// The new-sequence form is a dialog you ask for. The page is the list of what exists; making
+// another is the exception, and it should not sit above the file you came for.
+const showNew = ref(false);
+
+function lengthOf(ms: number): string {
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
 const name = ref("");
 // Seeded from the preference (xLights' "Default Sequence Duration and FPS"), which exists so you
 // aren't setting the same two numbers every time.
@@ -251,6 +261,7 @@ onMounted(load);
 
 <template>
   <main class="sequences-page">
+    <AppBar :project-id="projectId" active="sequences" />
     <ImportMappingDialog
       v-if="pendingImport"
       :targets="pendingImport.targets"
@@ -260,181 +271,258 @@ onMounted(load);
       @cancel="pendingImport = null"
       @confirm="confirmImport"
     />
-    <header>
-      <TabNav :project-id="projectId" active="sequences" />
+    <header class="page-toolbar">
       <h1>Sequences</h1>
-      <label class="import-btn">
-        {{ importing ? "Importing..." : "Import .xsq" }}
+      <button class="primary" @click="showNew = true">New sequence</button>
+      <label class="btn">
+        {{ importing ? "Importing…" : "Import .xsq" }}
         <input type="file" accept=".xsq" @change="importXsq" :disabled="importing" hidden />
       </label>
-      <label class="import-btn" title="Turn an .xsq into an .fseq without creating a sequence">
-        {{ converting ? "Converting..." : "Convert .xsq → .fseq" }}
+      <label class="btn" title="Turn an .xsq into an .fseq without creating a sequence">
+        {{ converting ? "Converting…" : "Convert .xsq → .fseq" }}
         <input type="file" accept=".xsq" @change="convertXsqToFseq" :disabled="converting" hidden />
       </label>
+      <span v-if="importMessage || convertMessage" class="status">{{ importMessage || convertMessage }}</span>
     </header>
-    <p v-if="importMessage" class="import-message">{{ importMessage }}</p>
-    <p v-if="convertMessage" class="import-message">{{ convertMessage }}</p>
 
-    <section class="new-sequence">
-      <h2>New sequence</h2>
-      <label>
-        Audio file
-        <input type="file" accept="audio/*" @change="onFilePicked" />
-      </label>
-      <label>
-        Name
-        <input v-model="name" type="text" />
-      </label>
-      <label>
-        Frame interval
-        <select v-model.number="frameMs">
-          <option v-for="f in FRAME_OPTIONS" :key="f" :value="f">{{ f }}ms ({{ Math.round(1000 / f) }}fps)</option>
-        </select>
-      </label>
-      <button
-        class="secondary"
-        :disabled="!name.trim() || creating"
-        :title="`A sequence with no soundtrack, ${Math.round(newPrefs.defaultSequenceMs / 1000)}s long`"
-        @click="createAnimatedSequence"
-      >
-        Animated (no audio)
-      </button>
-      <button :disabled="!audioFile || !name.trim() || creating" @click="createSequence">
-        {{ creating ? "Decoding audio..." : "Create" }}
-      </button>
-      <p v-if="error" class="error">{{ error }}</p>
-    </section>
+    <div class="content">
+      <table v-if="sequences.length" class="list">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Length</th>
+            <th>Frame</th>
+            <th>Audio</th>
+            <th>Edited</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="s in sequences" :key="s.id" @click="router.push({ name: 'sequencer', params: { projectId, sequenceId: s.id } })">
+            <td class="name">{{ s.name }}</td>
+            <td class="num">{{ lengthOf(s.duration_ms) }}</td>
+            <td class="num">{{ Math.round(1000 / s.frame_ms) }} fps</td>
+            <td class="muted">{{ s.sequence_type === "animated" ? "Animated" : (s.audio_filename ?? "Audio") }}</td>
+            <td class="muted">{{ relativeTime(s.updated_at) }}</td>
+            <td class="open">
+              <router-link :to="{ name: 'sequencer', params: { projectId, sequenceId: s.id } }" class="btn" @click.stop>Open</router-link>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <section v-else class="empty">
+        <h2>No sequences yet</h2>
+        <p>A sequence is a song and the effects you put to it. Start one from an audio file, or bring one over from xLights.</p>
+        <div class="empty-actions">
+          <button class="primary" @click="showNew = true">New sequence</button>
+          <label class="btn">
+            Import .xsq
+            <input type="file" accept=".xsq" @change="importXsq" :disabled="importing" hidden />
+          </label>
+        </div>
+      </section>
+    </div>
 
-    <ul class="list">
-      <li v-for="s in sequences" :key="s.id">
-        <router-link :to="{ name: 'sequencer', params: { projectId, sequenceId: s.id } }">
-          {{ s.name }} <span class="meta">{{ s.frame_ms }}ms &middot; {{ (s.duration_ms / 1000).toFixed(1) }}s</span>
-        </router-link>
-      </li>
-      <li v-if="sequences.length === 0" class="empty">No sequences yet.</li>
-    </ul>
+    <ModalPanel v-if="showNew" id="new-sequence" title="New sequence" @close="showNew = false">
+      <div class="new-form">
+        <label>
+          <span>Audio file</span>
+          <input type="file" accept="audio/*" @change="onFilePicked" />
+          <small>The song this sequence is set to. Its length becomes the sequence's length.</small>
+        </label>
+        <label>
+          <span>Name</span>
+          <input v-model="name" type="text" placeholder="Taken from the audio file if left blank" />
+        </label>
+        <label>
+          <span>Frame interval</span>
+          <select v-model.number="frameMs">
+            <option v-for="f in FRAME_OPTIONS" :key="f" :value="f">{{ f }} ms ({{ Math.round(1000 / f) }} fps)</option>
+          </select>
+        </label>
+        <p v-if="error" class="error">{{ error }}</p>
+        <div class="new-actions">
+          <button class="primary" :disabled="!audioFile || !name.trim() || creating" @click="createSequence">
+            {{ creating ? "Decoding audio…" : "Create" }}
+          </button>
+          <button
+            :disabled="!name.trim() || creating"
+            :title="`A sequence with no soundtrack, ${Math.round(newPrefs.defaultSequenceMs / 1000)}s long`"
+            @click="createAnimatedSequence"
+          >
+            Create without audio
+          </button>
+        </div>
+      </div>
+    </ModalPanel>
   </main>
 </template>
 
 <style scoped>
 .sequences-page {
-  font-family: system-ui, sans-serif;
+  font-family: var(--sans);
   min-height: 100vh;
-  background: #0d0d11;
-  color: #ddd;
+  background: var(--bg);
+  color: var(--text);
+  text-align: left;
 }
-header {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid #333;
-  background: #16161c;
+.status {
+  color: var(--text-muted);
 }
-header a {
-  color: #e8c468;
+.content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 3rem;
 }
-header h1 {
-  font-size: 1.1rem;
-  margin: 0;
-  color: #ddd;
+.list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.list th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.list td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.list tbody tr {
+  cursor: pointer;
+}
+.list tbody tr:hover td {
+  background: var(--bg-panel);
+}
+.list tbody tr:hover .name {
+  color: var(--accent);
+}
+.name {
   font-weight: 600;
 }
-.import-btn {
-  margin-left: auto;
-  cursor: pointer;
-  padding: 0.4rem 0.85rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  background: #1e1e26;
-  color: #ddd;
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.import-btn:hover {
-  border-color: #e8c468;
-  color: #e8c468;
+.muted {
+  color: var(--text-muted);
+  max-width: 24rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.import-message {
-  font-size: 0.8rem;
-  color: #aaa;
-  margin: 0;
-  padding: 0.6rem 1.25rem;
-  border-bottom: 1px solid #333;
+.open {
+  text-align: right;
+  width: 1%;
 }
-.sequences-page > .new-sequence,
-.sequences-page > .list {
-  max-width: 480px;
-  margin: 0 auto;
+.empty {
+  max-width: 52ch;
+  margin: 3rem auto;
+  padding: 1.5rem 1.75rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
 }
-.new-sequence {
-  border: 1px solid #333;
-  background: #16161c;
-  border-radius: 8px;
-  padding: 1.25rem;
-  margin-top: 1.5rem;
-  margin-bottom: 1.5rem;
+.empty h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.empty p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.empty-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.new-form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.9rem;
 }
-.new-sequence h2 {
-  margin: 0 0 0.25rem;
-  font-size: 0.95rem;
-  color: #ddd;
-  font-weight: 600;
-}
-.new-sequence label {
+.new-form label {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
   font-size: 0.8rem;
-  color: #aaa;
+  color: var(--text-muted);
 }
-.new-sequence button {
-  padding: 0.5rem 0;
-  font-size: 0.85rem;
-  font-weight: 600;
-  border: none;
-  border-radius: 5px;
-  background: #e8c468;
-  color: #111;
+.new-form label > span {
+  color: var(--text);
+}
+.new-form small {
+  color: var(--text-dim);
+}
+.new-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.sequences-page button,
+.sequences-page .btn,
+.sequences-page input[type="text"],
+.sequences-page select,
+.new-form button,
+.new-form input[type="text"],
+.new-form select {
+  font: inherit;
+  font-size: 0.8rem;
+  height: 30px;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
+  box-sizing: border-box;
+}
+.sequences-page button,
+.sequences-page .btn,
+.new-form button {
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  text-decoration: none;
 }
-.new-sequence button:disabled {
-  background: #3a3624;
-  color: #777;
+.sequences-page button:hover:not(:disabled),
+.sequences-page .btn:hover,
+.new-form button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.sequences-page .primary,
+.new-form .primary:disabled {
+  opacity: 0.45;
+  color: var(--accent-ink);
+}
+.sequences-page .primary,
+.new-form .primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.sequences-page .primary:hover:not(:disabled),
+.new-form .primary:hover:not(:disabled) {
+  color: var(--accent-ink);
+  filter: brightness(1.05);
+}
+.sequences-page button:disabled,
+.new-form button:disabled {
+  color: var(--text-dim);
   cursor: default;
 }
 .error {
-  margin: 0;
-  color: #e57373;
+  color: var(--danger);
   font-size: 0.8rem;
-}
-.list {
-  list-style: none;
-  padding: 0 1.25rem 1.5rem;
   margin: 0;
-}
-.list li {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #222;
-}
-.list li:last-child {
-  border-bottom: none;
-}
-.list a {
-  color: #ddd;
-}
-.list a:hover {
-  color: #e8c468;
-}
-.meta {
-  color: #888;
-  font-size: 0.8rem;
-  margin-left: 0.5rem;
-}
-.empty {
-  color: #666;
-  padding: 0.5rem 0;
 }
 </style>

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import { api, ApiError, type CreditStatus, type ShaderRecord } from "../lib/api";
+import { api, ApiError, type CreditStatus, type ShaderRecord, type ShaderTarget } from "../lib/api";
 import { checkDraft, defaultInputs, suggestName } from "../lib/shaderDraft";
 import { forgetKey, loadKey, loadProvider, looksLikeKey, maskKey, saveKey, saveProvider } from "../lib/anthropicKey";
 import { colorInputNames, type IsfShader } from "@webxlights/formats";
 import ShaderPreview from "../components/ShaderPreview.vue";
-import TabNav from "../components/TabNav.vue";
+import AppBar from "../components/AppBar.vue";
 
 // The shader library: what everyone has made, and the assistant that makes another.
 //
@@ -18,6 +18,9 @@ const route = useRoute();
 const projectId = computed(() => route.params.projectId as string);
 
 const shaders = ref<ShaderRecord[]>([]);
+// A card runs while the pointer is over it. Every card running at once would melt a laptop; one
+// running is how you tell what a shader does before you put it in a show.
+const hoveredId = ref<number | null>(null);
 // The browsing vocabulary the built-in library is baked with (tools/shader-check/bake-builtins.mjs)
 // plus "Generator", which every ISF header carries.
 const CATEGORIES = ["Light show", "Motion background", "Natural", "Geometric", "Seasonal", "Generator"];
@@ -34,6 +37,26 @@ const status = ref<CreditStatus | null>(null);
 // ---- the assistant -------------------------------------------------------------------------
 
 const prompt = ref("");
+// Which prop the shader is for. The assistant designs for a matrix first either way; saying
+// "roofline" changes what excellent means, and it is the difference between a shader that reads
+// on the roof and one that collapses to a colour cycling on it.
+const target = ref<ShaderTarget>("matrix");
+const TARGETS: { value: ShaderTarget; label: string }[] = [
+  { value: "matrix", label: "a matrix or panel" },
+  { value: "line", label: "a roofline or strip" },
+  { value: "tree", label: "a mega tree" },
+  { value: "any", label: "any prop" },
+];
+// Descriptions that generate well, for someone staring at an empty box. Specific and visual,
+// which is what the assistant needs: a subject, a motion, and a mood.
+const EXAMPLES = [
+  "big soft snowflakes drifting down over a deep blue night",
+  "a bright comet with a long glowing tail chasing itself around the display",
+  "bold checkerboard squares sliding steadily sideways",
+  "rings expanding outward from the centre one after another",
+  "curtains of aurora rippling slowly, bright at the base",
+  "a radar line sweeping around and leaving a fading trail",
+];
 const busy = ref(false);
 const stage = ref<string>("");
 const draft = ref<{ source: string; shader: IsfShader } | null>(null);
@@ -65,16 +88,44 @@ const usingOwnKey = computed(() => userKey.value !== null);
 async function refresh(): Promise<void> {
   loading.value = true;
   try {
-    const page = await api.listShaders({
-      q: search.value || undefined,
-      mine: scope.value === "mine",
-      kind: scope.value === "builtin" || scope.value === "community" ? scope.value : "all",
-      category: category.value || undefined,
-      sort: sort.value,
-    });
+    const page = await api.listShaders(listParams(1));
     shaders.value = page.data;
+    lastPage.value = page.last_page;
+    total.value = page.total;
   } finally {
     loading.value = false;
+  }
+}
+
+// The API pages at 24 and the library alone is 50, so the gallery needs a second page.
+// Appended rather than paged, because a gallery is browsed, not navigated.
+const lastPage = ref(1);
+const total = ref(0);
+const loadingMore = ref(false);
+const currentPage = computed(() => Math.ceil(shaders.value.length / 24));
+const remaining = computed(() => Math.max(0, total.value - shaders.value.length));
+
+function listParams(page: number) {
+  return {
+    q: search.value || undefined,
+    mine: scope.value === "mine",
+    kind: scope.value === "builtin" || scope.value === "community" ? scope.value : ("all" as const),
+    category: category.value || undefined,
+    sort: sort.value,
+    page,
+  };
+}
+
+async function loadMore(): Promise<void> {
+  if (loadingMore.value || currentPage.value >= lastPage.value) return;
+  loadingMore.value = true;
+  try {
+    const page = await api.listShaders(listParams(currentPage.value + 1));
+    shaders.value = [...shaders.value, ...page.data];
+    lastPage.value = page.last_page;
+    total.value = page.total;
+  } finally {
+    loadingMore.value = false;
   }
 }
 
@@ -113,13 +164,13 @@ async function generate(): Promise<void> {
 
   try {
     stage.value = "Writing the shader…";
-    let result = await api.generateShader({ description }, credentials.value);
+    let result = await api.generateShader({ description, target: target.value }, credentials.value);
     let check = checkDraft(result.source);
 
     if (!check.ok && check.stage !== "unavailable") {
       stage.value = "It did not compile - sending the error back…";
       result = await api.generateShader(
-        { description, previous_source: result.source, compile_error: check.error },
+        { description, target: target.value, previous_source: result.source, compile_error: check.error },
         credentials.value,
       );
       check = checkDraft(result.source);
@@ -239,15 +290,10 @@ onMounted(async () => {
 
 <template>
   <div class="page">
-    <header class="head">
-      <div>
-        <h1>Shaders</h1>
-        <p class="sub">
-          GLSL effects that run on your props. Describe one and the assistant writes it, or use
-          something someone else made.
-        </p>
-      </div>
-      <TabNav :project-id="projectId" active="shaders" />
+    <AppBar :project-id="projectId" active="shaders" />
+    <header class="page-toolbar">
+      <h1>Shaders</h1>
+      <span class="sub">GLSL effects that run on your props. Describe one and the assistant writes it, or use something someone else made.</span>
     </header>
 
     <!-- The assistant -->
@@ -264,6 +310,20 @@ onMounted(async () => {
         <button class="primary" :disabled="busy || prompt.trim().length < 3 || !canGenerate" @click="generate">
           {{ busy ? "Working…" : "Generate" }}
         </button>
+      </div>
+      <div class="ask-meta">
+        <label class="target">
+          Designed for
+          <select v-model="target" :disabled="busy">
+            <option v-for="t in TARGETS" :key="t.value" :value="t.value">{{ t.label }}</option>
+          </select>
+        </label>
+        <div v-if="!draft && !busy" class="examples" aria-label="Example descriptions">
+          <span class="examples-label">Try:</span>
+          <button v-for="example in EXAMPLES" :key="example" type="button" class="chip" @click="prompt = example">
+            {{ example }}
+          </button>
+        </div>
       </div>
 
       <p v-if="busy" class="stage">{{ stage }}</p>
@@ -363,9 +423,20 @@ onMounted(async () => {
       </p>
 
       <ul v-else class="grid">
-        <li v-for="shader in shaders" :key="shader.id" class="card">
+        <li
+          v-for="shader in shaders"
+          :key="shader.id"
+          class="card"
+          @pointerenter="hoveredId = shader.id"
+          @pointerleave="hoveredId = null"
+        >
           <!-- Paused: thirty shaders running at once would melt a laptop. They start on hover. -->
-          <ShaderPreview :source="shader.source" :running="false" :color-inputs="colorInputNames(shader.inputs ?? [])" class="thumb" />
+          <ShaderPreview
+            :source="shader.source"
+            :running="hoveredId === shader.id"
+            :color-inputs="colorInputNames(shader.inputs ?? [])"
+            class="thumb"
+          />
           <div class="meta">
             <h3>
               {{ shader.name }}
@@ -388,33 +459,37 @@ onMounted(async () => {
           </div>
         </li>
       </ul>
+      <button v-if="!loading && remaining > 0" type="button" class="more" :disabled="loadingMore" @click="loadMore">
+        {{ loadingMore ? "Loading…" : `Show ${Math.min(remaining, 24)} more of ${total}` }}
+      </button>
     </section>
   </div>
 </template>
 
 <style scoped>
 .page {
-  padding: 1rem 1.2rem 3rem;
-  color: #e8e8ef;
+  padding: 0 0 3rem;
+  color: var(--text);
+  text-align: left;
+}
+/* The app bar spans the window; everything under it sits in a reading column. */
+.page > :not(:first-child):not(.page-toolbar) {
   max-width: 1100px;
-  margin: 0 auto;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.2rem;
+  padding-right: 1.2rem;
 }
-.head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-h1 {
-  margin: 0;
-  font-size: 1.3rem;
+.page > .assistant {
+  margin-top: 1.25rem;
 }
 .sub {
-  margin: 0.25rem 0 0;
-  color: #9a9aa6;
-  font-size: 0.85rem;
-  max-width: 52ch;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .assistant {
   background: #1a1a21;
@@ -426,6 +501,70 @@ h1 {
 .ask {
   display: flex;
   gap: 0.5rem;
+}
+.ask-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.target {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+.target select {
+  font: inherit;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
+}
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.examples-label {
+  color: var(--text-dim);
+}
+.chip {
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.more {
+  display: block;
+  margin: 1rem auto 0;
+  padding: 0.4rem 1rem;
+  font: inherit;
+  font-size: 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
+  cursor: pointer;
+}
+.more:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 textarea {
   flex: 1;

@@ -14,6 +14,19 @@ class ShaderController extends Controller
 {
     private const PER_PAGE = 24;
 
+    // The parsed ISF header the client sends alongside the source. Bounded, because both columns
+    // are JSON that every gallery card renders: an unbounded array is a way to make a page of 24
+    // cards weigh megabytes, and a category is a short word from a fixed vocabulary.
+    private const SHAPE_RULES = [
+        'inputs' => ['sometimes', 'array', 'max:32'],
+        'inputs.*' => ['array'],
+        'inputs.*.name' => ['required', 'string', 'max:64'],
+        'inputs.*.type' => ['required', 'string', 'max:16'],
+        'inputs.*.label' => ['nullable', 'string', 'max:64'],
+        'categories' => ['sometimes', 'array', 'max:12'],
+        'categories.*' => ['string', 'max:60'],
+    ];
+
     public function index(Request $request)
     {
         $data = $request->validate([
@@ -86,8 +99,7 @@ class ShaderController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:2000'],
             'source' => ['required', 'string', 'max:100000'],
-            'inputs' => ['array'],
-            'categories' => ['array'],
+            ...self::SHAPE_RULES,
             'is_public' => ['boolean'],
             'prompt' => ['nullable', 'string', 'max:4000'],
             'ai_generated' => ['boolean'],
@@ -110,8 +122,7 @@ class ShaderController extends Controller
             'name' => ['sometimes', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:2000'],
             'source' => ['sometimes', 'string', 'max:100000'],
-            'inputs' => ['sometimes', 'array'],
-            'categories' => ['sometimes', 'array'],
+            ...self::SHAPE_RULES,
             'is_public' => ['sometimes', 'boolean'],
         ]);
         $shader->update($data);

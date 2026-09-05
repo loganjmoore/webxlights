@@ -1,8 +1,15 @@
-# The 50-shader library
+# The built-in shader library
 
-Status on 2026-08-26: **the measurement and shipping infrastructure is built, calibrated and
-tested. Zero of the 50 shaders have been generated.** Generation is blocked on credentials, not
-on design. This document records what was built, what it proved, and exactly what is left.
+Status on 2026-09-04: **all fifty concepts are shipped**, hand-authored rather than
+generated, because no machine that has worked on this has held model credentials. Every one of
+the fifty compiles in both dialects (`check.mjs`, xLights via glslang), clears every fitted gate
+at all four shapes (`metrics.mjs`), survives the ten-hour drift check, and is no near-duplicate of
+another (`closestPairs` minimum 0.081). They were reviewed by eye from `render.mjs` contact
+sheets at 32x32 and tuned where the numbers passed and the picture did not. See the hand-edit
+log below for what that changed.
+
+The `SYSTEM` prompt was edited on 2026-09-04 (see DECISIONS.md, "Shader prompt: matrix-first")
+without corpus verification. That is a stated exception to the rule below, not a repeal of it.
 
 Read `docs/GOAL-shader-library-50.md` for the brief this works against.
 
@@ -18,7 +25,7 @@ Read `docs/GOAL-shader-library-50.md` for the brief this works against.
 | `library.json` - the 50 descriptions | **done**, family counts exactly as specified |
 | Shipping into the gallery on a fresh install | **done**, mechanism built and tested end to end |
 | Gallery usable at 50+ entries | **done**: built-in badge, browse by category, existing search |
-| The 50 `.fs` files | **not started** - blocked, see below |
+| The 50 `.fs` files | **done** - hand-authored, measured, see the hand-edit log |
 | Five rounds of ten, with adversarial review | **not started** - blocked |
 | An improved `SYSTEM` prompt | **not started** - deliberately, see "No unverified prompt edits" |
 | Round-1-vs-round-5 regeneration | **not started** - blocked |
@@ -239,9 +246,34 @@ The machinery is tested (`metricsCore.test.mjs`) and prints automatically from `
 
 ## Hand-edit log
 
-**Empty, because no shader has been generated or edited.** Every hand-edit to a generated `.fs`
-belongs here with the reason it could not be a prompt fix - that log is the honest measure of
-whether the prompt improved.
+The fifty shipped shaders were written by hand, so this log records what the *measurement* and
+the *eye* changed after the first draft of each - the things a prompt would have to say to get
+them right first time. Each is now a line in `SYSTEM`.
+
+- **Line shapes need wider edges.** `checker-slide`, `expanding-rings`, `spin-tunnel` and
+  `marquee-chase` all tripped `aliasEnergy` at 60x1 with edges that were fine at 32x32. Fix: 3 to
+  4 pixels of `smoothstep` on a line, 1.5 on a matrix; on the checkerboard, no seams at all on a
+  line. `plasma-storm` and `metaballs` aliased for a different reason - aspect-correcting a 60x1
+  buffer makes it 60 units wide - so the aspect is capped at 3 for anything organic.
+- **Open bright.** `comet-chase`, `heartbeat`, `pixel-cascade`, `radar-sweep` and `starburst`
+  all opened under `openingLuma` 0.25 at their own DEFAULTs. Fix: a resting glow that is part of
+  the design (the radar's base, the column's dim colour), and a phase offset so frame 0 lands
+  on the beat rather than the rest.
+- **Phase from the wrong hash.** `twinkle-field` chose its stars with `h > 1 - density` and
+  then used the same `h` as the phase, so every star's phase fell in the same half-turn and they
+  all blinked together. Passed every gate; obvious on the contact sheet. Phase now has its own hash.
+- **Too dense reads as static.** `snowfall` (three layers, 3px columns) and `pixel-cascade`
+  (3px columns, short blocks) passed the gates and looked like noise at 32x32. Fewer, bigger.
+  `snowfall` then failed `peakBrightness` at 192x108 because a 1.8px flake on a 108-tall canvas
+  is a speck; flake size now scales with the canvas.
+- **Statistically alike, visually not.** `ember-rise` measured 0.057 from `radar-sweep` and
+  `cloud-drift` 0.058 from `peppermint-swirl` - under the 0.08 distinctness floor, though no
+  eye would confuse them. The feature vector sees brightness, contrast and motion statistics,
+  not subjects. Both were pushed apart (ember: brighter, faster, whiter-hot; clouds: darker sky,
+  whiter cloud) rather than the floor being lowered, which is the rule.
+- **Slow paths drift.** `metaballs` failed `driftDelta` (hard) at 17%: with blob paths on
+  0.2 to 0.6 rad/s, a 6-second window at 600 s and at 36000 s simply saw different arrangements.
+  Doubling the rates fixed it. Not decay, but the gate cannot tell, and faster was better anyway.
 
 ---
 

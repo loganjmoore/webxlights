@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { compileCached, paletteColorValues, rgba, type RGBA } from "@webxlights/engine";
+import { parseIsf } from "@webxlights/formats";
+import { defaultInputs } from "../lib/shaderDraft";
 
 // A shader, running.
 //
@@ -22,6 +24,16 @@ const props = withDefaults(
   }>(),
   { width: 48, height: 32, running: true },
 );
+
+// The header's own DEFAULTs, for a card that was given no inputs. Without them every float
+// uniform is zero - a candy cane with zero stripes is a solid colour - which is not the shader.
+const headerDefaults = computed(() => {
+  try {
+    return defaultInputs(parseIsf(props.source));
+  } catch {
+    return {};
+  }
+});
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 const error = ref<string | null>(null);
@@ -58,8 +70,8 @@ function draw(now: number): void {
     frameIndex: frame++,
     palette: props.palette ?? DEFAULT_PALETTE,
     inputs: props.colorInputs?.length
-      ? { ...(props.inputs ?? {}), ...paletteColorValues(props.colorInputs, props.palette ?? DEFAULT_PALETTE) }
-      : (props.inputs ?? {}),
+      ? { ...headerDefaults.value, ...(props.inputs ?? {}), ...paletteColorValues(props.colorInputs, props.palette ?? DEFAULT_PALETTE) }
+      : { ...headerDefaults.value, ...(props.inputs ?? {}) },
   });
   if (!pixels) return;
 
