@@ -4,6 +4,8 @@
 
 The docked effect settings panel beside the grid has the same tear-off control as the dialogs: a click opens it in a separate Chrome window (shift-click for a tab), the grid takes the width it leaves behind, and closing that window brings it back. The mechanism moved out of the dialog component into `lib/tearOff.ts` so both share it. Verified in real Chrome: the panel and its controls appeared in the new window, the main page showed the "in its own window" note with a wider grid, and closing the window returned the panel.
 
+The command palette opens on Cmd+K and Ctrl+K as well as xLights' Ctrl+Shift+K, because that is the key people press. Palette tiles no longer let a native text or image drag start from the glyph, which could cancel the pointer sequence mid-drag so the drop never arrived, and a mouse release that arrives without its pointer event now counts. The controller properties panel's labels are left-aligned.
+
 The effect palette's tiles are smaller - 44px wide with 16px glyphs - so the strip takes about a third less height.
 
 ## Panels that fit, lists you can type into, and a drop that always lets go

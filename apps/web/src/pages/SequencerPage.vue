@@ -1147,6 +1147,9 @@ function onTileClick(name: string): void {
 
 function onTilePointerDown(e: PointerEvent, name: string): void {
   if (e.button !== 0) return;
+  // A mouse press on a tile must not start a text selection or a native drag of the glyph:
+  // either one cancels the pointer sequence mid-drag and the drop never arrives.
+  if (e.pointerType === "mouse") e.preventDefault();
   const el = e.currentTarget as HTMLElement;
   tilePointer = { id: e.pointerId, name, startX: e.clientX, startY: e.clientY, el, started: false };
   el.setPointerCapture(e.pointerId);
@@ -1165,6 +1168,7 @@ function onTilePointerMove(e: PointerEvent): void {
     // ends that arrive when capture is lost - the window losing focus, a release the button
     // never hears about - because a proxy that never leaves the screen is a stuck drag.
     window.addEventListener("pointerup", onTilePointerUp, true);
+    window.addEventListener("mouseup", onTileMouseUp, true);
     window.addEventListener("blur", cancelTileDrag);
     pointer.el.addEventListener("lostpointercapture", onTileLostCapture);
   }
@@ -1195,6 +1199,12 @@ function onTilePointerUp(e: PointerEvent): void {
     // Whatever the drop did or failed to do, the drag is over.
     finishTileDrag();
   }
+}
+
+/** A mouse release that arrived without its pointer event: treat it as the release. */
+function onTileMouseUp(e: MouseEvent): void {
+  if (!tilePointer?.started) return;
+  onTilePointerUp(Object.assign(e, { pointerId: tilePointer.id }) as unknown as PointerEvent);
 }
 
 function onTileLostCapture(): void {
@@ -1231,6 +1241,7 @@ function finishTileDrag(): void {
   document.body.classList.remove("dragging-tile");
   window.removeEventListener("keydown", onTileDragKey, true);
   window.removeEventListener("pointerup", onTilePointerUp, true);
+  window.removeEventListener("mouseup", onTileMouseUp, true);
   window.removeEventListener("pointermove", onTilePointerMove, true);
   window.removeEventListener("blur", cancelTileDrag);
 }
@@ -2502,7 +2513,7 @@ watch(sequenceId, async (id) => {
       <div class="group">
         <MenuButton label="Windows" :items="windowsMenu" :active="anyPanelOpen" />
         <MenuButton label="Sequence" :items="sequenceMenu" />
-        <button title="Command palette (Ctrl+Shift+K)" @click="paletteOpen = true">⌘K</button>
+        <button title="Command palette (⌘K or Ctrl+K): type any command or effect" @click="paletteOpen = true">⌘K</button>
       </div>
       <div class="status">
         <span class="save-status">{{ store.saveStatus }}</span>
@@ -3293,6 +3304,7 @@ watch(sequenceId, async (id) => {
           :aria-pressed="pendingEffectName === name"
           :class="{ armed: pendingEffectName === name, lifted: tileDrag?.name === name }"
           @click="onTileClick(name)"
+          @dragstart.prevent
           @pointerdown="onTilePointerDown($event, name)"
           @pointermove="onTilePointerMove"
           @pointerup="onTilePointerUp"
@@ -3748,6 +3760,7 @@ header button.active {
   cursor: grab;
   touch-action: none;
   user-select: none;
+  -webkit-user-drag: none;
   transition: background 120ms ease-out, color 120ms ease-out, transform 120ms ease-out;
 }
 .palette-tiles .effect-tile svg {
