@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Self-host webXLights</title>
+<meta name="description" content="How to run webXLights on your own machine or server: the pieces, the Docker image, the Render blueprint, the optional AI keys, and the GPL-3.0 licence.">
+<link rel="canonical" href="https://webxlights-web.onrender.com/self-hosting">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/site/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="webXLights">
+<meta property="og:title" content="Self-host webXLights">
+<meta property="og:description" content="How to run webXLights on your own machine or server: the pieces, the Docker image, the Render blueprint, the optional AI keys, and the GPL-3.0 licence.">
+<meta property="og:url" content="https://webxlights-web.onrender.com/self-hosting">
+<meta property="og:image" content="https://webxlights-web.onrender.com/site/img/sequencer.png">
+<meta name="twitter:card" content="summary_large_image">
+
+</head>
+<body>
+<header class="site-head"><div class="wrap">
+<a class="wordmark" href="/">webX<span>Lights</span></a>
+<nav class="site-nav" aria-label="Site"><a href="/features">Features</a><a href="/why">Why</a><a href="/xlights">xLights</a><a href="/self-hosting" aria-current="page">Self-host</a><a href="/about">About</a><a href="/docs">Docs</a></nav>
+<a class="btn primary" href="/auth">Open the app</a>
+</div></header>
+<main class="wrap">
+
+<div class="hero"><h1>Run your own webXLights</h1><p class="lede">Open source, GPL-3.0. Run it on a laptop, a home server, or a host of your choosing.</p></div>
+<section class="first"><div class="prose">
+<h2>What it is made of</h2>
+<p>A Vue app (the sequencer, layout and previews, all in the browser) and a Laravel API (accounts, projects, sequences, audio, the shader assistant, lyric timing) behind Postgres. One Docker image holds both behind nginx. The <a href="https://github.com/loganjmoore/webxlights">repository</a> has the details; this is the short version.</p>
+<h2>On your own machine</h2>
+<pre><code>git clone https://github.com/loganjmoore/webxlights.git
+cd webxlights
+docker compose up -d postgres            # Postgres on localhost:5433
+cd apps/api &amp;&amp; cp .env.example .env &amp;&amp; php artisan key:generate &amp;&amp; php artisan migrate
+php artisan serve --port=8000            # the API
+# in another shell, from the repository root:
+npm install &amp;&amp; npm run dev               # the app on http://localhost:5173</code></pre>
+<p>Needs PHP 8.4, Node 22 and Docker (for Postgres). Sign up on the first screen; the first account is yours.</p>
+<h2>As one container</h2>
+<pre><code>docker build -t webxlights .
+docker run -p 10000:10000 -e APP_KEY=... -e DB_URL=postgres://... webxlights</code></pre>
+<p>The image serves the app and the API on port 10000 and runs pending migrations on start. Audio is kept on a disk you mount; the <code>render.yaml</code> in the repository is a working blueprint for <a href="https://render.com">Render</a>, and is what the hosted copy runs from.</p>
+<h2>The optional parts</h2>
+<table>
+<thead><tr><th>Feature</th><th>What it needs</th></tr></thead>
+<tbody>
+<tr><td>Shader assistant</td><td><code>SHADER_API_KEY</code> for Anthropic (default) or any OpenAI-compatible endpoint; a local model works too. People can bring their own key instead. <code>SHADER_MONTHLY_LIMIT</code> caps server-funded generations per person.</td></tr>
+<tr><td>Automatic lyric timing</td><td><code>LYRICS_API_KEY</code> for a speech-to-text endpoint with word timestamps (OpenAI <code>whisper-1</code> by default). <code>LYRICS_MONTHLY_LIMIT</code> caps listens per person.</td></tr>
+</tbody></table>
+<p>Without a key, each feature says so in the app and everything else works.</p>
+<h2>Licence</h2>
+<p>webXLights is licensed under the <a href="https://github.com/loganjmoore/webxlights/blob/main/LICENSE">GNU General Public License v3.0</a>, the same licence as xLights. You may run it, study it, change it and share it, and changes you distribute stay under the same licence. Security reports go to the address in <a href="https://github.com/loganjmoore/webxlights/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+</div></section>
+
+</main>
+<footer class="site-foot"><div class="wrap">
+<a href="https://github.com/loganjmoore/webxlights">Source on GitHub</a>
+<a href="https://github.com/loganjmoore/webxlights/blob/main/LICENSE">GPL-3.0 licence</a>
+<a href="https://github.com/loganjmoore/webxlights/blob/main/SECURITY.md">Security</a>
+<a href="/docs">Docs</a>
+<a href="https://xlights.org">xLights desktop</a>
+<span class="fine">webXLights is an independent open source project. It is not affiliated with or endorsed by the xLights project; xLights is a trademark of its authors.</span>
+</div></footer>
+</body>
+</html>

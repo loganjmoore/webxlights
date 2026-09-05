@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>webXLights features: layout, sequencer, shaders, auto lyrics, controllers</title>
+<meta name="description" content="What is in webXLights today: 3D layout, the sequencer with value curves and audio-reactive effects, automatic lyric timing, an AI shader assistant, a controller visualiser, FPP Connect, autosave and snapshots.">
+<link rel="canonical" href="https://webxlights-web.onrender.com/features">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/site/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="webXLights">
+<meta property="og:title" content="webXLights features: layout, sequencer, shaders, auto lyrics, controllers">
+<meta property="og:description" content="What is in webXLights today: 3D layout, the sequencer with value curves and audio-reactive effects, automatic lyric timing, an AI shader assistant, a controller visualiser, FPP Connect, autosave and snapshots.">
+<meta property="og:url" content="https://webxlights-web.onrender.com/features">
+<meta property="og:image" content="https://webxlights-web.onrender.com/site/img/sequencer.png">
+<meta name="twitter:card" content="summary_large_image">
+
+</head>
+<body>
+<header class="site-head"><div class="wrap">
+<a class="wordmark" href="/">webX<span>Lights</span></a>
+<nav class="site-nav" aria-label="Site"><a href="/features" aria-current="page">Features</a><a href="/why">Why</a><a href="/xlights">xLights</a><a href="/self-hosting">Self-host</a><a href="/about">About</a><a href="/docs">Docs</a></nav>
+<a class="btn primary" href="/auth">Open the app</a>
+</div></header>
+<main class="wrap">
+
+<div class="hero"><h1>Features</h1><p class="lede">Everything here is in the app today. Things we have not built are not on this page.</p></div>
+<section class="first"><h2>Layout</h2><div class="prose">
+<ul><li>A 3D scene with twelve model types: matrices, arches, trees, stars, candy canes, icicles, lines, custom models and more.</li>
+<li>Drag to place, corner grips to resize (the same size at every zoom, and damped so a small drag is a small change), rotate on any axis.</li>
+<li>Undo and redo. Right-click a model for Align with ground, Reset rotation, Rename and Delete.</li>
+<li>Import your xLights <code>xlights_rgbeffects.xml</code> and the models come across, with a report of anything that did not.</li>
+<li>Model groups, sub-models and strands, and a model palette for adding new props.</li></ul></div>
+<figure class="shot"><img src="/site/img/layout.png" alt="Layout page" loading="lazy" width="1200" height="750"></figure></section>
+<section><h2>Sequencer</h2><div class="prose">
+<ul><li>An effect palette with icons; drag an effect onto a row, stretch it, move it, copy it, with a preview that renders as you edit.</li>
+<li>Value curves, transitions, blend modes, layers, and audio-reactive effects driven by the loaded track.</li>
+<li>Timing tracks: fixed interval, beat detection from the audio, MIDI notes, Papagayo lipsync files, and automatic lyric timing.</li>
+<li>Views, effect presets, a command palette on Cmd+K, and panels you can drag, pin, resize or pop out into their own browser window.</li>
+<li>Import <code>.xsq</code> sequences from xLights; export <code>.fseq</code> for FPP and other players, and video of a model.</li></ul></div>
+<figure class="shot"><img src="/site/img/sequencer.png" alt="Sequencer page" loading="lazy" width="1200" height="750"></figure></section>
+<section><h2>Automatic lyric timing</h2><div class="prose">
+<p>Paste the lyrics, one line per phrase, and press <em>Time the lyrics</em>. The song is listened to by a speech-to-text model that reports where every word is sung, each word is looked up in the CMU Pronouncing Dictionary, and the result is three timing tracks: lyrics, words and phonemes. The phonemes track is what a singing-face effect reads. Like the standalone tools that do this for xLights, it gets most of the way there; play it through and nudge the marks that are off. <em>Download .xtiming</em> saves the tracks for desktop xLights. <a href="https://github.com/loganjmoore/webxlights/blob/main/docs/AUTO-LYRICS.md">How it works, in detail.</a></p></div></section>
+<section><h2>Shaders</h2><div class="prose">
+<ul><li>A gallery of fifty built-in shaders written for real matrices and checked against xLights' shader dialect, each card a live preview.</li>
+<li>An assistant that writes a new shader from a sentence, compiles it, repairs it if the compiler complains, and shows it running before you keep it. A hundred free generations a month on the hosted app; bring your own key for more.</li>
+<li>Favourites, so the ones you use are one click away, and <em>Download for xLights</em> on every card for the desktop app's Shader effect.</li></ul></div>
+<figure class="shot"><img src="/site/img/shaders.png" alt="Shader gallery" loading="lazy" width="1200" height="750"></figure></section>
+<section><h2>Controllers and output</h2><div class="prose">
+<ul><li>Ethernet (DDP, E1.31), USB and null controllers, with start channels and channel counts.</li>
+<li>A visualiser: controllers down one side, unplaced models down the other, drag to chain them, with a search box for shows with a hundred props.</li>
+<li>FPP Connect for uploading sequences and audio to a Falcon Player.</li></ul></div>
+<figure class="shot"><img src="/site/img/visualiser.png" alt="Controller visualiser" loading="lazy" width="1200" height="750"></figure></section>
+<section><h2>Files</h2><div class="prose">
+<ul><li>Autosave. There is no save button to forget.</li>
+<li>Snapshots on a schedule and on demand, with a history you can restore from, and a retention setting like xLights' backup purge.</li>
+<li>Projects shared with other people, and export of a whole project as one file.</li></ul></div></section>
+
+</main>
+<footer class="site-foot"><div class="wrap">
+<a href="https://github.com/loganjmoore/webxlights">Source on GitHub</a>
+<a href="https://github.com/loganjmoore/webxlights/blob/main/LICENSE">GPL-3.0 licence</a>
+<a href="https://github.com/loganjmoore/webxlights/blob/main/SECURITY.md">Security</a>
+<a href="/docs">Docs</a>
+<a href="https://xlights.org">xLights desktop</a>
+<span class="fine">webXLights is an independent open source project. It is not affiliated with or endorsed by the xLights project; xLights is a trademark of its authors.</span>
+</div></footer>
+</body>
+</html>

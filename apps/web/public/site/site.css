@@ -1,0 +1,31 @@
+/* webXLights marketing site. Same tokens as the app (DESIGN.md): dark chrome, one warm accent. */
+:root{--bg:#0d0d11;--bg-panel:#16161c;--bg-control:#1e1e26;--bg-hover:#26262f;--border:#2c2c34;--border-strong:#3a3a44;--text:#e8e8ef;--text-muted:#9a9aa6;--text-dim:#5f5f6a;--accent:#e8c468;--accent-ink:#111;--info:#6a9fd8;--ok:#8fe0a0;--danger:#e5534b;--radius:4px;--radius-panel:6px;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}
+html{color-scheme:dark;background:var(--bg)}
+body{margin:0;font-family:var(--sans);font-size:1rem;line-height:1.55;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:var(--info);text-decoration:none}a:hover{text-decoration:underline}
+h1,h2,h3{font-weight:500;line-height:1.2;margin:0 0 .5rem}
+h1{font-size:2.25rem;letter-spacing:-.01em}h2{font-size:1.4rem;margin-top:0}h3{font-size:1.05rem}
+p{margin:0 0 1rem}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-control);border:1px solid var(--border);border-radius:var(--radius);padding:.05em .35em}
+pre{margin:0 0 1rem;padding:.75rem .9rem;background:var(--bg-panel);border:1px solid var(--border);border-radius:var(--radius-panel);overflow-x:auto;font-family:var(--mono);font-size:.85rem;line-height:1.5}
+pre code{background:none;border:0;padding:0;font-size:inherit}
+.wrap{max-width:68rem;margin:0 auto;padding:0 1.25rem}
+.site-head{position:sticky;top:0;z-index:5;background:var(--bg-panel);border-bottom:1px solid var(--border)}
+.site-head .wrap{display:flex;align-items:center;gap:1.25rem;height:3rem}
+.wordmark{font-weight:600;color:var(--text);letter-spacing:-.01em;margin-right:auto}.wordmark span{color:var(--accent)}.wordmark:hover{text-decoration:none}
+.site-nav{display:flex;gap:1rem;font-size:.9rem}.site-nav a{color:var(--text-muted)}.site-nav a[aria-current]{color:var(--text)}.site-nav a:hover{color:var(--text);text-decoration:none}
+.btn{display:inline-block;padding:.45rem .9rem;border-radius:var(--radius);border:1px solid var(--border-strong);background:var(--bg-control);color:var(--text);font-size:.9rem;line-height:1.2;white-space:nowrap}.btn:hover{background:var(--bg-hover);text-decoration:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:500}.btn.primary:hover{background:#f0d07c}
+.hero{padding:4rem 0 2.5rem}.hero h1{font-size:2.75rem;max-width:22ch}.hero .lede{font-size:1.2rem;color:var(--text-muted);max-width:56ch;margin-bottom:1.5rem}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center}.actions .note{font-size:.85rem;color:var(--text-dim);margin-left:.25rem}
+.shot{margin:2rem 0;border:1px solid var(--border-strong);border-radius:var(--radius-panel);overflow:hidden;background:var(--bg-panel);box-shadow:0 12px 40px rgba(0,0,0,.55)}.shot img{display:block;width:100%;height:auto}
+figure{margin:0}figcaption{font-size:.8rem;color:var(--text-muted);padding:.5rem .75rem;border-top:1px solid var(--border)}
+section{padding:2rem 0;border-top:1px solid var(--border)}section.first{border-top:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem 1.5rem;margin-top:1rem}
+.card{padding:1rem;background:var(--bg-panel);border:1px solid var(--border);border-radius:var(--radius-panel)}.card h3{margin-bottom:.35rem}.card p{color:var(--text-muted);font-size:.92rem;margin:0}
+.prose{max-width:62ch}.prose h2{margin-top:2rem}.prose ul{padding-left:1.2rem}.prose li{margin-bottom:.35rem}
+.honest{border-left:3px solid var(--accent);padding:.25rem 1rem;color:var(--text-muted);margin:1.5rem 0}
+table{border-collapse:collapse;width:100%;font-size:.92rem;margin:1rem 0}th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--border);vertical-align:top}th{color:var(--text-muted);font-weight:500;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+.site-foot{border-top:1px solid var(--border);margin-top:3rem;padding:1.5rem 0 2.5rem;font-size:.85rem;color:var(--text-muted)}.site-foot .wrap{display:flex;flex-wrap:wrap;gap:.75rem 1.5rem;align-items:center}.site-foot .fine{width:100%;color:var(--text-dim)}
+@media (max-width:640px){.hero h1{font-size:2rem}.site-head .wrap{flex-wrap:wrap;height:auto;gap:.5rem .75rem;padding-top:.6rem;padding-bottom:.6rem}.site-nav{order:3;width:100%;gap:.9rem;font-size:.85rem;overflow-x:auto;white-space:nowrap;padding-bottom:.1rem}.site-head .btn{padding:.35rem .6rem}}
