@@ -54,7 +54,7 @@ class ShaderCreditsTest extends TestCase
         $this->assertGreaterThan(0, User::factory()->create()->fresh()->credits);
     }
 
-    public function test_generating_spends_a_credit_and_returns_the_shader(): void
+    public function test_generating_counts_against_the_month_and_returns_the_shader(): void
     {
         $this->fakeGenerator("/*{}*/\nvoid main(){ gl_FragColor = vec4(1.0); }");
         $user = User::factory()->create(['credits' => 3]);
@@ -63,9 +63,32 @@ class ShaderCreditsTest extends TestCase
             'description' => 'swirling fire',
         ]);
 
-        $response->assertOk()->assertJsonPath('credits', 2);
+        // The balance is untouched: the monthly allowance is the gate, and the ledger row is
+        // what counts the generation against it.
+        $response->assertOk()->assertJsonPath('credits', 3);
         $this->assertStringContainsString('void main', $response->json('source'));
-        $this->assertSame(2, $user->fresh()->credits);
+        $this->assertSame(3, $user->fresh()->credits);
+        $this->actingAs($user)->getJson('/api/v1/credits')->assertOk()->assertJsonPath('used_this_month', 1);
+    }
+
+    public function test_the_monthly_allowance_refuses_the_next_one_without_spending(): void
+    {
+        config(['services.shader.monthly_limit' => 2]);
+        $fake = $this->fakeGenerator();
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->postJson('/api/v1/shaders/generate', ['description' => 'one'])->assertOk();
+        $this->actingAs($user)->postJson('/api/v1/shaders/generate', ['description' => 'two'])->assertOk();
+        $this->actingAs($user)->postJson('/api/v1/shaders/generate', ['description' => 'three'])
+            ->assertStatus(429)
+            ->assertJsonPath('code', 'monthly_limit')
+            ->assertJsonPath('monthly_limit', 2);
+
+        // Your own key is your own bill: not counted, not capped.
+        $this->actingAs($user)
+            ->withHeaders(['X-Shader-Key' => 'a-key-of-their-own'])
+            ->postJson('/api/v1/shaders/generate', ['description' => 'four'])
+            ->assertOk();
     }
 
     public function test_the_ledger_records_every_movement(): void
@@ -78,21 +101,21 @@ class ShaderCreditsTest extends TestCase
         // ledger row behind it makes "why do I have 4 credits" unanswerable.
         $this->assertDatabaseHas('credit_transactions', [
             'user_id' => $user->id,
-            'amount' => -1,
+            'amount' => 0,
             'reason' => 'shader_generation',
-            'balance_after' => 4,
+            'balance_after' => 5,
         ]);
     }
 
-    public function test_an_empty_balance_is_refused_rather_than_going_negative(): void
+    public function test_an_empty_balance_no_longer_stops_anyone(): void
     {
+        // The allowance is monthly and per person; the old balance is history, not a gate.
         $this->fakeGenerator();
         $user = User::factory()->create(['credits' => 0]);
 
         $this->actingAs($user)
             ->postJson('/api/v1/shaders/generate', ['description' => 'anything'])
-            ->assertStatus(402)
-            ->assertJsonPath('code', 'insufficient_credits');
+            ->assertOk();
 
         $this->assertSame(0, $user->fresh()->credits);
     }
@@ -119,9 +142,10 @@ class ShaderCreditsTest extends TestCase
             ->postJson('/api/v1/shaders/generate', ['description' => 'anything'])
             ->assertStatus(503);
 
-        // Charged then refunded, so the user is where they started and the ledger says why.
+        // Counted then refunded, so the month is where it started and the ledger says why.
         $this->assertSame(2, $user->fresh()->credits);
         $this->assertDatabaseHas('credit_transactions', ['user_id' => $user->id, 'reason' => 'refund']);
+        $this->actingAs($user)->getJson('/api/v1/credits')->assertOk()->assertJsonPath('used_this_month', 0);
     }
 
     public function test_credits_cannot_be_spent_twice_by_racing(): void
@@ -155,7 +179,8 @@ class ShaderCreditsTest extends TestCase
         $this->actingAs($user)->getJson('/api/v1/credits')
             ->assertOk()
             ->assertJsonPath('credits', 3)
-            ->assertJsonPath('cost_per_generation', 1)
+            ->assertJsonPath('cost_per_generation', 0)
+            ->assertJsonPath('monthly_limit', 100)
             ->assertJsonPath('transactions.0.reason', 'shader_generation');
     }
 
@@ -223,7 +248,7 @@ class ShaderCreditsTest extends TestCase
         $this->actingAs($user)->postJson('/api/v1/shaders/generate', ['description' => 'aurora'])->assertOk();
 
         $this->assertNull($fake->sawKey);
-        $this->assertSame(1, $user->fresh()->credits);
+        $this->assertSame(2, $user->fresh()->credits);
     }
 
     public function test_an_operator_can_refuse_to_proxy_user_keys(): void

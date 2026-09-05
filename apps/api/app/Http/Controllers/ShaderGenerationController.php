@@ -32,7 +32,9 @@ use Throwable;
 // knows, so the client decides.
 class ShaderGenerationController extends Controller
 {
-    private const COST = 1;
+    // Every server-funded generation is a ledger row, so the monthly count and any bill can
+    // never disagree; the row's amount is zero because the allowance, not a balance, is the gate.
+    private const COST = 0;
 
     public function generate(Request $request, ShaderGenerator $generator)
     {
@@ -85,17 +87,27 @@ class ShaderGenerationController extends Controller
             }
         }
 
-        // Debited before the call, not after. The generation is the thing being paid for and it
-        // costs real money the moment it is made, so a failure to bill has to stop the request
-        // rather than be noticed afterwards. Refunded below if the call itself fails, which is
-        // the case where the user got nothing.
+        // The monthly allowance: what a signed-in person gets for free. Counted from the ledger,
+        // refunds subtracted, so a failed call never costs a slot.
+        if (! $ownKey && ($monthly = (int) config('services.shader.monthly_limit')) > 0) {
+            if ($this->generationsThisMonth($user) >= $monthly) {
+                return response()->json([
+                    'message' => "You have used this month's {$monthly} free generations. The allowance resets on the 1st"
+                        .' - or add your own API key to keep going now.',
+                    'code' => 'monthly_limit',
+                    'monthly_limit' => $monthly,
+                    'resets_at' => now('UTC')->addMonthNoOverflow()->startOfMonth()->toIso8601String(),
+                    'credits' => $user->credits,
+                ], 429);
+            }
+        }
+
+        // Recorded before the call, not after: the generation costs real money the moment it is
+        // made, so the ledger row that counts it has to exist even if the response is lost.
+        // Refunded below if the call itself fails, which is the case where the user got nothing.
         $meta = ['description' => mb_substr($data['description'], 0, 200)];
-        if (! $ownKey && ! $user->moveCredits(-self::COST, 'shader_generation', $meta)) {
-            return response()->json([
-                'message' => 'You are out of credits. Add your own Anthropic API key in Settings to keep generating.',
-                'credits' => $user->credits,
-                'code' => 'insufficient_credits',
-            ], 402);
+        if (! $ownKey) {
+            $user->moveCredits(-self::COST, 'shader_generation', $meta);
         }
 
         try {
@@ -150,15 +162,30 @@ class ShaderGenerationController extends Controller
             - (clone $today)->where('reason', 'refund')->count();
     }
 
-    /** The balance and the ledger behind it. */
+    /** How many server-funded generations this user has made since the 1st of the month (UTC). */
+    private function generationsThisMonth($user): int
+    {
+        $month = $user->creditTransactions()->where('created_at', '>=', now('UTC')->startOfMonth());
+
+        return (clone $month)->where('reason', 'shader_generation')->count()
+            - (clone $month)->where('reason', 'refund')->count();
+    }
+
+    /** The allowance, the balance and the ledger behind it. */
     public function credits(Request $request)
     {
         $user = $request->user();
         $limit = (int) config('services.shader.daily_limit');
+        $monthly = (int) config('services.shader.monthly_limit');
 
         return response()->json([
             'credits' => $user->credits,
             'cost_per_generation' => self::COST,
+            // The monthly allowance, so the UI can say "37 of 100 this month" rather than
+            // surprising anyone with a 429. Zero means the operator turned the cap off.
+            'monthly_limit' => $monthly,
+            'used_this_month' => $monthly > 0 ? max(0, $this->generationsThisMonth($user)) : 0,
+            'month_resets_at' => now('UTC')->addMonthNoOverflow()->startOfMonth()->toIso8601String(),
             // The daily cap, so the UI can say "n of m today" instead of surprising anyone
             // with a 429. Zero means the operator turned the cap off.
             'daily_limit' => $limit,

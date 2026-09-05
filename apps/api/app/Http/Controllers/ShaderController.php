@@ -37,10 +37,16 @@ class ShaderController extends Controller
             // which kind of shader, and which category within it.
             'kind' => ['nullable', 'in:all,builtin,community'],
             'category' => ['nullable', 'string', 'max:60'],
+            // The caller's own collection: what they starred, whoever made it.
+            'favourites' => ['nullable', 'boolean'],
         ]);
 
         $userId = $request->user()?->id;
-        $query = Shader::query()->with('author:id,name');
+        $query = Shader::query()->with('author:id,name')->withFavouritedBy($userId);
+
+        if ($data['favourites'] ?? false) {
+            $query->whereHas('favouritedBy', fn ($q) => $q->where('users.id', $userId ?? 0));
+        }
 
         if ($data['mine'] ?? false) {
             $query->where('user_id', $userId);
@@ -90,7 +96,7 @@ class ShaderController extends Controller
     {
         abort_unless($shader->is_public || $shader->user_id === $request->user()?->id, 404);
 
-        return response()->json($shader->load('author:id,name'));
+        return response()->json(Shader::withFavouritedBy($request->user()?->id)->with('author:id,name')->findOrFail($shader->id));
     }
 
     public function store(Request $request)
@@ -136,6 +142,22 @@ class ShaderController extends Controller
         $shader->delete();
 
         return response()->noContent();
+    }
+
+    /** Puts a shader in the caller's collection. Idempotent: starring twice is one star. */
+    public function favourite(Request $request, Shader $shader)
+    {
+        abort_unless($shader->is_public || $shader->user_id === $request->user()->id, 404);
+        $shader->favouritedBy()->syncWithoutDetaching([$request->user()->id]);
+
+        return response()->json(['favourited' => true]);
+    }
+
+    public function unfavourite(Request $request, Shader $shader)
+    {
+        $shader->favouritedBy()->detach($request->user()->id);
+
+        return response()->json(['favourited' => false]);
     }
 
     /**

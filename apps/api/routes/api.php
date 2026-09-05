@@ -34,6 +34,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('shaders/{shader}', [ShaderController::class, 'update']);
         Route::delete('shaders/{shader}', [ShaderController::class, 'destroy']);
         Route::post('shaders/{shader}/used', [ShaderController::class, 'used']);
+        Route::post('shaders/{shader}/favourite', [ShaderController::class, 'favourite']);
+        Route::delete('shaders/{shader}/favourite', [ShaderController::class, 'unfavourite']);
 
         // Rate limited on top of the credit cost. Credits stop a user spending more than they
         // have; this stops a script spending a whole balance in a second and stops one account

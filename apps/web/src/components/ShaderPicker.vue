@@ -40,6 +40,8 @@ const browsing = ref(false);
 const shaders = ref<ShaderRecord[]>([]);
 const loading = ref(false);
 const search = ref("");
+// Your own collection first: the picker is where a favourite pays off.
+const onlyFavourites = ref(false);
 const chosen = ref<ShaderRecord | null>(null);
 
 /**
@@ -57,7 +59,7 @@ const total = ref(0);
 async function load(page = 1): Promise<void> {
   loading.value = true;
   try {
-    const result = await api.listShaders({ q: search.value || undefined, sort: "popular", page });
+    const result = await api.listShaders({ q: search.value || undefined, sort: "popular", page, favourites: onlyFavourites.value });
     shaders.value = page === 1 ? result.data : [...shaders.value, ...result.data];
     lastPage.value = result.last_page;
     total.value = result.total;
@@ -175,6 +177,7 @@ onMounted(() => {
     <div v-if="browsing" class="browser">
       <div class="filters">
         <input v-model="search" placeholder="Search…" @keydown.enter="load()" />
+        <label class="fav-toggle" title="Only the shaders you starred"><input v-model="onlyFavourites" type="checkbox" @change="load()" /> ★</label>
         <button @click="load()">Go</button>
         <button @click="browsing = false">Close</button>
       </div>
@@ -310,5 +313,13 @@ button {
 .more:hover {
   color: var(--accent);
   border-color: var(--accent);
+}
+.fav-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 </style>

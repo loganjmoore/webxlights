@@ -60,9 +60,13 @@ services:
       # compile rate is unmeasured, and docs/SHADER-ASSISTANT-COST.md explains why that number
       # is the one that matters. Run the corpus against it before trusting it long-term.
       - key: SHADER_PROVIDER
-        value: openai
+        value: anthropic
       - key: SHADER_MODEL
-        value: gpt-5-mini
+        value: claude-sonnet-5
+      # The free allowance per signed-in person per calendar month. Bring-your-own-key callers
+      # are not counted against it.
+      - key: SHADER_MONTHLY_LIMIT
+        value: "100"
       # R2 + SANCTUM_STATEFUL_DOMAINS are set manually in the Render dashboard
       # (bucket/domain don't exist until M0's provisioning step is approved).
 
