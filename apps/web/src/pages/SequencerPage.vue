@@ -1644,6 +1644,25 @@ async function toggleHistory(): Promise<void> {
   if (showHistory.value && store.sequence) versions.value = await api.listVersions(store.sequence.id);
 }
 
+// Automatic snapshots, the way the layout already takes them: every N minutes (the Layout
+// snapshot preference; 0 turns it off), and only if the sequence has been saved since the last
+// one. Leaving a sequence open overnight must not fill its history with identical copies.
+let autoSnapshotTimer: ReturnType<typeof setInterval> | null = null;
+let lastSnapshotRevision = -1;
+onMounted(() => {
+  const minutes = prefs.value.layoutSnapshotMinutes;
+  if (minutes <= 0) return;
+  autoSnapshotTimer = setInterval(() => {
+    const revision = store.sequence?.revision ?? -1;
+    if (revision < 0 || revision === lastSnapshotRevision) return;
+    lastSnapshotRevision = revision;
+    void snapshotNow();
+  }, minutes * 60_000);
+});
+onBeforeUnmount(() => {
+  if (autoSnapshotTimer) clearInterval(autoSnapshotTimer);
+});
+
 async function snapshotNow(): Promise<void> {
   if (!store.sequence) return;
   const v = await api.snapshotVersion(store.sequence.id);

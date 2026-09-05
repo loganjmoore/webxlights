@@ -14,6 +14,8 @@ const emit = defineEmits<{
   select: [modelId: number | null];
   move: [modelId: number, x: number, y: number, z: number];
   create: [type: string, x: number, y: number];
+  /** Right-click on a model: where, and which. The page owns the menu. */
+  contextmenu: [modelId: number, x: number, y: number];
   resize: [modelId: number, screen: { scale: number; scaleY: number; scaleZ: number; y: number }];
 }>();
 
@@ -250,9 +252,25 @@ const uniformScale = ref(false);
 // Little square grips at the corners of the selected model's box. Cubes rather than sprites or
 // screen-space quads: a cube is pickable from any camera angle, including the orbits where the
 // model's own plane is edge-on and a flat handle would vanish.
-const HANDLE_MIN_WORLD = 6;
-const HANDLE_FRACTION = 0.1; // of the smaller half-extent, so a big prop gets bigger grips
+const HANDLE_PX = 9; // on screen, whatever the zoom: a grip you can always hit
 let handleMeshes: THREE.Mesh[] = [];
+
+/**
+ * Keeps every grip the same size on screen. A grip sized in world units disappears when the
+ * camera is far away and swallows the prop when it is close; this rescales each one every frame
+ * from its distance to the camera.
+ */
+function sizeHandlesToScreen(): void {
+  if (!setup || handleMeshes.length === 0) return;
+  const camera = setup.camera;
+  const height = setup.renderer.domElement.clientHeight || 1;
+  const halfFov = (camera.fov * Math.PI) / 360;
+  for (const mesh of handleMeshes) {
+    const dist = mesh.position.distanceTo(camera.position);
+    const worldPerPx = (2 * dist * Math.tan(halfFov)) / height;
+    mesh.scale.setScalar(Math.max(worldPerPx * HANDLE_PX, 1e-3));
+  }
+}
 
 function clearHandles(): void {
   if (!setup) return;
@@ -305,11 +323,10 @@ function buildHandles(): void {
   clearHandles();
   const entry = rowEntries.find((r) => r.model.id === props.selectedModelId);
   if (!entry) return;
-  const { halfW, halfH } = worldHalfExtents(entry);
-  const size = Math.max(Math.min(halfW, halfH) * HANDLE_FRACTION, HANDLE_MIN_WORLD);
   handleMaterial = new THREE.MeshBasicMaterial({ color: 0xe8c468, depthTest: false });
   for (const corner of handleCornersFor(entry)) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), handleMaterial);
+    // Unit cubes; sizeHandlesToScreen scales them to HANDLE_PX every frame.
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), handleMaterial);
     mesh.position.copy(corner.pos);
     mesh.renderOrder = 999; // drawn over the model, so a grip inside a dense prop stays visible
     setup.scene.add(mesh);
@@ -328,8 +345,11 @@ function moveHandlesTo(entry: RowEntry): void {
 interface ResizeState {
   entry: RowEntry;
   unit: { halfW: number; halfH: number };
+  /** How far from the centre the grip was when grabbed: the resize is relative to this. */
+  grab: { halfW: number; halfH: number };
   startScaleZ: number;
   startScale: number;
+  startScaleY: number;
   changed: boolean;
 }
 let resizeState: ResizeState | null = null;
@@ -344,15 +364,18 @@ let resizeState: ResizeState | null = null;
  */
 function applyResize(hit: THREE.Vector3): void {
   if (!resizeState) return;
-  const { entry, unit, startScale, startScaleZ } = resizeState;
+  const { entry, unit, grab, startScale, startScaleY, startScaleZ } = resizeState;
   const centre = entry.pickMesh.position;
   const { scale, scaleY, scaleZ } = resizeFromCorner({
     halfWidthWorld: Math.abs(hit.x - centre.x),
     halfHeightWorld: Math.abs(hit.y - centre.y),
+    grabHalfWidthWorld: grab.halfW,
+    grabHalfHeightWorld: grab.halfH,
     unitHalfWidth: unit.halfW,
     unitHalfHeight: unit.halfH,
     unitsPerLocal: NODE_SPACING,
     startScale,
+    startScaleY,
     startScaleZ,
     uniform: uniformScale.value,
   });
@@ -485,7 +508,31 @@ function worldAt(clientX: number, clientY: number): { x: number; y: number } | n
   const hit = rayOnDepthPlane(raycaster.ray, 0);
   return hit ? { x: hit.x, y: hit.y } : null;
 }
-defineExpose({ worldAt });
+/** Plants a model's lowest point on the ground plane, and reports the move like a drag would. */
+function alignToGround(modelId: number): void {
+  const entry = rowEntries.find((r) => r.model.id === modelId);
+  if (!entry) return;
+  const next = entry.pickMesh.position.clone();
+  next.y = groundedAnchorY(groundY(), transformedHalfExtents(entry.geometry, entry.transform).halfH * NODE_SPACING);
+  applyDragPosition(entry, next);
+  moveHandlesTo(entry);
+  emit("move", entry.model.id, next.x, next.y, next.z);
+}
+
+function onContextMenu(e: MouseEvent): void {
+  const ray = pointerRay(e as unknown as PointerEvent);
+  if (!ray) return;
+  const raycaster = new THREE.Raycaster();
+  raycaster.set(ray.origin, ray.direction);
+  const hit = raycaster.intersectObjects(rowEntries.map((r) => r.pickMesh))[0];
+  if (!hit) return;
+  e.preventDefault();
+  const id = hit.object.userData.modelId as number;
+  emit("select", id);
+  emit("contextmenu", id, e.clientX, e.clientY);
+}
+
+defineExpose({ worldAt, alignToGround });
 
 function projectToScreen(p: THREE.Vector3): THREE.Vector2 | null {
   if (!setup) return null;
@@ -565,6 +612,9 @@ function applyDragPosition(entry: RowEntry, position: THREE.Vector3): void {
 }
 
 function onPointerDown(e: PointerEvent): void {
+  // The right button is the context menu's (onContextMenu picks for it); it neither drags nor
+  // counts as a click, or its release would clear the selection the menu just made.
+  if (e.button === 2) return;
   downPoint = { x: e.clientX, y: e.clientY };
   if (!setup) return;
   const ray = pointerRay(e);
@@ -577,12 +627,16 @@ function onPointerDown(e: PointerEvent): void {
   const grip = raycaster.intersectObjects(handleMeshes)[0];
   const selected = rowEntries.find((r) => r.model.id === props.selectedModelId);
   if (grip && selected) {
-    // Which corner was grabbed doesn't need recording: the new size is the distance from the
-    // model's centre to the pointer, and that is the same measurement from any of the four.
+    // Where the grip was grabbed, on the model's own depth plane: the resize is measured
+    // relative to this, so the first pixel of movement is a small change whatever the prop's size.
+    const centre = selected.pickMesh.position;
+    const grabHit = rayOnDepthPlane(ray, centre.z) ?? grip.point;
     resizeState = {
       entry: selected,
       unit: unitHalfExtents(selected),
+      grab: { halfW: Math.max(Math.abs(grabHit.x - centre.x), 1e-3), halfH: Math.max(Math.abs(grabHit.y - centre.y), 1e-3) },
       startScale: selected.transform.scale ?? 1,
+      startScaleY: selected.transform.scaleY ?? selected.transform.scale ?? 1,
       startScaleZ: selected.scaleZ,
       changed: false,
     };
@@ -643,6 +697,7 @@ function onPointerMove(e: PointerEvent): void {
 }
 
 function onPointerUp(e: PointerEvent): void {
+  if (e.button === 2) return;
   if (resizeState) {
     const { entry, changed } = resizeState;
     resizeState = null;
@@ -721,6 +776,7 @@ onMounted(() => {
 
   const animate = () => {
     orbit?.update();
+    sizeHandlesToScreen();
     if (setup) setup.renderer.render(setup.scene, setup.camera);
     rafId = requestAnimationFrame(animate);
   };
@@ -763,7 +819,7 @@ watch(() => props.selectedModelId, updateSelectionHighlight);
 </script>
 
 <template>
-  <div class="layout-canvas-3d-wrap">
+  <div class="layout-canvas-3d-wrap" @contextmenu="onContextMenu">
     <div ref="containerRef" class="layout-canvas-3d"></div>
     <div class="view-hud">
       <span class="axis-hint" :class="{ active: zAxisMode }">

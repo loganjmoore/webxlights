@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groundedAnchorY, MIN_SCALE, resizeFromCorner } from "../src/lib/resizeModel";
+import { groundedAnchorY, MIN_SCALE, RESIZE_DAMPING, resizeFromCorner } from "../src/lib/resizeModel";
 
 const base = {
   unitHalfWidth: 10,
@@ -56,5 +56,16 @@ describe("resizing a model by a corner grip", () => {
     // the new half-height so the feet stay on the lawn.
     expect(groundedAnchorY(0, 160)).toBe(160);
     expect(groundedAnchorY(-40, 160)).toBe(120);
+  });
+
+  it("grows relative to where the grip was grabbed, and more slowly than the hand moves", () => {
+    // Grabbed 40 out; pointer now 80 out: twice the distance. Damped, that is 2^0.6 = 1.52x.
+    const r = resizeFromCorner({ ...base, halfWidthWorld: 80, halfHeightWorld: 160, grabHalfWidthWorld: 40, grabHalfHeightWorld: 80 });
+    expect(r.scale).toBeCloseTo(Math.pow(2, RESIZE_DAMPING), 6);
+    expect(r.scaleY).toBeCloseTo(Math.pow(2, RESIZE_DAMPING), 6);
+    // The grip being a long way out on a tiny prop no longer matters: no movement, no change.
+    const still = resizeFromCorner({ ...base, halfWidthWorld: 40, halfHeightWorld: 80, grabHalfWidthWorld: 40, grabHalfHeightWorld: 80, startScale: 0.05, startScaleY: 0.05 });
+    expect(still.scale).toBeCloseTo(0.05, 6);
+    expect(still.scaleY).toBeCloseTo(0.05, 6);
   });
 });
