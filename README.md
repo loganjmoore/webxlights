@@ -1,6 +1,6 @@
 # webXLights
 
-Browser-based clone of xLights. See [ROADMAP.md](ROADMAP.md) for milestones and [DECISIONS.md](DECISIONS.md) for the locked stack.
+Browser-based clone of xLights. See [ROADMAP.md](ROADMAP.md) for milestones, [DECISIONS.md](DECISIONS.md) for the locked stack, [DESIGN.md](DESIGN.md) for the interface rules, and [SECURITY.md](SECURITY.md) for the security model and how to report a problem.
 
 ## Local dev
 

@@ -78,7 +78,6 @@ const emit = defineEmits<{
   // would mean two ways to be selected, and the panel reading a different one from the grid.
   selectMany: [ids: string[], reference: string | null];
   place: [row: GridRow, startMs: number, endMs: number];
-  dropEffect: [row: GridRow, name: string, startMs: number];
   // Where the dragged effects landed, on release. One event for the whole drag, so the move is one
   // undo entry rather than one per pointermove.
   moveMany: [moves: { id: string; startMs: number; endMs: number; rowIndex: number }[]];
@@ -109,11 +108,6 @@ const HEADER_HEIGHT = 24; // pinned timing-track ruler, drawn every frame regard
 const VIEWPORT_HEIGHT = 420; // fixed canvas height - only visible rows are drawn (M9 perf budget: 100 rows / 5k effects)
 const EDGE_PX = 6;
 const SNAP_PX = 6;
-
-// Must match SequencerPage.vue's palette dragstart MIME type exactly - namespaced so this
-// grid ignores any other drag source that happens to land here (matches ModelPalette.vue's
-// same convention on the Layout page, for the same reason).
-const EFFECT_DRAG_MIME = "application/x-webxlights-effect-name";
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const scrollRef = ref<HTMLDivElement | null>(null);
@@ -184,7 +178,11 @@ const canvasWidth = computed(() =>
 );
 
 function effectsForRow(row: GridRow): SequenceEffect[] {
-  const found = props.body.rows.find((r) => r.elementType === row.elementType && r.elementId === row.elementId);
+  // The sub-name matters: a model's strands and sub-models are separate rows in the body, and
+  // matching on type and id alone drew every strand's effects on every strand.
+  const found = props.body.rows.find(
+    (r) => r.elementType === row.elementType && r.elementId === row.elementId && (r.subName ?? undefined) === (row.subName ?? undefined),
+  );
   const effects = found?.effects ?? [];
   // A collapsed row shows every layer at once, which is what it always did. An expanded one shows
   // only its own, so the layers can be told apart and dragged separately.
@@ -438,7 +436,7 @@ function draw(): void {
 
   // The ghosts, over the effects but under the band: an outline hidden behind a block would look
   // like it had stopped following the pointer.
-  const ghosts = dragState?.kind === "move" ? dragState.ghosts : dragState?.kind === "resize" && dragState.ghost ? [dragState.ghost] : [];
+  const ghosts = dragState?.kind === "move" ? dragState.ghosts : dragState?.kind === "resize" && dragState.ghost ? [dragState.ghost] : dropGhost ? [dropGhost] : [];
   for (const ghost of ghosts) {
     const gy = HEADER_HEIGHT + ghost.rowIndex * height - scrollTop.value;
     if (gy + height < HEADER_HEIGHT || gy > rect.height) continue;
@@ -827,28 +825,44 @@ function onPointerUp(e: PointerEvent): void {
   dragState = null;
 }
 
-// Native HTML5 drag-and-drop from the effect palette, matching ModelPalette.vue's convention
-// on the Layout page - the same "drag a labeled control onto a canvas" gesture in both places,
-// not two different interaction models for a conceptually identical action. This is additive:
-// the existing "arm, then click-drag on the grid to size it" gesture (xLights' own placement
-// model) still works unchanged - dropping just places at a default size, resizable after, the
-// same "place with defaults" convention M13's model palette already established.
-function onDragOver(e: DragEvent): void {
-  if (!e.dataTransfer?.types.includes(EFFECT_DRAG_MIME)) return;
-  e.preventDefault();
-}
-function onDrop(e: DragEvent): void {
-  const name = e.dataTransfer?.getData(EFFECT_DRAG_MIME);
-  if (!name) return;
+// A drag from the effect palette (SequencerPage.vue owns the gesture; this draws where it lands).
+//
+// The page asks where a pointer position falls, tells the grid the effect's would-be span, and
+// the grid answers "blocked or not" and draws the outline - the same green/red ghost the manual
+// describes for moving effects, because dropping a new one is the same question.
+let dropGhost: GhostPlacement | null = null;
+
+/** The row and snapped moment under a viewport point, or null when the point is off the rows. */
+function dropTargetAt(clientX: number, clientY: number): { row: GridRow; rowIndex: number; ms: number } | null {
   const canvas = canvasRef.value;
-  if (!canvas) return;
+  if (!canvas) return null;
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left + scrollLeft.value;
-  const y = e.clientY - rect.top;
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
+  const x = clientX - rect.left + scrollLeft.value;
+  const y = clientY - rect.top;
   const hit = hitTest(x, y);
-  if (hit.kind !== "row-empty") return; // dropping onto an existing effect/ruler is a no-op, not an overwrite
-  emit("dropEffect", hit.row, name, snapMs(xToMs(x)));
+  // Over an existing effect still reports the row: the ghost turns red there, which says "not
+  // here" better than the outline vanishing would.
+  if (hit.kind !== "row-empty" && hit.kind !== "effect") return null;
+  return { row: hit.row, rowIndex: rowIndexAt(y), ms: snapMs(xToMs(x)) };
 }
+
+/** Draws the outline for a would-be drop, and says whether something is already there. */
+function showDropGhost(rowIndex: number, startMs: number, endMs: number): boolean {
+  const row = props.rows[rowIndex];
+  const blocked = !row || effectsForRow(row).some((e) => startMs < e.endMs && endMs > e.startMs);
+  dropGhost = { id: "drop", rowIndex, startMs, endMs, blocked };
+  draw();
+  return blocked;
+}
+
+function clearDropGhost(): void {
+  if (!dropGhost) return;
+  dropGhost = null;
+  draw();
+}
+
+defineExpose({ dropTargetAt, showDropGhost, clearDropGhost });
 
 onMounted(() => {
   rebuildDrawIndex();
@@ -908,8 +922,6 @@ watch(
         @pointerup="onPointerUp"
         @dblclick="onDoubleClick"
         @contextmenu="onContextMenu"
-        @dragover="onDragOver"
-        @drop="onDrop"
       ></canvas>
     </div>
   </div>

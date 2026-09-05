@@ -151,6 +151,9 @@ export interface CreditStatus {
   transactions: Array<{ amount: number; reason: string; balance_after: number; created_at: string }>;
 }
 
+/** Where a generated shader will mostly be shown; the assistant designs for that shape first. */
+export type ShaderTarget = "matrix" | "line" | "tree" | "any";
+
 export interface GeneratedShader {
   source: string;
   credits: number;
@@ -444,7 +447,7 @@ export const api = {
    * costs no credits (lib/anthropicKey.ts).
    */
   generateShader: (
-    body: { description: string; previous_source?: string; compile_error?: string },
+    body: { description: string; previous_source?: string; compile_error?: string; target?: ShaderTarget },
     credentials?: { key?: string | null; provider?: string | null; model?: string | null },
   ) => {
     const headers: Record<string, string> = {};

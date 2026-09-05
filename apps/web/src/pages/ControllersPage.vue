@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import TabNav from "../components/TabNav.vue";
+import AppBar from "../components/AppBar.vue";
+import MenuButton from "../components/MenuButton.vue";
 import { useRoute } from "vue-router";
 import { api, type ControllerProtocol, type ControllerRecord, type ControllerUpsertPayload, type ModelRecord } from "../lib/api";
 
@@ -68,14 +69,17 @@ onMounted(load);
 
 <template>
   <main class="controllers-page">
+    <AppBar :project-id="projectId" active="controllers" />
     <header>
-      <TabNav :project-id="projectId" active="controllers" />
       <h1>Controllers</h1>
-      <div class="add-buttons">
-        <button @click="addController('usb', 'USB')">Add USB</button>
-        <button @click="addController('ethernet', 'Ethernet')">Add Ethernet</button>
-        <button @click="addController('null', 'Null')">Add Null</button>
-      </div>
+      <MenuButton
+        label="Add controller"
+        :items="[
+          { label: 'Ethernet (DDP / E1.31)', run: () => addController('ethernet', 'Ethernet') },
+          { label: 'USB (serial)', run: () => addController('usb', 'USB') },
+          { label: 'Null (channels with no output)', run: () => addController('null', 'Null') },
+        ]"
+      />
     </header>
     <p v-if="error" class="error">{{ error }}</p>
 
@@ -106,7 +110,7 @@ onMounted(load);
             <td>{{ c.model ?? "—" }}</td>
           </tr>
           <tr v-if="controllers.length === 0">
-            <td colspan="6" class="empty">No controllers yet — add one above.</td>
+            <td colspan="6" class="empty">No controllers yet. Add one from the menu above.</td>
           </tr>
         </tbody>
       </table>
@@ -212,24 +216,6 @@ header h1 {
   margin: 0;
   color: #ddd;
   font-weight: 600;
-}
-.add-buttons {
-  margin-left: auto;
-  display: flex;
-  gap: 0.5rem;
-}
-.add-buttons button {
-  padding: 0.4rem 0.85rem;
-  font-size: 0.85rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: #1e1e26;
-  color: #ddd;
-  cursor: pointer;
-}
-.add-buttons button:hover {
-  border-color: #e8c468;
-  color: #e8c468;
 }
 .error {
   margin: 0;

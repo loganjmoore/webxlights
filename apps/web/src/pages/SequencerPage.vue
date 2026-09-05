@@ -12,7 +12,8 @@ import { describePapagayoImport, tracksFromPapagayo } from "../lib/papagayoTimin
 import { breakdownPhrases, breakdownWords, cellsOf, phonemesTrackName, wordsTrackName } from "../lib/lyricBreakdown";
 import { effectIcon } from "../lib/effectIcons";
 import ModalPanel from "../components/ModalPanel.vue";
-import TabNav from "../components/TabNav.vue";
+import MenuButton, { type MenuItem } from "../components/MenuButton.vue";
+import AppBar from "../components/AppBar.vue";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
 import { takePendingDemoAudio } from "../lib/demoProject";
 import { openPanelWindow, openPreviewChannel, postPreviewMessage, previewUrlFor, type PreviewMessage } from "../lib/previewChannel";
@@ -63,7 +64,7 @@ import { withFade } from "../lib/effectFade";
 import { ALIGN_MODES, alignedTo, type AlignMode } from "../lib/alignEffects";
 import { clipboardFrom, pastedAt, type EffectClipboard } from "../lib/effectClipboard";
 import { MAX_LAYERS, addLayer, canAddLayer, layerCount, layerOf, removeLayer } from "../lib/effectLayers";
-import type { WindowTarget } from "../lib/windowShortcuts";
+import { WINDOW_SHORTCUTS, type WindowTarget } from "../lib/windowShortcuts";
 import { describeCriteria, matchingEffectIds, type EffectCriteria } from "../lib/selectEffects";
 import { expandToMark, jumpTargetMs } from "../lib/expandEffect";
 import type { SequenceMetadata, SequenceRow, TimingTrack } from "../lib/api";
@@ -1089,11 +1090,95 @@ function handlePlace(row: GridRow, startMs: number, endMs: number): void {
   pendingEffectName.value = null;
 }
 
-const EFFECT_DRAG_MIME = "application/x-webxlights-effect-name";
-function onEffectDragStart(e: DragEvent, name: string): void {
-  if (!e.dataTransfer) return;
-  e.dataTransfer.setData(EFFECT_DRAG_MIME, name);
-  e.dataTransfer.effectAllowed = "copy";
+// Dragging a tile from the palette onto the grid.
+//
+// Pointer events rather than HTML5 drag-and-drop, which is what this used to be. Native DnD hands
+// the gesture to the OS: you get a washed-out screenshot of the button as the ghost, a "copy"
+// cursor with a badge, throttled position updates, and no way to draw where the effect will land
+// until the drop. With pointer capture the page owns the whole gesture - the tile lifts under the
+// pointer, the grid draws a snapped outline exactly where the effect will go (green when it fits,
+// red when something is in the way), Escape cancels - which is how a desktop editor feels.
+//
+// The existing arm-then-drag-on-the-grid gesture (which sizes the effect in one motion) is
+// untouched and still the way to place a specific length.
+const gridRef = ref<InstanceType<typeof SequencerGrid> | null>(null);
+const tileDrag = ref<{
+  name: string;
+  x: number;
+  y: number;
+  target: { row: GridRow; rowIndex: number; ms: number } | null;
+  blocked: boolean;
+} | null>(null);
+let tilePointer: { id: number; name: string; startX: number; startY: number; el: HTMLElement; started: boolean } | null = null;
+// A drag ends with a pointerup on the tile, which the browser follows with a click; that click
+// must not also arm the effect.
+let suppressTileClick = false;
+
+function onTileClick(name: string): void {
+  if (suppressTileClick) {
+    suppressTileClick = false;
+    return;
+  }
+  armEffect(name);
+}
+
+function onTilePointerDown(e: PointerEvent, name: string): void {
+  if (e.button !== 0) return;
+  const el = e.currentTarget as HTMLElement;
+  tilePointer = { id: e.pointerId, name, startX: e.clientX, startY: e.clientY, el, started: false };
+  el.setPointerCapture(e.pointerId);
+}
+
+function onTilePointerMove(e: PointerEvent): void {
+  const pointer = tilePointer;
+  if (!pointer || e.pointerId !== pointer.id) return;
+  if (!pointer.started) {
+    // Four pixels of slop, so a click that wobbles is still a click.
+    if (Math.abs(e.clientX - pointer.startX) < 4 && Math.abs(e.clientY - pointer.startY) < 4) return;
+    pointer.started = true;
+    document.body.classList.add("dragging-tile");
+    window.addEventListener("keydown", onTileDragKey, true);
+  }
+  const target = gridRef.value?.dropTargetAt(e.clientX, e.clientY) ?? null;
+  let blocked = false;
+  if (target) {
+    const { startMs, endMs } = placementAt(target.ms);
+    blocked = gridRef.value?.showDropGhost(target.rowIndex, startMs, endMs) ?? false;
+  } else {
+    gridRef.value?.clearDropGhost();
+  }
+  tileDrag.value = { name: pointer.name, x: e.clientX, y: e.clientY, target, blocked };
+}
+
+function onTilePointerUp(e: PointerEvent): void {
+  const pointer = tilePointer;
+  if (!pointer || e.pointerId !== pointer.id) return;
+  const drag = tileDrag.value;
+  if (pointer.started) {
+    suppressTileClick = true;
+    if (drag?.target && !drag.blocked) handleDropEffect(drag.target.row, drag.name, drag.target.ms);
+  }
+  finishTileDrag();
+}
+
+function onTileDragKey(e: KeyboardEvent): void {
+  if (e.key !== "Escape") return;
+  e.stopPropagation();
+  cancelTileDrag();
+}
+
+function cancelTileDrag(): void {
+  if (tilePointer?.started) suppressTileClick = true;
+  finishTileDrag();
+}
+
+function finishTileDrag(): void {
+  if (tilePointer) tilePointer.el.releasePointerCapture?.(tilePointer.id);
+  tilePointer = null;
+  tileDrag.value = null;
+  gridRef.value?.clearDropGhost();
+  document.body.classList.remove("dragging-tile");
+  window.removeEventListener("keydown", onTileDragKey, true);
 }
 
 // Kept as the fallback for anything that runs before preferences load; the preference is what
@@ -1152,9 +1237,7 @@ function placementAt(atMs: number): { startMs: number; endMs: number } {
 const MIN_EFFECT_PX = 30;
 const minimumEffectMs = computed(() => MIN_EFFECT_PX / Math.max(pxPerMs.value, 1e-9));
 
-// Native drag-and-drop from the palette (SequencerGrid.vue's onDrop). The existing arm+drag-on-grid
-// gesture (which lets you size the effect in one motion) is untouched and still the way to place a
-// specific length.
+// A tile dropped on a row (onTilePointerUp): placed at the default length, resizable after.
 function handleDropEffect(row: GridRow, name: string, startMs: number): void {
   const { startMs: from, endMs: to } = placementAt(startMs);
   store.addEffect(row.elementType, row.elementId, row.subName, {
@@ -1917,6 +2000,63 @@ function moveSelectedEffectToAdjacentRow(direction: -1 | 1): void {
   store.moveEffectToRow(id, target.elementType, target.elementId, target.subName);
 }
 
+// The header's two menus. Every panel and every export used to be its own button; twenty-two of
+// them, wrapping to two rows, all at the same weight. A desktop editor groups these under a
+// menu, and the tick says which panels are open right now.
+function windowKey(target: WindowTarget): string | undefined {
+  return WINDOW_SHORTCUTS.find((s) => s.target === target)?.keyLabel;
+}
+const anyPanelOpen = computed(
+  () =>
+    showModelsPanel.value ||
+    showViewsPanel.value ||
+    showPresetsPanel.value ||
+    showRegionsPanel.value ||
+    showTimingPanel.value ||
+    showSelectPanel.value ||
+    showHistory.value ||
+    showFppPanel.value,
+);
+const windowsMenu = computed<MenuItem[]>(() => [
+  { label: "Models", checked: showModelsPanel.value, shortcut: windowKey("models"), run: () => (showModelsPanel.value = !showModelsPanel.value) },
+  { label: "Views", checked: showViewsPanel.value, run: () => (showViewsPanel.value = !showViewsPanel.value) },
+  {
+    label: presets.value.length ? `Effect presets (${presets.value.length})` : "Effect presets",
+    checked: showPresetsPanel.value,
+    shortcut: windowKey("presets"),
+    run: () => (showPresetsPanel.value = !showPresetsPanel.value),
+  },
+  { label: "Song regions", checked: showRegionsPanel.value, run: () => (showRegionsPanel.value = !showRegionsPanel.value) },
+  { label: "Timing tracks", checked: showTimingPanel.value, disabled: !store.sequence, run: () => (showTimingPanel.value = !showTimingPanel.value) },
+  { label: "Select effects", checked: showSelectPanel.value, shortcut: windowKey("select"), disabled: !store.sequence, run: () => (showSelectPanel.value = !showSelectPanel.value) },
+  { label: "Version history", checked: showHistory.value, disabled: !store.sequence, run: () => void toggleHistory() },
+  ...(FPP_CONNECT_ENABLED
+    ? [{ label: "FPP Connect", checked: showFppPanel.value, disabled: !store.sequence, run: () => (showFppPanel.value = !showFppPanel.value) } satisfies MenuItem]
+    : []),
+  { kind: "separator" },
+  {
+    label: previewPoppedOut.value ? "House preview: bring back" : "House preview in its own window",
+    checked: previewPoppedOut.value,
+    shortcut: windowKey("housePreview"),
+    disabled: !store.sequence,
+    run: togglePreviewWindow,
+  },
+  // ponytail: only panels with a window route can be torn off; the rest are inlined in this
+  // page and share its store. Add a PanelWindowPage case per panel as each is extracted.
+  {
+    label: "Video export in its own window",
+    disabled: !store.sequence,
+    run: () => openPanelWindow(route.params.projectId as string, sequenceId.value, "video"),
+  },
+]);
+const sequenceMenu = computed<MenuItem[]>(() => [
+  { label: "Sequence settings", checked: showSettingsPanel.value, disabled: !store.sequence, run: () => (showSettingsPanel.value = !showSettingsPanel.value) },
+  { label: "Preferences", checked: showPrefsPanel.value, shortcut: windowKey("prefs"), run: () => (showPrefsPanel.value = !showPrefsPanel.value) },
+  { kind: "separator" },
+  { label: "Save a snapshot", disabled: !store.sequence, run: () => void snapshotNow() },
+  { label: "Export .fseq", disabled: !store.sequence, run: exportFseq },
+]);
+
 const commands = computed(() =>
   buildCommands({
     effectShortcuts: shortcutsInForce.value,
@@ -2266,78 +2406,68 @@ watch(sequenceId, async (id) => {
 
 <template>
   <main class="sequencer-page">
-    <header>
-      <TabNav :project-id="route.params.projectId as string" active="sequences" />
-      <h1>{{ store.sequence?.name }}</h1>
-      <div class="transport">
-        <button @click="togglePlay" :disabled="!audioLoaded">{{ playing ? "Pause" : "Play" }}</button>
-        <button @click="stop" :disabled="!audioLoaded">Stop</button>
+    <AppBar :project-id="route.params.projectId as string" active="sequences" />
+    <header class="toolbar">
+      <h1 :title="store.sequence?.name">{{ store.sequence?.name }}</h1>
+      <div class="group transport">
+        <button :disabled="!audioLoaded" :title="playing ? 'Pause (Space)' : 'Play (Space)'" @click="togglePlay">
+          {{ playing ? "Pause" : "Play" }}
+        </button>
+        <button :disabled="!audioLoaded" title="Stop" @click="stop">Stop</button>
         <span class="time" :title="`Time shown as ${prefs.timeFormat}`">{{ playheadLabel }}</span>
       </div>
-      <div class="undo">
-        <button @click="store.undo" :disabled="!store.canUndo">Undo</button>
-        <button @click="store.redo" :disabled="!store.canRedo">Redo</button>
+      <div class="group">
+        <button :disabled="!store.canUndo" title="Undo (Ctrl+Z)" @click="store.undo">Undo</button>
+        <button :disabled="!store.canRedo" title="Redo (Ctrl+Y)" @click="store.redo">Redo</button>
       </div>
-      <select v-model.number="zoomLevel" title="Zoom. Double-click the waveform to zoom in, shift+double-click to zoom out, ctrl+wheel over the grid, right-click the waveform to reset.">
-        <option v-for="(step, i) in ZOOM_STEPS" :key="i" :value="i">{{ step }}x</option>
-      </select>
-      <button @click="exportFseq" :disabled="!store.sequence">Export .fseq</button>
-      <button @click="openPreviewWindow" :disabled="!store.sequence" title="Open the house preview in its own window">
-        Pop out preview
-      </button>
-      <span v-if="analyzingAudio" class="analyzing">Analyzing audio…</span>
-      <span v-if="exportError" class="export-error">{{ exportError }}</span>
-      <button @click="snapshotNow" :disabled="!store.sequence">Snapshot</button>
-      <button @click="toggleHistory" :disabled="!store.sequence">History</button>
-      <select
-        v-model="activeViewName"
-        title="Which view the grid is showing. The Master View is every row."
-        :disabled="rows.length === 0"
-      >
-        <option :value="null">Master View</option>
-        <option v-for="v in views" :key="v.name" :value="v.name">{{ v.name }}</option>
-      </select>
-      <button title="Command palette (Ctrl+Shift+K)" @click="paletteOpen = true">⌘K</button>
-      <button :class="{ active: showSelectPanel }" @click="showSelectPanel = !showSelectPanel" :disabled="!store.sequence">
-        Select effects
-      </button>
-      <button :class="{ active: showSettingsPanel }" @click="showSettingsPanel = !showSettingsPanel" :disabled="!store.sequence">
-        Sequence settings
-      </button>
-      <button :class="{ active: showPrefsPanel }" @click="showPrefsPanel = !showPrefsPanel">Preferences</button>
-      <button :class="{ active: showRegionsPanel }" @click="showRegionsPanel = !showRegionsPanel">
-        Regions{{ currentRegion ? `: ${currentRegion.name}` : "" }}
-      </button>
-      <button :class="{ active: showViewsPanel }" @click="showViewsPanel = !showViewsPanel">Views</button>
-      <button :class="{ active: showPresetsPanel }" @click="showPresetsPanel = !showPresetsPanel">
-        Presets{{ presets.length ? ` (${presets.length})` : "" }}
-      </button>
-      <button :class="{ active: showModelsPanel }" @click="showModelsPanel = !showModelsPanel">
-        Models{{ hiddenRowKeys.size ? ` (${visibleRows.length}/${rows.length})` : "" }}
-      </button>
-      <button :class="{ active: showTimingPanel }" @click="showTimingPanel = !showTimingPanel" :disabled="!store.sequence">Timing</button>
-      <button v-if="FPP_CONNECT_ENABLED" @click="showFppPanel = !showFppPanel" :disabled="!store.sequence">FPP Connect</button>
-      <!-- A range you can't see the edges of is a range you can't get rid of, and shift-dragging
-           a new one over it isn't obvious enough to be the only way out. -->
-      <span v-if="playRange" class="play-range">
-        Looping {{ formatTime(playRange.startMs, prefs.timeFormat, store.sequence?.frame_ms) }}–{{
-          formatTime(playRange.endMs, prefs.timeFormat, store.sequence?.frame_ms)
-        }}
-        <button title="Play the whole sequence again" @click="clearPlayRange">×</button>
-      </span>
-      <!-- Which timing track is in force. xLights' manual leans on this being a choice ("if no
-           timing track is selected..."), and it decides where a dropped effect lands, what
-           snapping snaps to, and which track a new mark goes on. -->
-      <label v-if="store.body.timingTracks.length" class="active-track">
-        Timing
-        <select :value="activeTrackIndex" @change="activeTrackIndex = Number(($event.target as HTMLSelectElement).value)">
-          <option v-for="(track, i) in store.body.timingTracks" :key="i" :value="i">{{ track.name }}</option>
-          <option :value="-1">All tracks</option>
+      <div class="group">
+        <select v-model.number="zoomLevel" title="Zoom. Ctrl+wheel over the grid, double-click the waveform to zoom in, shift+double-click to zoom out, right-click the waveform to reset.">
+          <option v-for="(step, i) in ZOOM_STEPS" :key="i" :value="i">{{ step }}x</option>
         </select>
-      </label>
-      <!-- Forty new marks and none at all look identical on a dense ruler, so dividing says which
-           it was rather than leaving you to count. -->
-      <span v-if="timingNotice" class="play-range">{{ timingNotice }}</span>
+        <select
+          v-model="activeViewName"
+          title="Which view the grid is showing. The Master View is every row."
+          :disabled="rows.length === 0"
+        >
+          <option :value="null">Master View</option>
+          <option v-for="v in views" :key="v.name" :value="v.name">{{ v.name }}</option>
+        </select>
+        <!-- Which timing track is in force. xLights' manual leans on this being a choice ("if no
+             timing track is selected..."), and it decides where a dropped effect lands, what
+             snapping snaps to, and which track a new mark goes on. -->
+        <select
+          v-if="store.body.timingTracks.length"
+          :value="activeTrackIndex"
+          title="Which timing track placement and snapping follow"
+          @change="activeTrackIndex = Number(($event.target as HTMLSelectElement).value)"
+        >
+          <option v-for="(track, i) in store.body.timingTracks" :key="i" :value="i">Timing: {{ track.name }}</option>
+          <option :value="-1">Timing: all tracks</option>
+        </select>
+      </div>
+      <div class="group">
+        <MenuButton label="Windows" :items="windowsMenu" :active="anyPanelOpen" />
+        <MenuButton label="Sequence" :items="sequenceMenu" />
+        <button title="Command palette (Ctrl+Shift+K)" @click="paletteOpen = true">⌘K</button>
+      </div>
+      <div class="status">
+        <span v-if="analyzingAudio" class="analyzing">Analyzing audio…</span>
+        <span v-if="exportError" class="export-error">{{ exportError }}</span>
+        <!-- A range you can't see the edges of is a range you can't get rid of, and shift-dragging
+             a new one over it isn't obvious enough to be the only way out. -->
+        <span v-if="playRange" class="play-range">
+          Looping {{ formatTime(playRange.startMs, prefs.timeFormat, store.sequence?.frame_ms) }}–{{
+            formatTime(playRange.endMs, prefs.timeFormat, store.sequence?.frame_ms)
+          }}
+          <button title="Play the whole sequence again" @click="clearPlayRange">×</button>
+        </span>
+        <!-- Forty new marks and none at all look identical on a dense ruler, so dividing says which
+             it was rather than leaving you to count. -->
+        <span v-if="timingNotice" class="play-range">{{ timingNotice }}</span>
+        <button v-if="currentRegion" class="region-chip" title="Song regions" @click="showRegionsPanel = true">
+          {{ currentRegion.name }}
+        </button>
+      </div>
       <span class="save-status">{{ store.saveStatus }}</span>
     </header>
 
@@ -2355,7 +2485,7 @@ watch(sequenceId, async (id) => {
       </div>
     </div>
 
-    <ModalPanel v-if="showTimingPanel" wide title="Timing tracks" @close="showTimingPanel = false">
+    <ModalPanel v-if="showTimingPanel" id="timing" wide title="Timing tracks" @close="showTimingPanel = false">
       <div class="timing-panel">
       <!-- Tracks could be created and never removed, and creating one is a single click: a fixed
            interval, a metronome and an onset detection each add one. -->
@@ -2468,7 +2598,7 @@ watch(sequenceId, async (id) => {
       </div>
     </ModalPanel>
 
-    <ModalPanel v-if="showFppPanel" title="FPP Connect" @close="showFppPanel = false">
+    <ModalPanel v-if="showFppPanel" id="fpp" title="FPP Connect" @close="showFppPanel = false">
       <div class="fpp-panel">
       <template v-if="!fppChromiumCapable">
         <p>
@@ -2502,7 +2632,7 @@ watch(sequenceId, async (id) => {
       <button @click="store.takeTheirs">Take theirs</button>
     </div>
 
-    <ModalPanel v-if="showHistory" title="Version history" @close="showHistory = false">
+    <ModalPanel v-if="showHistory" id="history" title="Version history" @close="showHistory = false">
       <div class="history-panel">
       <h2>Version history</h2>
       <ul>
@@ -2519,7 +2649,7 @@ watch(sequenceId, async (id) => {
     <EffectWheel
       :shortcuts="shortcutsInForce" v-if="wheel" :x="wheel.x" :y="wheel.y" @pick="placeFromWheel" @close="wheel = null" />
 
-    <ModalPanel v-if="showRegionsPanel" title="Song regions" @close="showRegionsPanel = false">
+    <ModalPanel v-if="showRegionsPanel" id="regions" title="Song regions" @close="showRegionsPanel = false">
       <div class="models-panel">
       <div class="models-panel-head">
         <h2>Song structure</h2>
@@ -2577,7 +2707,7 @@ watch(sequenceId, async (id) => {
       </div>
     </ModalPanel>
 
-    <ModalPanel v-if="showPrefsPanel" title="Preferences" @close="showPrefsPanel = false">
+    <ModalPanel v-if="showPrefsPanel" id="prefs" title="Preferences" @close="showPrefsPanel = false">
       <div class="models-panel">
       <div class="models-panel-head"><h2>Preferences</h2></div>
       <p class="timing-note">
@@ -2845,7 +2975,7 @@ watch(sequenceId, async (id) => {
     </ModalPanel>
 
     <!-- xLights' Select Effect window: "select effects based on type, model, and time". -->
-    <ModalPanel v-if="showSelectPanel" wide title="Select effects" @close="showSelectPanel = false">
+    <ModalPanel v-if="showSelectPanel" id="select" wide title="Select effects" @close="showSelectPanel = false">
       <div class="models-panel">
       <div class="models-panel-head"><h2>Select effects</h2></div>
       <label class="blend-row">
@@ -2880,7 +3010,7 @@ watch(sequenceId, async (id) => {
 
     <!-- xLights' Sequence Settings dialog. The Info/Media and Metadata tabs; its Timings tab is
          the Timing panel here, and Data Layers and Images have nothing behind them yet. -->
-    <ModalPanel v-if="showSettingsPanel" wide title="Sequence settings" @close="showSettingsPanel = false">
+    <ModalPanel v-if="showSettingsPanel" id="settings" wide title="Sequence settings" @close="showSettingsPanel = false">
       <div class="models-panel">
       <div class="models-panel-head">
         <h2>Sequence settings</h2>
@@ -2937,7 +3067,7 @@ watch(sequenceId, async (id) => {
       </div>
     </ModalPanel>
 
-    <ModalPanel v-if="showPresetsPanel" title="Effect presets" @close="showPresetsPanel = false">
+    <ModalPanel v-if="showPresetsPanel" id="presets" title="Effect presets" @close="showPresetsPanel = false">
       <div class="models-panel">
       <div class="models-panel-head">
         <h2>Effect presets</h2>
@@ -2987,7 +3117,7 @@ watch(sequenceId, async (id) => {
       </div>
     </ModalPanel>
 
-    <ModalPanel v-if="showViewsPanel" title="Views" @close="showViewsPanel = false">
+    <ModalPanel v-if="showViewsPanel" id="views" title="Views" @close="showViewsPanel = false">
       <div class="models-panel">
       <div class="models-panel-head">
         <h2>Views</h2>
@@ -3046,7 +3176,7 @@ watch(sequenceId, async (id) => {
       </div>
     </ModalPanel>
 
-    <ModalPanel v-if="showModelsPanel" wide title="Models" @close="showModelsPanel = false">
+    <ModalPanel v-if="showModelsPanel" id="models" wide title="Models" @close="showModelsPanel = false">
       <div class="models-panel">
       <div class="models-panel-head">
         <h2>Rows shown on the grid</h2>
@@ -3084,30 +3214,47 @@ watch(sequenceId, async (id) => {
       @ended="playing = false"
     ></audio>
 
-    <div class="palette">
-      <div class="palette-buttons">
-        <span class="palette-label">Effects:</span>
+    <div class="palette" role="toolbar" aria-label="Effects">
+      <div class="palette-tiles">
         <button
           v-for="name in Object.keys(EFFECT_SCHEMAS)"
           :key="name"
-          class="effect-btn"
-          draggable="true"
-          :title="name"
+          type="button"
+          class="effect-tile"
+          :title="`${name} — click to arm, or drag onto a row`"
           :aria-label="name"
-          :class="{ armed: pendingEffectName === name }"
-          @click="armEffect(name)"
-          @dragstart="onEffectDragStart($event, name)"
+          :aria-pressed="pendingEffectName === name"
+          :class="{ armed: pendingEffectName === name, lifted: tileDrag?.name === name }"
+          @click="onTileClick(name)"
+          @pointerdown="onTilePointerDown($event, name)"
+          @pointermove="onTilePointerMove"
+          @pointerup="onTilePointerUp"
+          @pointercancel="cancelTileDrag"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" v-html="effectIcon(name)"></svg>
+          <span class="tile-label">{{ name }}</span>
         </button>
       </div>
       <!-- Always rendered (visibility, not v-if) so arming/disarming never changes the palette's
            height - a v-if here used to reflow the whole grid below by ~90px every time an effect
            got armed, moving the exact row a user was about to drag on out from under their cursor. -->
       <p class="hint" :class="{ visible: !!pendingEffectName }">
-        Drag "{{ pendingEffectName }}" onto a row to place it, or drag its palette button directly onto the grid.
+        "{{ pendingEffectName }}" is armed: drag out its length on a row. Or drag any tile straight onto the grid.
       </p>
     </div>
+    <!-- The thing being dragged, lifted under the pointer. The grid draws where it will land. -->
+    <Teleport to="body">
+      <div
+        v-if="tileDrag"
+        class="drag-proxy"
+        :class="{ over: tileDrag.target !== null, blocked: tileDrag.blocked }"
+        :style="{ left: `${tileDrag.x}px`, top: `${tileDrag.y}px` }"
+        aria-hidden="true"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" v-html="effectIcon(tileDrag.name)"></svg>
+        <span>{{ tileDrag.name }}</span>
+      </div>
+    </Teleport>
 
     <div class="editor">
       <div class="timeline">
@@ -3142,6 +3289,7 @@ watch(sequenceId, async (id) => {
             :colors="uiColors"
           />
           <SequencerGrid
+            ref="gridRef"
             :rows="visibleRows"
             :body="store.body"
             :duration-ms="store.sequence?.duration_ms ?? 0"
@@ -3159,7 +3307,6 @@ watch(sequenceId, async (id) => {
             @wheel="openWheel"
             @row-expand="toggleRowExpanded"
             @place="handlePlace"
-            @drop-effect="handleDropEffect"
             @move-many="handleMoves"
             @fade="handleFade"
             @seek="seekTo"
@@ -3212,58 +3359,77 @@ watch(sequenceId, async (id) => {
 .sequencer-page a {
   color: #e8c468;
 }
-header {
-  padding: 0.6rem 1rem;
-  border-bottom: 1px solid #333;
+.toolbar {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  row-gap: 0.4rem;
-  column-gap: 1rem;
-  background: #16161c;
+  row-gap: 0.3rem;
+  column-gap: 0.75rem;
+  background: var(--bg-panel);
+  text-align: left;
 }
-header h1 {
-  font-size: 1rem;
-  margin: 0;
-  color: #ddd;
+.toolbar h1 {
+  font-size: 0.95rem;
+  margin: 0 0.25rem 0 0;
+  color: var(--text);
   font-weight: 600;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-header button,
+.group {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.toolbar button,
 .fpp-row button,
 .history-panel button,
 .conflict-banner button {
-  padding: 0.35rem 0.7rem;
+  padding: 0.3rem 0.65rem;
   font-size: 0.8rem;
   white-space: nowrap;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: #1e1e26;
-  color: #ddd;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
   cursor: pointer;
 }
-header button:hover:not(:disabled),
+.toolbar button:hover:not(:disabled),
 .fpp-row button:hover:not(:disabled),
 .history-panel button:hover:not(:disabled),
 .conflict-banner button:hover {
-  border-color: #e8c468;
-  color: #e8c468;
+  border-color: var(--accent);
+  color: var(--accent);
 }
-header button:disabled {
-  color: #555;
+.toolbar button:disabled {
+  color: var(--text-dim);
   cursor: default;
 }
-header select {
+.toolbar select {
   padding: 0.3rem 0.4rem;
   font-size: 0.8rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: #1e1e26;
-  color: #ddd;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
+  max-width: 12rem;
 }
-.transport,
-.undo {
+.status {
   display: flex;
-  gap: 0.4rem;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.region-chip {
+  font-size: 0.7rem !important;
+  padding: 0.15rem 0.5rem !important;
+  color: var(--info) !important;
+  border-color: transparent !important;
+  background: rgba(106, 159, 216, 0.12) !important;
 }
 .time {
   font-variant-numeric: tabular-nums;
@@ -3473,58 +3639,70 @@ header button.active {
   color: #aaa;
 }
 .palette {
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid #333;
+  padding: 0.4rem 0.75rem 0.3rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
 }
-.palette-buttons {
+.palette-tiles {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.2rem;
 }
-/* Square, so forty-eight of them make an even grid rather than a ragged block of names whose
-   width depends on how long each effect happens to be called. */
-.palette-buttons button.effect-btn {
+/* A tile is a picture with its name under it, so the row you reach for is a toolbox rather than
+   a line of glyphs you have to hover to decode. Fixed width, so forty-eight of them make an even
+   grid whatever the names happen to be. */
+.palette-tiles .effect-tile {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 4px;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: #1e1e26;
-  color: #ddd;
+  gap: 1px;
+  width: 52px;
+  padding: 4px 2px 3px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
   cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: background 120ms ease-out, color 120ms ease-out, transform 120ms ease-out;
 }
-.palette-buttons button.effect-btn svg {
-  width: 100%;
-  height: 100%;
-  pointer-events: none; /* the button owns the drag, not the glyph inside it */
+.palette-tiles .effect-tile svg {
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
 }
-.palette-buttons button:hover {
-  border-color: #e8c468;
-  color: #e8c468;
+.tile-label {
+  max-width: 100%;
+  font-size: 0.6rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
-.palette-buttons button:active {
+.palette-tiles .effect-tile:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.palette-tiles .effect-tile:active {
   cursor: grabbing;
 }
-.palette-label {
-  color: #888;
-  font-size: 0.8rem;
+.palette-tiles .effect-tile.lifted {
+  opacity: 0.35;
 }
-.palette button.armed {
-  background: #e8c468;
-  color: #111;
-  border-color: #e8c468;
+.palette-tiles .effect-tile.armed {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
 }
 /* Reserved height always present (visibility, not display:none) - see the template comment:
    arming an effect must never change the palette's height, or the grid below jumps under the
    user's cursor mid-interaction. */
 .hint {
-  margin: 0.35rem 0 0;
-  color: #e8c468;
-  font-size: 0.8rem;
+  margin: 0.25rem 0 0;
+  color: var(--accent);
+  font-size: 0.75rem;
   line-height: 1.3;
   visibility: hidden;
 }

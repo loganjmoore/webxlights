@@ -1,1 +1,1005 @@
-[]
+[
+  {
+    "builtin_key": "aurora-curtain",
+    "name": "Aurora Curtain",
+    "description": "Curtains of aurora rippling slowly across the sky, bright at the base",
+    "source": "/*{\n  \"DESCRIPTION\": \"Curtains of aurora rippling slowly across the sky, bright at the base\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [0.1, 1.0, 0.4, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.6, 0.1, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"folds\", \"TYPE\": \"float\", \"MIN\": 1.0, \"MAX\": 8.0, \"DEFAULT\": 4.0 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float t = mod(TIME * speed, 62.831853);\n  float x = uv.x * folds;\n  // The folds of the curtain: a slow large wave with a faster ripple over it. Whole tenths for\n  // every frequency, so the twenty-pi wrap is seamless.\n  float fold = 0.5 + 0.5 * sin(x * 1.9 + t * 0.7 + sin(x * 0.7 - t * 0.4) * 2.0);\n  fold = fold * 0.65 + 0.35 * (0.5 + 0.5 * sin(x * 4.3 - t * 1.1));\n  float y = isLine ? 0.3 : uv.y;\n  // Brightest at the base, thinning towards the top of the sky.\n  float base = 1.0 - smoothstep(0.0, 1.1, y);\n  float lum = clamp(fold * 1.3 * (0.35 + base), 0.0, 1.0);\n  // Green at the foot, violet higher up - two flat zones with a narrow edge, not a gradient.\n  vec3 col = mix(colorA.rgb, colorB.rgb, smoothstep(0.42, 0.62, y + 0.15 * fold));\n  gl_FragColor = vec4(col * (0.3 + 0.7 * lum), 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          0.1,
+          1,
+          0.4,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          0.6,
+          0.1,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "folds",
+        "type": "float",
+        "min": 1,
+        "max": 8,
+        "default": 4
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Motion background"
+    ],
+    "prompt": "curtains of aurora rippling slowly across the sky, green and violet, bright at the base",
+    "family": "motion-background"
+  },
+  {
+    "builtin_key": "candy-cane",
+    "name": "Candy Cane",
+    "description": "Red and white candy cane stripes spiralling steadily along the display",
+    "source": "/*{\n  \"DESCRIPTION\": \"Red and white candy cane stripes spiralling steadily along the display\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.05, 0.05, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"stripes\", \"TYPE\": \"float\", \"MIN\": 2.0, \"MAX\": 12.0, \"DEFAULT\": 5.0 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  // Wrapped so the scroll never loses precision; 100 * 0.5 is whole, so the wrap is seamless.\n  float t = mod(TIME * speed, 100.0);\n  // Diagonal on a matrix, straight along a line: the stripe still travels the same way.\n  float d = isLine ? uv.x : (uv.x * aspect + uv.y) / (aspect + 1.0);\n  float v = fract(d * stripes - t * 0.5);\n  // 0 in the middle of a stripe, 1 at its edges; a pixel and a half of softening so neighbouring\n  // bulbs on a roofline never sit at opposite brightness.\n  float s = abs(v - 0.5) * 2.0;\n  float aa = 1.5 * stripes / max(RENDERSIZE.x, 8.0);\n  float band = smoothstep(0.5 + aa, 0.5 - aa, s);\n  gl_FragColor = vec4(mix(colorB.rgb, colorA.rgb, band), 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          0.05,
+          0.05,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "stripes",
+        "type": "float",
+        "min": 2,
+        "max": 12,
+        "default": 5
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Light show"
+    ],
+    "prompt": "red and white candy cane stripes spiralling slowly along the whole display",
+    "family": "light-show-canon"
+  },
+  {
+    "builtin_key": "checker-slide",
+    "name": "Checker Slide",
+    "description": "Big bold checkerboard squares sliding steadily sideways",
+    "source": "/*{\n  \"DESCRIPTION\": \"Big bold checkerboard squares sliding steadily sideways\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.1, 0.1, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.1, 0.8, 0.2, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"squares\", \"TYPE\": \"float\", \"MIN\": 2.0, \"MAX\": 8.0, \"DEFAULT\": 4.0 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  // 100 * 0.5 is whole, so the slide never jumps when the clock wraps.\n  float t = mod(TIME * speed, 100.0);\n  // Square squares: the count runs across the width, and the height gets as many as fit.\n  float cx = uv.x * squares + t * 0.5;\n  float cy = uv.y * squares / max(aspect, 0.25);\n  float parity = mod(floor(cx) + floor(cy), 2.0);\n  // A one-pixel dark seam between squares, so the board reads as squares and never blends two\n  // palette colours through a muddy edge.\n  float aaX = 1.2 * squares / max(RENDERSIZE.x, 8.0);\n  float aaY = 1.2 * squares / max(aspect, 0.25) / max(RENDERSIZE.y, 8.0);\n  float fx = fract(cx);\n  float fy = fract(cy);\n  float seam = smoothstep(0.0, aaX, fx) * smoothstep(1.0, 1.0 - aaX, fx) * smoothstep(0.0, aaY, fy) * smoothstep(1.0, 1.0 - aaY, fy);\n  // On a line the seams would be dark bulbs between bright ones, so there the squares just butt.\n  if (RENDERSIZE.y < 2.0) seam = 1.0;\n  vec3 col = mix(colorA.rgb, colorB.rgb, parity);\n  gl_FragColor = vec4(col * (0.15 + 0.85 * seam), 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          0.1,
+          0.1,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          0.1,
+          0.8,
+          0.2,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "squares",
+        "type": "float",
+        "min": 2,
+        "max": 8,
+        "default": 4
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Light show"
+    ],
+    "prompt": "big bold checkerboard squares sliding steadily sideways",
+    "family": "light-show-canon"
+  },
+  {
+    "builtin_key": "colour-wash",
+    "name": "Colour Wash",
+    "description": "The whole display washing slowly from one colour to the next, always bright",
+    "source": "/*{\n  \"DESCRIPTION\": \"The whole display washing slowly from one colour to the next, always bright\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.1, 0.1, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.1, 0.9, 0.2, 1.0] },\n    { \"NAME\": \"colorC\", \"TYPE\": \"color\", \"DEFAULT\": [0.1, 0.4, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"sweep\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 0.5, \"DEFAULT\": 0.15 }\n  ]\n}*/\nvec3 pick(float i) {\n  if (i < 0.5) return colorA.rgb;\n  if (i < 1.5) return colorB.rgb;\n  return colorC.rgb;\n}\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  // 100 * 0.1 is whole, so the cycle never jumps when the clock wraps.\n  float t = mod(TIME * speed, 100.0);\n  // The wash sweeps diagonally across the display rather than switching everywhere at once.\n  float d = (uv.x * aspect + uv.y) / (aspect + 1.0);\n  float phase = fract(t * 0.1 - d * sweep) * 3.0;\n  float idx = floor(phase);\n  float next = mod(idx + 1.0, 3.0);\n  // Each colour holds for most of its third, then crosses to the next in a short, bright fade\n  // rather than a long slide through the muddy midpoint.\n  float k = smoothstep(0.8, 1.0, fract(phase));\n  vec3 col = mix(pick(idx), pick(next), k);\n  gl_FragColor = vec4(col, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          0.1,
+          0.1,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          0.1,
+          0.9,
+          0.2,
+          1
+        ]
+      },
+      {
+        "name": "colorC",
+        "type": "color",
+        "default": [
+          0.1,
+          0.4,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "sweep",
+        "type": "float",
+        "min": 0,
+        "max": 0.5,
+        "default": 0.15
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Light show"
+    ],
+    "prompt": "the whole display washing slowly from one colour to the next, always bright, never muddy in between",
+    "family": "light-show-canon"
+  },
+  {
+    "builtin_key": "comet-chase",
+    "name": "Comet Chase",
+    "description": "A bright comet with a long glowing tail chasing itself around the display",
+    "source": "/*{\n  \"DESCRIPTION\": \"A bright comet with a long glowing tail chasing itself around the display\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [0.1, 0.4, 1.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"tailLength\", \"TYPE\": \"float\", \"MIN\": 0.2, \"MAX\": 0.9, \"DEFAULT\": 0.7 },\n    { \"NAME\": \"glow\", \"TYPE\": \"float\", \"MIN\": 0.0, \"MAX\": 0.4, \"DEFAULT\": 0.22 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);\n  // 20 pi: one orbit per 2 pi seconds at speed 1, and the wrap lands exactly on a whole orbit.\n  float t = mod(TIME * speed, 62.831853);\n\n  float back;   // how far behind the head this pixel is, 0..1 around the loop\n  float onPath; // 1 on the comet's track, 0 off it\n  float head;   // the bright head itself\n  if (isLine) {\n    float pos = fract(t / 6.2831853);\n    back = fract(pos - uv.x);\n    onPath = 1.0;\n    head = smoothstep(0.06, 0.0, abs(uv.x - pos));\n  } else {\n    float r = length(p);\n    float radius = 0.34 * min(aspect, 1.0);\n    float a = atan(p.y, p.x);\n    back = fract((t - a) / 6.2831853);\n    onPath = smoothstep(0.14, 0.04, abs(r - radius));\n    vec2 headPos = vec2(cos(t), sin(t)) * radius;\n    head = smoothstep(0.13, 0.0, length(p - headPos));\n  }\n  // The tail is what moves: it is a function of the head's position, so it reaches the output.\n  float tail = pow(clamp(1.0 - back / tailLength, 0.0, 1.0), 2.2) * onPath;\n  vec3 col = colorA.rgb * (tail + glow);\n  col = mix(col, colorB.rgb, head);\n  gl_FragColor = vec4(col, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          0.1,
+          0.4,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "tailLength",
+        "type": "float",
+        "min": 0.2,
+        "max": 0.9,
+        "default": 0.7
+      },
+      {
+        "name": "glow",
+        "type": "float",
+        "min": 0,
+        "max": 0.4,
+        "default": 0.22
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Light show"
+    ],
+    "prompt": "a bright comet with a long glowing tail chasing itself around the display, the head much brighter than the tail",
+    "family": "light-show-canon"
+  },
+  {
+    "builtin_key": "expanding-rings",
+    "name": "Expanding Rings",
+    "description": "Bright rings expanding outward from the centre one after another",
+    "source": "/*{\n  \"DESCRIPTION\": \"Bright rings expanding outward from the centre one after another\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.1, 0.1, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.1, 0.4, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"count\", \"TYPE\": \"float\", \"MIN\": 1.0, \"MAX\": 8.0, \"DEFAULT\": 3.0 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  // Centred and aspect-corrected: a ring is a ring on a wide panel, and on a line it is a pair\n  // of pulses running out from the middle.\n  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);\n  float t = mod(TIME * speed, 100.0);\n  // A line is one pixel tall, so its \"radius\" is just the distance from the middle of it.\n  float d = RENDERSIZE.y < 2.0 ? abs(uv.x - 0.5) * 2.0 : length(p);\n  // The wave itself is what moves. 100 * 0.5 is whole, so the wrap is seamless.\n  float ring = fract(d * count - t * 0.5);\n  // Softer on a line, where the ring is bulbs in a row and a hard edge is a flicker.\n  float aa = (RENDERSIZE.y < 2.0 ? 3.0 : 1.5) * count / max(RENDERSIZE.x, 8.0);\n  float band = smoothstep(0.55 + aa, 0.55 - aa, ring) * smoothstep(0.1 - aa, 0.1 + aa, ring);\n  // Alternate rings take alternate palette colours, flat, never mixed through a midpoint.\n  float which = step(0.5, fract((d * count - t * 0.5) * 0.5));\n  vec3 col = mix(colorA.rgb, colorB.rgb, which);\n  // Fade with distance so the newest ring is the brightest, but never below what reads at night.\n  float fade = 0.6 + 0.4 * (1.0 - smoothstep(0.0, 0.75, d));\n  gl_FragColor = vec4(col * band * fade, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          0.1,
+          0.1,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          0.1,
+          0.4,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "count",
+        "type": "float",
+        "min": 1,
+        "max": 8,
+        "default": 3
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Geometric"
+    ],
+    "prompt": "bright rings expanding outward from the centre one after another and fading at the edge",
+    "family": "geometric"
+  },
+  {
+    "builtin_key": "firelight",
+    "name": "Firelight",
+    "description": "The warm restless flicker of firelight in deep orange and gold",
+    "source": "/*{\n  \"DESCRIPTION\": \"The warm restless flicker of firelight in deep orange and gold\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.25, 0.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.8, 0.15, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"height\", \"TYPE\": \"float\", \"MIN\": 0.4, \"MAX\": 1.5, \"DEFAULT\": 0.9 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float t = mod(TIME * speed, 62.831853);\n  // Sums of sines rather than a hash: every frequency is a whole number of tenths, so the\n  // twenty-pi wrap is seamless and nothing ever loses precision.\n  float x = uv.x * 6.0;\n  float y = isLine ? 0.5 : uv.y;\n  float n = sin(x * 1.3 + t * 1.7) * 0.5 + sin(x * 2.9 - t * 2.3 + y * 4.0) * 0.3 + sin(y * 7.0 - t * 3.1 + x * 0.7) * 0.4;\n  n = 0.5 + 0.5 * n / 1.2;\n  // Hot at the bottom, dying out towards the top; on a line the whole strip is the fire's base.\n  float rise = isLine ? 0.65 : clamp(1.0 - uv.y / height, 0.0, 1.0);\n  float heat = clamp(rise * (0.55 + 0.9 * n), 0.0, 1.0);\n  // Never dim enough to read as off: the coals always glow.\n  float lit = 0.35 + 0.65 * smoothstep(0.1, 0.8, heat);\n  vec3 col = mix(colorA.rgb, colorB.rgb, smoothstep(0.55, 0.85, heat));\n  gl_FragColor = vec4(col * lit, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          0.25,
+          0,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          0.8,
+          0.15,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "height",
+        "type": "float",
+        "min": 0.4,
+        "max": 1.5,
+        "default": 0.9
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Light show"
+    ],
+    "prompt": "the warm flicker of firelight, deep orange and gold, restless but never strobing",
+    "family": "light-show-canon"
+  },
+  {
+    "builtin_key": "flag-wave",
+    "name": "Flag Wave",
+    "description": "A red white and blue flag rippling in a steady breeze",
+    "source": "/*{\n  \"DESCRIPTION\": \"A red white and blue flag rippling in a steady breeze\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.05, 0.05, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"colorC\", \"TYPE\": \"color\", \"DEFAULT\": [0.05, 0.15, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"stripes\", \"TYPE\": \"float\", \"MIN\": 3.0, \"MAX\": 13.0, \"DEFAULT\": 7.0 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float t = mod(TIME * speed, 62.831853);\n  // The breeze: a wave travelling along the flag, and the cloth's shading follows its slope.\n  float phase = uv.x * 8.0 - t * 2.0;\n  float wave = sin(phase);\n  float shade = 0.72 + 0.28 * cos(phase + 0.8);\n  vec3 col;\n  if (isLine) {\n    // A line shows the stripes running along it, carried by the same breeze.\n    float s = mod(floor(fract(uv.x - t * 0.05) * stripes), 2.0);\n    col = mix(colorA.rgb, colorB.rgb, s);\n  } else {\n    float yy = uv.y + 0.035 * wave;\n    float s = mod(floor(clamp(yy, 0.0, 0.999) * stripes), 2.0);\n    col = mix(colorA.rgb, colorB.rgb, s);\n    // The canton, top left, with a few stars in it.\n    if (uv.x < 0.42 && yy > 0.53) {\n      vec2 cell = floor(vec2(uv.x / 0.42, (yy - 0.53) / 0.47) * vec2(4.0, 3.0));\n      vec2 local = fract(vec2(uv.x / 0.42, (yy - 0.53) / 0.47) * vec2(4.0, 3.0)) - 0.5;\n      float star = smoothstep(0.22, 0.1, length(local)) * step(0.5, mod(cell.x + cell.y + 1.0, 2.0));\n      col = mix(colorC.rgb, colorB.rgb, star);\n    }\n  }\n  gl_FragColor = vec4(col * shade, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          0.05,
+          0.05,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "colorC",
+        "type": "color",
+        "default": [
+          0.05,
+          0.15,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "stripes",
+        "type": "float",
+        "min": 3,
+        "max": 13,
+        "default": 7
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Light show"
+    ],
+    "prompt": "a red white and blue flag rippling in a steady breeze",
+    "family": "light-show-canon"
+  },
+  {
+    "builtin_key": "heartbeat",
+    "name": "Heartbeat",
+    "description": "A deep red heartbeat pulsing twice then resting, over and over",
+    "source": "/*{\n  \"DESCRIPTION\": \"A deep red heartbeat pulsing twice then resting, over and over\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.05, 0.1, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"rest\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 0.6, \"DEFAULT\": 0.5 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);\n  // 100 * 0.5 is whole: one beat cycle every two seconds at speed 1, wrapping cleanly.\n  // Offset so the very first frame lands on a beat rather than on the rest.\n  float phase = fract(mod(TIME * speed, 100.0) * 0.5 + 0.12);\n  // Two beats close together, the second a little softer, then the rest of the cycle quiet.\n  float b1 = pow(max(0.0, 1.0 - abs(phase - 0.12) * 9.0), 2.0);\n  float b2 = pow(max(0.0, 1.0 - abs(phase - 0.32) * 9.0), 2.0) * 0.8;\n  float beat = max(b1, b2);\n  // The resting glow is what keeps it from ever reading as off.\n  float env = rest + (1.0 - rest) * beat;\n  // Brighter at the centre, and the beat swells outward.\n  float d = isLine ? abs(uv.x - 0.5) * 2.0 : length(p) / 0.72;\n  float swell = 1.0 - smoothstep(0.0, 1.0, d) * (0.5 - 0.3 * beat);\n  gl_FragColor = vec4(colorA.rgb * env * swell, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          0.05,
+          0.1,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "rest",
+        "type": "float",
+        "min": 0.1,
+        "max": 0.6,
+        "default": 0.5
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Seasonal"
+    ],
+    "prompt": "a deep red heartbeat pulsing twice then resting, over and over",
+    "family": "seasonal"
+  },
+  {
+    "builtin_key": "marquee-chase",
+    "name": "Marquee Chase",
+    "description": "Theatre marquee bulbs chasing around the edge of the display",
+    "source": "/*{\n  \"DESCRIPTION\": \"Theatre marquee bulbs chasing around the edge of the display\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.85, 0.3, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.1, 0.1, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"spacing\", \"TYPE\": \"float\", \"MIN\": 2.0, \"MAX\": 6.0, \"DEFAULT\": 3.0 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  vec2 px = uv * RENDERSIZE;\n  float w = RENDERSIZE.x;\n  float h = RENDERSIZE.y;\n  // 100 * 3 is a multiple of the three-bulb cycle, so the chase never skips at the wrap.\n  float t = mod(TIME * speed, 100.0);\n  float stepIndex = floor(t * 3.0);\n  // Position along the edge, going round clockwise from the bottom-left corner. On a line the\n  // whole strip is the edge.\n  float bw = 1.5;\n  float s = -1.0;\n  if (isLine) s = px.x;\n  else if (px.y < bw) s = px.x;\n  else if (px.x > w - bw) s = w + px.y;\n  else if (px.y > h - bw) s = w + h + (w - px.x);\n  else if (px.x < bw) s = 2.0 * w + h + (h - px.y);\n  vec3 col;\n  if (s >= 0.0) {\n    // Every third bulb lit, and the lit one steps along three times a second. Each lit bulb is\n    // a soft glow rather than a hard dot, so neighbouring bulbs never sit at opposite brightness.\n    float u = mod(s / spacing - stepIndex, 3.0);\n    float dist = min(abs(u - 0.5), 3.0 - abs(u - 0.5));\n    float lit = smoothstep(1.4, 0.2, dist);\n    col = mix(colorA.rgb * 0.22, colorA.rgb, lit);\n  } else {\n    // Inside the frame: the sign itself, breathing slowly in the second colour.\n    float breathe = 0.55 + 0.25 * sin(mod(TIME * speed, 62.831853) * 0.5);\n    vec2 q = (uv - 0.5) * 2.0;\n    float inner = 1.0 - smoothstep(0.5, 1.0, max(abs(q.x), abs(q.y)));\n    col = colorB.rgb * breathe * (0.55 + 0.45 * inner);\n  }\n  gl_FragColor = vec4(col, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          0.85,
+          0.3,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          0.1,
+          0.1,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "spacing",
+        "type": "float",
+        "min": 2,
+        "max": 6,
+        "default": 3
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Geometric"
+    ],
+    "prompt": "theatre marquee bulbs chasing around the edge of the display",
+    "family": "geometric"
+  },
+  {
+    "builtin_key": "metaballs",
+    "name": "Metaballs",
+    "description": "Big soft blobs drifting and merging into each other like a lava lamp",
+    "source": "/*{\n  \"DESCRIPTION\": \"Big soft blobs drifting and merging into each other like a lava lamp\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.2, 0.5, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.85, 0.2, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"size\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 0.5, \"DEFAULT\": 0.22 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  // Capped so a 60-wide line is a few units across, not sixty.\n  float ax = min(aspect, 3.0);\n  vec2 p = (uv - 0.5) * vec2(ax, 1.0);\n  float t = mod(TIME * speed, 62.831853);\n  // Four blobs on their own slow figures; every frequency is a whole tenth so the wrap is clean.\n  vec2 b0 = vec2(sin(t * 0.6), cos(t * 0.8)) * 0.3;\n  vec2 b1 = vec2(cos(t * 1.0 + 1.0), sin(t * 0.4 + 2.0)) * 0.32;\n  vec2 b2 = vec2(sin(t * 0.8 + 3.0), sin(t * 1.2 + 1.0)) * 0.28;\n  vec2 b3 = vec2(cos(t * 0.4 + 2.0), cos(t * 1.0)) * 0.3;\n  if (isLine) {\n    // On a line the blobs sit on it: only their x matters, or they would miss it entirely.\n    b0.y = 0.0; b1.y = 0.0; b2.y = 0.0; b3.y = 0.0;\n    b0.x *= ax; b1.x *= ax; b2.x *= ax; b3.x *= ax;\n  }\n  float s = size * size;\n  float field = s / max(dot(p - b0, p - b0), 0.0004)\n              + s / max(dot(p - b1, p - b1), 0.0004)\n              + s / max(dot(p - b2, p - b2), 0.0004)\n              + s / max(dot(p - b3, p - b3), 0.0004);\n  // Three flat zones - dark, body, hot core - with narrow edges so no two colours ever mix into mud.\n  float body = smoothstep(0.85, 1.15, field);\n  float core = smoothstep(2.4, 3.2, field);\n  vec3 col = colorA.rgb * body;\n  col = mix(col, colorB.rgb, core);\n  gl_FragColor = vec4(col, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          0.2,
+          0.5,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          0.85,
+          0.2,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "size",
+        "type": "float",
+        "min": 0.1,
+        "max": 0.5,
+        "default": 0.22
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Motion background"
+    ],
+    "prompt": "big soft blobs drifting and merging into each other like a lava lamp, bright and saturated",
+    "family": "motion-background"
+  },
+  {
+    "builtin_key": "pixel-cascade",
+    "name": "Pixel Cascade",
+    "description": "Blocks of colour cascading down the display in columns at different speeds",
+    "source": "/*{\n  \"DESCRIPTION\": \"Blocks of colour cascading down the display in columns at different speeds\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [0.1, 0.5, 1.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.2, 0.6, 1.0] },\n    { \"NAME\": \"colorC\", \"TYPE\": \"color\", \"DEFAULT\": [0.2, 1.0, 0.4, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"columnWidth\", \"TYPE\": \"float\", \"MIN\": 2.0, \"MAX\": 8.0, \"DEFAULT\": 4.0 }\n  ]\n}*/\nfloat hash(vec2 c) {\n  return fract(sin(dot(c, vec2(127.1, 311.7))) * 43758.5453);\n}\nvec3 pick(float i) {\n  if (i < 0.5) return colorA.rgb;\n  if (i < 1.5) return colorB.rgb;\n  return colorC.rgb;\n}\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  // On a line the blocks run along it: swap the axes and the same code runs.\n  vec2 size = isLine ? RENDERSIZE.yx : RENDERSIZE;\n  vec2 px = (isLine ? uv.yx : uv) * size;\n  // 100 * 0.1 is whole, so every fall rate below wraps seamlessly.\n  float t = mod(TIME * speed, 100.0);\n  float col = floor(px.x / columnWidth);\n  // A dim base in the column's colour, so the display is never empty between blocks.\n  vec3 out3 = pick(mod(col, 3.0)) * 0.16;\n  // Two blocks per column, half a cycle apart, so a column is never empty for long.\n  for (int i = 0; i < 2; i++) {\n    float fi = float(i);\n    float h = hash(vec2(col, fi));\n    float rate = 0.1 + 0.1 * floor(hash(vec2(col + 3.0, fi)) * 4.0);\n    float y = fract(h + fi * 0.5 - t * rate);\n    // The block's head, and a trail of the same colour fading behind it upward.\n    float head = y * size.y;\n    float len = 0.4 * size.y;\n    float behind = px.y - head;\n    float body = step(0.0, behind) * step(behind, len) * (1.0 - smoothstep(0.0, len, behind) * 0.8);\n    vec3 c = pick(mod(col + fi, 3.0));\n    out3 = max(out3, c * body);\n  }\n  gl_FragColor = vec4(out3, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          0.1,
+          0.5,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          0.2,
+          0.6,
+          1
+        ]
+      },
+      {
+        "name": "colorC",
+        "type": "color",
+        "default": [
+          0.2,
+          1,
+          0.4,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "columnWidth",
+        "type": "float",
+        "min": 2,
+        "max": 8,
+        "default": 4
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Geometric"
+    ],
+    "prompt": "blocks of colour cascading down the display in columns at different speeds",
+    "family": "geometric"
+  },
+  {
+    "builtin_key": "plasma-storm",
+    "name": "Plasma Storm",
+    "description": "A swirling plasma storm with bright cores and deep space between them",
+    "source": "/*{\n  \"DESCRIPTION\": \"A swirling plasma storm with bright cores and deep space between them\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [0.6, 0.05, 1.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.9, 0.3, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"scale\", \"TYPE\": \"float\", \"MIN\": 1.0, \"MAX\": 6.0, \"DEFAULT\": 2.5 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  // Aspect-corrected, but capped: a 60-wide line would otherwise be 60 units across and the\n  // swirl would be finer than the bulbs.\n  vec2 p = (uv - 0.5) * vec2(min(aspect, 3.0), 1.0) * scale;\n  if (isLine) p.y = 0.35 * sin(p.x * 1.5);\n  // Every frequency is a whole number of tenths, so the wrap at 20 pi is seamless.\n  float t = mod(TIME * speed, 62.831853);\n  float v = sin(p.x * 1.7 + t * 1.1);\n  v += sin(p.y * 2.3 - t * 0.9);\n  v += sin((p.x + p.y) * 1.3 + t * 0.7);\n  v += sin(length(p + vec2(sin(t * 0.5), cos(t * 0.6))) * 2.1 - t * 1.3);\n  v = 0.5 + v * 0.125;\n  // Three flat zones - dark space, the body colour, the hot core - with narrow edges between\n  // them, instead of a wide gradient that would pass through grey.\n  float body = smoothstep(0.36, 0.48, v);\n  float core = smoothstep(0.66, 0.76, v);\n  vec3 col = colorA.rgb * body;\n  col = mix(col, colorB.rgb, core);\n  gl_FragColor = vec4(col, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          0.6,
+          0.05,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          0.9,
+          0.3,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "scale",
+        "type": "float",
+        "min": 1,
+        "max": 6,
+        "default": 2.5
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Motion background"
+    ],
+    "prompt": "a swirling plasma storm with bright cores and deep space between them, never grey or muddy",
+    "family": "motion-background"
+  },
+  {
+    "builtin_key": "radar-sweep",
+    "name": "Radar Sweep",
+    "description": "A radar line sweeping around the display leaving a fading trail behind it",
+    "source": "/*{\n  \"DESCRIPTION\": \"A radar line sweeping around the display leaving a fading trail behind it\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [0.1, 1.0, 0.3, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"trail\", \"TYPE\": \"float\", \"MIN\": 0.2, \"MAX\": 1.0, \"DEFAULT\": 0.5 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);\n  // 20 pi: one revolution per 2 pi seconds at speed 1, wrapping on a whole turn.\n  float t = mod(TIME * speed, 62.831853);\n  float back;\n  float edge;\n  if (isLine) {\n    // A line can't turn, so the sweep runs along it and starts again.\n    float pos = fract(t / 6.2831853);\n    back = fract(pos - uv.x);\n    edge = smoothstep(0.05, 0.0, abs(uv.x - pos));\n  } else {\n    float a = atan(p.y, p.x);\n    back = fract((t - a) / 6.2831853);\n    edge = smoothstep(0.07, 0.0, min(back, 1.0 - back));\n  }\n  // The trail: bright just behind the line, fading round to nothing before the line comes back.\n  float glow = pow(clamp(1.0 - back / trail, 0.0, 1.0), 2.5);\n  // Faint range rings under everything, so the screen reads as a radar and not just a wedge.\n  float r = length(p);\n  float rings = isLine ? 0.0 : smoothstep(0.07, 0.0, abs(fract(r * 3.0 + 0.5) - 0.5)) * 0.35;\n  vec3 col = colorA.rgb * (0.16 + rings + glow);\n  col = mix(col, colorB.rgb, edge * 0.85);\n  gl_FragColor = vec4(col, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          0.1,
+          1,
+          0.3,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "trail",
+        "type": "float",
+        "min": 0.2,
+        "max": 1,
+        "default": 0.5
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Geometric"
+    ],
+    "prompt": "a radar line sweeping around the display leaving a fading trail behind it",
+    "family": "geometric"
+  },
+  {
+    "builtin_key": "rainbow-sweep",
+    "name": "Rainbow Sweep",
+    "description": "A smooth saturated rainbow sweeping steadily across the display",
+    "source": "/*{\n  \"DESCRIPTION\": \"A smooth saturated rainbow sweeping steadily across the display\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"bands\", \"TYPE\": \"float\", \"MIN\": 0.5, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"diagonal\", \"TYPE\": \"bool\", \"DEFAULT\": true }\n  ]\n}*/\nvec3 hsv2rgb(vec3 c) {\n  vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);\n  return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);\n}\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  float t = mod(TIME * speed, 100.0);\n  float d = (isLine || !diagonal) ? uv.x : (uv.x * aspect + uv.y) / (aspect + 1.0);\n  // 100 * 0.25 is whole, so the hue never jumps when the clock wraps.\n  float hue = fract(d * bands - t * 0.25);\n  gl_FragColor = vec4(hsv2rgb(vec3(hue, 1.0, 1.0)), 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "bands",
+        "type": "float",
+        "min": 0.5,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "diagonal",
+        "type": "bool",
+        "default": true
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Light show"
+    ],
+    "prompt": "a smooth rainbow sweeping steadily across the display, deep saturated colour, no flicker",
+    "family": "light-show-canon"
+  },
+  {
+    "builtin_key": "snowfall",
+    "name": "Snowfall",
+    "description": "Big soft snowflakes drifting gently down against a deep winter sky",
+    "source": "/*{\n  \"DESCRIPTION\": \"Big soft snowflakes drifting gently down against a deep winter sky\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.05, 0.12, 0.6, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"flakeSize\", \"TYPE\": \"float\", \"MIN\": 1.0, \"MAX\": 4.0, \"DEFAULT\": 1.8 },\n    { \"NAME\": \"sky\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 0.8, \"DEFAULT\": 0.35 }\n  ]\n}*/\nfloat hash(vec2 c) {\n  return fract(sin(dot(c, vec2(127.1, 311.7))) * 43758.5453);\n}\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  // On a line there is no \"down\", so the flakes drift along it instead: swap the axes and the\n  // same code runs, columns become the one row and the fall runs left to right.\n  vec2 size = isLine ? RENDERSIZE.yx : RENDERSIZE;\n  vec2 px = (isLine ? uv.yx : uv) * size;\n  // 100 * 0.1 is whole, so every fall rate below wraps seamlessly.\n  float t = mod(TIME * speed, 100.0);\n  // Flakes scale with the canvas: a flake is a bulb or two on a matrix, and a proper blob on a\n  // screen-sized panel rather than a speck.\n  float scale = max(1.0, min(size.x, size.y) / 32.0);\n  float colW = 4.0 * scale;\n  float cols = max(1.0, floor(size.x / colW));\n  float snow = 0.0;\n  // Three layers of flakes, each column with its own speed and offset, so it never looks like\n  // a repeating pattern.\n  for (int layer = 0; layer < 2; layer++) {\n    float fl = float(layer);\n    float c = floor(px.x / (size.x / cols));\n    float h = hash(vec2(c, fl));\n    float h2 = hash(vec2(c + 7.0, fl + 3.0));\n    float rate = 0.1 + 0.1 * floor(h2 * 3.0);\n    // Falling: the y position decreases with time. Each layer is offset a third of the way.\n    // Not every column carries a flake in every layer, or it reads as static rather than snow.\n    if (hash(vec2(c + 11.0, fl)) < 0.3) continue;\n    float fy = fract(h + fl / 2.0 - t * rate);\n    float cx = (c + 0.5) * (size.x / cols) + sin(fy * 12.566 + h * 6.28) * 0.6;\n    float cy = fy * size.y;\n    float d = length(px - vec2(cx, cy));\n    snow = max(snow, smoothstep(flakeSize * scale, flakeSize * scale * 0.25, d));\n  }\n  vec3 col = colorB.rgb * sky;\n  col = mix(col, colorA.rgb, snow);\n  gl_FragColor = vec4(col, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          0.05,
+          0.12,
+          0.6,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "flakeSize",
+        "type": "float",
+        "min": 1,
+        "max": 4,
+        "default": 1.8
+      },
+      {
+        "name": "sky",
+        "type": "float",
+        "min": 0.1,
+        "max": 0.8,
+        "default": 0.35
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Light show"
+    ],
+    "prompt": "big soft snowflakes drifting gently downward against a dark winter sky",
+    "family": "light-show-canon"
+  },
+  {
+    "builtin_key": "spin-tunnel",
+    "name": "Spin Tunnel",
+    "description": "A spiral tunnel turning slowly, pulling the eye into the middle of the display",
+    "source": "/*{\n  \"DESCRIPTION\": \"A spiral tunnel turning slowly, pulling the eye into the middle of the display\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.1, 0.1, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.9, 0.2, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"arms\", \"TYPE\": \"float\", \"MIN\": 1.0, \"MAX\": 4.0, \"DEFAULT\": 2.0 },\n    { \"NAME\": \"twist\", \"TYPE\": \"float\", \"MIN\": 0.5, \"MAX\": 3.0, \"DEFAULT\": 1.4 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);\n  // 100 * 0.3 is whole, so the turn never jumps when the clock wraps.\n  float t = mod(TIME * speed, 100.0);\n  float s;\n  if (isLine) {\n    // A line can't spiral, so the bands run in from both ends towards the middle instead.\n    s = fract(abs(uv.x - 0.5) * 2.0 * arms + t * 0.3);\n  } else {\n    float r = length(p);\n    float a = atan(p.y, p.x) / 6.2831853;\n    // Angle plus log-radius is a spiral; adding time turns it and draws it inward.\n    s = fract(a * arms + log(r + 0.03) * twist + t * 0.3);\n  }\n  float aa = (isLine ? 4.0 : 2.0) * arms / max(RENDERSIZE.x, 8.0);\n  float band = smoothstep(0.5 + aa, 0.5 - aa, abs(s - 0.5) * 2.0);\n  // The dark half of each arm is not black: a dim version of the other colour keeps the whole\n  // tunnel readable while the bright arm carries the spin.\n  vec3 col = mix(colorB.rgb * 0.22, colorA.rgb, band);\n  // The centre glows, which is what makes it a tunnel rather than a pinwheel.\n  float centre = isLine ? 0.0 : smoothstep(0.22, 0.0, length(p));\n  col = mix(col, colorB.rgb, centre);\n  gl_FragColor = vec4(col, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          0.1,
+          0.1,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          0.9,
+          0.2,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "arms",
+        "type": "float",
+        "min": 1,
+        "max": 4,
+        "default": 2
+      },
+      {
+        "name": "twist",
+        "type": "float",
+        "min": 0.5,
+        "max": 3,
+        "default": 1.4
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Light show"
+    ],
+    "prompt": "a spiral tunnel turning slowly, pulling the eye into the middle of the display",
+    "family": "light-show-canon"
+  },
+  {
+    "builtin_key": "starburst",
+    "name": "Starburst",
+    "description": "Bright rays bursting outward from the centre and fading, one burst after another",
+    "source": "/*{\n  \"DESCRIPTION\": \"Bright rays bursting outward from the centre and fading, one burst after another\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.8, 0.2, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"rays\", \"TYPE\": \"float\", \"MIN\": 4.0, \"MAX\": 16.0, \"DEFAULT\": 8.0 }\n  ]\n}*/\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float aspect = RENDERSIZE.x / max(RENDERSIZE.y, 1.0);\n  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);\n  // 100 * 0.25 is whole, so a burst never jumps when the clock wraps.\n  float t = mod(TIME * speed, 100.0) + 1.2;\n  float d = isLine ? abs(uv.x - 0.5) * 2.0 : length(p) / 0.72;\n  float a = atan(p.y, p.x);\n  // Rays: dark between them on a matrix; a line has no \"between\".\n  float rayMask = isLine ? 1.0 : pow(abs(sin(a * rays * 0.5)), 1.8);\n  // Two bursts half a cycle apart, so one is always on screen while the other is being born.\n  float burst = 0.0;\n  for (int i = 0; i < 2; i++) {\n    float front = fract(t * 0.25 + float(i) * 0.5);\n    float wave = smoothstep(front + 0.03, front - 0.03, d) * smoothstep(front - 0.4, front, d);\n    burst = max(burst, wave);\n  }\n  // A constant hot centre, where every burst comes from.\n  float core = smoothstep(0.28, 0.0, d);\n  // The rays are faintly present all the time; the bursts light them up.\n  vec3 col = colorA.rgb * (0.1 + 0.9 * burst) * rayMask;\n  col = mix(col, colorB.rgb, core);\n  gl_FragColor = vec4(col, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          0.8,
+          0.2,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "rays",
+        "type": "float",
+        "min": 4,
+        "max": 16,
+        "default": 8
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Light show"
+    ],
+    "prompt": "bright rays bursting outward from the centre and fading, one burst after another",
+    "family": "light-show-canon"
+  },
+  {
+    "builtin_key": "twinkle-field",
+    "name": "Twinkle Field",
+    "description": "A field of stars twinkling softly at different times over a deep coloured background",
+    "source": "/*{\n  \"DESCRIPTION\": \"A field of stars twinkling softly at different times over a deep coloured background\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 1.0, 1.0, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [0.05, 0.15, 0.7, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"density\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 1.0, \"DEFAULT\": 0.45 },\n    { \"NAME\": \"background\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 0.8, \"DEFAULT\": 0.4 }\n  ]\n}*/\nfloat hash(vec2 c) {\n  return fract(sin(dot(c, vec2(127.1, 311.7))) * 43758.5453);\n}\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  // Every pixel is its own star: the point of a twinkle is that neighbours differ.\n  vec2 cell = floor(uv * RENDERSIZE);\n  float t = mod(TIME * speed, 62.831853);\n  float h = hash(cell);\n  float h2 = hash(cell + 19.0);\n  float h3 = hash(cell + 41.0);\n  // Only some pixels are stars, and each has its own phase and its own rate (0.8, 1.0 or 1.2,\n  // all tenths so the wrap at 20 pi is seamless). The phase comes from its own hash: taking\n  // it from the one that chose the star would give every star a phase in the same half-turn,\n  // and they would all blink together.\n  float isStar = step(1.0 - density, h);\n  float rate = 0.8 + 0.2 * floor(h3 * 3.0);\n  float pulse = 0.5 + 0.5 * sin(t * rate + h2 * 6.2831853);\n  // Sharpened, so a star is mostly off and then bright rather than a slow uniform shimmer.\n  float star = isStar * pow(pulse, 4.0);\n  vec3 col = colorB.rgb * background;\n  col = mix(col, colorA.rgb, star);\n  gl_FragColor = vec4(col, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          0.05,
+          0.15,
+          0.7,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "density",
+        "type": "float",
+        "min": 0.1,
+        "max": 1,
+        "default": 0.45
+      },
+      {
+        "name": "background",
+        "type": "float",
+        "min": 0.1,
+        "max": 0.8,
+        "default": 0.4
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Light show"
+    ],
+    "prompt": "a field of stars twinkling softly at different times over a deep coloured background",
+    "family": "light-show-canon"
+  },
+  {
+    "builtin_key": "vu-bars",
+    "name": "Vu Bars",
+    "description": "A row of VU meter bars bouncing up and down at different heights",
+    "source": "/*{\n  \"DESCRIPTION\": \"A row of VU meter bars bouncing up and down at different heights\",\n  \"CREDIT\": \"webXLights\",\n  \"CATEGORIES\": [\"Generator\"],\n  \"INPUTS\": [\n    { \"NAME\": \"colorA\", \"TYPE\": \"color\", \"DEFAULT\": [0.1, 1.0, 0.2, 1.0] },\n    { \"NAME\": \"colorB\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.85, 0.1, 1.0] },\n    { \"NAME\": \"colorC\", \"TYPE\": \"color\", \"DEFAULT\": [1.0, 0.1, 0.1, 1.0] },\n    { \"NAME\": \"speed\", \"TYPE\": \"float\", \"MIN\": 0.1, \"MAX\": 4.0, \"DEFAULT\": 1.0 },\n    { \"NAME\": \"bars\", \"TYPE\": \"float\", \"MIN\": 2.0, \"MAX\": 16.0, \"DEFAULT\": 8.0 }\n  ]\n}*/\nfloat hash(float n) {\n  return fract(sin(n * 91.7) * 43758.5453);\n}\nvoid main() {\n  vec2 uv = isf_FragNormCoord;\n  bool isLine = RENDERSIZE.y < 2.0;\n  float t = mod(TIME * speed, 62.831853);\n  float level;\n  float along;\n  float seam = 1.0;\n  if (isLine) {\n    // A line is one bar, filling from the left.\n    level = 0.45 + 0.45 * (0.5 + 0.5 * sin(t * 2.1)) * (0.5 + 0.5 * sin(t * 0.7 + 1.0));\n    along = uv.x;\n  } else {\n    // Never narrower than three pixels a bar, or a seam would swallow the bar itself.\n    float n = min(bars, max(1.0, floor(RENDERSIZE.x / 3.0)));\n    float bar = floor(uv.x * n);\n    float h = hash(bar);\n    // Each bar bounces at its own pair of rates, all whole tenths so the wrap is seamless.\n    float rate = 1.5 + 0.5 * floor(h * 4.0);\n    float bounce = 0.5 + 0.5 * sin(t * rate + h * 6.28);\n    float slow = 0.6 + 0.4 * sin(t * 0.3 + h * 3.0);\n    level = 0.25 + 0.7 * bounce * slow;\n    along = uv.y;\n    // A dark seam between bars, so they read as bars.\n    float fx = fract(uv.x * n);\n    float aa = min(0.3, 1.2 * n / max(RENDERSIZE.x, 8.0));\n    seam = smoothstep(0.0, aa, fx) * smoothstep(1.0, 1.0 - aa, fx);\n  }\n  float lit = step(along, level);\n  // Green below, gold through the middle, red at the top: flat zones, like the real meter.\n  vec3 col = colorA.rgb;\n  col = mix(col, colorB.rgb, step(0.5, along));\n  col = mix(col, colorC.rgb, step(0.8, along));\n  // The unlit part of a bar is a dim ghost, so the meter's full scale is always visible.\n  gl_FragColor = vec4(col * (0.12 + 0.88 * lit) * seam, 1.0);\n}\n",
+    "inputs": [
+      {
+        "name": "colorA",
+        "type": "color",
+        "default": [
+          0.1,
+          1,
+          0.2,
+          1
+        ]
+      },
+      {
+        "name": "colorB",
+        "type": "color",
+        "default": [
+          1,
+          0.85,
+          0.1,
+          1
+        ]
+      },
+      {
+        "name": "colorC",
+        "type": "color",
+        "default": [
+          1,
+          0.1,
+          0.1,
+          1
+        ]
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "min": 0.1,
+        "max": 4,
+        "default": 1
+      },
+      {
+        "name": "bars",
+        "type": "float",
+        "min": 2,
+        "max": 16,
+        "default": 8
+      }
+    ],
+    "categories": [
+      "Generator",
+      "Geometric"
+    ],
+    "prompt": "a row of vu meter bars bouncing up and down at different heights",
+    "family": "geometric"
+  }
+]

@@ -38,7 +38,7 @@ import { buildPlacementReport, copyOrDownloadReport } from "../lib/placementRepo
 import { channelCountForModel } from "../lib/fseqExport";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
 import ModelPalette from "../components/ModelPalette.vue";
-import TabNav from "../components/TabNav.vue";
+import AppBar from "../components/AppBar.vue";
 import { NODE_SPACING } from "../lib/worldUnits";
 
 // The canvases' local-unit-to-world factor, the same value the importer places against
@@ -916,9 +916,8 @@ onUnmounted(() => {
 
 <template>
   <main class="layout-page">
+    <AppBar :project-id="projectId" active="layout" />
     <header>
-      <router-link to="/projects" class="projects-link">&larr; Projects</router-link>
-      <TabNav :project-id="projectId" active="layout" />
       <h1>Layout</h1>
       <label class="import-btn">
         {{ importing ? "Importing..." : "Import xlights_rgbeffects.xml" }}

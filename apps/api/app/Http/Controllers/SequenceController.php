@@ -111,7 +111,12 @@ class SequenceController extends Controller
     {
         $this->authorizeSequence($request, $sequence, 'editor');
 
-        $request->validate(['audio' => ['required', 'file', 'max:51200']]); // 50MB
+        // 50MB, and only audio. The file is served back from this origin (audio() below), so an
+        // uploaded .html would otherwise be a stored script running as the app - an extension
+        // allow-list plus nosniff on the way out closes that regardless of what a browser guesses.
+        $request->validate([
+            'audio' => ['required', 'file', 'max:51200', 'extensions:mp3,m4a,aac,wav,wave,ogg,oga,opus,flac,webm,mp4'],
+        ]);
 
         if ($sequence->audio_path) {
             Storage::disk('audio')->delete($sequence->audio_path);
@@ -129,7 +134,10 @@ class SequenceController extends Controller
 
         abort_if(!$sequence->audio_path || !Storage::disk('audio')->exists($sequence->audio_path), 404);
 
-        return Storage::disk('audio')->response($sequence->audio_path);
+        return Storage::disk('audio')->response($sequence->audio_path, null, [
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Disposition' => 'inline',
+        ]);
     }
 
     private function etag(Sequence $sequence): string

@@ -32,6 +32,7 @@ class ShaderCreditsTest extends TestCase
                 ?string $userKey = null,
                 ?string $providerName = null,
                 ?string $modelName = null,
+                ?string $target = null,
             ): array {
                 $this->called = true;
                 $this->sawKey = $userKey;
@@ -107,6 +108,7 @@ class ShaderCreditsTest extends TestCase
                 ?string $userKey = null,
                 ?string $providerName = null,
                 ?string $modelName = null,
+                ?string $target = null,
             ): array {
                 throw new RuntimeException('No API key is configured for the shader assistant.');
             }

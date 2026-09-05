@@ -37,6 +37,7 @@ class ShaderScopeTest extends TestCase
                 ?string $userKey = null,
                 ?string $providerName = null,
                 ?string $modelName = null,
+                ?string $target = null,
             ): array {
                 $this->called = true;
 

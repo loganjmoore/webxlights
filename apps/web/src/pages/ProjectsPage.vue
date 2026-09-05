@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useProjectsStore } from "../stores/projects";
 import { useAuthStore } from "../stores/auth";
+import AppBar from "../components/AppBar.vue";
 import { api, type Project, type ProjectMember } from "../lib/api";
 import { describeRestore, downloadPackage, exportPackage, importPackage } from "../lib/packageShow";
 import { createSampleProject } from "../lib/demoProject";
@@ -87,11 +88,6 @@ async function removeMember(userId: number): Promise<void> {
   members.value = members.value.filter((m) => m.user.id !== userId);
 }
 
-async function logout(): Promise<void> {
-  await auth.logout();
-  router.push("/auth");
-}
-
 const sampleBusy = ref(false);
 const sampleError = ref("");
 
@@ -111,12 +107,9 @@ async function loadSampleProject(): Promise<void> {
 
 <template>
   <main class="projects">
+    <AppBar />
     <header class="page-header">
       <h1>Your projects</h1>
-      <nav class="header-nav">
-        <router-link to="/docs" class="docs-nav-link">Docs</router-link>
-        <button class="logout-btn" @click="logout">Log out ({{ auth.user?.name }})</button>
-      </nav>
     </header>
     <form @submit.prevent="createProject">
       <input v-model="newName" placeholder="New project name" required />
@@ -174,7 +167,7 @@ async function loadSampleProject(): Promise<void> {
   color: #ddd;
   font-family: system-ui, sans-serif;
 }
-.projects > * {
+.projects > :not(:first-child) {
   max-width: 560px;
   margin-left: auto;
   margin-right: auto;
@@ -196,25 +189,6 @@ async function loadSampleProject(): Promise<void> {
   margin: 0;
   color: #fff;
   font-weight: 600;
-}
-.header-nav {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-.logout-btn,
-.docs-nav-link {
-  font-size: 0.8rem;
-  color: #aaa;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  font-family: inherit;
-}
-.docs-nav-link:hover,
-.logout-btn:hover {
-  color: #e8c468;
 }
 form {
   display: flex;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import TabNav from "../components/TabNav.vue";
+import AppBar from "../components/AppBar.vue";
 import { useRoute, useRouter } from "vue-router";
 import { parseXsq } from "@webxlights/formats";
 import { describeMapping, mapXsqToBody } from "../lib/xsqConvert";
@@ -251,6 +251,7 @@ onMounted(load);
 
 <template>
   <main class="sequences-page">
+    <AppBar :project-id="projectId" active="sequences" />
     <ImportMappingDialog
       v-if="pendingImport"
       :targets="pendingImport.targets"
@@ -261,7 +262,6 @@ onMounted(load);
       @confirm="confirmImport"
     />
     <header>
-      <TabNav :project-id="projectId" active="sequences" />
       <h1>Sequences</h1>
       <label class="import-btn">
         {{ importing ? "Importing..." : "Import .xsq" }}
