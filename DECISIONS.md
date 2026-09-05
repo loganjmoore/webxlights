@@ -927,6 +927,10 @@ xLights chains models on a port so each starts where the previous ends. Our data
 
 The transcription runs after the response in the web process (`dispatchAfterResponse`), not on the worker: the sequence audio is on the web service's local disk, which the worker cannot read, and the browser has to poll either way. Moving audio to shared storage is the upgrade if a second web instance ever appears. The heard transcript is treated as a clock, never as the words: the pasted lyrics keep their spelling and line breaks and only borrow times, so a misheard word cannot end up on a face. Phonemes come from the CMU dictionary (BSD) on the server and fall back to the existing letter-based shapes in the browser, so no word ever produces an empty cell - the failure xLights users have to notice by eye.
 
+## The library shares sequences, not songs
+
+A published sequence is a frozen copy with a donor manifest (the names and types of the models its rows were written for), because row ids mean nothing in another project and the publisher's original may change or vanish. Audio is copied only when the publisher explicitly confirms they may share that recording, default off. Hosting recordings of commercial songs is a copyright exposure the project should not carry by default; the xLights sequence-sharing sites work the same way (sequence travels, song does not). Mapping happens in the browser with the xsq import's dialog and arithmetic, so there is one way to put someone else's rows on your models, not two.
+
 ## Deviation log
 
 - 2026-08-10: `composer create-project laravel/laravel` installs Laravel 13.x (goal prompt said "12.x-ish LTS"). Laravel 12 is not what `laravel/laravel` resolves to as of this date; using current stable 13 instead of pinning back to an EOL-adjacent 12.

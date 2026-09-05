@@ -171,37 +171,45 @@ async function loadMapping(e: Event, mode: "replace" | "add"): Promise<void> {
 </template>
 
 <style scoped>
+/* Same chrome as every other panel (DESIGN.md): dark, one accent, tokens only. */
 .mapping-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
 }
 .mapping-dialog {
-  background: #fff;
-  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel, 0 12px 40px rgba(0, 0, 0, 0.55));
   padding: 0.9rem;
   width: min(48rem, 92vw);
   max-height: 88vh;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  text-align: left;
 }
 h2 {
   margin: 0;
   font-size: 1rem;
+  font-weight: 500;
 }
 h3 {
   margin: 0 0 0.3rem;
   font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 .hint {
   margin: 0.2rem 0 0;
-  font-size: 0.7rem;
-  color: #666;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 .mapping-actions {
   display: flex;
@@ -210,8 +218,10 @@ h3 {
   align-items: center;
 }
 .file-button {
-  border: 1px solid #ccc;
-  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
   padding: 0.15rem 0.4rem;
   font-size: 0.75rem;
   cursor: pointer;
@@ -235,24 +245,28 @@ table {
 }
 th {
   text-align: left;
-  font-weight: 600;
-  border-bottom: 1px solid #ddd;
-  padding: 0.2rem;
+  font-weight: 500;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-strong);
+  padding: 0.25rem 0.2rem;
 }
 td {
   padding: 0.15rem 0.2rem;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border);
 }
 /* Groups are blue in xLights' own dialog, and telling them apart matters: mapping onto a group
    spreads one donor row across every prop in it. */
 td.group {
-  color: #2d5fa8;
+  color: var(--info);
 }
 td select {
   width: 100%;
 }
 option.used {
-  color: #999;
+  color: var(--text-dim);
 }
 .timing-list {
   flex: 0 0 12rem;
@@ -267,14 +281,19 @@ footer {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border);
   padding-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
 .footer-actions {
   display: flex;
   gap: 0.3rem;
 }
 .primary {
-  font-weight: 600;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 500;
 }
 </style>

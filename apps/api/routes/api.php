@@ -8,6 +8,7 @@ use App\Http\Controllers\ModelEntityController;
 use App\Http\Controllers\ModelGroupController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMemberController;
+use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\LyricAlignmentController;
 use App\Http\Controllers\SequenceController;
 use App\Http\Controllers\SequencerViewController;
@@ -76,6 +77,13 @@ Route::middleware('auth:sanctum')->group(function () {
         // Automatic lyric timing. Each listen is a paid call, so a burst is stopped at the door.
         Route::post('sequences/{sequence}/lyrics', [LyricAlignmentController::class, 'store'])->middleware('throttle:6,1');
         Route::get('sequences/{sequence}/lyrics', [LyricAlignmentController::class, 'latest']);
+        // The shared sequence library.
+        Route::get('library', [LibraryController::class, 'index']);
+        Route::get('library/{library}', [LibraryController::class, 'show']);
+        Route::get('library/{library}/audio', [LibraryController::class, 'audio']);
+        Route::post('library/{library}/copy', [LibraryController::class, 'copy']);
+        Route::delete('library/{library}', [LibraryController::class, 'destroy']);
+        Route::post('sequences/{sequence}/publish', [LibraryController::class, 'publish'])->middleware('throttle:10,1');
 
         Route::get('layouts/{layout}/versions', [LayoutVersionController::class, 'index']);
         Route::post('layouts/{layout}/versions', [LayoutVersionController::class, 'store']);

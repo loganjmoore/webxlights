@@ -293,6 +293,33 @@ export interface LyricAlignmentRecord {
   created_at: string | null;
 }
 
+/** A sequence in the shared library: a frozen copy plus the names its rows were written for. */
+export interface LibraryDonor {
+  name: string;
+  elementType: "model" | "group";
+  elementId: number;
+  type: string;
+  effectCount: number;
+}
+export interface LibrarySequenceSummary {
+  id: number;
+  title: string;
+  description: string | null;
+  author: { id: number; name: string } | null;
+  user_id: number;
+  frame_ms: number;
+  duration_ms: number;
+  audio_filename: string | null;
+  has_audio: boolean;
+  donors: LibraryDonor[];
+  timing_track_names: string[];
+  uses: number;
+  created_at: string | null;
+}
+export interface LibrarySequenceRecord extends LibrarySequenceSummary {
+  body: SequenceBody;
+}
+
 export interface TimingTrack {
   name: string;
   marks: number[];
@@ -502,6 +529,23 @@ export const api = {
   alignLyrics: (sequenceId: number, lyrics: string) =>
     request<LyricAlignmentRecord>(`/v1/sequences/${sequenceId}/lyrics`, { method: "POST", body: JSON.stringify({ lyrics }) }),
   latestLyricAlignment: (sequenceId: number) => request<LyricAlignmentRecord | null>(`/v1/sequences/${sequenceId}/lyrics`),
+
+  // The shared sequence library.
+  listLibrary: (params: { q?: string; sort?: "recent" | "popular"; mine?: boolean; page?: number } = {}) => {
+    const search = new URLSearchParams();
+    if (params.q) search.set("q", params.q);
+    if (params.sort) search.set("sort", params.sort);
+    if (params.mine) search.set("mine", "1");
+    if (params.page) search.set("page", String(params.page));
+    const qs = search.toString();
+    return request<{ data: LibrarySequenceSummary[]; current_page: number; last_page: number; total: number }>(`/v1/library${qs ? `?${qs}` : ""}`);
+  },
+  getLibrarySequence: (id: number) => request<LibrarySequenceRecord>(`/v1/library/${id}`),
+  publishSequence: (sequenceId: number, data: { title: string; description?: string; include_audio?: boolean }) =>
+    request<LibrarySequenceSummary>(`/v1/sequences/${sequenceId}/publish`, { method: "POST", body: JSON.stringify(data) }),
+  copyLibrarySequence: (id: number, data: { project_id: number; name: string; body: SequenceBody }) =>
+    request<SequenceRecord>(`/v1/library/${id}/copy`, { method: "POST", body: JSON.stringify(data) }),
+  deleteLibrarySequence: (id: number) => request<void>(`/v1/library/${id}`, { method: "DELETE" }),
 
   listModelGroups: (layoutId: number) => request<ModelGroupRecord[]>(`/v1/layouts/${layoutId}/model-groups`),
   bulkUpsertModelGroups: (layoutId: number, groups: GroupUpsertPayload[]) =>

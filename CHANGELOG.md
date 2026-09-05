@@ -1,5 +1,13 @@
 # Changelog
 
+## A shared sequence library
+
+A **Library** tab beside Shaders: sequences people have shared, searchable, newest or most used first, each card saying how long it is, whether the audio came with it, and the names and types of the models it was written for. **Use on my layout** opens the same mapping dialog an xsq import uses - which of your models takes which of theirs, which timing tracks to bring - and the copy lands in your project and opens in the sequencer, where the preview draws it on your own show. Effects come across as they are, same engine, same parameters, with fresh ids. Share your own from the sequencer's Sequence menu: a title, a description, and a snapshot of the sequence with your model names attached, so editing afterwards changes nothing in the library. Only the publisher can take an entry down; copies people already made stay theirs.
+
+Audio is not shared unless the publisher ticks a box saying they have the right to share that recording. Most commercial songs cannot be, which is also how the xLights sequence-sharing sites work: the sequence travels, the song does not, and whoever copies it adds their own copy of the song. The card says which it is.
+
+Verified: 7 API tests (publishing freezes the body and names the rows, audio only travels when allowed, search, copy into your own project with the audio copied, no copying into projects you cannot edit, only the publisher deletes) and an end-to-end run in real Chrome.
+
 ## A front door: the marketing site, and a licence file
 
 The app now has a public site in front of it, served by nginx from static HTML beside the app build (`apps/web/public/site/`): a home page at `/`, plus `/features`, `/why`, `/xlights`, `/self-hosting` and `/about`. The copy says what the app is (a browser-based sequencer in the spirit of xLights, GPL-3.0, host it yourself), what it does today and nothing it does not, why it was built, and that desktop xLights is still the better tool for a lot of shows and we still love it, with a link. Each page has a title, description, canonical URL, Open Graph tags and, on the home page, structured data; there is a `robots.txt` and a `sitemap.xml`, and the app shell itself is marked noindex because everything behind it needs a login. Screenshots are real captures of the app. The app's router already sent `/` to `/projects`, so the app lost nothing.

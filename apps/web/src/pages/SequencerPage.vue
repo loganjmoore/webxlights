@@ -215,6 +215,45 @@ const papagayoMessage = ref("");
 // Automatic lyric timing (Sequencer > Timing tracks > Auto lyrics). The server listens to the
 // song; the browser polls, then lines the heard words up with the pasted lyrics and makes the
 // same three tracks a Papagayo import would (lib/lyricAlign.ts).
+// Sharing to the library (Sequence > Share to library). A frozen copy with the names of the
+// models it was written for, so someone else can map it onto their layout.
+const showSharePanel = ref(false);
+const shareTitle = ref("");
+const shareDescription = ref("");
+const shareAudio = ref(false);
+const shareBusy = ref(false);
+const shareMessage = ref("");
+function openShare(): void {
+  if (!shareTitle.value) shareTitle.value = store.sequence?.name ?? "";
+  shareMessage.value = "";
+  showSharePanel.value = true;
+}
+async function shareToLibrary(): Promise<void> {
+  if (!shareTitle.value.trim()) {
+    shareMessage.value = "Give it a title.";
+    return;
+  }
+  shareBusy.value = true;
+  try {
+    // Saved first, so the copy is what is on screen and not what was on screen a minute ago.
+    await store.saveNow();
+    const entry = await api.publishSequence(sequenceId.value, { title: shareTitle.value.trim(), description: shareDescription.value.trim() || undefined, include_audio: shareAudio.value });
+    shareMessage.value = `Shared as "${entry.title}" with ${entry.donors.length} models${entry.has_audio ? " and the audio" : ""}. It is in the Library tab now.`;
+  } catch (err) {
+    let text = err instanceof Error ? err.message : "Couldn't share it.";
+    if (err instanceof ApiError) {
+      try {
+        text = (JSON.parse(err.message) as { message?: string }).message ?? text;
+      } catch {
+        // Not JSON.
+      }
+    }
+    shareMessage.value = text;
+  } finally {
+    shareBusy.value = false;
+  }
+}
+
 const LYRICS_TRACK = "Lyrics";
 const lyricsText = ref("");
 const lyricsBusy = ref(false);
@@ -2222,6 +2261,8 @@ const sequenceMenu = computed<MenuItem[]>(() => [
   { kind: "separator" },
   { label: "Save a snapshot", disabled: !store.sequence, run: () => void snapshotNow() },
   { label: "Export .fseq", disabled: !store.sequence, run: exportFseq },
+  { kind: "separator" },
+  { label: "Share to library…", disabled: !store.sequence, run: openShare },
 ]);
 
 const commands = computed(() =>
@@ -2784,6 +2825,26 @@ watch(sequenceId, async (id) => {
         <button type="button" title="Save the lyric tracks as an xLights .xtiming file" @click="downloadLyricsXtiming">Download .xtiming</button>
       </div>
       <p v-if="lyricsMessage" class="timing-note">{{ lyricsMessage }}</p>
+      </div>
+    </ModalPanel>
+
+    <ModalPanel v-if="showSharePanel" id="share-library" title="Share to the library" @close="showSharePanel = false">
+      <div class="share-form">
+        <p class="timing-note">
+          A copy of this sequence goes into the library for other people to put on their own layouts, with the names of your models
+          so they can map them. It is a snapshot: changes you make afterwards stay yours.
+        </p>
+        <label class="share-field">Title <input v-model="shareTitle" maxlength="160" /></label>
+        <label class="share-field">Description <textarea v-model="shareDescription" class="lyrics-box" rows="3" maxlength="4000" placeholder="What song, what it is like, anything people should know"></textarea></label>
+        <label class="check">
+          <input v-model="shareAudio" type="checkbox" :disabled="!store.sequence?.audio_filename" />
+          Include the audio file. Only tick this if you have the right to share this recording; most commercial songs cannot be shared, and people can add their own copy of the song after copying the sequence.
+        </label>
+        <div class="timing-row">
+          <button type="button" class="primary" :disabled="shareBusy" @click="shareToLibrary">{{ shareBusy ? "Sharing…" : "Share" }}</button>
+          <button type="button" :disabled="shareBusy" @click="showSharePanel = false">Close</button>
+        </div>
+        <p v-if="shareMessage" class="timing-note">{{ shareMessage }}</p>
       </div>
     </ModalPanel>
 
@@ -3808,6 +3869,34 @@ header button.active {
 .fpp-panel,
 .timing-panel {
   font-size: 0.85rem;
+}
+.share-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.share-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.share-field input {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.35rem 0.5rem;
+  color: var(--text);
+  background: var(--bg-control);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.share-form .check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
 .timing-heading {
   margin: 1rem 0 0.25rem;
