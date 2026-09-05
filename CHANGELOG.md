@@ -1,5 +1,11 @@
 # Changelog
 
+## A front door: the marketing site, and a licence file
+
+The app now has a public site in front of it, served by nginx from static HTML beside the app build (`apps/web/public/site/`): a home page at `/`, plus `/features`, `/why`, `/xlights`, `/self-hosting` and `/about`. The copy says what the app is (a browser-based sequencer in the spirit of xLights, GPL-3.0, host it yourself), what it does today and nothing it does not, why it was built, and that desktop xLights is still the better tool for a lot of shows and we still love it, with a link. Each page has a title, description, canonical URL, Open Graph tags and, on the home page, structured data; there is a `robots.txt` and a `sitemap.xml`, and the app shell itself is marked noindex because everything behind it needs a login. Screenshots are real captures of the app. The app's router already sent `/` to `/projects`, so the app lost nothing.
+
+The repository has a `LICENSE` file: GPL-3.0, the same licence as xLights. Verified in real Chrome: the pages render on desktop and at 390px wide with no horizontal overflow; the nginx routes are exercised by the image build.
+
 ## The controller visualiser has a window of its own
 
 The visualiser moved out from under the controller table into its own window: a **Visualiser** button in the Controllers toolbar opens it at nearly the whole screen (the one exception to the seven-tenths rule, because it is a surface you work on rather than a dialog you answer), draggable, pinnable and able to pop out into a separate Chrome window like every other panel. Controllers run down the left in the order people number them (2 before 10), the models not yet on a controller run down the right, each side scrolling on its own, with a search box at the top of the models that narrows the list as you type - exact name first, then names starting with it, then names containing it. Drag from one side to the other to chain; drag back to take off. Verified in real Chrome: the window opened at 1404×866 in a 1440×900 viewport, "star" narrowed the tray to Star-1, Star-1 chained onto the first controller and came back off, and no drag proxy was left behind.
