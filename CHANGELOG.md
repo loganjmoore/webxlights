@@ -1,5 +1,9 @@
 # Changelog
 
+## Shaders download for desktop xLights
+
+Every shader card, and a freshly generated draft, has **Download for xLights**: it saves the shader as an ISF `.fs` file, the format xLights' Shader effect loads. Put the file in your show folder's `Shaders` directory and pick it in the effect's file chooser. Nothing is converted: the library's sources already carry the ISF header and are checked against xLights' GLSL dialect by the shader harness, so the file on disk is the shader as the gallery runs it. Verified in real Chrome: the button on a gallery card produced `Ink Bloom.fs`, which passes the harness in both the webXLights and xLights dialects.
+
 ## Layout: undo, steadier resizing, a context menu, and a list that follows the canvas
 
 The Layout page has Undo and Redo (buttons in the toolbar, Cmd/Ctrl+Z and Shift+Z) for moves, resizes, rotations and renames, so a slip with the mouse is one key away from gone. The resize grips are the same nine pixels on screen at every zoom - they used to be sized in world units and vanished when you zoomed out - and dragging one is damped: the size follows the pointer at a gentler curve (`resizeModel.ts`, `RESIZE_DAMPING`) measured from where you grabbed, so the first few pixels are a small change instead of a lurch to gigantic. The model list's width is a splitter you drag (180 to 560px, remembered). Clicking a model on the canvas highlights its row and scrolls it into view; clicking a row selects it on the canvas.
