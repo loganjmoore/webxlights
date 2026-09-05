@@ -11,6 +11,7 @@ import { ALL_TRACKS, describeMidiImport, midiTrackChoices, timingTrackFromMidi }
 import { describePapagayoImport, tracksFromPapagayo } from "../lib/papagayoTiming";
 import { breakdownPhrases, breakdownWords, cellsOf, phonemesTrackName, wordsTrackName } from "../lib/lyricBreakdown";
 import { effectIcon } from "../lib/effectIcons";
+import { filterRanked, isDefaultStrandName } from "../lib/listFilter";
 import ModalPanel from "../components/ModalPanel.vue";
 import MenuButton, { type MenuItem } from "../components/MenuButton.vue";
 import AppBar from "../components/AppBar.vue";
@@ -103,6 +104,23 @@ const groupRecords = ref<ModelGroupRecord[]>([]);
 // hiding a row here never touches its effects, and doesn't need to round-trip through .xsq
 // import/export or collaborate across users the way real sequence content does.
 const hiddenRowKeys = ref<Set<string>>(new Set());
+// The Models panel's typeahead and its "everything" switch. A show's rows are mostly numbered
+// strands nobody sequences individually; the list shows models, groups, sub-models and any
+// strand someone bothered to name, and the rest only on request.
+const modelsQuery = ref("");
+const showEveryRow = ref(false);
+const modelsPanelRows = computed(() => {
+  const base = showEveryRow.value ? rows.value : rows.value.filter((r) => r.elementType !== "strand" || !isDefaultStrandName(r.name));
+  return filterRanked(base, modelsQuery.value, (r) => r.name);
+});
+const hiddenByDefaultCount = computed(() => rows.value.filter((r) => r.elementType === "strand" && isDefaultStrandName(r.name)).length);
+// The same typeahead for the Views panel's row picker and the preset list.
+const viewRowsQuery = ref("");
+const viewPickerRows = computed(() => {
+  const base = showEveryRow.value ? rows.value : rows.value.filter((r) => r.elementType !== "strand" || !isDefaultStrandName(r.name));
+  return filterRanked(base, viewRowsQuery.value, (r) => r.name);
+});
+const presetsQuery = ref("");
 const showModelsPanel = ref(false);
 const showViewsPanel = ref(false);
 const showPresetsPanel = ref(false);
@@ -494,7 +512,7 @@ function rowNameFor(key: string): string {
 // The manual's own workflow: highlight an effect, save it under a group, then apply it somewhere
 // else "without recreating them from scratch". Presets live on the layout, like views, because
 // they are global in xLights rather than belonging to one sequence.
-const presetGroups = computed(() => groupPresets(presets.value));
+const presetGroups = computed(() => groupPresets(filterRanked(presets.value, presetsQuery.value, (p) => `${p.group} ${p.name}`)));
 
 async function savePresets(next: EffectPreset[]): Promise<void> {
   if (layoutId.value === null) return;
@@ -1138,6 +1156,12 @@ function onTilePointerMove(e: PointerEvent): void {
     pointer.started = true;
     document.body.classList.add("dragging-tile");
     window.addEventListener("keydown", onTileDragKey, true);
+    // The tile holds pointer capture, so its own pointerup is the normal end. These are the
+    // ends that arrive when capture is lost - the window losing focus, a release the button
+    // never hears about - because a proxy that never leaves the screen is a stuck drag.
+    window.addEventListener("pointerup", onTilePointerUp, true);
+    window.addEventListener("blur", cancelTileDrag);
+    pointer.el.addEventListener("lostpointercapture", onTileLostCapture);
   }
   const target = gridRef.value?.dropTargetAt(e.clientX, e.clientY) ?? null;
   let blocked = false;
@@ -1154,11 +1178,25 @@ function onTilePointerUp(e: PointerEvent): void {
   const pointer = tilePointer;
   if (!pointer || e.pointerId !== pointer.id) return;
   const drag = tileDrag.value;
-  if (pointer.started) {
-    suppressTileClick = true;
-    if (drag?.target && !drag.blocked) handleDropEffect(drag.target.row, drag.name, drag.target.ms);
+  try {
+    if (pointer.started) {
+      suppressTileClick = true;
+      // The latest position wins: the window-level fallback may fire before the tile's own,
+      // and the pointer may have moved since the last move event.
+      const target = gridRef.value?.dropTargetAt(e.clientX, e.clientY) ?? drag?.target ?? null;
+      if (target && !drag?.blocked) handleDropEffect(target.row, pointer.name, target.ms);
+    }
+  } finally {
+    // Whatever the drop did or failed to do, the drag is over.
+    finishTileDrag();
   }
-  finishTileDrag();
+}
+
+function onTileLostCapture(): void {
+  // Capture can go without a pointerup (another element took it, the OS interrupted): the
+  // pointer is still down somewhere, so the drag continues on window events until it ends.
+  if (!tilePointer?.started) return;
+  window.addEventListener("pointermove", onTilePointerMove, true);
 }
 
 function onTileDragKey(e: KeyboardEvent): void {
@@ -1173,12 +1211,23 @@ function cancelTileDrag(): void {
 }
 
 function finishTileDrag(): void {
-  if (tilePointer) tilePointer.el.releasePointerCapture?.(tilePointer.id);
+  const pointer = tilePointer;
+  if (pointer) {
+    pointer.el.removeEventListener("lostpointercapture", onTileLostCapture);
+    try {
+      if (pointer.el.hasPointerCapture?.(pointer.id)) pointer.el.releasePointerCapture(pointer.id);
+    } catch {
+      // Already released; nothing to do.
+    }
+  }
   tilePointer = null;
   tileDrag.value = null;
   gridRef.value?.clearDropGhost();
   document.body.classList.remove("dragging-tile");
   window.removeEventListener("keydown", onTileDragKey, true);
+  window.removeEventListener("pointerup", onTilePointerUp, true);
+  window.removeEventListener("pointermove", onTilePointerMove, true);
+  window.removeEventListener("blur", cancelTileDrag);
 }
 
 // Kept as the fallback for anything that runs before preferences load; the preference is what
@@ -3086,6 +3135,9 @@ watch(sequenceId, async (id) => {
         </div>
       </div>
 
+      <div v-if="presets.length" class="panel-search">
+        <input v-model="presetsQuery" type="search" placeholder="Find a preset…" aria-label="Find presets" />
+      </div>
       <template v-for="g in presetGroups" :key="g.group">
         <div class="models-panel-head"><h2>{{ g.group }}</h2></div>
         <ul>
@@ -3154,14 +3206,19 @@ watch(sequenceId, async (id) => {
         <div class="models-panel-head">
           <h2>Add or remove rows</h2>
         </div>
+        <div class="panel-search">
+          <input v-model="viewRowsQuery" type="search" placeholder="Find a row…" aria-label="Find rows" />
+          <label class="every"><input v-model="showEveryRow" type="checkbox" /> Show everything</label>
+        </div>
         <ul>
-          <li v-for="row in rows" :key="rowKey(row)">
+          <li v-for="row in viewPickerRows" :key="rowKey(row)">
             <label>
               <input type="checkbox" :checked="activeView.rowKeys.includes(rowKey(row))" @change="toggleRowInView(row)" />
               {{ row.name }}
               <span class="row-type">{{ row.elementType }}</span>
             </label>
           </li>
+          <li v-if="viewPickerRows.length === 0" class="empty">Nothing matches "{{ viewRowsQuery }}".</li>
         </ul>
       </template>
       </div>
@@ -3169,6 +3226,19 @@ watch(sequenceId, async (id) => {
 
     <ModalPanel v-if="showModelsPanel" id="models" wide title="Models" @close="showModelsPanel = false">
       <div class="models-panel">
+      <div class="panel-search">
+        <input
+          v-model="modelsQuery"
+          type="search"
+          placeholder="Find a model, group or sub-model…"
+          autofocus
+          aria-label="Find rows"
+        />
+        <label class="every" :title="hiddenByDefaultCount ? `${hiddenByDefaultCount} numbered strands are hidden from this list` : 'Nothing is hidden from this list'">
+          <input v-model="showEveryRow" type="checkbox" />
+          Show everything{{ hiddenByDefaultCount && !showEveryRow ? ` (+${hiddenByDefaultCount} strands)` : "" }}
+        </label>
+      </div>
       <div class="models-panel-head">
         <h2>Rows shown on the grid</h2>
         <div class="models-panel-actions">
@@ -3177,7 +3247,7 @@ watch(sequenceId, async (id) => {
         </div>
       </div>
       <ul>
-        <li v-for="row in rows" :key="rowKey(row)">
+        <li v-for="row in modelsPanelRows" :key="rowKey(row)">
           <label>
             <input type="checkbox" :checked="!hiddenRowKeys.has(rowKey(row))" @change="toggleRowVisible(row)" />
             {{ row.name }}
@@ -3186,6 +3256,7 @@ watch(sequenceId, async (id) => {
           <span class="row-effect-count">{{ effectCountFor(row) }} effect{{ effectCountFor(row) === 1 ? "" : "s" }}</span>
         </li>
         <li v-if="rows.length === 0" class="empty">No models or groups in this project's layout yet.</li>
+        <li v-else-if="modelsPanelRows.length === 0" class="empty">Nothing matches "{{ modelsQuery }}".</li>
       </ul>
       </div>
     </ModalPanel>
@@ -3466,6 +3537,35 @@ watch(sequenceId, async (id) => {
    descendant rules below still key off this class. */
 .models-panel {
   font-size: 0.85rem;
+}
+/* The typeahead at the top of a list panel: one box, the whole width, always first. */
+.panel-search {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.panel-search input[type="search"] {
+  flex: 1;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+.panel-search input[type="search"]:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.panel-search .every {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 .models-panel-head {
   display: flex;
