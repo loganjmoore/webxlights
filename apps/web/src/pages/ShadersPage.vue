@@ -88,16 +88,44 @@ const usingOwnKey = computed(() => userKey.value !== null);
 async function refresh(): Promise<void> {
   loading.value = true;
   try {
-    const page = await api.listShaders({
-      q: search.value || undefined,
-      mine: scope.value === "mine",
-      kind: scope.value === "builtin" || scope.value === "community" ? scope.value : "all",
-      category: category.value || undefined,
-      sort: sort.value,
-    });
+    const page = await api.listShaders(listParams(1));
     shaders.value = page.data;
+    lastPage.value = page.last_page;
+    total.value = page.total;
   } finally {
     loading.value = false;
+  }
+}
+
+// The API pages at 24 and the library alone is 50, so the gallery needs a second page.
+// Appended rather than paged, because a gallery is browsed, not navigated.
+const lastPage = ref(1);
+const total = ref(0);
+const loadingMore = ref(false);
+const currentPage = computed(() => Math.ceil(shaders.value.length / 24));
+const remaining = computed(() => Math.max(0, total.value - shaders.value.length));
+
+function listParams(page: number) {
+  return {
+    q: search.value || undefined,
+    mine: scope.value === "mine",
+    kind: scope.value === "builtin" || scope.value === "community" ? scope.value : ("all" as const),
+    category: category.value || undefined,
+    sort: sort.value,
+    page,
+  };
+}
+
+async function loadMore(): Promise<void> {
+  if (loadingMore.value || currentPage.value >= lastPage.value) return;
+  loadingMore.value = true;
+  try {
+    const page = await api.listShaders(listParams(currentPage.value + 1));
+    shaders.value = [...shaders.value, ...page.data];
+    lastPage.value = page.last_page;
+    total.value = page.total;
+  } finally {
+    loadingMore.value = false;
   }
 }
 
@@ -436,6 +464,9 @@ onMounted(async () => {
           </div>
         </li>
       </ul>
+      <button v-if="!loading && remaining > 0" type="button" class="more" :disabled="loadingMore" @click="loadMore">
+        {{ loadingMore ? "Loading…" : `Show ${Math.min(remaining, 24)} more of ${total}` }}
+      </button>
     </section>
   </div>
 </template>
@@ -532,6 +563,22 @@ h1 {
 .chip:hover {
   color: var(--accent);
   border-color: var(--accent);
+}
+.more {
+  display: block;
+  margin: 1rem auto 0;
+  padding: 0.4rem 1rem;
+  font: inherit;
+  font-size: 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
+  cursor: pointer;
+}
+.more:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 textarea {
   flex: 1;

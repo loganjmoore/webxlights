@@ -2,6 +2,8 @@
 
 ## The library is complete: fifty of fifty
 
+Fifty built-ins exposed a gap the gallery had quietly had all along: the API pages at 24 and nothing on the page could reach page two. The gallery and the sequencer's shader picker now append a page at a time behind a "Show 24 more of 50" button.
+
 The last ten: mesh gradient, liquid metal, iridescent silk, neuro noise, ink bloom, voronoi crystal, moire drift, smoke plume, plankton glow and dust storm - the motion-background family the brief called the reference aesthetic, built for props first. Fifty of fifty compile in both dialects and clear every fitted gate at every shape; the closest pair is 0.081 apart. The distinctness gate did most of the work this round: plankton and twinkle, comet and neuro noise, moire and peppermint, marquee and snowfall all measured as statistical neighbours and were pushed apart by design changes (bigger specks in a brighter sea, denser filaments over true black, deeper dark bands), never by lowering the floor. One move went the wrong way and was reverted, which the numbers made obvious inside a minute.
 
 ## Forty built-in shaders

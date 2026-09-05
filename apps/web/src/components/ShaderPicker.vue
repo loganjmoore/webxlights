@@ -50,10 +50,17 @@ const chosen = ref<ShaderRecord | null>(null);
  */
 const inputSpecs = computed<IsfInput[]>(() => chosen.value?.inputs ?? []);
 
-async function load(): Promise<void> {
+// Appended a page at a time: the API pages at 24 and the built-in library alone is 50.
+const lastPage = ref(1);
+const total = ref(0);
+
+async function load(page = 1): Promise<void> {
   loading.value = true;
   try {
-    shaders.value = (await api.listShaders({ q: search.value || undefined, sort: "popular" })).data;
+    const result = await api.listShaders({ q: search.value || undefined, sort: "popular", page });
+    shaders.value = page === 1 ? result.data : [...shaders.value, ...result.data];
+    lastPage.value = result.last_page;
+    total.value = result.total;
   } finally {
     loading.value = false;
   }
@@ -167,8 +174,8 @@ onMounted(() => {
     <!-- The library, inline. A modal over a modal is worse than a list that expands in place. -->
     <div v-if="browsing" class="browser">
       <div class="filters">
-        <input v-model="search" placeholder="Search…" @keydown.enter="load" />
-        <button @click="load">Go</button>
+        <input v-model="search" placeholder="Search…" @keydown.enter="load()" />
+        <button @click="load()">Go</button>
         <button @click="browsing = false">Close</button>
       </div>
       <p v-if="loading" class="none">Loading…</p>
@@ -183,6 +190,9 @@ onMounted(() => {
           </button>
         </li>
       </ul>
+      <button v-if="!loading && shaders.length < total" type="button" class="more" @click="load(Math.ceil(shaders.length / 24) + 1)">
+        Show {{ Math.min(total - shaders.length, 24) }} more
+      </button>
     </div>
   </div>
 </template>
@@ -283,5 +293,22 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.more {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.3rem;
+  font: inherit;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.more:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 </style>
