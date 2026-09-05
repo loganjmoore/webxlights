@@ -37,10 +37,10 @@ void main() {
     col = mix(colorA.rgb * 0.22, colorA.rgb, lit);
   } else {
     // Inside the frame: the sign itself, breathing slowly in the second colour.
-    float breathe = 0.55 + 0.25 * sin(mod(TIME * speed, 62.831853) * 0.5);
+    float breathe = 0.7 + 0.3 * sin(mod(TIME * speed, 62.831853) * 0.5);
     vec2 q = (uv - 0.5) * 2.0;
     float inner = 1.0 - smoothstep(0.5, 1.0, max(abs(q.x), abs(q.y)));
-    col = colorB.rgb * breathe * (0.55 + 0.45 * inner);
+    col = colorB.rgb * breathe * (0.4 + 0.6 * inner);
   }
   gl_FragColor = vec4(col, 1.0);
 }

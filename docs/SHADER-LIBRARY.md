@@ -1,10 +1,10 @@
 # The built-in shader library
 
-Status on 2026-09-04: **forty of the fifty concepts are shipped**, hand-authored rather than
+Status on 2026-09-04: **all fifty concepts are shipped**, hand-authored rather than
 generated, because no machine that has worked on this has held model credentials. Every one of
-the forty compiles in both dialects (`check.mjs`, xLights via glslang), clears every fitted gate
+the fifty compiles in both dialects (`check.mjs`, xLights via glslang), clears every fitted gate
 at all four shapes (`metrics.mjs`), survives the ten-hour drift check, and is no near-duplicate of
-another (`closestPairs` minimum 0.084). They were reviewed by eye from `render.mjs` contact
+another (`closestPairs` minimum 0.081). They were reviewed by eye from `render.mjs` contact
 sheets at 32x32 and tuned where the numbers passed and the picture did not. See the hand-edit
 log below for what that changed.
 
@@ -25,7 +25,7 @@ Read `docs/GOAL-shader-library-50.md` for the brief this works against.
 | `library.json` - the 50 descriptions | **done**, family counts exactly as specified |
 | Shipping into the gallery on a fresh install | **done**, mechanism built and tested end to end |
 | Gallery usable at 50+ entries | **done**: built-in badge, browse by category, existing search |
-| The 50 `.fs` files | **not started** - blocked, see below |
+| The 50 `.fs` files | **done** - hand-authored, measured, see the hand-edit log |
 | Five rounds of ten, with adversarial review | **not started** - blocked |
 | An improved `SYSTEM` prompt | **not started** - deliberately, see "No unverified prompt edits" |
 | Round-1-vs-round-5 regeneration | **not started** - blocked |
@@ -246,7 +246,7 @@ The machinery is tested (`metricsCore.test.mjs`) and prints automatically from `
 
 ## Hand-edit log
 
-The forty shipped shaders were written by hand, so this log records what the *measurement* and
+The fifty shipped shaders were written by hand, so this log records what the *measurement* and
 the *eye* changed after the first draft of each - the things a prompt would have to say to get
 them right first time. Each is now a line in `SYSTEM`.
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## The library is complete: fifty of fifty
+
+The last ten: mesh gradient, liquid metal, iridescent silk, neuro noise, ink bloom, voronoi crystal, moire drift, smoke plume, plankton glow and dust storm - the motion-background family the brief called the reference aesthetic, built for props first. Fifty of fifty compile in both dialects and clear every fitted gate at every shape; the closest pair is 0.081 apart. The distinctness gate did most of the work this round: plankton and twinkle, comet and neuro noise, moire and peppermint, marquee and snowfall all measured as statistical neighbours and were pushed apart by design changes (bigger specks in a brighter sea, denser filaments over true black, deeper dark bands), never by lowering the floor. One move went the wrong way and was reverted, which the numbers made obvious inside a minute.
+
 ## Forty built-in shaders
 
 Ten more: icicle drip, kaleidoscope, lightning, sunrise, ember rise, lava flow, halftone pulse, caustics, cloud drift and god rays. Forty of forty compile in both dialects and clear every fitted gate at every shape; the closest pair is 0.084 apart. The distinctness gate earned its place this round: it flagged ember rise as statistically too close to radar sweep and cloud drift too close to peppermint swirl - pairs no eye would confuse - and both were pushed apart (a brighter, faster ember field; a darker sky under whiter clouds) rather than the gate being loosened. The other by-eye tune was a kaleidoscope whose cells were too small to read at 32x32.
