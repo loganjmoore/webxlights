@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ControllerController;
+use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\LayoutController;
 use App\Http\Controllers\LayoutVersionController;
 use App\Http\Controllers\ModelEntityController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMemberController;
 use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\LyricAlignmentController;
+use App\Http\Controllers\MediaController;
 use App\Http\Controllers\SequenceController;
 use App\Http\Controllers\SequencerViewController;
 use App\Http\Controllers\SequenceVersionController;
@@ -22,6 +24,10 @@ use Illuminate\Support\Facades\Route;
 // password can't be guessed at speed and accounts can't be minted by a script.
 Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+// Which sign-in buttons to offer besides email and password. The Google redirect and callback
+// themselves live in routes/web.php: the callback arrives from Google, with no Referer that
+// Sanctum would count as stateful, and it needs the session all the same.
+Route::get('/auth/providers', fn () => ['google' => GoogleAuthController::enabled()]);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -72,8 +78,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('sequences/{sequence}', [SequenceController::class, 'show']);
         Route::patch('sequences/{sequence}', [SequenceController::class, 'updateSettings']);
         Route::put('sequences/{sequence}/body', [SequenceController::class, 'updateBody']);
+        Route::delete('sequences/{sequence}', [SequenceController::class, 'destroy']);
         Route::post('sequences/{sequence}/audio', [SequenceController::class, 'uploadAudio']);
         Route::get('sequences/{sequence}/audio', [SequenceController::class, 'audio']);
+        // A project's files: the audio and images it has uploaded.
+        Route::get('projects/{project}/media', [MediaController::class, 'index']);
+        Route::post('projects/{project}/media', [MediaController::class, 'store']);
+        Route::patch('media/{media}', [MediaController::class, 'update']);
+        Route::delete('media/{media}', [MediaController::class, 'destroy']);
+        Route::get('media/{media}/file', [MediaController::class, 'file']);
         // Automatic lyric timing. Each listen is a paid call, so a burst is stopped at the door.
         Route::post('sequences/{sequence}/lyrics', [LyricAlignmentController::class, 'store'])->middleware('throttle:6,1');
         Route::get('sequences/{sequence}/lyrics', [LyricAlignmentController::class, 'latest']);

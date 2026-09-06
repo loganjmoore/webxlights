@@ -71,6 +71,13 @@ services:
         sync: false
       - key: LYRICS_MONTHLY_LIMIT
         value: "20"
+      # "Continue with Google". An OAuth client in Google Cloud, web application type, with
+      # https://pixl.community/api/auth/google/callback as its redirect URI. Left unset, the
+      # button is not offered.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
       # R2 + SANCTUM_STATEFUL_DOMAINS are set manually in the Render dashboard
       # (bucket/domain don't exist until M0's provisioning step is approved).
 

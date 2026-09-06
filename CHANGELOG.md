@@ -1,5 +1,21 @@
 # Changelog
 
+## Continue with Google
+
+A **Continue with Google** button under the log-in form. It is the plain OAuth 2.0 authorization-code flow done with the framework's HTTP client, three requests and no package: out to Google with a `state` in the session, back to `/api/auth/google/callback`, code for token, token for the verified email and the account's stable id. A person who already registered with a password and presses the button lands in the account they have, matched by email; a new person gets an account with a random unusable password and a verified email. The button is offered only when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set, so a self-hosted copy without them shows nothing that goes nowhere. Apple sign-in is not done.
+
+The consent screen links to a new **/privacy** page on the marketing site, which says what the hosted copy stores, what leaves the server and how to delete an account. It is in the footer of every site page and in the sitemap.
+
+Verified: 5 API tests (offered only when configured, new account, existing email linked, forged state refused, unverified email refused), and in real Chrome the button reaches Google's account chooser for pixl with the right callback.
+
+## Files: a project's audio and pictures, and deleting sequences
+
+A **Files** tab beside Shaders: every file the project owns, in a table that says what each is, how big it is, which sequences are set to it and when it arrived. Upload from there, rename (the name in the list; the stored file and every sequence pointing at it are untouched), open in a new tab, and delete. A file a sequence is still set to refuses to be deleted and says which sequences those are. Every soundtrack uploaded before this page existed is listed on day one; one uploaded from the new-sequence dialog or the sequencer lands here the same as one uploaded here. The new-sequence dialog can take its song from Files instead of asking for the file again, and a Pictures effect can take its image from a picture in Files.
+
+Sequences can be renamed and deleted from the list: a menu on each row, a confirm before deleting. Deleting a sequence never deletes its audio, which stays in Files where it is deleted on its own. Not done: video and model files, which nothing in the app consumes yet, and folders or search in Files.
+
+Verified: 6 API tests (upload and list with kind and size, rename keeps the file, delete refused with the sequence names while a sequence uses it, delete removes an unused file from disk, deleting a sequence keeps its soundtrack, members read and only editors change) plus the changed re-upload test, and in real Chrome: upload, rename, delete, the sequence row menu, and a sequence created from a song in Files.
+
 ## The hosted copy is called pixl
 
 The instance at pixl.community, and everything a person sees on it, now says **pixl**: the marketing pages, the wordmark in the app bar and on the sign-in screen, the welcome card, the browser tab, the placement report and the messages that name the product. The code keeps its name: the repository, the packages, the Docker image, the fseq producer tag and the file formats are still webXLights, and the site's footer and self-hosting page say so. Canonical URLs, Open Graph URLs, the sitemap and robots.txt point at pixl.community; `render.yaml` sets `APP_NAME` and `APP_URL` to match. Not done here: the four screenshots on the site still show the old wordmark, and the Render dashboard still needs the custom domain attached and added to `SANCTUM_STATEFUL_DOMAINS`.

@@ -387,6 +387,20 @@ export interface SequenceSummary {
   updated_at?: string;
 }
 
+/** A file the project owns: a soundtrack or a picture. `used_by` is every sequence set to it. */
+export interface MediaRecord {
+  id: number;
+  project_id: number;
+  kind: "audio" | "image";
+  name: string;
+  filename: string;
+  mime: string | null;
+  size_bytes: number;
+  used_by: { id: number; name: string }[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SequenceVersion {
   id: number;
   number: number;
@@ -435,6 +449,9 @@ export const api = {
     request<User>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
   me: () => request<User>("/auth/me"),
+  /** Which sign-in buttons the server can honour besides email and password. */
+  authProviders: () => request<{ google: boolean }>("/auth/providers"),
+  googleRedirectUrl: "/api/auth/google/redirect",
   listProjects: () => request<Project[]>("/v1/projects"),
   createProject: (name: string) => request<Project>("/v1/projects", { method: "POST", body: JSON.stringify({ name }) }),
   listLayouts: (projectId: number) => request<Layout[]>(`/v1/projects/${projectId}/layouts`),
@@ -576,11 +593,38 @@ export const api = {
       frame_ms: number;
       duration_ms: number;
       audio_filename?: string;
+      /** A soundtrack already in the project's Files, instead of uploading one. */
+      media_id?: number;
       sequence_type?: "media" | "animated";
       blend_between_models?: boolean;
     },
   ) =>
     request<SequenceRecord>(`/v1/projects/${projectId}/sequences`, { method: "POST", body: JSON.stringify(data) }),
+  deleteSequence: (sequenceId: number) => request<void>(`/v1/sequences/${sequenceId}`, { method: "DELETE" }),
+  // ---- Files ---------------------------------------------------------------------------
+  listMedia: (projectId: number) => request<MediaRecord[]>(`/v1/projects/${projectId}/media`),
+  async uploadMedia(projectId: number, file: File): Promise<MediaRecord> {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`/api/v1/projects/${projectId}/media`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json" }, // no Content-Type: fetch sets the multipart boundary itself
+      body: form,
+    });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    return res.json();
+  },
+  renameMedia: (mediaId: number, name: string) => request<MediaRecord>(`/v1/media/${mediaId}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+  deleteMedia: (mediaId: number) => request<void>(`/v1/media/${mediaId}`, { method: "DELETE" }),
+  mediaFileUrl: (mediaId: number) => `/api/v1/media/${mediaId}/file`,
+  /** The file itself, as a File, so it goes through the same decode path as one picked from disk. */
+  async fetchMediaFile(media: Pick<MediaRecord, "id" | "filename">): Promise<File> {
+    const res = await fetch(`/api/v1/media/${media.id}/file`, { credentials: "include" });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    const blob = await res.blob();
+    return new File([blob], media.filename, { type: blob.type });
+  },
   getSequence: (sequenceId: number) => request<SequenceRecord>(`/v1/sequences/${sequenceId}`),
   /** xLights' Sequence Settings dialog. Separate from the body autosave, which carries an etag. */
   updateSequenceSettings: (
