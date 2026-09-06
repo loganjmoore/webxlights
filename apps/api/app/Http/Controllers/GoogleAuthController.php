@@ -51,11 +51,11 @@ class GoogleAuthController extends Controller
 
         $expected = $request->session()->pull('google_oauth_state');
         if (! $expected || ! hash_equals($expected, (string) $request->query('state', ''))) {
-            return redirect('/auth?error=google');
+            return redirect()->away($this->appUrl('/auth?error=google'));
         }
         if (! $request->query('code')) {
             // The person pressed Cancel on Google's screen. Not an error worth a message.
-            return redirect('/auth');
+            return redirect()->away($this->appUrl('/auth'));
         }
 
         $token = Http::asForm()->post(self::TOKEN_URL, [
@@ -66,14 +66,14 @@ class GoogleAuthController extends Controller
             'grant_type' => 'authorization_code',
         ]);
         if (! $token->ok() || ! $token->json('access_token')) {
-            return redirect('/auth?error=google');
+            return redirect()->away($this->appUrl('/auth?error=google'));
         }
 
         $info = Http::withToken($token->json('access_token'))->get(self::USERINFO_URL);
         $sub = $info->json('sub');
         $email = $info->json('email');
         if (! $info->ok() || ! $sub || ! $email || ! $info->json('email_verified')) {
-            return redirect('/auth?error=google');
+            return redirect()->away($this->appUrl('/auth?error=google'));
         }
 
         // By Google id first, then by email so someone who registered with a password and now
@@ -98,7 +98,7 @@ class GoogleAuthController extends Controller
         Auth::guard('web')->login($user, true);
         $request->session()->regenerate();
 
-        return redirect('/projects');
+        return redirect()->away($this->appUrl('/projects'));
     }
 
     // What Google sends the browser back to, registered on the OAuth client exactly as built
@@ -108,5 +108,13 @@ class GoogleAuthController extends Controller
     private function callbackUrl(): string
     {
         return config('services.google.redirect') ?: rtrim(config('app.url'), '/').'/api/auth/google/callback';
+    }
+
+    // Where the browser goes afterwards: the same origin the callback lives on, for the same
+    // reason. A relative redirect would be resolved against the request host, which through the
+    // Vite proxy is localhost:8000, where there is no app to land in.
+    private function appUrl(string $path): string
+    {
+        return preg_replace('#/api/auth/google/callback$#', '', $this->callbackUrl()).$path;
     }
 }
