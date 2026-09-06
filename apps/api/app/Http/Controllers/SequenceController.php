@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Media;
 use App\Models\Project;
 use App\Models\Sequence;
 use Illuminate\Http\Request;
@@ -29,11 +30,21 @@ class SequenceController extends Controller
             'frame_ms' => ['required', 'integer', Rule::in([20, 25, 33, 40, 50])],
             'duration_ms' => ['required', 'integer', 'min:0'],
             'audio_filename' => ['nullable', 'string'],
+            // A soundtrack already in the project's Files, instead of uploading it again.
+            'media_id' => ['nullable', 'integer'],
             // An animated sequence has no soundtrack, which is the whole distinction - so the
             // type has to be settable at creation, not only afterwards.
             'sequence_type' => ['sometimes', Rule::in(['media', 'animated'])],
             'blend_between_models' => ['sometimes', 'boolean'],
         ]);
+
+        $mediaId = $data['media_id'] ?? null;
+        unset($data['media_id']);
+        if ($mediaId) {
+            $media = $project->media()->where('kind', 'audio')->findOrFail($mediaId);
+            $data['audio_path'] = $media->path;
+            $data['audio_filename'] = $media->filename;
+        }
 
         $sequence = $project->sequences()->create($data + ['body' => ['timingTracks' => [], 'rows' => []]]);
 
@@ -121,14 +132,34 @@ class SequenceController extends Controller
             'audio' => ['required', 'file', 'max:51200', 'extensions:mp3,m4a,aac,wav,wave,ogg,oga,opus,flac,webm,mp4'],
         ]);
 
-        if ($sequence->audio_path) {
+        // The old file goes only if it isn't in Files: one that is stays there as a file the
+        // project still owns, and is deleted from the Files page, not by re-picking here.
+        if ($sequence->audio_path && ! Media::where('path', $sequence->audio_path)->exists()) {
             Storage::disk('audio')->delete($sequence->audio_path);
         }
 
-        $path = $request->file('audio')->store("sequences/{$sequence->id}", 'audio');
-        $sequence->update(['audio_path' => $path]);
+        $upload = $request->file('audio');
+        $path = $upload->store("media/{$sequence->project_id}", 'audio');
+        Media::record($sequence->project, $upload->getClientOriginalName(), $path, $upload->getClientMimeType(), $upload->getSize());
+        $sequence->update(['audio_path' => $path, 'audio_filename' => $upload->getClientOriginalName()]);
 
         return $this->withEtag($sequence->fresh());
+    }
+
+    // Deleting a sequence never deletes its soundtrack: the file is the project's, listed in
+    // Files, and is deleted from there. Only a file no Files row knows about (a copy made
+    // before the media table existed) goes with the sequence, so it can't be orphaned on disk.
+    public function destroy(Request $request, Sequence $sequence)
+    {
+        $this->authorizeSequence($request, $sequence, 'editor');
+
+        $path = $sequence->audio_path;
+        $sequence->delete();
+        if ($path && ! Media::where('path', $path)->exists()) {
+            Storage::disk('audio')->delete($path);
+        }
+
+        return response()->noContent();
     }
 
     public function audio(Request $request, Sequence $sequence)

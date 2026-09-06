@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LibrarySequence;
 use App\Models\ModelEntity;
 use App\Models\ModelGroup;
+use App\Models\Media;
 use App\Models\Project;
 use App\Models\Sequence;
 use Illuminate\Http\Request;
@@ -107,6 +108,7 @@ class LibraryController extends Controller
             $path = "sequences/{$sequence->id}/".($library->audio_filename ?: 'audio'.($ext ? ".{$ext}" : ''));
             Storage::disk('audio')->copy($library->audio_path, $path);
             $sequence->update(['audio_path' => $path]);
+            Media::record($project, $library->audio_filename ?: basename($path), $path);
         }
         $library->increment('uses');
 

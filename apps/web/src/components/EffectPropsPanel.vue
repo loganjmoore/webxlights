@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import CollapsibleSection from "./CollapsibleSection.vue";
 import {
   DEFAULT_PALETTE_HEX,
@@ -29,7 +30,7 @@ import {
   type TransitionSpec,
   type TransitionType,
 } from "@webxlights/engine";
-import type { EffectParamValue, SequenceEffect } from "../lib/api";
+import { api, type EffectParamValue, type MediaRecord, type SequenceEffect } from "../lib/api";
 import ColorCurveEditor from "./ColorCurveEditor.vue";
 import PixelEditor from "./PixelEditor.vue";
 import { decodeImageForEffect } from "../lib/pictureImport";
@@ -76,6 +77,41 @@ const drawing = ref(false);
 function imageParam(key: string): PictureImage | undefined {
   const value = props.effect?.params[key];
   return value && typeof value === "object" && "data" in value ? (value as PictureImage) : undefined;
+}
+
+// The project's pictures, for the Pictures effect: a file uploaded once on the Files page can
+// go on any effect without picking it from disk again. Fetched the first time an image param
+// is shown, not on every panel, since most effects never ask.
+const route = useRoute();
+const pictureFiles = ref<MediaRecord[]>([]);
+const pictureFilesLoaded = ref(false);
+const hasImageParam = computed(() => (schema.value?.params ?? []).some((p) => p.type === "image"));
+watch(
+  hasImageParam,
+  async (has) => {
+    if (!has || pictureFilesLoaded.value) return;
+    pictureFilesLoaded.value = true;
+    const projectId = Number(route.params.projectId);
+    if (!projectId) return;
+    try {
+      pictureFiles.value = (await api.listMedia(projectId)).filter((f) => f.kind === "image");
+    } catch {
+      pictureFiles.value = [];
+    }
+  },
+  { immediate: true },
+);
+
+async function pickImageFromFiles(key: string, e: Event): Promise<void> {
+  const select = e.target as HTMLSelectElement;
+  const chosen = pictureFiles.value.find((f) => f.id === Number(select.value));
+  select.value = "";
+  if (!chosen) return;
+  try {
+    setParam(key, await decodeImageForEffect(await api.fetchMediaFile(chosen)));
+  } catch {
+    // Same as pickImage: a fetch that fails reaches the error overlay, not a blank effect.
+  }
 }
 
 async function pickImage(key: string, e: Event): Promise<void> {
@@ -736,6 +772,10 @@ function curveable(p: EffectParamSpec): boolean {
         -->
         <template v-else-if="p.type === 'image'">
           <input type="file" accept="image/*" @change="pickImage(p.key, $event)" />
+          <select v-if="pictureFiles.length" aria-label="A picture from Files" @change="pickImageFromFiles(p.key, $event)">
+            <option value="">From Files…</option>
+            <option v-for="f in pictureFiles" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
           <button class="draw-toggle" @click="drawing = !drawing">{{ drawing ? "Hide" : "Draw" }}</button>
           <PixelEditor
             v-if="drawing"

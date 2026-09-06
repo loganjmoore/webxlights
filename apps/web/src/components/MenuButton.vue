@@ -51,6 +51,12 @@ async function toggle(): Promise<void> {
   place();
   highlighted.value = -1;
   await nextTick();
+  // A button at the right edge of the page (a table row's menu) would put the list half off
+  // screen; once it has a width, it is pulled back in.
+  const width = listRef.value?.offsetWidth ?? 0;
+  if (width && position.value.left + width > window.innerWidth - 8) {
+    position.value = { ...position.value, left: Math.max(8, window.innerWidth - width - 8) };
+  }
   listRef.value?.focus();
 }
 

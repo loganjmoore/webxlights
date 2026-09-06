@@ -199,7 +199,8 @@ class SequenceTest extends TestCase
         $fetch->assertOk();
     }
 
-    public function test_re_uploading_audio_replaces_the_stored_file_and_deletes_the_old_one(): void
+    // The old file is still the project's: it stays in Files, unused, and is deleted from there.
+    public function test_re_uploading_audio_points_the_sequence_at_the_new_file_and_keeps_the_old_one_in_files(): void
     {
         Storage::fake('audio');
         $user = User::factory()->create();
@@ -215,8 +216,12 @@ class SequenceTest extends TestCase
             'audio' => UploadedFile::fake()->create('second.mp3', 100, 'audio/mpeg'),
         ]);
 
-        Storage::disk('audio')->assertMissing($firstPath);
+        Storage::disk('audio')->assertExists($firstPath);
         Storage::disk('audio')->assertExists($seq->fresh()->audio_path);
+        $this->assertSame('second.mp3', $seq->fresh()->audio_filename);
+        $files = $this->actingAs($user)->getJson("/api/v1/projects/{$project->id}/media")->assertJsonCount(2);
+        $this->assertSame([], $files->json('1.used_by'));
+        $this->assertSame('Show', $files->json('0.used_by.0.name'));
     }
 
     public function test_a_user_cannot_upload_or_fetch_audio_for_another_users_sequence(): void

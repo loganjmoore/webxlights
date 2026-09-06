@@ -43,6 +43,11 @@ class Project extends Model
         return $this->hasMany(Controller::class);
     }
 
+    public function media(): HasMany
+    {
+        return $this->hasMany(Media::class);
+    }
+
     // 'owner' (full control), 'editor' (read/write), 'viewer' (read-only), or null (no access).
     public function accessLevel(User $user): ?string
     {

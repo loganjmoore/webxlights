@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import AppBar from "../components/AppBar.vue";
+import MenuButton from "../components/MenuButton.vue";
 import ModalPanel from "../components/ModalPanel.vue";
+import { confirm } from "../lib/confirm";
 import { relativeTime } from "../lib/relativeTime";
 import { useRoute, useRouter } from "vue-router";
 import { parseXsq } from "@webxlights/formats";
 import { describeMapping, mapXsqToBody } from "../lib/xsqConvert";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
-import { api, type ModelGroupRecord, type ModelRecord, type SequenceSummary } from "../lib/api";
+import { api, type MediaRecord, type ModelGroupRecord, type ModelRecord, type SequenceSummary } from "../lib/api";
 import { loadPreferences } from "../lib/preferences";
 import { decodeAudioFile } from "../lib/audio";
 import {
@@ -41,6 +43,10 @@ const name = ref("");
 const newPrefs = loadPreferences(typeof localStorage === "undefined" ? null : localStorage);
 const frameMs = ref(newPrefs.defaultFrameMs);
 const audioFile = ref<File | null>(null);
+// A song already in the project's Files, instead of uploading it again. Loaded when the dialog
+// opens; picking one fetches it so its length can be read the same way as a picked file's.
+const audioFiles = ref<MediaRecord[]>([]);
+const fromFilesId = ref<number | "">("");
 const creating = ref(false);
 const error = ref("");
 const importing = ref(false);
@@ -52,29 +58,79 @@ async function load(): Promise<void> {
   sequences.value = await api.listSequences(projectId.value);
 }
 
+async function openNew(): Promise<void> {
+  showNew.value = true;
+  try {
+    audioFiles.value = (await api.listMedia(projectId.value)).filter((f) => f.kind === "audio");
+  } catch {
+    audioFiles.value = [];
+  }
+}
+
+// Sequence rows' own actions. A rename is the settings dialog's name field without opening the
+// sequencer; delete asks first and never takes the soundtrack, which stays in Files.
+const renaming = ref<{ id: number; name: string } | null>(null);
+
+async function commitRename(): Promise<void> {
+  const edit = renaming.value;
+  if (!edit) return;
+  const next = edit.name.trim();
+  renaming.value = null;
+  if (!next) return;
+  await api.updateSequenceSettings(edit.id, { name: next });
+  await load();
+}
+
+async function deleteSequence(s: SequenceSummary): Promise<void> {
+  const ok = await confirm({
+    title: `Delete ${s.name}?`,
+    message: "The sequence and its saved versions will be removed. Its audio stays in Files. This can't be undone.",
+    confirmLabel: "Delete",
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await api.deleteSequence(s.id);
+    sequences.value = sequences.value.filter((x) => x.id !== s.id);
+  } catch (err) {
+    importMessage.value = err instanceof Error ? err.message : "Could not delete that sequence";
+  }
+}
+
 function onFilePicked(e: Event): void {
   const input = e.target as HTMLInputElement;
   audioFile.value = input.files?.[0] ?? null;
+  if (audioFile.value) fromFilesId.value = "";
   if (audioFile.value && !name.value) {
     name.value = audioFile.value.name.replace(/\.[^.]+$/, "");
   }
 }
 
+function onFromFilesPicked(): void {
+  if (fromFilesId.value === "") return;
+  audioFile.value = null;
+  const chosen = audioFiles.value.find((f) => f.id === fromFilesId.value);
+  if (chosen && !name.value) name.value = chosen.name;
+}
+
 async function createSequence(): Promise<void> {
-  if (!audioFile.value || !name.value.trim()) return;
+  const chosen = fromFilesId.value === "" ? null : audioFiles.value.find((f) => f.id === fromFilesId.value) ?? null;
+  if ((!audioFile.value && !chosen) || !name.value.trim()) return;
   creating.value = true;
   error.value = "";
   try {
-    const buffer = await decodeAudioFile(audioFile.value);
+    const file = audioFile.value ?? (await api.fetchMediaFile(chosen!));
+    const buffer = await decodeAudioFile(file);
     const durationMs = Math.round(buffer.duration * 1000);
     const record = await api.createSequence(projectId.value, {
       name: name.value.trim(),
       frame_ms: frameMs.value,
       duration_ms: durationMs,
-      audio_filename: audioFile.value.name,
+      audio_filename: file.name,
+      media_id: chosen?.id,
       blend_between_models: newPrefs.defaultBlendBetweenModels,
     });
-    await api.uploadSequenceAudio(record.id, audioFile.value);
+    if (audioFile.value) await api.uploadSequenceAudio(record.id, audioFile.value);
     router.push({ name: "sequencer", params: { projectId: projectId.value, sequenceId: record.id } });
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Could not create sequence";
@@ -273,7 +329,7 @@ onMounted(load);
     />
     <header class="page-toolbar">
       <h1>Sequences</h1>
-      <button class="primary" @click="showNew = true">New sequence</button>
+      <button class="primary" @click="openNew">New sequence</button>
       <label class="btn">
         {{ importing ? "Importing…" : "Import .xsq" }}
         <input type="file" accept=".xsq" @change="importXsq" :disabled="importing" hidden />
@@ -304,8 +360,16 @@ onMounted(load);
             <td class="num">{{ Math.round(1000 / s.frame_ms) }} fps</td>
             <td class="muted">{{ s.sequence_type === "animated" ? "Animated" : (s.audio_filename ?? "Audio") }}</td>
             <td class="muted">{{ relativeTime(s.updated_at) }}</td>
-            <td class="open">
-              <router-link :to="{ name: 'sequencer', params: { projectId, sequenceId: s.id } }" class="btn" @click.stop>Open</router-link>
+            <td class="open" @click.stop>
+              <router-link :to="{ name: 'sequencer', params: { projectId, sequenceId: s.id } }" class="btn">Open</router-link>
+              <MenuButton
+                label="⋯"
+                :items="[
+                  { label: 'Rename…', run: () => (renaming = { id: s.id, name: s.name }) },
+                  { kind: 'separator' },
+                  { label: 'Delete…', run: () => deleteSequence(s) },
+                ]"
+              />
             </td>
           </tr>
         </tbody>
@@ -314,7 +378,7 @@ onMounted(load);
         <h2>No sequences yet</h2>
         <p>A sequence is a song and the effects you put to it. Start one from an audio file, or bring one over from xLights.</p>
         <div class="empty-actions">
-          <button class="primary" @click="showNew = true">New sequence</button>
+          <button class="primary" @click="openNew">New sequence</button>
           <label class="btn">
             Import .xsq
             <input type="file" accept=".xsq" @change="importXsq" :disabled="importing" hidden />
@@ -323,12 +387,32 @@ onMounted(load);
       </section>
     </div>
 
+    <ModalPanel v-if="renaming" title="Rename sequence" @close="renaming = null">
+      <form class="new-form" @submit.prevent="commitRename">
+        <label>
+          <span>Name</span>
+          <input v-model="renaming.name" type="text" autofocus />
+        </label>
+        <div class="new-actions">
+          <button type="submit" class="primary" :disabled="!renaming.name.trim()">Rename</button>
+          <button type="button" @click="renaming = null">Cancel</button>
+        </div>
+      </form>
+    </ModalPanel>
+
     <ModalPanel v-if="showNew" id="new-sequence" title="New sequence" @close="showNew = false">
       <div class="new-form">
         <label>
           <span>Audio file</span>
           <input type="file" accept="audio/*" @change="onFilePicked" />
           <small>The song this sequence is set to. Its length becomes the sequence's length.</small>
+        </label>
+        <label v-if="audioFiles.length">
+          <span>Or a song already in Files</span>
+          <select v-model="fromFilesId" @change="onFromFilesPicked">
+            <option value="">Pick one…</option>
+            <option v-for="f in audioFiles" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
         </label>
         <label>
           <span>Name</span>
@@ -342,7 +426,7 @@ onMounted(load);
         </label>
         <p v-if="error" class="error">{{ error }}</p>
         <div class="new-actions">
-          <button class="primary" :disabled="!audioFile || !name.trim() || creating" @click="createSequence">
+          <button class="primary" :disabled="(!audioFile && fromFilesId === '') || !name.trim() || creating" @click="createSequence">
             {{ creating ? "Decoding audio…" : "Create" }}
           </button>
           <button
@@ -420,6 +504,14 @@ onMounted(load);
 .open {
   text-align: right;
   width: 1%;
+  white-space: nowrap;
+}
+.open :deep(.menu-button) {
+  margin-left: 0.3rem;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0 0.45rem;
+  color: var(--text-muted);
 }
 .empty {
   max-width: 52ch;
