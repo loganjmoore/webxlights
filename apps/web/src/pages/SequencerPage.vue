@@ -91,8 +91,10 @@ import SequencerGrid, { type ContextMenuTarget, type GridRow } from "../componen
 import EffectContextMenu from "../components/EffectContextMenu.vue";
 import Waveform from "../components/Waveform.vue";
 import EffectPropsPanel from "../components/EffectPropsPanel.vue";
+import { houseModelFrom, type HouseModel } from "../lib/houseModel";
 import HousePreview from "../components/HousePreview.vue";
 
+const houseModel = ref<HouseModel | null>(null);
 const route = useRoute();
 const router = useRouter();
 const sequenceId = computed(() => Number(route.params.sequenceId));
@@ -857,6 +859,7 @@ async function loadRows(): Promise<void> {
   // The sequencer needs a project's layout; fetch it via the sequence's project.
   const layouts = await api.listLayouts(Number(route.params.projectId));
   const layout = layouts[0];
+  houseModel.value = houseModelFrom(layout?.settings);
   if (!layout) return;
   const [models, groups]: [ModelRecord[], ModelGroupRecord[]] = await Promise.all([
     api.listModels(layout.id),
@@ -3526,6 +3529,7 @@ watch(sequenceId, async (id) => {
              compose-cache rebuild. Hidden, the component pauses itself and costs nothing. -->
         <div v-show="!previewPoppedOut" class="preview-wrap">
           <HousePreview
+            :house-model="houseModel"
             :models="modelRecords"
             :groups="groupRecords"
             :body="store.body"

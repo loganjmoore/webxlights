@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as THREE from "three";
+import { createHouseGroup, disposeHouseGroup, fitHouseCamera, resizeHouseCamera, type HouseModel } from "../lib/houseModel";
 import {
   computeGeometryFromAttrs,
   strandSpecs,
@@ -27,6 +28,7 @@ import { displayY, transformForModel } from "../lib/modelTransform";
 import { NODE_SPACING } from "../lib/worldUnits";
 
 const props = defineProps<{
+  houseModel?: HouseModel | null;
   models: ModelRecord[];
   // A group row renders across several models at once, so the preview needs the memberships as
   // well as the models themselves.
@@ -54,6 +56,18 @@ let setup: SceneSetup | null = null;
 let points: THREE.Points | null = null;
 let orbit: OrbitControls | null = null;
 let rafId: number | null = null;
+let houseGroup: THREE.Group | null = null;
+function buildHouse(): void {
+  disposeHouseGroup(houseGroup);
+  houseGroup = null;
+  if (!setup || !props.houseModel) return;
+  houseGroup = createHouseGroup(props.houseModel);
+  setup.scene.add(houseGroup);
+}
+watch(() => props.houseModel, () => {
+  buildHouse();
+  fitCameraToScene();
+}, { deep: true });
 
 interface RowEntry {
   model: ModelRecord;
@@ -251,6 +265,13 @@ function zoomView(factor: number): void {
 
 function fitCameraToScene(): void {
   if (!setup) return;
+  if (houseGroup && orbit) {
+    const bounds = new THREE.Box3();
+    if (points) bounds.expandByObject(points);
+    fitHouseCamera(houseGroup, setup.camera, orbit.target, bounds);
+    orbit.update();
+    return;
+  }
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const entry of rowEntries) {
     const mx = entry.model.screen.x ?? 0;
@@ -309,6 +330,7 @@ function initScene(): void {
   points = new THREE.Points(geo, material);
   setup.scene.add(points);
 
+  buildHouse();
   fitCameraToScene();
   hasFittedToModels = rowEntries.length > 0;
   updateColors();
@@ -326,7 +348,9 @@ function initScene(): void {
 function handleResize(): void {
   const container = containerRef.value;
   if (!container || !setup) return;
+  const previousAspect = setup.camera.aspect;
   resizeScene(setup, container);
+  if (houseGroup && orbit) resizeHouseCamera(setup.camera, orbit.target, previousAspect);
 }
 
 onMounted(() => {
@@ -336,6 +360,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener("resize", handleResize);
   if (rafId) cancelAnimationFrame(rafId);
+  disposeHouseGroup(houseGroup);
   if (setup && containerRef.value) disposeScene(setup, containerRef.value);
 });
 
@@ -390,6 +415,10 @@ watch(
     if (!points) return;
     const positions = buildPositions();
     points.geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    // The house may arrive before the lights. Discard bounds computed for the empty buffer,
+    // or framing and frustum culling can keep treating the loaded lights as an empty scene.
+    points.geometry.computeBoundingBox();
+    points.geometry.computeBoundingSphere();
     points.geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(positions.length), 3));
     // Only the first time models arrive. This used to re-fit on every change, which threw away
     // the camera the moment anything in the show was edited - now that the preview can be

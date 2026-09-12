@@ -38,9 +38,11 @@ import { confirm } from "../lib/confirm";
 import { loadPreferences } from "../lib/preferences";
 import { buildPlacementReport, copyOrDownloadReport } from "../lib/placementReport";
 import { channelCountForModel } from "../lib/fseqExport";
+import { houseModelFrom } from "../lib/houseModel";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
 
 const canvasRef = ref<InstanceType<typeof LayoutCanvas3D> | null>(null);
+const houseModel = computed(() => houseModelFrom(layout.value?.settings));
 import ModelPalette from "../components/ModelPalette.vue";
 import AppBar from "../components/AppBar.vue";
 import { NODE_SPACING } from "../lib/worldUnits";
@@ -1461,6 +1463,7 @@ onUnmounted(() => {
           <LayoutCanvas3D
             ref="canvasRef"
             :models="previewModels"
+            :house-model="houseModel"
             :view-objects="viewObjects"
             :selected-model-id="selectedModelId"
             @select="selectedIds = $event === null ? [] : [$event]"

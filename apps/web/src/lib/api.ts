@@ -1,3 +1,4 @@
+import type { HouseModel } from "./houseModel";
 import type { EffectPreset } from "./effectPresets";
 import type { BackgroundImage } from "./backgroundImage";
 import type { SongBoundary } from "./songRegions";
@@ -577,6 +578,8 @@ export const api = {
   listEffectPresets: (layoutId: number) => request<{ presets: EffectPreset[] }>(`/v1/layouts/${layoutId}/effect-presets`),
   replaceEffectPresets: (layoutId: number, presets: EffectPreset[]) =>
     request<{ presets: EffectPreset[] }>(`/v1/layouts/${layoutId}/effect-presets`, { method: "PUT", body: JSON.stringify({ presets }) }),
+  replaceHouseModel: (layoutId: number, houseModel: HouseModel | null) =>
+    request<{ houseModel: HouseModel | null }>(`/v1/layouts/${layoutId}/house-model`, { method: "PUT", body: JSON.stringify({ houseModel }) }),
   replaceBackground: (layoutId: number, background: BackgroundImage | null) =>
     request<{ background: BackgroundImage | null }>(`/v1/layouts/${layoutId}/background`, {
       method: "PUT",
