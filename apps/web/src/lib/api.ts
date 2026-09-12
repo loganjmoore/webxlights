@@ -578,8 +578,13 @@ export const api = {
   listEffectPresets: (layoutId: number) => request<{ presets: EffectPreset[] }>(`/v1/layouts/${layoutId}/effect-presets`),
   replaceEffectPresets: (layoutId: number, presets: EffectPreset[]) =>
     request<{ presets: EffectPreset[] }>(`/v1/layouts/${layoutId}/effect-presets`, { method: "PUT", body: JSON.stringify({ presets }) }),
-  replaceHouseModel: (layoutId: number, houseModel: HouseModel | null) =>
-    request<{ houseModel: HouseModel | null }>(`/v1/layouts/${layoutId}/house-model`, { method: "PUT", body: JSON.stringify({ houseModel }) }),
+  getHouseModel: (layoutId: number) => request<{ houseModel: HouseModel | null; revision: string }>(`/v1/layouts/${layoutId}/house-model`),
+  lookupHouseAddress: (layoutId: number, address: string, signal?: AbortSignal) =>
+    request<{ candidates: { token: string; label: string }[] }>(`/v1/layouts/${layoutId}/house-model/lookup`, { method: "POST", body: JSON.stringify({ address }), signal }),
+  generateHouse: (layoutId: number, token: string, requestId: string, photos: string[], signal?: AbortSignal) =>
+    request<HouseDraft>(`/v1/layouts/${layoutId}/house-model/generate`, { method: "POST", body: JSON.stringify({ token, requestId, photos }), signal }),
+  replaceHouseModel: (layoutId: number, houseModel: HouseModel | null, ifMatch?: string) =>
+    request<{ houseModel: HouseModel | null; revision: string }>(`/v1/layouts/${layoutId}/house-model`, { method: "PUT", body: JSON.stringify({ houseModel, ...(ifMatch ? { if_match: ifMatch } : {}) }) }),
   replaceBackground: (layoutId: number, background: BackgroundImage | null) =>
     request<{ background: BackgroundImage | null }>(`/v1/layouts/${layoutId}/background`, {
       method: "PUT",
@@ -691,3 +696,11 @@ export const api = {
   removeMember: (projectId: number, userId: number) =>
     request<void>(`/v1/projects/${projectId}/members/${userId}`, { method: "DELETE" }),
 };
+
+export interface HouseDraft {
+  houseModel: HouseModel;
+  evidence: string;
+  missing: string[];
+  warnings: string[];
+  photos: { dataUrl: string; credit?: { label: string; url: string; license: string } }[];
+}

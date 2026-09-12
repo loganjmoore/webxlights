@@ -57,6 +57,7 @@ let points: THREE.Points | null = null;
 let orbit: OrbitControls | null = null;
 let rafId: number | null = null;
 let houseGroup: THREE.Group | null = null;
+let resizeObserver: ResizeObserver | null = null;
 function buildHouse(): void {
   disposeHouseGroup(houseGroup);
   houseGroup = null;
@@ -347,7 +348,7 @@ function initScene(): void {
 
 function handleResize(): void {
   const container = containerRef.value;
-  if (!container || !setup) return;
+  if (!container?.clientWidth || !container.clientHeight || !setup) return;
   const previousAspect = setup.camera.aspect;
   resizeScene(setup, container);
   if (houseGroup && orbit) resizeHouseCamera(setup.camera, orbit.target, previousAspect);
@@ -355,10 +356,12 @@ function handleResize(): void {
 
 onMounted(() => {
   initScene();
+  if (containerRef.value) { resizeObserver = new ResizeObserver(handleResize); resizeObserver.observe(containerRef.value); }
   window.addEventListener("resize", handleResize);
 });
 onBeforeUnmount(() => {
   window.removeEventListener("resize", handleResize);
+  resizeObserver?.disconnect();
   if (rafId) cancelAnimationFrame(rafId);
   disposeHouseGroup(houseGroup);
   if (setup && containerRef.value) disposeScene(setup, containerRef.value);

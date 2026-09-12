@@ -27,7 +27,7 @@ class HouseModelTest extends TestCase
         $this->getJson("/api/v1/projects/{$project->id}/layouts")->assertOk()->assertJsonPath('0.settings.houseModel.source.label', $this->house()['source']['label']);
         $this->assertEquals($this->house(), $layout->fresh()->settings['houseModel']);
         $version = $this->postJson("/api/v1/layouts/{$layout->id}/versions")->assertCreated()->json('id');
-        $this->putJson($url, ['houseModel' => null])->assertOk()->assertExactJson(['houseModel' => null]);
+        $this->putJson($url, ['houseModel' => null])->assertOk()->assertJsonPath('houseModel', null);
         $this->assertArrayNotHasKey('houseModel', $layout->fresh()->settings);
         $this->assertSame('Front', $layout->fresh()->settings['views'][0]['name']);
         $this->assertSame($model->id, $layout->fresh()->models->first()->id);

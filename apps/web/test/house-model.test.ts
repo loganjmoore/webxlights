@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import * as THREE from "three";
 import fixture from "./fixtures/synthetic-house.json";
-import { houseModelFrom, createHouseGroup, disposeHouseGroup, fitHouseCamera, resizeHouseCamera } from "../src/lib/houseModel";
+import { houseModelFrom, createHouseGroup, disposeHouseGroup, fitHouseCamera, resizeHouseCamera, calibrateHouseWidth, houseDimensions } from "../src/lib/houseModel";
 
 describe("house exterior geometry", () => {
   it("preserves every surface type and meter geometry without images or textures", () => {
@@ -18,6 +18,16 @@ describe("house exterior geometry", () => {
     const disposal = vi.spyOn(meshes[0]!.geometry, "dispose");
     disposeHouseGroup(group);
     expect(disposal).toHaveBeenCalledOnce();
+  });
+
+  it("calibrates real dimensions without moving the house or mutating its source", () => {
+    const house = houseModelFrom({ houseModel: fixture })!;
+    const before = structuredClone(house);
+    const scaled = calibrateHouseWidth(house, 24);
+    expect(houseDimensions(scaled)).toEqual({ width: 24, height: 10, depth: 20 });
+    expect(scaled.placement).toEqual(house.placement);
+    expect(house).toEqual(before);
+    for (const width of [0, -1, NaN, Infinity, 101]) expect(() => calibrateHouseWidth(house, width)).toThrow();
   });
 
   it("rejects corrupt or oversized geometry from stored layouts", () => {

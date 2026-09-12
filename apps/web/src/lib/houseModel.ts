@@ -11,7 +11,7 @@ export interface HouseSurface {
 }
 export interface HouseModel {
   version: 1;
-  source: { label: string; notes: string };
+  source: { label: string; notes: string; credits?: { label: string; url: string; license: string }[] };
   /** Explicit calibration: existing layouts do not have a universal physical scale. */
   placement: { position: HousePoint; rotationY: number; worldUnitsPerMeter: number };
   surfaces: HouseSurface[];
@@ -29,6 +29,9 @@ export function houseModelFrom(settings: Record<string, unknown> | null | undefi
   if (!record(h) || h.version !== 1 || !record(h.source) || !record(h.placement)) return null;
   if (typeof h.source.label !== "string" || !h.source.label.trim() || h.source.label.length > 200 ||
       typeof h.source.notes !== "string" || h.source.notes.length > 2000) return null;
+  if (h.source.credits !== undefined && (!Array.isArray(h.source.credits) || h.source.credits.length > 8 ||
+      !h.source.credits.every(c => record(c) && typeof c.label === "string" && typeof c.license === "string" &&
+        typeof c.url === "string" && /^https:\/\//.test(c.url)))) return null;
   const p = h.placement;
   if (!point(p.position, 100000) || !numberIn(p.rotationY, -360, 360) || !numberIn(p.worldUnitsPerMeter, 0.1, 1000)) return null;
   if (!Array.isArray(h.surfaces) || !h.surfaces.length || h.surfaces.length > 256) return null;
@@ -107,4 +110,23 @@ export function resizeHouseCamera(camera: THREE.PerspectiveCamera, target: THREE
   camera.position.sub(target).multiplyScalar(ratio).add(target);
   camera.far = Math.max(camera.far, camera.position.distanceTo(target) * 4);
   camera.updateProjectionMatrix();
+}
+
+export function houseDimensions(house: HouseModel): { width: number; height: number; depth: number } {
+  const bounds = new THREE.Box3();
+  for (const s of house.surfaces) for (const p of s.vertices) bounds.expandByPoint(new THREE.Vector3(...p));
+  const size = bounds.getSize(new THREE.Vector3());
+  return { width: size.x, height: size.y, depth: size.z };
+}
+
+/** Physical calibration changes meter geometry, independently of alignment with existing lights. */
+export function calibrateHouseWidth(house: HouseModel, meters: number): HouseModel {
+  const width = houseDimensions(house).width;
+  if (!Number.isFinite(meters) || meters < 1 || meters > 100 || width <= 0) throw new Error("Enter a house width between 1 and 100 meters.");
+  const ratio = meters / width;
+  const next = structuredClone(house);
+  for (const surface of next.surfaces) surface.vertices = surface.vertices.map(p => p.map(v => v * ratio) as HousePoint);
+  next.source.notes = `Width calibrated to ${meters.toFixed(2)} m; other dimensions scaled proportionally.\n${house.source.notes}`.slice(0, 2000);
+  if (!houseModelFrom({ houseModel: next })) throw new Error("That width exceeds the supported model size.");
+  return next;
 }
