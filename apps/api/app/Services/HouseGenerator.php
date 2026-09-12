@@ -26,7 +26,7 @@ Each surface has a name, kind (wall, roof, window, door, porch, exterior) and a 
 PROMPT;
         $number = ['type' => 'number'];
         $response = Http::withHeaders(['x-api-key' => config('services.house.key'), 'anthropic-version' => '2023-06-01'])
-            ->connectTimeout(10)->timeout(120)->post('https://api.anthropic.com/v1/messages', [
+            ->connectTimeout(10)->timeout(240)->post('https://api.anthropic.com/v1/messages', [
                 'model' => config('services.house.model'), 'max_tokens' => 16000, 'system' => $system,
                 'messages' => [['role' => 'user', 'content' => $content]],
                 'tool_choice' => ['type' => 'tool', 'name' => 'house_exterior'],

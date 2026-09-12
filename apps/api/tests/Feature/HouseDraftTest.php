@@ -80,6 +80,17 @@ class HouseDraftTest extends TestCase
         $this->assertEquals($house, $layout->fresh()->settings['houseModel']);
     }
 
+    public function test_provider_timeout_preserves_layout_and_logs_no_source_or_credentials(): void
+    {
+        [$user, $layout, $base, $token, $sources] = $this->setupHouse();
+        $sources->shouldReceive('streetPhotos')->andReturn([['dataUrl' => 'private-photo']]);
+        $this->mock(HouseGenerator::class)->shouldReceive('generate')->once()->andThrow(new \Illuminate\Http\Client\ConnectionException('private-provider-message'));
+        \Illuminate\Support\Facades\Log::spy();
+        $this->postJson("$base/generate", ['token' => $token, 'requestId' => (string) Str::uuid()])->assertStatus(503)->assertJsonPath('message', 'House generation could not finish. Your layout is unchanged. Please try again.');
+        $this->assertSame(['keep' => 'yes'], $layout->fresh()->settings);
+        \Illuminate\Support\Facades\Log::shouldHaveReceived('warning')->once()->with('House generation request failed', \Mockery::on(fn($meta) => array_keys($meta) === ['failure','upstream_status','elapsed_seconds'] && $meta['failure'] === 'ConnectionException' && $meta['upstream_status'] === null));
+    }
+
     public function test_lookup_and_generation_have_independent_rate_limits(): void
     {
         config(['services.house.key' => 'test-key']);

@@ -42,7 +42,7 @@ class HouseDraftController extends Controller
     public function generate(Request $request, Layout $layout, HouseSources $sources, HouseGenerator $generator)
     {
         $layout->project->authorize($request->user(), 'editor');
-        set_time_limit(240);
+        set_time_limit(360);
         $data = $request->validate([
             'token' => ['required', 'uuid'], 'requestId' => ['required', 'uuid'],
             'photos' => ['sometimes', 'array', 'max:4'], 'photos.*' => ['string', 'max:7000000'],
@@ -56,7 +56,7 @@ class HouseDraftController extends Controller
             abort_unless(hash_equals($cached['fingerprint'], $fingerprint), 409, 'This draft request has changed. Start a new draft.');
             return response()->json($cached['result'])->header('Cache-Control', 'private, no-store');
         }
-        $lock = Cache::lock($key.':lock', 240);
+        $lock = Cache::lock($key.':lock', 400);
         abort_unless($lock->get(), 409, 'This house draft is still being generated. Wait for it to finish before retrying.');
         try {
             if ($cached = Cache::get($key)) {
@@ -94,8 +94,17 @@ class HouseDraftController extends Controller
                 // Reserved before the paid request, even if a client loses the response.
                 $user->moveCredits(0, 'house_generation');
             });
+            $generationStarted = microtime(true);
             try { $result = $generator->generate($place, $building, $photos); }
-            catch (ConnectionException|RequestException) { abort(503, 'House generation could not finish. Your layout is unchanged. Please try again.'); }
+            catch (ConnectionException|RequestException $e) {
+                // Diagnose provider limits without logging addresses, photos, keys or response bodies.
+                \Illuminate\Support\Facades\Log::warning('House generation request failed', [
+                    'failure' => class_basename($e),
+                    'upstream_status' => $e instanceof RequestException ? $e->response->status() : null,
+                    'elapsed_seconds' => round(microtime(true) - $generationStarted, 1),
+                ]);
+                abort(503, 'House generation could not finish. Your layout is unchanged. Please try again.');
+            }
             $result['warnings'] = $warnings;
             Cache::put($key, ['fingerprint' => $fingerprint, 'result' => $result], 600);
             return response()->json($result)->header('Cache-Control', 'private, no-store');
