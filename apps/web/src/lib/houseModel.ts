@@ -130,3 +130,21 @@ export function calibrateHouseWidth(house: HouseModel, meters: number): HouseMod
   if (!houseModelFrom({ houseModel: next })) throw new Error("That width exceeds the supported model size.");
   return next;
 }
+
+/** Preserve photo proportions, fit the empty layout's 200-unit span, and stand on the lawn.
+ * Placement changes only: estimated meter geometry is retained, never presented as measured.
+ */
+export function fitHouseToLayout(house: HouseModel): HouseModel {
+  const bounds = new THREE.Box3();
+  for (const surface of house.surfaces) for (const p of surface.vertices) bounds.expandByPoint(new THREE.Vector3(...p));
+  const size = bounds.getSize(new THREE.Vector3());
+  const scale = 200 / Math.max(size.x, size.y, size.z);
+  const next = structuredClone(house);
+  next.placement = {
+    worldUnitsPerMeter: scale,
+    rotationY: 0,
+    position: [-(bounds.min.x + bounds.max.x) / 2 * scale, -bounds.min.y * scale, -bounds.max.z * scale],
+  };
+  if (!houseModelFrom({ houseModel: next })) throw new Error("This draft could not be fitted to the layout. Try clearer house photos.");
+  return next;
+}

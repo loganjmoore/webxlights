@@ -1,8 +1,12 @@
 # House modeling
 
-Layout → Model my house accepts a mailing address, locates a house address, and generates an untextured exterior from licensed public photos and mapped building information. Review the draft, optionally calibrate its width or align it to existing lights, then save. Saving or removing first creates a layout version. Concurrent changes are protected with a revision check.
+Layout → Model my house now starts with 1–4 uploaded photos. Use a clear front photo first, then angled and side views showing the roof and porch. No address lookup or reference measurement is required. Photos must be owned by the user or used with permission.
 
-Coverage is incomplete. Unmapped addresses can use your own photos without invented coordinates. If public photos cannot identify the house, add up to four front/side photos you own or have permission to use. Hidden windows and doors are not inferred. Dimensions and hidden structural surfaces are estimates, not a survey. Old source photos may differ from today's exterior. Review the source images and verify dimensions before buying lights.
+The model estimates relative proportions using the visible house, doors and storeys. New drafts are centered horizontally, grounded, and scaled uniformly to the empty layout's 200-unit span, with the frontmost surface at Z=0. Geometry retains its estimated meter coordinates; placement scale is for the editor, not a physical measurement. The default camera fits the house and existing lights together, including narrow panes. A Fit to default layout button resets placement; manual placement remains available. Existing saved houses are not rescaled merely by opening them.
+
+Review and save the draft. Saving or removing first creates a layout version, with revision checks for concurrent edits. Hidden openings are not invented; estimates are available under Estimated details and sources. No approximate feet/meters or calibration step is required in the upload flow.
+
+The earlier address-based API remains for compatibility with already-open clients. It is no longer exposed in the dialog; normal photo uploads make no mapping or public-imagery calls. Legacy source credits are preserved on saved models. Uploaded-only drafts do not claim OSM attribution.
 
 ## Sources and configuration
 
@@ -17,6 +21,14 @@ Coverage is incomplete. Unmapped addresses can use your own photos without inven
 Use a shared database cache across web workers. The server needs outgoing HTTPS to the source providers and Anthropic. Nginx allows 360 seconds on the generation route; source lookup has an 80-second overall budget and API model calls have a 240-second limit. Draft locks last 400 seconds, beyond the combined source and generation budgets. Provider failures log only error class, HTTP status and elapsed time. Uploaded photos are reduced in-browser and validated again server-side. Remote downloads only use allowlisted hosts, no redirects, and bounded image sizes.
 
 Geometry is saved in layout settings and shown in Layout, Sequencer, and Preview. Project viewers can read it; editors can generate/change it. Successful draft cache entries may contain the submitted photos for 10 minutes. Source metadata and address caches expire separately. Layout versions retain previous house geometry and attribution, as with other layout settings.
+
+## Upload-first verification — 12 September 2026
+
+- 543 web tests and 180 API tests / 698 assertions passed, plus frontend lint, type checks and production build. The existing bundle-size warning remains.
+- A browser selected and removed a real photo; generation enabled only with an image and required neither an address nor a measurement.
+- A previously saved 34-surface house was fitted and saved through the dialog, then reloaded. Database bounds confirmed horizontal centering, ground Y=0, frontmost Z=0 and largest dimension 200 units, with all surfaces retained.
+- Desktop and 480 × 800 browser views showed the house in the default camera and kept the upload, fit and save controls reachable. Wheel gestures over the 3D preview zoom the camera; scrolling the surrounding dialog moves its content.
+- The no-address API regression verifies no geocoder/imagery calls, no allowance spent without a photo, idempotent generation, unchanged layout until save, and no spurious OSM credit for photo-only geometry.
 
 ## Verification — 12 September 2026
 

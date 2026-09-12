@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import * as THREE from "three";
 import fixture from "./fixtures/synthetic-house.json";
-import { houseModelFrom, createHouseGroup, disposeHouseGroup, fitHouseCamera, resizeHouseCamera, calibrateHouseWidth, houseDimensions } from "../src/lib/houseModel";
+import { houseModelFrom, createHouseGroup, disposeHouseGroup, fitHouseCamera, resizeHouseCamera, calibrateHouseWidth, houseDimensions, fitHouseToLayout } from "../src/lib/houseModel";
 
 describe("house exterior geometry", () => {
   it("preserves every surface type and meter geometry without images or textures", () => {
@@ -28,6 +28,28 @@ describe("house exterior geometry", () => {
     expect(scaled.placement).toEqual(house.placement);
     expect(house).toEqual(before);
     for (const width of [0, -1, NaN, Infinity, 101]) expect(() => calibrateHouseWidth(house, width)).toThrow();
+  });
+
+  it("fits unmeasured photo geometry to the default layout without changing its proportions", () => {
+    const house = houseModelFrom({ houseModel: structuredClone(fixture) })!;
+    // An offset photo reconstruction must not float above the lawn or miss the center.
+    for (const surface of house.surfaces) for (const p of surface.vertices) { p[0] += 40; p[1] += 7; p[2] += 20; }
+    const before = structuredClone(house);
+    const fitted = fitHouseToLayout(house);
+    expect(fitted.surfaces).toEqual(before.surfaces);
+    expect(house).toEqual(before);
+    expect(fitted.source).toEqual(before.source);
+    const group = createHouseGroup(fitted);
+    const bounds = new THREE.Box3().setFromObject(group);
+    const size = bounds.getSize(new THREE.Vector3());
+    expect(Math.max(size.x, size.y, size.z)).toBeCloseTo(200);
+    expect(bounds.min.y).toBeCloseTo(0);
+    expect(bounds.max.z).toBeCloseTo(0);
+    expect((bounds.min.x + bounds.max.x) / 2).toBeCloseTo(0);
+    expect(size.x / size.y).toBeCloseTo(12 / 5);
+    expect(size.x / size.z).toBeCloseTo(12 / 10);
+    expect(fitHouseToLayout(fitted)).toEqual(fitted);
+    disposeHouseGroup(group);
   });
 
   it("rejects corrupt or oversized geometry from stored layouts", () => {

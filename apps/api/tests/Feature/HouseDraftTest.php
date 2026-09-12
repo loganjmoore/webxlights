@@ -127,6 +127,28 @@ class HouseDraftTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_photos_generate_without_address_measurement_or_source_requests(): void
+    {
+        config(['services.house.key' => 'test-key']);
+        Http::preventStrayRequests();
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['owner_id' => $user->id]);
+        $layout = $project->layouts()->create(['name' => 'House', 'settings' => ['keep' => 'yes']]);
+        $base = "/api/v1/layouts/{$layout->id}/house-model";
+        $this->actingAs($user);
+        $this->mock(HouseSources::class)->shouldNotReceive('search', 'building', 'streetPhotos', 'commonsPhotos');
+        $request = ['requestId' => (string) Str::uuid()];
+        $this->postJson("$base/generate", $request)->assertUnprocessable()->assertJsonPath('message', 'Add at least one house photo to create a draft.');
+        $this->assertSame(0, $user->creditTransactions()->count());
+        $request['photos'] = ['data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII='];
+        $this->mock(HouseGenerator::class)->shouldReceive('generate')->once()->withArgs(fn($p,$b,$photos) => $p['label'] === 'My house' && $p['lat'] === null && $p['lng'] === null && $b === [] && count($photos) === 1)->andReturn(['houseModel' => [], 'evidence' => 'Test', 'missing' => [], 'photos' => []]);
+        $this->postJson("$base/generate", $request)->assertOk();
+        $this->postJson("$base/generate", $request)->assertOk();
+        $this->assertSame(1, $user->creditTransactions()->count());
+        $this->assertSame(['keep' => 'yes'], $layout->fresh()->settings);
+        Http::assertNothingSent();
+    }
+
     public function test_real_tool_shape_is_preserved_and_zero_area_padding_is_removed(): void
     {
         config(['services.house.key' => 'test-key']);
@@ -134,9 +156,10 @@ class HouseDraftTest extends TestCase
         $surfaces = array_map(fn($s) => array_intersect_key($s, array_flip(['name','kind','vertices'])), $house['surfaces']);
         array_push($surfaces[0]['vertices'], [0,0,0], [0,0,0], [0,0,0]);
         Http::fake(['api.anthropic.com/*' => Http::response(['stop_reason' => 'tool_use', 'content' => [['type' => 'tool_use', 'name' => 'house_exterior', 'input' => ['targetIdentified' => true, 'evidence' => 'Exact house photo', 'notes' => 'Estimated', 'missing' => [], 'surfaces' => $surfaces]]]])]);
-        $result = (new HouseGenerator())->generate(['label' => '123 Main', 'name' => '', 'lat' => 41, 'lng' => -87], [], []);
+        $result = (new HouseGenerator())->generate(['label' => 'My house', 'name' => '', 'lat' => null, 'lng' => null], [], []);
         $this->assertEquals($house['surfaces'], $result['houseModel']['surfaces']);
-        $this->assertSame('123 Main', $result['houseModel']['source']['label']);
+        $this->assertSame('My house', $result['houseModel']['source']['label']);
+        $this->assertSame([], $result['houseModel']['source']['credits']);
         Http::assertSent(fn($r) => $r['tools'][0]['strict'] === true);
     }
 

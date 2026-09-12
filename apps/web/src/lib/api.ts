@@ -581,7 +581,7 @@ export const api = {
   getHouseModel: (layoutId: number) => request<{ houseModel: HouseModel | null; revision: string }>(`/v1/layouts/${layoutId}/house-model`),
   lookupHouseAddress: (layoutId: number, address: string, signal?: AbortSignal) =>
     request<{ candidates: { token: string; label: string }[] }>(`/v1/layouts/${layoutId}/house-model/lookup`, { method: "POST", body: JSON.stringify({ address }), signal }),
-  generateHouse: (layoutId: number, token: string, requestId: string, photos: string[], signal?: AbortSignal) =>
+  generateHouse: (layoutId: number, token: string | null, requestId: string, photos: string[], signal?: AbortSignal) =>
     request<HouseDraft>(`/v1/layouts/${layoutId}/house-model/generate`, { method: "POST", body: JSON.stringify({ token, requestId, photos }), signal }),
   replaceHouseModel: (layoutId: number, houseModel: HouseModel | null, ifMatch?: string) =>
     request<{ houseModel: HouseModel | null; revision: string }>(`/v1/layouts/${layoutId}/house-model`, { method: "PUT", body: JSON.stringify({ houseModel, ...(ifMatch ? { if_match: ifMatch } : {}) }) }),

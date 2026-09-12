@@ -44,14 +44,21 @@ class HouseDraftController extends Controller
         $layout->project->authorize($request->user(), 'editor');
         set_time_limit(360);
         $data = $request->validate([
-            'token' => ['required', 'uuid'], 'requestId' => ['required', 'uuid'],
+            'token' => ['nullable', 'uuid'], 'requestId' => ['required', 'uuid'],
             'photos' => ['sometimes', 'array', 'max:4'], 'photos.*' => ['string', 'max:7000000'],
         ]);
-        $place = Cache::get($this->selectionKey($request, $layout, $data['token']));
-        abort_unless($place, 422, 'This address selection expired. Search for the address again.');
+        $token = $data['token'] ?? null;
+        if ($token) {
+            // Preserve compatibility with an address-based dialog already open during deployment.
+            $place = Cache::get($this->selectionKey($request, $layout, $token));
+            abort_unless($place, 422, 'This address selection expired. Search for the address again.');
+        } else {
+            abort_unless(count($data['photos'] ?? []), 422, 'Add at least one house photo to create a draft.');
+            $place = ['label' => 'My house', 'name' => '', 'lat' => null, 'lng' => null, 'osmType' => '', 'osmId' => 0, 'unmapped' => true];
+        }
         abort_unless(config('services.house.key'), 503, 'House generation is not configured on this server yet. Your existing layout is unchanged.');
         $key = 'house-draft:'.$request->user()->id.':'.$layout->id.':'.$data['requestId'];
-        $fingerprint = hash('sha256', json_encode([$data['token'], $data['photos'] ?? []]));
+        $fingerprint = hash('sha256', json_encode([$token, $data['photos'] ?? []]));
         if ($cached = Cache::get($key)) {
             abort_unless(hash_equals($cached['fingerprint'], $fingerprint), 409, 'This draft request has changed. Start a new draft.');
             return response()->json($cached['result'])->header('Cache-Control', 'private, no-store');
@@ -71,7 +78,7 @@ class HouseDraftController extends Controller
                 $photos[] = [...HouseSources::imageBytes($bytes), 'context' => 'User-supplied photo of their own target house.'];
             }
             $warnings = [];
-            try { $building = $sources->building($place); }
+            try { $building = $token ? $sources->building($place) : []; }
             catch (\Throwable) { $building = []; $warnings[] = 'Mapped dimensions were unavailable; dimensions are estimated from photos.'; }
             if (!$photos && ($place['unmapped'] ?? false)) {
                 abort(422, 'This address is not mapped yet. Add your own front and side photos below to model this house.');
