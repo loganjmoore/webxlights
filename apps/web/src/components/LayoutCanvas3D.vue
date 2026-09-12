@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as THREE from "three";
+import { createHouseGroup, disposeHouseGroup, fitHouseCamera, resizeHouseCamera, type HouseModel } from "../lib/houseModel";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { computeGeometryFromAttrs, geometryCenter, nodeWorldOffset, transformedHalfExtents, type ModelGeometry, type ScreenTransform } from "@webxlights/engine";
 import type { ModelRecord, ViewObjectRecord } from "../lib/api";
@@ -9,7 +10,7 @@ import { displayY, transformForModel } from "../lib/modelTransform";
 import { groundedAnchorY, resizeFromCorner } from "../lib/resizeModel";
 import { NODE_SPACING } from "../lib/worldUnits";
 
-const props = defineProps<{ models: ModelRecord[]; viewObjects?: ViewObjectRecord[]; selectedModelId: number | null }>();
+const props = defineProps<{ houseModel?: HouseModel | null; models: ModelRecord[]; viewObjects?: ViewObjectRecord[]; selectedModelId: number | null }>();
 const emit = defineEmits<{
   select: [modelId: number | null];
   move: [modelId: number, x: number, y: number, z: number];
@@ -41,6 +42,18 @@ let orbit: OrbitControls | null = null;
 let points: THREE.Points | null = null;
 let selectionHelper: THREE.BoxHelper | null = null;
 let rafId: number | null = null;
+let houseGroup: THREE.Group | null = null;
+function buildHouse(): void {
+  disposeHouseGroup(houseGroup);
+  houseGroup = null;
+  if (!setup || !props.houseModel) return;
+  houseGroup = createHouseGroup(props.houseModel);
+  setup.scene.add(houseGroup);
+}
+watch(() => props.houseModel, () => {
+  buildHouse();
+  fitCameraToScene();
+}, { deep: true });
 let gridLines: THREE.LineSegments[] = [];
 let groundGrid: THREE.LineSegments | null = null;
 
@@ -419,6 +432,13 @@ function zoomView(factor: number): void {
 
 function fitCameraToScene(): void {
   if (!setup) return;
+  if (houseGroup && orbit) {
+    const bounds = new THREE.Box3();
+    for (const entry of rowEntries) bounds.expandByObject(entry.pickMesh);
+    fitHouseCamera(houseGroup, setup.camera, orbit.target, bounds);
+    orbit.update();
+    return;
+  }
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const entry of rowEntries) {
     const { x: mx, y: my } = entry.pickMesh.position;
@@ -763,6 +783,7 @@ onMounted(() => {
   orbit.enableDamping = true;
   buildScene();
   buildViewObjects();
+  buildHouse();
   fitCameraToScene();
   hasFittedToModels = rowEntries.length > 0;
 
@@ -786,7 +807,9 @@ onMounted(() => {
 function handleResize(): void {
   const container = containerRef.value;
   if (!container || !setup) return;
+  const previousAspect = setup.camera.aspect;
   resizeScene(setup, container);
+  if (houseGroup && orbit) resizeHouseCamera(setup.camera, orbit.target, previousAspect);
 }
 
 onBeforeUnmount(() => {
@@ -799,6 +822,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("keyup", onKeyUp);
   window.removeEventListener("blur", onWindowBlur);
   if (rafId) cancelAnimationFrame(rafId);
+  disposeHouseGroup(houseGroup);
   orbit?.dispose();
   if (setup && container) disposeScene(setup, container);
 });

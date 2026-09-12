@@ -38,9 +38,13 @@ import { confirm } from "../lib/confirm";
 import { loadPreferences } from "../lib/preferences";
 import { buildPlacementReport, copyOrDownloadReport } from "../lib/placementReport";
 import { channelCountForModel } from "../lib/fseqExport";
+import { houseModelFrom } from "../lib/houseModel";
+import HouseModelDialog from "../components/HouseModelDialog.vue";
 import LayoutCanvas3D from "../components/LayoutCanvas3D.vue";
 
 const canvasRef = ref<InstanceType<typeof LayoutCanvas3D> | null>(null);
+const showHouseModel = ref(false);
+const houseModel = computed(() => houseModelFrom(layout.value?.settings));
 import ModelPalette from "../components/ModelPalette.vue";
 import AppBar from "../components/AppBar.vue";
 import { NODE_SPACING } from "../lib/worldUnits";
@@ -1022,6 +1026,7 @@ onUnmounted(() => {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 7 5 5-5 5M20 12H10a5 5 0 0 0 0 10h3" /></svg>
         </button>
       </div>
+      <button :disabled="!layout" @click="showHouseModel = true">Model my house</button>
       <label class="btn">
         {{ importing ? "Importing..." : "Import xlights_rgbeffects.xml" }}
         <input type="file" accept=".xml" @change="handleFileChange" :disabled="importing" hidden />
@@ -1034,6 +1039,7 @@ onUnmounted(() => {
         Copy placement report
       </button>
     </header>
+    <HouseModelDialog v-if="showHouseModel && layout" :layout-id="layout.id" @close="showHouseModel = false" @saved="house => { if (layout) layout.settings = { ...layout.settings, houseModel: house }; void loadVersions(); }" />
     <p v-if="importMessage" class="import-message">{{ importMessage }}</p>
     <p v-if="viewObjectsError" class="view-objects-error">{{ viewObjectsError }}</p>
     <p v-if="reportMessage" class="import-message">{{ reportMessage }}</p>
@@ -1461,6 +1467,7 @@ onUnmounted(() => {
           <LayoutCanvas3D
             ref="canvasRef"
             :models="previewModels"
+            :house-model="houseModel"
             :view-objects="viewObjects"
             :selected-model-id="selectedModelId"
             @select="selectedIds = $event === null ? [] : [$event]"

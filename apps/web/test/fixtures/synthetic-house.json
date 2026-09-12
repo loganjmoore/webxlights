@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "source": {"label": "Synthetic test house — not a real address", "notes": "Authored test geometry. No Google imagery or measured dimensions."},
+  "placement": {"position": [0, 0, 0], "rotationY": 0, "worldUnitsPerMeter": 40},
+  "surfaces": [
+    {"name": "Front wall", "kind": "wall", "estimated": true, "vertices": [[-6, 0, 0], [6, 0, 0], [6, 3, 0], [-6, 0, 0], [6, 3, 0], [-6, 3, 0]]},
+    {"name": "Back wall", "kind": "wall", "estimated": true, "vertices": [[6, 0, -8], [-6, 0, -8], [-6, 3, -8], [6, 0, -8], [-6, 3, -8], [6, 3, -8]]},
+    {"name": "Left wall", "kind": "wall", "estimated": true, "vertices": [[-6, 0, -8], [-6, 0, 0], [-6, 3, 0], [-6, 0, -8], [-6, 3, 0], [-6, 3, -8]]},
+    {"name": "Right wall", "kind": "wall", "estimated": true, "vertices": [[6, 0, 0], [6, 0, -8], [6, 3, -8], [6, 0, 0], [6, 3, -8], [6, 3, 0]]},
+    {"name": "Front gable", "kind": "wall", "estimated": true, "vertices": [[-6, 3, 0], [6, 3, 0], [0, 5, 0]]},
+    {"name": "Back gable", "kind": "wall", "estimated": true, "vertices": [[6, 3, -8], [-6, 3, -8], [0, 5, -8]]},
+    {"name": "Left roof", "kind": "roof", "estimated": true, "vertices": [[-6, 3, 0], [0, 5, 0], [0, 5, -8], [-6, 3, 0], [0, 5, -8], [-6, 3, -8]]},
+    {"name": "Right roof", "kind": "roof", "estimated": true, "vertices": [[0, 5, 0], [6, 3, 0], [6, 3, -8], [0, 5, 0], [6, 3, -8], [0, 5, -8]]},
+    {"name": "Front door", "kind": "door", "estimated": true, "vertices": [[-0.5, 0, 0.015], [0.5, 0, 0.015], [0.5, 2.2, 0.015], [-0.5, 0, 0.015], [0.5, 2.2, 0.015], [-0.5, 2.2, 0.015]]},
+    {"name": "Front window -4", "kind": "window", "estimated": true, "vertices": [[-4, 1, 0.015], [-2.8, 1, 0.015], [-2.8, 2.2, 0.015], [-4, 1, 0.015], [-2.8, 2.2, 0.015], [-4, 2.2, 0.015]]},
+    {"name": "Front window 3", "kind": "window", "estimated": true, "vertices": [[3, 1, 0.015], [4.2, 1, 0.015], [4.2, 2.2, 0.015], [3, 1, 0.015], [4.2, 2.2, 0.015], [3, 2.2, 0.015]]},
+    {"name": "Porch deck", "kind": "porch", "estimated": true, "vertices": [[-2, 0.1, 0], [2, 0.1, 0], [2, 0.1, 2], [-2, 0.1, 0], [2, 0.1, 2], [-2, 0.1, 2]]},
+    {"name": "Porch cover", "kind": "porch", "estimated": true, "vertices": [[-2, 2.6, 0], [2, 2.6, 0], [2, 2.4, 2], [-2, 2.6, 0], [2, 2.4, 2], [-2, 2.4, 2]]},
+    {"name": "Porch post -1.9", "kind": "exterior", "estimated": true, "vertices": [[-1.9, 0.1, 1.9], [-1.7999999999999998, 0.1, 1.9], [-1.7999999999999998, 2.4, 1.9], [-1.9, 0.1, 1.9], [-1.7999999999999998, 2.4, 1.9], [-1.9, 2.4, 1.9]]},
+    {"name": "Porch post 1.8", "kind": "exterior", "estimated": true, "vertices": [[1.8, 0.1, 1.9], [1.9000000000000001, 0.1, 1.9], [1.9000000000000001, 2.4, 1.9], [1.8, 0.1, 1.9], [1.9000000000000001, 2.4, 1.9], [1.8, 2.4, 1.9]]}
+  ]
+}

@@ -5,12 +5,14 @@ import type { AudioSeries } from "@webxlights/engine";
 import { api, type ModelGroupRecord, type ModelRecord, type SequenceBody } from "../lib/api";
 import { openPreviewChannel, postPreviewMessage, type PreviewMessage } from "../lib/previewChannel";
 import { playheadAt, shouldResync, type TransportAnchor } from "../lib/previewClock";
+import { houseModelFrom, type HouseModel } from "../lib/houseModel";
 import HousePreview from "../components/HousePreview.vue";
 
 // The popped-out house preview. It renders the same sequence the sequencer tab is editing and
 // follows its playhead; its own Play/Stop send commands back rather than driving audio here,
 // so there's exactly one audio element in play across both windows.
 
+const houseModel = ref<HouseModel | null>(null);
 const route = useRoute();
 const projectId = computed(() => Number(route.params.projectId));
 const sequenceId = computed(() => Number(route.params.sequenceId));
@@ -77,6 +79,7 @@ function onScrub(e: Event): void {
 async function loadOwnData(): Promise<void> {
   const [layouts, sequence] = await Promise.all([api.listLayouts(projectId.value), api.getSequence(sequenceId.value)]);
   const layout = layouts[0];
+  houseModel.value = houseModelFrom(layout?.settings);
   if (layout) {
     models.value = await api.listModels(layout.id);
     groups.value = await api.listModelGroups(layout.id);
@@ -160,7 +163,7 @@ onBeforeUnmount(() => {
     </header>
 
     <div class="stage">
-      <HousePreview :models="models" :groups="groups" :body="body" :playhead-ms="playheadMs" :frame-ms="frameMs" :audio="audio ?? undefined" />
+      <HousePreview :house-model="houseModel" :models="models" :groups="groups" :body="body" :playhead-ms="playheadMs" :frame-ms="frameMs" :audio="audio ?? undefined" />
     </div>
 
     <p v-if="!connected" class="hint">
