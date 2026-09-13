@@ -1,6 +1,6 @@
 # webXLights goal prompt: M10, M11, M12
 
-Run this as the goal for a fresh session working in `/Users/loganmoore/code/webxlights`.
+Run this as the goal for a fresh session working in a checkout of this repo.
 Supersedes the original `webxlights-goal-prompt.md` for everything after M9.
 
 ---
