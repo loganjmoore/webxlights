@@ -1,0 +1,3 @@
+# Every path is owned by the maintainer. With "require review from Code Owners" on in the
+# branch protection for main, no pull request can merge without their approval.
+* @loganjmoore
