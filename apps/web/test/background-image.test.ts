@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_BACKGROUND_OPACITY,
   MAX_BACKGROUND_EDGE,
   backgroundFrom,
   clampOpacity,
   scaledSize,
+  prepareBackground,
 } from "../src/lib/backgroundImage";
 
 describe("scaling a photo down to something a settings row can carry", () => {
@@ -72,5 +73,71 @@ describe("opacity", () => {
   it("falls back rather than producing NaN", () => {
     expect(clampOpacity(undefined)).toBe(DEFAULT_BACKGROUND_OPACITY);
     expect(clampOpacity("loud")).toBe(DEFAULT_BACKGROUND_OPACITY);
+  });
+});
+
+
+describe("preparing picked photos", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const file = new File(["photo"], "house.jpg", { type: "image/jpeg" });
+
+  function canvas() {
+    const drawImage = vi.fn();
+    const target = { width: 0, height: 0, getContext: () => ({ drawImage }), toDataURL: () => "data:image/jpeg;base64,resized" };
+    vi.stubGlobal("document", { createElement: () => target });
+    return { target, drawImage };
+  }
+
+  function fallback(options: { readFails?: boolean; decodeFails?: boolean } = {}) {
+    vi.stubGlobal("FileReader", class {
+      result = "data:image/jpeg;base64,original";
+      onload = () => {}; onerror = () => {};
+      readAsDataURL() { queueMicrotask(() => options.readFails ? this.onerror() : this.onload()); }
+    });
+    vi.stubGlobal("Image", class {
+      naturalWidth = 4032; naturalHeight = 3024;
+      onload = () => {}; onerror = () => {};
+      set src(value: string) { if (value) queueMicrotask(() => options.decodeFails ? this.onerror() : this.onload()); }
+    });
+  }
+
+  it("rescales a camera photo and releases the bitmap", async () => {
+    const close = vi.fn();
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 4032, height: 3024, close }));
+    const { target } = canvas();
+    const result = await prepareBackground(file);
+    expect(result.image).toMatchObject({ width: 1600, height: 1200, dataUrl: "data:image/jpeg;base64,resized" });
+    expect(target.width).toBe(1600);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it.each(["rejected", "unavailable"])("previews and resizes via the image decoder when bitmap decoding is %s", async mode => {
+    vi.stubGlobal("createImageBitmap", mode === "rejected" ? vi.fn().mockRejectedValue(new Error("decoder failed")) : undefined);
+    fallback();
+    const { drawImage } = canvas();
+    expect(await prepareBackground(file)).toMatchObject({ error: "", image: { width: 1600, height: 1200 } });
+    expect(drawImage).toHaveBeenCalledOnce();
+  });
+
+  it("explains when the selected file itself cannot be read", async () => {
+    vi.stubGlobal("createImageBitmap", undefined); fallback({ readFails: true });
+    const result = await prepareBackground(file);
+    expect(result.image).toBeNull();
+    expect(result.error).toContain("Download the original photo to this device");
+  });
+
+  it("explains unsupported encoding instead of reporting an upload failure", async () => {
+    vi.stubGlobal("createImageBitmap", undefined); fallback({ decodeFails: true });
+    const result = await prepareBackground(file);
+    expect(result.image).toBeNull();
+    expect(result.error).toContain("Export the photo as JPEG or PNG");
+  });
+
+  it("releases decoded pixels even when canvas preparation fails", async () => {
+    const close = vi.fn();
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 4032, height: 3024, close }));
+    vi.stubGlobal("document", { createElement: () => ({ getContext: () => null }) });
+    expect((await prepareBackground(file)).image).toBeNull();
+    expect(close).toHaveBeenCalledOnce();
   });
 });
