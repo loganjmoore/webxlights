@@ -29,7 +29,7 @@ class HouseModelController extends Controller
             $locked = Layout::whereKey($layout->id)->lockForUpdate()->firstOrFail();
             $settings = $locked->settings ?? [];
             if ($request->has('if_match')) {
-                abort_unless(hash_equals(self::revision($settings['houseModel'] ?? null), $request->input('if_match')), 409, 'The house changed in another window. Reopen Model my house to load it before saving.');
+                abort_unless(hash_equals(self::revision($settings['houseModel'] ?? null), $request->input('if_match')), 409, 'The house changed in another window. Reload the layout before saving.');
             }
             if ($house === null) {
                 unset($settings['houseModel']);

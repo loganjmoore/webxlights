@@ -3,16 +3,6 @@
 use App\Services\Shader\Providers;
 
 return [
-    'house' => [
-        'geocoder_url' => env('HOUSE_GEOCODER_URL', 'https://photon.komoot.io/api/'),
-        'osm_url' => env('HOUSE_OSM_URL', 'https://api.openstreetmap.org/api/0.6'),
-        'imagery_url' => env('HOUSE_IMAGERY_URL', 'https://api.openstreetcam.org/2.0/photo/'),
-        // Reuse the app's Anthropic connection only; keys for other shader providers never cross over.
-        'key' => env('HOUSE_ANTHROPIC_KEY', env('ANTHROPIC_API_KEY', env('SHADER_PROVIDER', 'anthropic') === 'anthropic' ? env('SHADER_API_KEY') : null)),
-        'model' => env('HOUSE_MODEL', 'claude-sonnet-5'),
-        'monthly_limit' => (int) env('HOUSE_MONTHLY_LIMIT', 10),
-    ],
-
     // The shader assistant. Absent in local development and in CI, which is why every path that
     // needs it checks rather than assuming - a server without a key answers 503 and refunds,
     // instead of throwing.

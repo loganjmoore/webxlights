@@ -69,8 +69,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('layouts/{layout}/effect-presets', [SequencerViewController::class, 'presets']);
         Route::put('layouts/{layout}/effect-presets', [SequencerViewController::class, 'replacePresets']);
         Route::get('layouts/{layout}/house-model', [\App\Http\Controllers\HouseModelController::class, 'show']);
-        Route::post('layouts/{layout}/house-model/lookup', [\App\Http\Controllers\HouseDraftController::class, 'lookup'])->middleware('throttle:10,1,house-lookup:');
-        Route::post('layouts/{layout}/house-model/generate', [\App\Http\Controllers\HouseDraftController::class, 'generate'])->middleware('throttle:3,1,house-generate:');
+        // Old tabs get a clear retirement response, without any photo processing or provider calls.
+        Route::post('layouts/{layout}/house-model/{action}', fn () => response()->json([
+            'message' => 'Model my house has been removed. Reload the page to continue.',
+        ], 410))->where('action', 'lookup|generate');
         Route::put('layouts/{layout}/house-model', [\App\Http\Controllers\HouseModelController::class, 'replace']);
         Route::put('layouts/{layout}/background', [SequencerViewController::class, 'replaceBackground']);
 

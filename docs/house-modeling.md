@@ -1,3 +1,11 @@
+# House modeling — removed
+
+“Model my house” is no longer available. The upload dialog, address lookup, and AI generation have been removed. Requests from old tabs receive HTTP 410 without contacting a provider. Existing saved house geometry, layout snapshots, and rendering remain compatible.
+
+The sections below are historical implementation and verification notes, not current setup instructions. House generation environment variables are no longer read.
+
+---
+
 # House modeling
 
 Layout → Model my house now starts with 1–4 uploaded photos. Use a clear front photo first, then angled and side views showing the roof and porch. No address lookup or reference measurement is required. Photos must be owned by the user or used with permission.
