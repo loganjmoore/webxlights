@@ -1,4 +1,4 @@
-/* pixl marketing site. Same tokens as the app (DESIGN.md): dark chrome, one warm accent. */
+/* pixl marketing site. Same tokens as the app (CLAUDE.md): dark chrome, one warm accent. */
 :root{--bg:#0d0d11;--bg-panel:#16161c;--bg-control:#1e1e26;--bg-hover:#26262f;--border:#2c2c34;--border-strong:#3a3a44;--text:#e8e8ef;--text-muted:#9a9aa6;--text-dim:#5f5f6a;--accent:#e8c468;--accent-ink:#111;--info:#6a9fd8;--ok:#8fe0a0;--danger:#e5534b;--radius:4px;--radius-panel:6px;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
 *{box-sizing:border-box}
 html{color-scheme:dark;background:var(--bg)}
