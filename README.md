@@ -21,7 +21,7 @@ Everything: the frontend, the backend, and the shared engine. One Docker image s
 | `packages/shaders` | The built-in shader library: ISF fragment shaders baked into the API's seed data. |
 | `tools/shader-check` | The shader assistant bake-off harness and its results. |
 
-Two more documents live at the root: [SECURITY.md](SECURITY.md) for the security model and how
+Two more documents live at the root: [SECURITY.md](SECURITY.md) for supported versions and how
 to report a vulnerability, and [CLAUDE.md](CLAUDE.md) for the locked technical decisions and the
 conventions the code follows.
 
@@ -98,8 +98,17 @@ docker build -t webxlights-web .     # apps/web + apps/api in one nginx + php-fp
 
 `render.yaml` describes the hosted deployment: a web service, a queue worker, a Postgres
 database and a persistent disk for audio. For running your own copy for other people, read the
-self-hosting checklist in [SECURITY.md](SECURITY.md#self-hosting-checklist) and the
+self-hosting checklist below and the
 [self-hosting page](apps/web/public/site/self-hosting.html) of the site.
+
+### Self-hosting checklist
+
+- Set `APP_KEY`, `APP_URL`, `SANCTUM_STATEFUL_DOMAINS` and `SESSION_SECURE_COOKIE=true`.
+- Leave `SHADER_API_KEY` unset unless you want to fund generations for your users; with
+  `SHADER_ALLOW_USER_KEYS` on, people bring their own.
+- Keep the app behind TLS. The cookie settings assume it.
+- Dependabot (`.github/dependabot.yml`) opens pull requests for dependency updates; review
+  and merge them.
 
 ## Contributing
 
