@@ -22,11 +22,11 @@ Locked technical decisions (goal prompt §4). Do not relitigate without recordin
 
 ## Deployed infrastructure (M0)
 
-- GitHub: https://github.com/loganjmoore/webxlights (private)
+- GitHub: https://github.com/loganjmoore/webxlights
 - Render Postgres: `webxlights-db` (Basic-1GB, Ohio)
 - Render web service: `webxlights-web` → https://webxlights-web.onrender.com (Starter, Docker, autoDeploy on push to `main`)
 - Render worker: `webxlights-worker` (Starter, `php artisan queue:work`)
-- R2 bucket: not yet created — the only credentials on hand (brightprompt-hub's R2 token) turned out to be bucket-scoped, not account-scoped, so `CreateBucket` was denied. Not a blocker for M0 (no file uploads yet); needed by M2. Needs either a fresh R2 API token with bucket-create scope, or Logan creating the bucket by hand in the Cloudflare dashboard.
+- R2 bucket: not yet created — the only R2 token on hand was scoped to another bucket, not the account, so `CreateBucket` was denied. Not a blocker for M0 (no file uploads yet); needed by M2. Needs either a fresh R2 API token with bucket-create scope, or Logan creating the bucket by hand in the Cloudflare dashboard.
 - Migrations run as one-off Render Jobs after deploy (`preDeployCommand` isn't exposed by the public Render API for docker services, only via the dashboard/Blueprint sync) — `render.yaml` still declares it for whenever the project switches to Blueprint-based deploys.
 
 ## M1 simplifications (documented ceilings, not silent gaps)
