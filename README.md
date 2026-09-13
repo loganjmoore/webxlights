@@ -20,12 +20,10 @@ Everything: the frontend, the backend, and the shared engine. One Docker image s
 | `packages/formats` | Parsers and writers for xLights files: `xlights_rgbeffects.xml`, `.xsq`, `.fseq`, plus ISF, MIDI and Papagayo. |
 | `packages/shaders` | The built-in shader library: ISF fragment shaders baked into the API's seed data. |
 | `tools/shader-check` | The shader assistant bake-off harness and its results. |
-| `docs/` | Design notes and feature specs. |
 
-The other top-level documents: [ROADMAP.md](ROADMAP.md) for milestones,
-[DECISIONS.md](DECISIONS.md) for the locked stack and why, [DESIGN.md](DESIGN.md) for the interface
-rules, [CHANGELOG.md](CHANGELOG.md) for what shipped when, and [SECURITY.md](SECURITY.md) for the
-security model and how to report a vulnerability.
+Two more documents live at the root: [SECURITY.md](SECURITY.md) for the security model and how
+to report a vulnerability, and [CLAUDE.md](CLAUDE.md) for the locked technical decisions and the
+conventions the code follows.
 
 ## Running it on your own machine
 
@@ -120,5 +118,5 @@ Contributions are welcome, and the process is deliberately simple.
   the work is done.
 - **Keep the tests green.** `npm run lint && npm run typecheck && npm run test` and
   `php artisan test` are what CI runs. Add a test when you fix a bug.
-- **Read [DECISIONS.md](DECISIONS.md) before proposing a stack change.** The runtime, framework
-  and hosting choices are locked there, with the reasons.
+- **Read [CLAUDE.md](CLAUDE.md) before proposing a stack change.** The runtime, framework and
+  hosting choices are locked there, with the reasons.
