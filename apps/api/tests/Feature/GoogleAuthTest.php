@@ -44,6 +44,44 @@ class GoogleAuthTest extends TestCase
         $this->get('/api/auth/google/redirect')->assertNotFound();
     }
 
+    public function test_embedded_browsers_get_recovery_instead_of_a_google_redirect(): void
+    {
+        Http::fake();
+        $browsers = [
+            'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/139.0 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/530.0.0.0;]',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 [FBAN/FBIOS;FBAV/530.0.0.0;]',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Instagram 390.0.0',
+            'Mozilla/5.0 (Linux; Android 15; Pixel 9 Build/AP3A; wv) AppleWebKit/537.36 Version/4.0 Chrome/139.0 Mobile Safari/537.36',
+        ];
+        foreach ($browsers as $browser) {
+            $this->withHeader('User-Agent', $browser)
+                ->getJson('/api/auth/providers')
+                ->assertOk()->assertJson(['google' => true, 'google_requires_browser' => true]);
+            $this->withSession(['google_oauth_state' => 'stale-state'])
+                ->get('/api/auth/google/redirect')
+                ->assertRedirect('/auth?error=google_browser')
+                ->assertSessionMissing('google_oauth_state');
+        }
+        Http::assertNothingSent();
+        $this->assertGuest('web');
+    }
+
+    public function test_regular_mobile_browsers_can_start_google_sign_in(): void
+    {
+        $browsers = [
+            'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/139.0.0.0 Mobile Safari/537.36',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 Version/18.6 Mobile/15E148 Safari/604.1',
+        ];
+        foreach ($browsers as $browser) {
+            $this->withHeader('User-Agent', $browser)
+                ->getJson('/api/auth/providers')
+                ->assertOk()->assertJson(['google' => true, 'google_requires_browser' => false]);
+            $response = $this->get('/api/auth/google/redirect')->assertRedirect();
+            $this->assertSame('accounts.google.com', parse_url($response->headers->get('Location'), PHP_URL_HOST));
+            $response->assertSessionHas('google_oauth_state');
+        }
+    }
+
     public function test_a_new_person_gets_an_account_and_a_session(): void
     {
         $this->fakeGoogle(['sub' => 'g-1', 'email' => 'sam@example.com', 'email_verified' => true, 'name' => 'Sam']);

@@ -18,6 +18,7 @@ use App\Http\Controllers\SequenceVersionController;
 use App\Http\Controllers\ShaderController;
 use App\Http\Controllers\ShaderGenerationController;
 use App\Http\Controllers\ViewObjectController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // The two routes anyone on the internet can hit without an account. Throttled per IP so a
@@ -27,7 +28,10 @@ Route::post('/auth/login', [AuthController::class, 'login'])->middleware('thrott
 // Which sign-in buttons to offer besides email and password. The Google redirect and callback
 // themselves live in routes/web.php: the callback arrives from Google, with no Referer that
 // Sanctum would count as stateful, and it needs the session all the same.
-Route::get('/auth/providers', fn () => ['google' => GoogleAuthController::enabled()]);
+Route::get('/auth/providers', fn (Request $request) => [
+    'google' => GoogleAuthController::enabled(),
+    'google_requires_browser' => GoogleAuthController::requiresBrowser($request),
+]);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
