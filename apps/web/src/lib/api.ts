@@ -1,3 +1,4 @@
+import { checkUploadSize, uploadErrorMessage } from "./uploads";
 import type { EffectPreset } from "./effectPresets";
 import type { BackgroundImage } from "./backgroundImage";
 import type { SongBoundary } from "./songRegions";
@@ -604,6 +605,7 @@ export const api = {
   // ---- Files ---------------------------------------------------------------------------
   listMedia: (projectId: number) => request<MediaRecord[]>(`/v1/projects/${projectId}/media`),
   async uploadMedia(projectId: number, file: File): Promise<MediaRecord> {
+    checkUploadSize(file);
     const form = new FormData();
     form.append("file", file);
     const res = await fetch(`/api/v1/projects/${projectId}/media`, {
@@ -612,7 +614,7 @@ export const api = {
       headers: { Accept: "application/json" }, // no Content-Type: fetch sets the multipart boundary itself
       body: form,
     });
-    if (!res.ok) throw new ApiError(res.status, await res.text());
+    if (!res.ok) throw new ApiError(res.status, uploadErrorMessage(res.status, await res.text()));
     return res.json();
   },
   renameMedia: (mediaId: number, name: string) => request<MediaRecord>(`/v1/media/${mediaId}`, { method: "PATCH", body: JSON.stringify({ name }) }),
@@ -633,6 +635,7 @@ export const api = {
   ) => request<SequenceRecord>(`/v1/sequences/${sequenceId}`, { method: "PATCH", body: JSON.stringify(patch) }),
   sequenceAudioUrl: (sequenceId: number) => `/api/v1/sequences/${sequenceId}/audio`,
   async uploadSequenceAudio(sequenceId: number, file: File): Promise<SequenceRecord> {
+    checkUploadSize(file);
     const form = new FormData();
     form.append("audio", file);
     const res = await fetch(`/api/v1/sequences/${sequenceId}/audio`, {
@@ -641,7 +644,7 @@ export const api = {
       headers: { Accept: "application/json" }, // no Content-Type: fetch sets the multipart boundary itself
       body: form,
     });
-    if (!res.ok) throw new ApiError(res.status, await res.text());
+    if (!res.ok) throw new ApiError(res.status, uploadErrorMessage(res.status, await res.text()));
     return res.json();
   },
   // Returns { ok:false, current } on a 409 (someone else saved since this etag was read)

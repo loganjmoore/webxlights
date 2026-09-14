@@ -49,6 +49,24 @@ class MediaTest extends TestCase
         $this->assertSame([], $list->json('1.used_by'));
     }
 
+    public function test_audio_upload_size_limit_matches_the_browser_and_server(): void
+    {
+        [$user, $project] = $this->owned();
+        $sequence = $project->sequences()->create(['name' => 'Show', 'frame_ms' => 50, 'duration_ms' => 1000]);
+
+        foreach ([
+            ["/api/v1/projects/{$project->id}/media", 'file', 201],
+            ["/api/v1/sequences/{$sequence->id}/audio", 'audio', 200],
+        ] as [$url, $field, $success]) {
+            $this->actingAs($user)->post($url, [
+                $field => UploadedFile::fake()->create('large.wav', 51200, 'audio/wav'),
+            ])->assertStatus($success);
+            $this->actingAs($user)->post($url, [
+                $field => UploadedFile::fake()->create('too-large.wav', 51201, 'audio/wav'),
+            ])->assertUnprocessable()->assertJsonValidationErrors($field);
+        }
+    }
+
     public function test_renaming_changes_the_name_and_not_the_file(): void
     {
         [$user, $project] = $this->owned();

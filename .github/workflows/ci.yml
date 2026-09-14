@@ -36,8 +36,18 @@ jobs:
         with:
           context: .
           push: false
+          load: true
+          tags: webxlights:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # Check the shipped PHP configuration; Laravel fake uploads bypass PHP's parser.
+      - name: Verify production upload limits
+        run: >-
+          docker run --rm --entrypoint php webxlights:ci -r
+          '$upload = ini_parse_quantity(ini_get("upload_max_filesize"));
+          $post = ini_parse_quantity(ini_get("post_max_size"));
+          if ($upload < 50 * 1024 * 1024 || $post <= $upload) {
+          fwrite(STDERR, "PHP must accept 50 MiB files with multipart overhead.\n"); exit(1); }'
 
   api:
     runs-on: ubuntu-latest

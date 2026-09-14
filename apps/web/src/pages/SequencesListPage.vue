@@ -12,6 +12,7 @@ import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { api, type MediaRecord, type ModelGroupRecord, type ModelRecord, type SequenceSummary } from "../lib/api";
 import { loadPreferences } from "../lib/preferences";
 import { decodeAudioFile } from "../lib/audio";
+import { checkUploadSize } from "../lib/uploads";
 import {
   applyMapping,
   donorRows,
@@ -48,6 +49,8 @@ const audioFile = ref<File | null>(null);
 const audioFiles = ref<MediaRecord[]>([]);
 const fromFilesId = ref<number | "">("");
 const creating = ref(false);
+const creationStep = ref("Creating sequence…");
+const audioInput = ref<HTMLInputElement | null>(null);
 const error = ref("");
 const importing = ref(false);
 const importMessage = ref("");
@@ -119,18 +122,31 @@ async function createSequence(): Promise<void> {
   creating.value = true;
   error.value = "";
   try {
-    const file = audioFile.value ?? (await api.fetchMediaFile(chosen!));
+    const upload = audioFile.value;
+    if (upload) checkUploadSize(upload);
+    creationStep.value = "Reading audio…";
+    const file = upload ?? (await api.fetchMediaFile(chosen!));
     const buffer = await decodeAudioFile(file);
     const durationMs = Math.round(buffer.duration * 1000);
+    let media = chosen;
+    if (upload) {
+      creationStep.value = "Uploading audio…";
+      media = await api.uploadMedia(projectId.value, upload);
+      // Keep a successful upload selected if sequence creation fails, so retry reuses it.
+      audioFiles.value.push(media);
+      fromFilesId.value = media.id;
+      audioFile.value = null;
+      if (audioInput.value) audioInput.value.value = "";
+    }
+    creationStep.value = "Creating sequence…";
     const record = await api.createSequence(projectId.value, {
       name: name.value.trim(),
       frame_ms: frameMs.value,
       duration_ms: durationMs,
       audio_filename: file.name,
-      media_id: chosen?.id,
+      media_id: media?.id,
       blend_between_models: newPrefs.defaultBlendBetweenModels,
     });
-    if (audioFile.value) await api.uploadSequenceAudio(record.id, audioFile.value);
     router.push({ name: "sequencer", params: { projectId: projectId.value, sequenceId: record.id } });
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Could not create sequence";
@@ -149,6 +165,7 @@ async function createSequence(): Promise<void> {
  */
 async function createAnimatedSequence(): Promise<void> {
   if (!name.value.trim()) return;
+  creationStep.value = "Creating sequence…";
   creating.value = true;
   error.value = "";
   try {
@@ -404,30 +421,30 @@ onMounted(load);
       <div class="new-form">
         <label>
           <span>Audio file</span>
-          <input type="file" accept="audio/*" @change="onFilePicked" />
-          <small>The song this sequence is set to. Its length becomes the sequence's length.</small>
+          <input ref="audioInput" type="file" accept="audio/*" :disabled="creating" @change="onFilePicked" />
+          <small>The song this sequence is set to, up to 50 MB. Its length becomes the sequence's length.</small>
         </label>
         <label v-if="audioFiles.length">
           <span>Or a song already in Files</span>
-          <select v-model="fromFilesId" @change="onFromFilesPicked">
+          <select v-model="fromFilesId" :disabled="creating" @change="onFromFilesPicked">
             <option value="">Pick one…</option>
             <option v-for="f in audioFiles" :key="f.id" :value="f.id">{{ f.name }}</option>
           </select>
         </label>
         <label>
           <span>Name</span>
-          <input v-model="name" type="text" placeholder="Taken from the audio file if left blank" />
+          <input v-model="name" :disabled="creating" type="text" placeholder="Taken from the audio file if left blank" />
         </label>
         <label>
           <span>Frame interval</span>
-          <select v-model.number="frameMs">
+          <select v-model.number="frameMs" :disabled="creating">
             <option v-for="f in FRAME_OPTIONS" :key="f" :value="f">{{ f }} ms ({{ Math.round(1000 / f) }} fps)</option>
           </select>
         </label>
-        <p v-if="error" class="error">{{ error }}</p>
+        <p v-if="error" class="error" role="alert">{{ error }}</p>
         <div class="new-actions">
           <button class="primary" :disabled="(!audioFile && fromFilesId === '') || !name.trim() || creating" @click="createSequence">
-            {{ creating ? "Decoding audio…" : "Create" }}
+            {{ creating ? creationStep : "Create" }}
           </button>
           <button
             :disabled="!name.trim() || creating"
