@@ -450,7 +450,7 @@ export const api = {
   logout: () => request<void>("/auth/logout", { method: "POST" }),
   me: () => request<User>("/auth/me"),
   /** Which sign-in buttons the server can honour besides email and password. */
-  authProviders: () => request<{ google: boolean }>("/auth/providers"),
+  authProviders: () => request<{ google: boolean; google_requires_browser?: boolean }>("/auth/providers"),
   googleRedirectUrl: "/api/auth/google/redirect",
   listProjects: () => request<Project[]>("/v1/projects"),
   createProject: (name: string) => request<Project>("/v1/projects", { method: "POST", body: JSON.stringify({ name }) }),

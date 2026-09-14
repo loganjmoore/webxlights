@@ -28,9 +28,22 @@ class GoogleAuthController extends Controller
         return (bool) config('services.google.client_id') && (bool) config('services.google.client_secret');
     }
 
+    public static function requiresBrowser(Request $request): bool
+    {
+        // A compatibility hint, not an authorization check. Embedded user agents cannot
+        // reliably complete Google OAuth. Unknown browsers still get manual recovery in the UI.
+        return (bool) preg_match('/FBAN|FBAV|FB_IAB|Instagram|;\s*wv\)/i', $request->userAgent() ?? '');
+    }
+
     public function redirect(Request $request)
     {
         abort_unless(self::enabled(), 404);
+
+        if (self::requiresBrowser($request)) {
+            $request->session()->forget('google_oauth_state');
+
+            return redirect()->away($this->appUrl('/auth?error=google_browser'));
+        }
 
         $state = Str::random(40);
         $request->session()->put('google_oauth_state', $state);
