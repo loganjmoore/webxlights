@@ -100,6 +100,7 @@ describe("what a shortcut is allowed to be", () => {
       placeRandomEffect: () => {},
       moveSelectedEffectVertically: () => {},
       openPalette: () => {},
+      exportXsq: () => {},
       exportFseq: () => {},
       snapshot: () => {},
     } satisfies CommandContext);
@@ -184,6 +185,7 @@ describe("the keyboard actually dispatches the changed binding", () => {
       zoomOut: () => {},
       placeEffect: (name: string) => placed.push(name),
       openPalette: () => {},
+      exportXsq: () => {},
       exportFseq: () => {},
       snapshot: () => {},
       effectShortcuts: effectShortcuts(setShortcut({}, "Fire", "z")),

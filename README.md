@@ -4,6 +4,17 @@ A browser-based sequencer for holiday light shows, in the spirit of [xLights](ht
 build your layout, sequence effects to music, preview in 3D and export `.fseq` files for your
 controllers. It runs entirely in the browser plus a small API.
 
+To continue editing a sequence in desktop xLights, choose **Sequence → Export for xLights
+(.xsq)** in the sequencer. Open the downloaded file in an xLights show with matching model,
+group and submodel names. Keep the audio beside the sequence; the export panel can download
+the saved soundtrack separately. The `.xsq` includes effect layers, palettes, timing labels
+and sequence metadata, but does not include the layout itself.
+
+The export panel lists settings that need adjustment in xLights. Numeric value curves currently
+export their starting value; image and shader effects remain disabled until their assets are
+selected in xLights. Render and preview there before using the sequence in a show. Opening,
+editing, saving and rendering an exported sequence has been verified in xLights 2025.13.
+
 The hosted copy is called **pixl** and lives at [pixl.community](https://pixl.community).
 webXLights is the name of the code. Licensed under the GPL-3.0, like xLights itself
 (see [LICENSE](LICENSE)).

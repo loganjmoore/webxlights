@@ -6,6 +6,7 @@ import { api, ApiError, type LyricAlignmentRecord, type ControllerRecord, type E
 import { computePeaks, decodeAudioFile, type PeakBucket } from "../lib/audio";
 import { analyzeAudioBuffer } from "../lib/audioAnalysis";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
+import { downloadXsq, exportSequenceToXsq, type XsqExport } from "../lib/xsqExport";
 import { parseMidi, parsePapagayo, type ParsedMidi } from "@webxlights/formats";
 import { ALL_TRACKS, describeMidiImport, midiTrackChoices, timingTrackFromMidi } from "../lib/midiTiming";
 import { describePapagayoImport, tracksFromPapagayo } from "../lib/papagayoTiming";
@@ -139,6 +140,7 @@ const newViewName = ref("");
 const viewError = ref("");
 const controllers = ref<ControllerRecord[]>([]);
 const exportError = ref<string | null>(null);
+const xsqExport = ref<XsqExport | null>(null);
 const peaks = ref<PeakBucket[]>([]);
 const audioEl = ref<HTMLAudioElement | null>(null);
 const audioUrl = ref<string | null>(null);
@@ -1753,6 +1755,16 @@ function addTimingMarkAtPlayhead(): void {
   store.addTimingMark(timingTargetIndex(), playheadMs.value);
 }
 
+function exportXsq(): void {
+  if (!store.sequence) return;
+  exportError.value = null;
+  try {
+    xsqExport.value = exportSequenceToXsq(modelRecords.value, store.body, store.sequence, groupRecords.value);
+  } catch (err) {
+    exportError.value = err instanceof Error ? err.message : "Could not export the sequence";
+  }
+}
+
 function exportFseq(): void {
   if (!store.sequence) return;
   exportError.value = null;
@@ -2263,6 +2275,7 @@ const sequenceMenu = computed<MenuItem[]>(() => [
   { label: "Preferences", checked: showPrefsPanel.value, shortcut: windowKey("prefs"), run: () => (showPrefsPanel.value = !showPrefsPanel.value) },
   { kind: "separator" },
   { label: "Save a snapshot", disabled: !store.sequence, run: () => void snapshotNow() },
+  { label: "Export for xLights (.xsq)…", disabled: !store.sequence, run: exportXsq },
   { label: "Export .fseq", disabled: !store.sequence, run: exportFseq },
   { kind: "separator" },
   { label: "Share to library…", disabled: !store.sequence, run: openShare },
@@ -2354,6 +2367,7 @@ const commands = computed(() =>
     openPalette: () => {
       paletteOpen.value = true;
     },
+    exportXsq,
     exportFseq,
     snapshot: () => void snapshotNow(),
   }),
@@ -3637,10 +3651,47 @@ watch(sequenceId, async (id) => {
       @action="handleContextAction"
       @close="contextMenu = null"
     />
+    <ModalPanel v-if="xsqExport && store.sequence" id="xsq-export" title="Export for xLights" @close="xsqExport = null">
+      <div class="xsq-export">
+        <p>Download an editable .xsq sequence with {{ xsqExport.effectCount }} effects and your timing tracks.</p>
+        <ol>
+          <li>Open the matching show folder in xLights. Model, group and submodel names must match this project.</li>
+          <li v-if="store.sequence.audio_filename">Keep <strong>{{ store.sequence.audio_filename }}</strong> beside the .xsq file. If xLights asks for the song, select that audio file.</li>
+          <li>Open the .xsq from xLights’ File menu, then render and preview it. Effects can look different in xLights.</li>
+        </ol>
+        <details v-if="xsqExport.modelNames.length">
+          <summary>Model and group names ({{ xsqExport.modelNames.length }})</summary>
+          <ul><li v-for="name in xsqExport.modelNames" :key="name">{{ name }}</li></ul>
+        </details>
+        <div v-if="xsqExport.warnings.length" role="status">
+          <h3>Settings to check in xLights</h3>
+          <p>These settings need adjustment after opening the file:</p>
+          <ul class="xsq-warnings"><li v-for="warning in xsqExport.warnings" :key="warning">{{ warning }}</li></ul>
+        </div>
+        <div class="xsq-actions">
+          <button class="primary" type="button" @click="downloadXsq(xsqExport, store.sequence.name)">Download .xsq</button>
+          <a v-if="store.sequence.audio_path && store.sequence.audio_filename" :href="api.sequenceAudioUrl(store.sequence.id)" :download="store.sequence.audio_filename">Download audio</a>
+        </div>
+      </div>
+    </ModalPanel>
+
   </main>
 </template>
 
 <style scoped>
+.xsq-export { display: grid; gap: 1rem; line-height: 1.5; }
+.xsq-export p, .xsq-export h3 { margin: 0; }
+.xsq-export ol, .xsq-export ul { margin: 0; padding-left: 1.25rem; }
+.xsq-export li + li { margin-top: 0.4rem; }
+.xsq-export strong, .xsq-export li { overflow-wrap: anywhere; }
+.xsq-export summary { cursor: pointer; }
+.xsq-export h3 { font-size: 1rem; }
+.xsq-warnings { max-height: 12rem; overflow: auto; }
+.xsq-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.xsq-actions button { font: inherit; font-weight: 600; padding: 0.4rem 0.75rem; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+.xsq-actions button:hover { filter: brightness(1.08); }
+.xsq-actions a { color: var(--accent); }
+
 .sequencer-page {
   font-family: system-ui, sans-serif;
   height: 100vh;

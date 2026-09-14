@@ -37,6 +37,7 @@ function context(): CommandContext & Record<string, ReturnType<typeof vi.fn>> {
     "placeRandomEffect",
     "moveSelectedEffectVertically",
     "openPalette",
+    "exportXsq",
     "exportFseq",
     "snapshot",
   ] as const;
