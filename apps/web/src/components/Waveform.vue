@@ -289,7 +289,9 @@ onUnmounted(() => {
 // the default pre-flush, a zoom change drew the playhead at the new px-per-ms into a bitmap
 // still sized for the old width; the browser then stretched that bitmap to the new width,
 // sliding the red line away from the grid's - and while paused nothing redrew to correct it.
-watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs, props.playRange, props.small], draw, {
+// viewportWidth too: the resize observer's own draw() runs before Vue has applied the new width,
+// so without this a resize while paused left the old bitmap stretched across the new canvas.
+watch(() => [props.peaks, props.playheadMs, props.pxPerMs, props.durationMs, props.playRange, props.small, viewportWidth.value], draw, {
   deep: true,
   flush: "post",
 });

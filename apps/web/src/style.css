@@ -22,6 +22,7 @@
   --radius-panel: 6px;
   --sans: system-ui, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
+  --rail-w: 44px;
 
   /* 1rem = 18px. The editors size everything in rem off this, so it stays. */
   font: 18px/145% var(--sans);
@@ -70,8 +71,8 @@ code {
   outline-offset: 1px;
 }
 
-/* The page toolbar (DESIGN.md > Navigation). Every project page has exactly one, directly under
-   the app bar: the page's name on the left, then its actions in the order you use them, then
+/* The page toolbar (DESIGN.md > Navigation). Every project page has exactly one, as its
+   topmost row beside the rail: the page's name on the left, then its actions in the order you use them, then
    status on the right. Same height, same controls, same place on every page. */
 .page-toolbar {
   display: flex;
@@ -92,6 +93,24 @@ code {
   margin: 0 0.25rem 0 0;
   color: var(--text);
   white-space: nowrap;
+}
+/* The project's name, teleported in by AppBar.vue; `order` puts it in front of the page's. */
+.page-toolbar .project-crumb {
+  order: -1;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.page-toolbar .project-crumb:hover {
+  color: var(--accent);
+}
+.page-toolbar .project-crumb span {
+  margin-left: 0.75rem;
+  color: var(--text-dim);
 }
 .page-toolbar .group {
   display: flex;
@@ -143,6 +162,9 @@ code {
   filter: brightness(1.05);
 }
 
+#app:has(.app-bar) {
+  padding-left: var(--rail-w);
+}
 #app {
   width: 100%;
   text-align: center;
