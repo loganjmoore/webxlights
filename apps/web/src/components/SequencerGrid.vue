@@ -105,7 +105,11 @@ const DEFAULT_ROW_HEIGHT = 28;
 const rowHeight = computed(() => Math.max(8, Math.round(props.rowHeight ?? DEFAULT_ROW_HEIGHT)));
 const ROW_LABEL_WIDTH = 140;
 const HEADER_HEIGHT = 24; // pinned timing-track ruler, drawn every frame regardless of scrollTop
-const VIEWPORT_HEIGHT = 420; // fixed canvas height - only visible rows are drawn (M9 perf budget: 100 rows / 5k effects)
+// The canvas is as tall as the space the page gives this component, and only the rows inside it
+// are drawn (M9 perf budget: 100 rows / 5k effects). 420 is what it was fixed at, and what it
+// stays at anywhere that mounts the grid without a height.
+const viewportHeight = ref(420);
+let vScrollResize: ResizeObserver | null = null;
 const EDGE_PX = 6;
 const SNAP_PX = 6;
 
@@ -867,6 +871,12 @@ defineExpose({ dropTargetAt, showDropGhost, clearDropGhost });
 onMounted(() => {
   rebuildDrawIndex();
   attachHScroll();
+  if (scrollRef.value) {
+    vScrollResize = new ResizeObserver(() => {
+      viewportHeight.value = scrollRef.value?.clientHeight || viewportHeight.value;
+    });
+    vScrollResize.observe(scrollRef.value);
+  }
   draw();
   window.addEventListener("resize", draw);
 });
@@ -874,6 +884,7 @@ onUnmounted(() => {
   window.removeEventListener("resize", draw);
   hScrollEl?.removeEventListener("scroll", onHScroll);
   hScrollResize?.disconnect();
+  vScrollResize?.disconnect();
 });
 // flush: "post" - draw() reads getBoundingClientRect(), which must run after Vue applies
 // any template-derived inline sizing, not before (pre-flush default risks a stale 0px read
@@ -895,6 +906,9 @@ watch(
     props.activeTrackIndex,
     props.colors,
     props.snapToTiming,
+    // The canvas's own size: the resize observers draw before Vue has applied it (see Waveform).
+    viewportWidth.value,
+    viewportHeight.value,
   ],
   draw,
   { flush: "post" },
@@ -911,12 +925,14 @@ watch(
 </script>
 
 <template>
-  <div ref="scrollRef" class="grid-scroll-viewport" :style="{ height: `${VIEWPORT_HEIGHT}px` }" @scroll="onScroll">
-    <div class="grid-spacer" :style="{ height: `${rows.length * rowHeight}px`, width: `${totalWidth}px` }">
+  <div ref="scrollRef" class="grid-scroll-viewport" @scroll="onScroll">
+    <!-- + HEADER_HEIGHT: the pinned ruler covers the top of the canvas, so without it the scroll
+         range ends 24px early and the last row never comes fully into view. -->
+    <div class="grid-spacer" :style="{ height: `${rows.length * rowHeight + HEADER_HEIGHT}px`, width: `${totalWidth}px` }">
       <canvas
         ref="canvasRef"
         class="grid-canvas"
-        :style="{ width: `${canvasWidth}px`, height: `${VIEWPORT_HEIGHT}px`, cursor: hoverCursor }"
+        :style="{ width: `${canvasWidth}px`, height: `${viewportHeight}px`, cursor: hoverCursor }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
@@ -929,6 +945,10 @@ watch(
 
 <style scoped>
 .grid-scroll-viewport {
+  /* In a flex column the grid takes what is left; anywhere else it is the height it always was. */
+  flex: 1 1 0;
+  height: 420px;
+  min-height: 0;
   overflow-y: auto;
   /* explicit, not the default - if overflow-x is left unset, the CSS spec computes it to
      "auto" too whenever overflow-y isn't visible, silently turning this into a second,

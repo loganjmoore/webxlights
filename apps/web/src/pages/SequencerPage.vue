@@ -1204,6 +1204,10 @@ function stopPlaybackFrames(): void {
 // from the preview window.
 watch(playing, (isPlaying) => (isPlaying ? startPlaybackFrames() : stopPlaybackFrames()));
 
+// The strip is one row of pictures, so finding Kaleidoscope among forty-nine is a search, not a scan.
+const paletteFilter = ref("");
+const paletteNames = computed(() => filterRanked(Object.keys(EFFECT_SCHEMAS), paletteFilter.value, (name) => name));
+
 function armEffect(name: string): void {
   pendingEffectName.value = pendingEffectName.value === name ? null : name;
 }
@@ -3495,9 +3499,10 @@ watch(sequenceId, async (id) => {
     ></audio>
 
     <div class="palette" role="toolbar" aria-label="Effects">
+      <input v-model="paletteFilter" class="palette-filter" type="search" placeholder="Filter effects…" aria-label="Filter effects" />
       <div class="palette-tiles">
         <button
-          v-for="name in Object.keys(EFFECT_SCHEMAS)"
+          v-for="name in paletteNames"
           :key="name"
           type="button"
           class="effect-tile"
@@ -3513,14 +3518,16 @@ watch(sequenceId, async (id) => {
           @pointercancel="cancelTileDrag"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" v-html="effectIcon(name)"></svg>
-          <span class="tile-label">{{ name }}</span>
+          <!-- Few enough tiles to have room for words only once the filter has narrowed them. -->
+          <span v-if="paletteFilter" class="tile-label">{{ name }}</span>
         </button>
       </div>
-      <!-- Always rendered (visibility, not v-if) so arming/disarming never changes the palette's
-           height - a v-if here used to reflow the whole grid below by ~90px every time an effect
+      <!-- Beside the tiles, not under them: arming an effect must never change the palette's
+           height - a line that appeared below used to reflow the whole grid every time an effect
            got armed, moving the exact row a user was about to drag on out from under their cursor. -->
-      <p class="hint" :class="{ visible: !!pendingEffectName }">
-        "{{ pendingEffectName }}" is armed: drag out its length on a row. Or drag any tile straight onto the grid.
+      <p v-if="pendingEffectName" class="hint">
+        {{ pendingEffectName }} armed: drag out its length on a row
+        <button type="button" title="Disarm (Esc)" aria-label="Disarm" @click="pendingEffectName = null">×</button>
       </p>
     </div>
     <!-- The thing being dragged, lifted under the pointer. The grid draws where it will land. -->
@@ -3539,21 +3546,6 @@ watch(sequenceId, async (id) => {
 
     <div class="editor">
       <div class="timeline">
-        <!-- v-show, not v-if: popping the preview back in used to pay a full THREE + geometry +
-             compose-cache rebuild. Hidden, the component pauses itself and costs nothing. -->
-        <div v-show="!previewPoppedOut" class="preview-wrap">
-          <HousePreview
-            :house-model="houseModel"
-            :models="modelRecords"
-            :groups="groupRecords"
-            :body="store.body"
-            :playhead-ms="playheadMs"
-            :frame-ms="store.sequence?.frame_ms ?? 50"
-            :audio="audioSeries ?? undefined"
-            :blend-between-models="store.sequence?.blend_between_models === true"
-            :paused="previewPoppedOut"
-          />
-        </div>
         <div ref="hScrollRef" class="h-scroll" @wheel="onTimelineWheel">
           <Waveform
             :peaks="peaks"
@@ -3599,6 +3591,24 @@ watch(sequenceId, async (id) => {
           />
         </div>
       </div>
+      <!-- One column for the two things you look at while you work on the grid, so neither of
+           them costs the grid any height. -->
+      <div class="inspector">
+        <!-- v-show, not v-if: popping the preview back in used to pay a full THREE + geometry +
+             compose-cache rebuild. Hidden, the component pauses itself and costs nothing. -->
+        <div v-show="!previewPoppedOut" class="preview-wrap">
+          <HousePreview
+            :house-model="houseModel"
+            :models="modelRecords"
+            :groups="groupRecords"
+            :body="store.body"
+            :playhead-ms="playheadMs"
+            :frame-ms="store.sequence?.frame_ms ?? 50"
+            :audio="audioSeries ?? undefined"
+            :blend-between-models="store.sequence?.blend_between_models === true"
+            :paused="previewPoppedOut"
+          />
+        </div>
       <aside class="props" :class="{ away: propsWindow.popped.value }">
         <div v-if="propsWindow.popped.value" class="props-away">
           <span>Effect settings is in its own window.</span>
@@ -3641,6 +3651,7 @@ watch(sequenceId, async (id) => {
         </div>
         </Teleport>
       </aside>
+      </div>
     </div>
 
     <EffectContextMenu
@@ -4035,25 +4046,48 @@ header button.active {
   color: #aaa;
 }
 .palette {
-  padding: 0.25rem 0.75rem 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 40px;
+  padding: 0 0.75rem;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--border);
   text-align: left;
+  flex: none;
 }
+.palette-filter {
+  flex: none;
+  width: 8.5rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.7rem;
+}
+/* One row whatever the window's width: what doesn't fit scrolls sideways, and the filter is the
+   quick way to it. */
 .palette-tiles {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  flex-wrap: wrap;
   gap: 0.1rem;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-/* A tile is a picture with its name under it, so the row you reach for is a toolbox rather than
-   a line of glyphs you have to hover to decode. Fixed width, so forty-eight of them make an even
-   grid whatever the names happen to be. */
+/* A tile is a picture; its name is the tooltip, and appears beside it once the filter has
+   narrowed the row enough to have room. Names under every tile cost the grid three rows. */
 .palette-tiles .effect-tile {
+  flex: none;
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
-  gap: 1px;
-  width: 44px;
-  padding: 2px 1px;
+  gap: 0.3rem;
+  min-width: 28px;
+  height: 28px;
+  justify-content: center;
+  padding: 0 5px;
   border: 1px solid transparent;
   border-radius: var(--radius);
   background: transparent;
@@ -4070,8 +4104,7 @@ header button.active {
   pointer-events: none;
 }
 .tile-label {
-  max-width: 100%;
-  font-size: 0.55rem;
+  font-size: 0.65rem;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
@@ -4093,18 +4126,27 @@ header button.active {
   color: var(--accent-ink);
   border-color: var(--accent);
 }
-/* Reserved height always present (visibility, not display:none) - see the template comment:
-   arming an effect must never change the palette's height, or the grid below jumps under the
-   user's cursor mid-interaction. */
 .hint {
-  margin: 0.25rem 0 0;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.15rem 0.3rem 0.15rem 0.55rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
   color: var(--accent);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   line-height: 1.3;
-  visibility: hidden;
+  white-space: nowrap;
 }
-.hint.visible {
-  visibility: visible;
+.hint button {
+  padding: 0 0.25rem;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 .editor {
   flex: 1;
@@ -4113,26 +4155,39 @@ header button.active {
 }
 .timeline {
   flex: 1;
-  overflow-y: auto;
   min-width: 0;
-}
-.preview-wrap {
-  height: 220px;
-  border-bottom: 1px solid #333;
-}
-.h-scroll {
-  overflow-x: auto;
-}
-.props {
-  width: 240px;
-  border-left: 1px solid var(--border);
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
-/* While the panel is in its own window, its column shrinks to a note and the grid takes the rest. */
-.props.away {
-  width: 160px;
+/* The waveform keeps its height and the grid takes every pixel under it (SequencerGrid sizes its
+   canvas to whatever it is given). */
+.h-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.inspector {
+  flex: none;
+  width: clamp(260px, 24vw, 440px);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.preview-wrap {
+  flex: none;
+  aspect-ratio: 16 / 10;
+  border-bottom: 1px solid var(--border);
+}
+.props {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 .props-away {
   padding: 0.9rem 0.75rem;
