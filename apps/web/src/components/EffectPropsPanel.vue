@@ -32,6 +32,8 @@ import {
 } from "@webxlights/engine";
 import { api, type EffectParamValue, type MediaRecord, type SequenceEffect } from "../lib/api";
 import ColorCurveEditor from "./ColorCurveEditor.vue";
+import PaletteChip from "./PaletteChip.vue";
+import { clonePalette, isPlaceholder, keepOrder, samePalette, swatchHex, type PickerAnchor } from "../lib/effectPicker";
 import PixelEditor from "./PixelEditor.vue";
 import { decodeImageForEffect } from "../lib/pictureImport";
 import ShaderPicker from "./ShaderPicker.vue";
@@ -54,10 +56,19 @@ const props = defineProps<{
   selectionSize?: number;
   /** The mouth positions the selected face definition actually has. */
   phonemeNames?: string[];
+  // The quick ways to a colour (lib/effectPicker.ts): what this sequence already uses, and the
+  // palettes saved on this machine. Optional so the panel works anywhere it is mounted without them.
+  usedColors?: string[];
+  usedPalettes?: StoredSwatch[][];
+  savedPalettes?: StoredSwatch[][];
 }>();
 const emit = defineEmits<{
   update: [params: Record<string, EffectParamValue>];
   updatePalette: [palette: StoredSwatch[]];
+  savePalette: [palette: StoredSwatch[]];
+  forgetPalette: [palette: StoredSwatch[]];
+  // A placeholder's one control: open the effect picker, beside the button that asked for it.
+  chooseEffect: [at: PickerAnchor];
   // The Colour panel's other three controls, which apply to any effect.
   updateColorAdjust: [adjust: ColorAdjust];
   // "The 'Update' button will apply the current colors palettes to all the selected effects."
@@ -191,8 +202,48 @@ function unmakeCurve(index: number): void {
   // Keeps the curve's first marker, which is the colour the swatch reads as at the effect's start.
   setSwatch(index, isColorCurve(current) ? (current.points[0]?.color ?? "#ffffff") : "#ffffff");
 }
-function swatchHex(entry: StoredSwatch): string {
-  return typeof entry === "string" ? entry : (entry.points[0]?.color ?? "#ffffff");
+
+// Most used colours fill the palette left to right: each click sets the ringed swatch and moves
+// the ring on, so red, green, white is three clicks rather than three trips into a colour
+// picker. Focusing a swatch moves the ring there, which is how you change just one.
+const nextSwatch = ref(0);
+watch(
+  () => props.effect?.id,
+  () => (nextSwatch.value = 0),
+);
+// One past the last swatch means "add one", until the palette is full.
+const targetSwatch = computed(() => Math.min(nextSwatch.value, palette.value.length, MAX_COLORS - 1));
+function useColor(color: string): void {
+  const index = targetSwatch.value;
+  setSwatch(index, color);
+  nextSwatch.value = index + 1;
+}
+
+// Ranked by use when an effect is selected, then held still while it stays selected (keepOrder).
+const shownColors = ref<string[]>([]);
+const shownPalettes = ref<StoredSwatch[][]>([]);
+watch(
+  () => [props.effect?.id, props.usedColors, props.usedPalettes] as const,
+  ([id, colors = [], palettes = []], previous) => {
+    const sameEffect = previous !== undefined && previous[0] === id;
+    shownColors.value = keepOrder(sameEffect ? shownColors.value : [], colors, (a, b) => a === b);
+    shownPalettes.value = keepOrder(sameEffect ? shownPalettes.value : [], palettes, samePalette);
+  },
+  { immediate: true },
+);
+
+/** The sequence's most used palettes that aren't already listed as saved ones. */
+const otherUsedPalettes = computed(() =>
+  shownPalettes.value.filter((used) => !(props.savedPalettes ?? []).some((saved) => samePalette(saved, used))),
+);
+// Only a palette of the effect's own is worth keeping; the default is on offer everywhere already.
+const canSavePalette = computed(() => {
+  const own = props.effect?.palette;
+  return Boolean(own?.length) && !(props.savedPalettes ?? []).some((saved) => samePalette(saved, own!));
+});
+function chooseEffectHere(e: MouseEvent): void {
+  const { left, top, bottom } = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  emit("chooseEffect", { x: left, top, bottom });
 }
 
 const colorAdjust = computed<ColorAdjust>(() => props.effect?.colorAdjust ?? {});
@@ -358,6 +409,11 @@ function curveable(p: EffectParamSpec): boolean {
     <template v-if="!effect">
       <p class="empty">Select an effect to edit its parameters.</p>
     </template>
+    <template v-else-if="isPlaceholder(effect)">
+      <h3>Placeholder</h3>
+      <p class="empty">Nothing plays here until you choose an effect.</p>
+      <button type="button" class="choose-effect" @click="chooseEffectHere">Choose effect…</button>
+    </template>
     <template v-else-if="!schema">
       <p class="empty">"{{ effect.name }}" has no parameter schema yet (render lands in a later milestone).</p>
     </template>
@@ -366,12 +422,13 @@ function curveable(p: EffectParamSpec): boolean {
 
       <CollapsibleSection title="Colors">
         <div class="swatches">
-          <div v-for="(entry, i) in palette" :key="i" class="swatch">
+          <div v-for="(entry, i) in palette" :key="i" class="swatch" :class="{ target: shownColors.length && i === targetSwatch }">
             <input
               type="color"
               :value="swatchHex(entry)"
               :disabled="isColorCurve(entry)"
               :title="isColorCurve(entry) ? 'This swatch is a colour curve' : 'Color'"
+              @focus="nextSwatch = i"
               @input="setSwatch(i, ($event.target as HTMLInputElement).value)"
             />
             <button
@@ -382,7 +439,52 @@ function curveable(p: EffectParamSpec): boolean {
             >~</button>
             <button v-if="palette.length > 1" class="remove-swatch" title="Remove color" @click="removeColor(i)">×</button>
           </div>
-          <button v-if="palette.length < MAX_COLORS" class="add-swatch" title="Add color" @click="addColor">+</button>
+          <button
+            v-if="palette.length < MAX_COLORS"
+            class="add-swatch"
+            :class="{ target: shownColors.length && targetSwatch === palette.length }"
+            title="Add color"
+            @click="addColor"
+          >+</button>
+        </div>
+        <div v-if="shownColors.length" class="quick-row">
+          <span class="quick-label">Most used</span>
+          <div class="quick-items">
+            <button
+              v-for="color in shownColors"
+              :key="color"
+              type="button"
+              class="color-dot"
+              :style="{ background: color }"
+              :aria-label="`Use ${color}`"
+              :title="`${color}: sets the ringed color, then moves to the next`"
+              @click="useColor(color)"
+            ></button>
+          </div>
+        </div>
+        <div v-if="savedPalettes?.length || otherUsedPalettes.length || canSavePalette" class="quick-row">
+          <span class="quick-label">Palettes</span>
+          <div class="quick-items">
+            <span v-for="(saved, i) in savedPalettes" :key="`saved-${i}`" class="saved-chip">
+              <PaletteChip :palette="saved" :selected="samePalette(saved, palette)" hint="saved" @click="emit('updatePalette', clonePalette(saved))" />
+              <button class="remove-swatch" title="Forget this palette" aria-label="Forget this palette" @click="emit('forgetPalette', saved)">×</button>
+            </span>
+            <PaletteChip
+              v-for="(used, i) in otherUsedPalettes"
+              :key="`used-${i}`"
+              :palette="used"
+              :selected="samePalette(used, palette)"
+              hint="used in this sequence"
+              @click="emit('updatePalette', clonePalette(used))"
+            />
+            <button
+              v-if="canSavePalette"
+              type="button"
+              class="save-palette"
+              title="Keep these colors as a palette, here and in every other sequence"
+              @click="emit('savePalette', clonePalette(palette))"
+            >Save</button>
+          </div>
         </div>
         <template v-for="(entry, i) in palette" :key="`curve-${i}`">
           <ColorCurveEditor
@@ -491,7 +593,7 @@ function curveable(p: EffectParamSpec): boolean {
         </p>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Transitions & fades">
+      <CollapsibleSection title="Transitions & fades" :default-open="false">
         <div class="fade-row">
           <label>
             Fade in (ms)
@@ -986,6 +1088,78 @@ function curveable(p: EffectParamSpec): boolean {
 .add-swatch:hover {
   color: #ddd;
   border-color: #666;
+}
+/* Where the next most-used colour lands. The accent, because it marks the current swatch. */
+.swatch.target input[type="color"],
+.add-swatch.target {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.quick-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+}
+.quick-label {
+  flex: none;
+  width: 4.2rem;
+  font-size: 0.7rem;
+  line-height: 20px;
+  color: var(--text-muted);
+  text-align: left;
+}
+/* Its own box, so a second row of chips starts under the first chip rather than under the label. */
+.quick-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.color-dot {
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.color-dot:hover {
+  border-color: var(--text);
+}
+.saved-chip {
+  position: relative;
+  display: inline-flex;
+}
+/* Out of the way until the chip is pointed at or tabbed to: forgetting is the rare act. */
+.saved-chip .remove-swatch {
+  display: none;
+}
+.saved-chip:hover .remove-swatch,
+.saved-chip:focus-within .remove-swatch {
+  display: block;
+}
+.save-palette,
+.choose-effect {
+  font: inherit;
+  font-size: 0.7rem;
+  color: var(--text);
+  background: var(--bg-control);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.save-palette {
+  height: 20px;
+  padding: 0 0.45rem;
+}
+.choose-effect {
+  margin-top: 0.6rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+}
+.save-palette:hover,
+.choose-effect:hover {
+  background: var(--bg-hover);
 }
 .blend-panel {
   margin-bottom: 0.75rem;

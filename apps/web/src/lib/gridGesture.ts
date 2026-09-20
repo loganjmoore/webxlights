@@ -22,9 +22,9 @@ export type GridGesture =
   | "resize"
   /** Plain drag on an effect's body: move it, and the block it belongs to. */
   | "move"
-  /** Drag out a new effect from the armed palette entry. */
+  /** Drag out a span on an empty row: the armed effect, or a placeholder and the effect picker. */
   | "place"
-  /** Rubber-band a block selection out of empty grid - or, without movement, seek. */
+  /** Rubber-band a block selection (shift on a row, or below the rows). */
   | "band";
 
 export interface GestureHit {
@@ -35,8 +35,6 @@ export interface GestureHit {
 
 export interface GestureModifiers {
   shiftKey: boolean;
-  /** An effect is armed from the palette, so empty grid means "draw it here". */
-  hasPendingEffect: boolean;
 }
 
 export function gestureFor(hit: GestureHit, modifiers: GestureModifiers): GridGesture {
@@ -54,7 +52,11 @@ export function gestureFor(hit: GestureHit, modifiers: GestureModifiers): GridGe
     return modifiers.shiftKey ? "pick-reference" : "move";
   }
 
-  if (hit.kind === "row-empty" && modifiers.hasPendingEffect) return "place";
+  // Adding effects is what a row is for, so the plain drag draws one out and the selection box
+  // takes the modifier. It used to be the other way round, which made the common act the one that
+  // needed a trip to the palette first. Shift here can't collide with the two shift gestures
+  // above: those need an effect under the pointer, and this needs there to be none.
+  if (hit.kind === "row-empty" && !modifiers.shiftKey) return "place";
   return "band";
 }
 

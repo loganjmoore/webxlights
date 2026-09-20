@@ -19,6 +19,19 @@ icon tiles on one row with a filter, names as tooltips (and beside the icon once
 the armed-effect hint beside the tiles so arming never moves the grid. The house preview and
 Effect settings share one column on the right; the waveform and grid fill everything else.
 
+Adding an effect starts on the grid, where it is going. Dragging out a span on a row opens the
+effect picker beside that row: below it, or above when there is no room, never over it. The picker
+is keyboard first. Search has focus, the sequence's most used effects lead the list, and a Colors
+row offers saved palettes and the ones the sequence already uses. It is a fixed size so it stays
+put while the list narrows. Until an effect is chosen the span is a placeholder: hollow and dashed,
+because it plays nothing and should not look like something that does. The accent marks the
+highlighted row's icon and the palette in force, nothing else.
+
+In Effect settings, Colors opens by default. Under the swatches, Most used fills them from left to
+right (the accent ring shows which swatch the next click sets) and Palettes lists saved palettes
+first, then the sequence's own. Quick colors hold their order while an effect stays selected, so
+nothing moves under the pointer between clicks.
+
 ## Sign-in and recovery
 
 Keep email login, registration and Google sign-in in the existing centered form. Recovery

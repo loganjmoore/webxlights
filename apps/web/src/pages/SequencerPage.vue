@@ -86,6 +86,8 @@ import {
 import { REGION_COLORS, boundariesFromTimingTrack, effectsInRegion, rebaseEffects, regionAt, regionsFrom } from "../lib/songRegions";
 import CommandPalette from "../components/CommandPalette.vue";
 import EffectWheel from "../components/EffectWheel.vue";
+import EffectPicker from "../components/EffectPicker.vue";
+import { PLACEHOLDER_EFFECT, clonePalette, colorUsage, effectUsage, isPlaceholder, loadSavedPalettes, paletteUsage, samePalette, saveSavedPalettes, type PickerAnchor } from "../lib/effectPicker";
 import ModelVideoExport from "../components/ModelVideoExport.vue";
 import { newEffectId, setAutosaveDebounce, useSequencerStore } from "../stores/sequencer";
 import SequencerGrid, { type ContextMenuTarget, type GridRow } from "../components/SequencerGrid.vue";
@@ -1206,7 +1208,8 @@ watch(playing, (isPlaying) => (isPlaying ? startPlaybackFrames() : stopPlaybackF
 
 // The strip is one row of pictures, so finding Kaleidoscope among forty-nine is a search, not a scan.
 const paletteFilter = ref("");
-const paletteNames = computed(() => filterRanked(Object.keys(EFFECT_SCHEMAS), paletteFilter.value, (name) => name));
+const effectNames = Object.keys(EFFECT_SCHEMAS);
+const paletteNames = computed(() => filterRanked(effectNames, paletteFilter.value, (name) => name));
 
 function armEffect(name: string): void {
   pendingEffectName.value = pendingEffectName.value === name ? null : name;
@@ -1222,22 +1225,94 @@ function layerFor(row: GridRow): { layerIndex?: number } {
   return row.layerIndex === undefined ? {} : { layerIndex: row.layerIndex };
 }
 
-function handlePlace(row: GridRow, startMs: number, endMs: number): void {
-  if (!pendingEffectName.value) return;
-  // Same floor as a drop. Sizing an effect by dragging it out on the grid is the one gesture
-  // that can produce any width at all, including a two-pixel flick that lands something on the
-  // row you then can't get hold of.
-  const width = Math.max(endMs - startMs, minimumEffectMs.value);
-  const end = Math.min(startMs + width, store.sequence?.duration_ms ?? startMs + width);
+/**
+ * A span dragged out on a row.
+ *
+ * With an effect armed it is that effect. Without one it is a placeholder, and the picker opens
+ * beside the row to say what it should be - so adding an effect starts on the grid, where it is
+ * going, rather than up at the palette. The grid has already kept the span inside its gap and
+ * above the width you can still get hold of (its minEffectMs).
+ */
+function handlePlace(row: GridRow, startMs: number, endMs: number, at: PickerAnchor): void {
+  const name = pendingEffectName.value ?? PLACEHOLDER_EFFECT;
+  const id = newEffectId();
   store.addEffect(row.elementType, row.elementId, row.subName, {
-    id: newEffectId(),
-    name: pendingEffectName.value,
-    startMs: Math.max(0, Math.min(startMs, end - width)),
-    endMs: end,
-    params: defaultParamsFor(pendingEffectName.value),
+    id,
+    name,
+    startMs,
+    endMs,
+    params: defaultParamsFor(name),
     ...layerFor(row),
   });
   pendingEffectName.value = null;
+  // Selected, so its colours are in the panel beside the grid the moment it lands.
+  store.setSelection([id], id);
+  if (name === PLACEHOLDER_EFFECT) openPicker(id, at, true);
+}
+
+// The effect picker (lib/effectPicker.ts, components/EffectPicker.vue).
+//
+// `fresh` marks a placeholder made by the drag that opened the picker: choosing its effect then
+// completes that drag rather than being a second edit, so the two share one undo entry. A
+// placeholder clicked later is an edit of its own.
+const picker = ref<{ effectId: string; anchor: PickerAnchor; fresh: boolean } | null>(null);
+// The palette the next effect arrives in. Kept between placements, because a run of effects in one
+// palette is the ordinary case and re-picking it for each would be the slow part. Null is the
+// effect's own default.
+const pickerPalette = ref<StoredSwatch[] | null>(null);
+// Counted only while the picker is open: nothing else reads it, and a closed picker shouldn't
+// cost a walk over every effect each time one of them changes.
+const pickerUsage = computed(() => (picker.value ? effectUsage(store.body) : []));
+const savedPalettes = ref<StoredSwatch[][]>(loadSavedPalettes(typeof localStorage === "undefined" ? null : localStorage));
+// Counted on the same terms as pickerUsage: only while something is showing them, which is the
+// picker or the Colors panel of a selected effect. Sliced here rather than in the template, so the
+// panel is handed the same array until the sequence changes instead of a new one on every
+// playhead tick.
+const showsQuickColors = computed(() => picker.value !== null || store.selectedEffectId !== null);
+const usedPalettes = computed(() => (showsQuickColors.value ? paletteUsage(store.body).slice(0, 8).map((u) => u.palette) : []));
+const usedColors = computed(() => (showsQuickColors.value ? colorUsage(store.body).slice(0, 12).map((u) => u.color) : []));
+/** Saved palettes first, then the sequence's most used that aren't already among them. */
+const quickPalettes = computed(() =>
+  [...savedPalettes.value, ...usedPalettes.value.filter((used) => !savedPalettes.value.some((saved) => samePalette(saved, used)))].slice(0, 12),
+);
+
+function openPicker(effectId: string, anchor: PickerAnchor, fresh: boolean): void {
+  // Opened first: the palettes on offer are only counted while something is showing them.
+  picker.value = { effectId, anchor, fresh };
+  // A kept palette that is no longer on offer would be applied without being visible anywhere.
+  const kept = pickerPalette.value;
+  if (kept && !quickPalettes.value.some((p) => samePalette(p, kept))) pickerPalette.value = null;
+}
+
+function fillFromPicker(name: string): void {
+  const target = picker.value;
+  picker.value = null;
+  if (target) fillPlaceholder(target.effectId, name, pickerPalette.value, !target.fresh);
+}
+
+/** Gives a placeholder its effect. The palette is the picker's; a dropped tile brings none. */
+function fillPlaceholder(effectId: string, name: string, palette: StoredSwatch[] | null = null, snapshot = true): void {
+  store.replaceEffectKind(effectId, { name, params: defaultParamsFor(name), palette: palette ? clonePalette(palette) : undefined }, snapshot);
+  store.setSelection([effectId], effectId);
+}
+
+/** A click on an effect that wasn't a drag. Only a placeholder has anything to say to one. */
+function handleEffectClick(effect: SequenceEffect, at: PickerAnchor): void {
+  if (isPlaceholder(effect)) openPicker(effect.id, at, false);
+}
+
+function setSavedPalettes(next: StoredSwatch[][]): void {
+  savedPalettes.value = next;
+  saveSavedPalettes(typeof localStorage === "undefined" ? null : localStorage, next);
+}
+function savePalette(palette: StoredSwatch[]): void {
+  if (savedPalettes.value.some((saved) => samePalette(saved, palette))) return;
+  // Newest first, so the one just saved is the one nearest to hand - and the one kept if the
+  // list is ever full.
+  setSavedPalettes([clonePalette(palette), ...savedPalettes.value]);
+}
+function forgetPalette(palette: StoredSwatch[]): void {
+  setSavedPalettes(savedPalettes.value.filter((saved) => !samePalette(saved, palette)));
 }
 
 // Dragging a tile from the palette onto the grid.
@@ -1260,7 +1335,7 @@ const tileDrag = ref<{
   name: string;
   x: number;
   y: number;
-  target: { row: GridRow; rowIndex: number; ms: number } | null;
+  target: { row: GridRow; rowIndex: number; ms: number; effect: SequenceEffect | null } | null;
   blocked: boolean;
 } | null>(null);
 let tilePointer: { id: number; name: string; startX: number; startY: number; el: HTMLElement; started: boolean } | null = null;
@@ -1306,8 +1381,10 @@ function onTilePointerMove(e: PointerEvent): void {
   const target = gridRef.value?.dropTargetAt(e.clientX, e.clientY) ?? null;
   let blocked = false;
   if (target) {
-    const { startMs, endMs } = placementAt(target.ms);
-    blocked = gridRef.value?.showDropGhost(target.rowIndex, startMs, endMs) ?? false;
+    // Over a placeholder the drop fills it, so the outline is the placeholder's own span.
+    const filling = target.effect && isPlaceholder(target.effect) ? target.effect : null;
+    const { startMs, endMs } = filling ?? placementAt(target.ms);
+    blocked = gridRef.value?.showDropGhost(target.rowIndex, startMs, endMs, filling?.id) ?? false;
   } else {
     gridRef.value?.clearDropGhost();
   }
@@ -1324,7 +1401,8 @@ function onTilePointerUp(e: PointerEvent): void {
       // The latest position wins: the window-level fallback may fire before the tile's own,
       // and the pointer may have moved since the last move event.
       const target = gridRef.value?.dropTargetAt(e.clientX, e.clientY) ?? drag?.target ?? null;
-      if (target && !drag?.blocked) handleDropEffect(target.row, pointer.name, target.ms);
+      if (target?.effect && isPlaceholder(target.effect)) fillPlaceholder(target.effect.id, pointer.name);
+      else if (target && !drag?.blocked) handleDropEffect(target.row, pointer.name, target.ms);
     }
   } finally {
     // Whatever the drop did or failed to do, the drag is over.
@@ -2379,8 +2457,8 @@ const commands = computed(() =>
 
 function onKeydown(e: KeyboardEvent): void {
   // The palette owns the keyboard while it is open - its own arrow keys and Enter would otherwise
-  // also be scrubbing the playhead behind it.
-  if (paletteOpen.value) return;
+  // also be scrubbing the playhead behind it. The effect picker is the same kind of thing.
+  if (paletteOpen.value || picker.value) return;
   if (isTypingTarget(e.target)) return;
 
   const command = commandForEvent(commands.value, e);
@@ -3575,12 +3653,13 @@ watch(sequenceId, async (id) => {
             :px-per-ms="pxPerMs"
             :playhead-ms="playheadMs"
             :selected-effect-id="store.selectedEffectId"
-            :pending-effect-name="pendingEffectName"
+            :min-effect-ms="minimumEffectMs"
             @select-many="handleSelectMany"
             :selected-effect-ids="store.selectedEffectIds"
             @wheel="openWheel"
             @row-expand="toggleRowExpanded"
             @place="handlePlace"
+            @effect-click="handleEffectClick"
             @move-many="handleMoves"
             @fade="handleFade"
             @seek="seekTo"
@@ -3640,7 +3719,13 @@ watch(sequenceId, async (id) => {
           :face-definition-names="faceDefinitionNames"
           :phoneme-names="phonemeNames"
           @update="handleParamsUpdate"
+          :used-colors="usedColors"
+          :used-palettes="usedPalettes"
+          :saved-palettes="savedPalettes"
           @update-palette="handlePaletteUpdate"
+          @save-palette="savePalette"
+          @forget-palette="forgetPalette"
+          @choose-effect="(at) => selectedEffect && openPicker(selectedEffect.id, at, false)"
           @update-color-adjust="handleColorAdjustUpdate"
           @apply-palette-to-selection="applyPaletteToSelection"
           :selection-size="store.selectedEffectIds.length"
@@ -3661,6 +3746,16 @@ watch(sequenceId, async (id) => {
       :items="contextMenu.items"
       @action="handleContextAction"
       @close="contextMenu = null"
+    />
+    <EffectPicker
+      v-if="picker"
+      v-model:palette="pickerPalette"
+      :anchor="picker.anchor"
+      :effect-names="effectNames"
+      :usage="pickerUsage"
+      :palettes="quickPalettes"
+      @pick="fillFromPicker"
+      @close="picker = null"
     />
     <ModalPanel v-if="xsqExport && store.sequence" id="xsq-export" title="Export for xLights" @close="xsqExport = null">
       <div class="xsq-export">

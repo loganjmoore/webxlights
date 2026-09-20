@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { marksInForce, placementFor } from "../src/lib/effectPlacement";
+import { dragOutSpan, freeGapAt, marksInForce, placementFor } from "../src/lib/effectPlacement";
 
 const DURATION = 10_000;
 const DEFAULT_MS = 1000;
@@ -84,5 +84,51 @@ describe("where a dropped effect lands", () => {
 
   it("copes with marks handed over out of order", () => {
     expect(placementFor([3000, 1000, 2000], 2400, DURATION, DEFAULT_MS)).toEqual({ startMs: 2000, endMs: 3000 });
+  });
+});
+
+describe("the free gap a span is dragged out in", () => {
+  const occupied = [
+    { startMs: 1000, endMs: 2000 },
+    { startMs: 5000, endMs: 6000 },
+  ];
+
+  it("runs from the effect before to the effect after", () => {
+    expect(freeGapAt(3000, occupied, DURATION)).toEqual({ startMs: 2000, endMs: 5000 });
+  });
+
+  it("runs to the ends of the sequence when nothing is in the way", () => {
+    expect(freeGapAt(500, occupied, DURATION)).toEqual({ startMs: 0, endMs: 1000 });
+    expect(freeGapAt(7000, occupied, DURATION)).toEqual({ startMs: 6000, endMs: DURATION });
+    expect(freeGapAt(7000, [], DURATION)).toEqual({ startMs: 0, endMs: DURATION });
+  });
+
+  it("counts an effect that ends exactly at the press as the one before", () => {
+    expect(freeGapAt(2000, occupied, DURATION)).toEqual({ startMs: 2000, endMs: 5000 });
+  });
+});
+
+describe("a span dragged out on a row", () => {
+  const gap = { startMs: 2000, endMs: 5000 };
+
+  it("is the same span whichever way it was dragged", () => {
+    expect(dragOutSpan(gap, 2500, 4000, 100)).toEqual({ startMs: 2500, endMs: 4000 });
+    expect(dragOutSpan(gap, 4000, 2500, 100)).toEqual({ startMs: 2500, endMs: 4000 });
+  });
+
+  it("stops at its neighbours instead of covering them", () => {
+    expect(dragOutSpan(gap, 3000, 9000, 100)).toEqual({ startMs: 3000, endMs: 5000 });
+    expect(dragOutSpan(gap, 3000, 0, 100)).toEqual({ startMs: 2000, endMs: 3000 });
+    // A snapped start can land inside the neighbour; it is pulled back to the gap's edge.
+    expect(dragOutSpan(gap, 1900, 3000, 100)).toEqual({ startMs: 2000, endMs: 3000 });
+  });
+
+  it("grows a flick to the minimum, to the right first and then back off the gap's end", () => {
+    expect(dragOutSpan(gap, 3000, 3010, 400)).toEqual({ startMs: 3000, endMs: 3400 });
+    expect(dragOutSpan(gap, 4900, 4950, 400)).toEqual({ startMs: 4600, endMs: 5000 });
+  });
+
+  it("fills a gap narrower than the minimum rather than overflowing it", () => {
+    expect(dragOutSpan({ startMs: 2000, endMs: 2100 }, 2010, 2050, 400)).toEqual({ startMs: 2000, endMs: 2100 });
   });
 });

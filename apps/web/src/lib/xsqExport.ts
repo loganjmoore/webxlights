@@ -1,6 +1,7 @@
 import type { ModelGroupRecord, ModelRecord, SequenceBody, SequenceEffect, SequenceRecord } from "./api";
 import { exportEffectSettings } from "./xsqEffectSettings";
 import { regionsFrom } from "./songRegions";
+import { isPlaceholder } from "./effectPicker";
 
 function xml(value: string | number): string {
   if (Array.from(String(value)).some((char) => char.charCodeAt(0) < 32 && ![9, 10, 13].includes(char.charCodeAt(0)))) throw new Error("Remove invalid control characters from names and text before exporting.");
@@ -54,7 +55,11 @@ export function exportSequenceToXsq(
     effectCount++;
     return `<Effect ref="${indexOf(effectDb, converted.settings)}" name="${xml(converted.name)}" startTime="${Math.round(startMs)}" endTime="${Math.round(endMs)}" palette="${indexOf(palettes, converted.palette)}"/>`;
   }
-  function layers(effects: SequenceEffect[], tag: string, attrs = ""): string {
+  function layers(all: SequenceEffect[], tag: string, attrs = ""): string {
+    // A placeholder renders nothing here, but xLights has no such effect and its nearest, Off,
+    // paints black over the layers below. Left out, the export plays the way the preview does.
+    const effects = all.filter((e) => !isPlaceholder(e));
+    if (effects.length < all.length) warnings.add("Placeholders with no effect chosen were left out.");
     const maxLayer = effects.reduce((max, e) => Math.max(max, e.layerIndex ?? 0), 0);
     if (!Number.isSafeInteger(maxLayer) || maxLayer > 1000 || effects.some((e) => !Number.isSafeInteger(e.layerIndex ?? 0) || (e.layerIndex ?? 0) < 0)) {
       throw new Error("An effect has an invalid layer number.");

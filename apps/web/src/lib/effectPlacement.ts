@@ -62,6 +62,36 @@ export function placementFor(
 }
 
 /**
+ * The free span around a moment on a row: from the effect before it to the effect after it.
+ *
+ * What a span dragged out on the grid is kept inside. Drawing a new effect across the one next
+ * door would bury part of it, and refusing the drag outright would throw away a gesture that was
+ * almost right - stopping at the neighbour's edge is what the drag was aiming for anyway.
+ */
+export function freeGapAt(atMs: number, occupied: readonly Placement[], durationMs: number): Placement {
+  return {
+    startMs: Math.max(0, ...occupied.filter((o) => o.endMs <= atMs).map((o) => o.endMs)),
+    endMs: Math.min(durationMs, ...occupied.filter((o) => o.startMs >= atMs).map((o) => o.startMs)),
+  };
+}
+
+/**
+ * The span a drag from one moment to another draws out, in either direction, inside its gap.
+ *
+ * Floored at `minimumMs` for the reason a drop is (see `widened`): a flick that lands something
+ * two pixels wide leaves an effect that can't be got hold of again. The floor gives way to the
+ * gap, though - a gap narrower than the minimum is filled, not overflowed.
+ */
+export function dragOutSpan(gap: Placement, fromMs: number, toMs: number, minimumMs: number): Placement {
+  const within = (ms: number) => Math.max(gap.startMs, Math.min(ms, gap.endMs));
+  const startMs = Math.min(within(fromMs), within(toMs));
+  const endMs = Math.max(within(fromMs), within(toMs));
+  if (endMs - startMs >= minimumMs) return { startMs, endMs };
+  const grownEnd = Math.min(startMs + minimumMs, gap.endMs);
+  return { startMs: Math.max(gap.startMs, grownEnd - minimumMs), endMs: grownEnd };
+}
+
+/**
  * Grows a placement that would come out too small to grab.
  *
  * The caller passes the minimum in milliseconds, but the number it cares about is a number of

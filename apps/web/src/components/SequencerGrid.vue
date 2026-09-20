@@ -6,6 +6,8 @@ import { fadeDurationAt } from "../lib/effectFade";
 import { boxFromDrag, idsInBox, isDrag, selectionAfterClick } from "../lib/blockSelect";
 import { acceptedMoves, previewMoves, type DraggedEffect, type GhostPlacement } from "../lib/dragPreview";
 import { gestureFor } from "../lib/gridGesture";
+import { dragOutSpan, freeGapAt, type Placement } from "../lib/effectPlacement";
+import { isPlaceholder, type PickerAnchor } from "../lib/effectPicker";
 
 export interface GridRow {
   elementType: RowElementType;
@@ -52,7 +54,9 @@ const props = defineProps<{
   // The block selection (lib/blockSelect.ts). Optional so the grid still draws anywhere it is
   // mounted without one; a selection of one behaves exactly as a single selection always did.
   selectedEffectIds?: string[];
-  pendingEffectName: string | null; // armed from the palette; next drag places this
+  // The narrowest a dragged-out effect may come out, which the page knows in pixels (see its
+  // minimumEffectMs). Optional so the grid still places something sensible without it.
+  minEffectMs?: number;
   // xLights' "snap to timing marks" preference. Off, an edge lands exactly where it was dropped,
   // which is what you want when placing against the music by ear rather than against the marks.
   snapToTiming?: boolean;
@@ -77,7 +81,12 @@ const emit = defineEmits<{
   // Selection is always a block and its reference, even when the block is one effect - two events
   // would mean two ways to be selected, and the panel reading a different one from the grid.
   selectMany: [ids: string[], reference: string | null];
-  place: [row: GridRow, startMs: number, endMs: number];
+  // A span dragged out on an empty row, and where on screen it is - the effect picker opens
+  // beside it, because that is where the eyes already are.
+  place: [row: GridRow, startMs: number, endMs: number, at: PickerAnchor];
+  // A press on an effect's body that was released without moving. What a click means depends on
+  // the effect (a placeholder opens the picker), so the grid reports it and the page decides.
+  effectClick: [effect: SequenceEffect, at: PickerAnchor];
   // Where the dragged effects landed, on release. One event for the whole drag, so the move is one
   // undo entry rather than one per pointermove.
   moveMany: [moves: { id: string; startMs: number; endMs: number; rowIndex: number }[]];
@@ -159,11 +168,15 @@ function attachHScroll(): void {
 }
 const hoverCursor = ref("crosshair");
 let dragState:
-  | { kind: "place"; row: GridRow; startMs: number }
+  // A span being drawn out on an empty row. `gap` is the free space the press landed in, which the
+  // span never leaves; the ghost is null until the pointer has moved far enough to be a drag
+  // rather than a click that wobbled, because a click on empty grid still seeks.
+  | { kind: "place"; row: GridRow; rowIndex: number; pressMs: number; gap: Placement; fromX: number; fromY: number; ghost: GhostPlacement | null }
   // A move is a *proposal* until release: the ghosts show where the block will land, and only the
   // unblocked ones drop. `dragged` is the whole selected block, since the manual's ghost is
-  // explicitly "the effect (or effects)".
-  | { kind: "move"; dragged: DraggedEffect[]; grabOffsetMs: number; fromRow: number; ghosts: GhostPlacement[] }
+  // explicitly "the effect (or effects)". `moved` has the same job as the place ghost being null:
+  // a press released where it started is a click on the effect, not a drag of nought pixels.
+  | { kind: "move"; effect: SequenceEffect; dragged: DraggedEffect[]; grabOffsetMs: number; fromRow: number; fromX: number; fromY: number; moved: boolean; ghosts: GhostPlacement[] }
   | { kind: "resize"; effect: SequenceEffect; rowIndex: number; edge: "left" | "right"; ghost: GhostPlacement | null }
   // Shift+resize authors a fade instead of moving the edge (manual: "hold the Shift key and drag
   // the left edge of an effect inwards to create a fade in").
@@ -219,6 +232,7 @@ interface DrawEffect {
   layerIndex?: number;
   inMs: number;
   outMs: number;
+  placeholder: boolean;
 }
 let drawIndex = new Map<string, DrawEffect[]>();
 let drawMarks: number[] = [];
@@ -240,6 +254,7 @@ function rebuildDrawIndex(): void {
         layerIndex: e.layerIndex,
         inMs: e.transition?.inDurationMs ?? 0,
         outMs: e.transition?.outDurationMs ?? 0,
+        placeholder: isPlaceholder(e),
       })),
     );
   }
@@ -347,22 +362,29 @@ function draw(): void {
       if (x2 < 0 || x1 > rect.width) continue;
       const isReference = effect.id === props.selectedEffectId;
       const inBlock = isReference || (props.selectedEffectIds?.includes(effect.id) ?? false);
-      ctx.fillStyle = inBlock ? ui().effectSelected : ui().effect;
+      // A placeholder is hollow and dashed: it renders nothing, and a solid block the colour of an
+      // effect would say otherwise. Selection still reads the same way on it as on anything else.
+      ctx.fillStyle = effect.placeholder ? (inBlock ? "rgba(255, 255, 255, 0.14)" : "rgba(255, 255, 255, 0.05)") : inBlock ? ui().effectSelected : ui().effect;
       ctx.fillRect(x1, y + 2, Math.max(2, x2 - x1), height - 4);
       // The reference gets the white outline and the rest of the block a dimmer one: an alignment
       // moves everything onto the reference, so which one that is has to be visible before you
       // pick the command, not after it has moved eleven effects.
-      ctx.strokeStyle = isReference ? "#fff" : inBlock ? "#8fb8e8" : "#2c3e5c";
+      ctx.strokeStyle = isReference ? "#fff" : inBlock ? "#8fb8e8" : effect.placeholder ? "#8a8a96" : "#2c3e5c";
       ctx.lineWidth = isReference ? 2 : 1;
+      if (effect.placeholder) ctx.setLineDash([4, 3]);
       ctx.strokeRect(x1, y + 2, Math.max(2, x2 - x1), height - 4);
+      ctx.setLineDash([]);
       ctx.lineWidth = 1;
       if (props.showTransitionMarks !== false) drawTransitionMarks(ctx, effect.inMs, effect.outMs, x1, x2, y, height);
       // The label is drawn last so a transition mark can't sit on top of it. Only when the block
       // is wide enough for the name to be legible at all, which was already the rule.
       if (x2 - x1 > 24) {
-        ctx.fillStyle = "#0c0c0f";
+        ctx.fillStyle = effect.placeholder ? "#b4b4c0" : "#0c0c0f";
         ctx.font = "10px system-ui";
-        ctx.fillText(effect.name, x1 + 3, y + height / 2 + 3, x2 - x1 - 6);
+        // fillText squeezes a label into its width rather than clipping it, which a short effect
+        // name survives and a sentence doesn't: a narrow placeholder gets the plus instead.
+        const label = effect.placeholder ? (x2 - x1 > 84 ? "Choose effect…" : "+") : effect.name;
+        ctx.fillText(label, x1 + 3, y + height / 2 + 3, x2 - x1 - 6);
       }
     }
   }
@@ -440,7 +462,14 @@ function draw(): void {
 
   // The ghosts, over the effects but under the band: an outline hidden behind a block would look
   // like it had stopped following the pointer.
-  const ghosts = dragState?.kind === "move" ? dragState.ghosts : dragState?.kind === "resize" && dragState.ghost ? [dragState.ghost] : dropGhost ? [dropGhost] : [];
+  const ghosts =
+    dragState?.kind === "move"
+      ? dragState.ghosts
+      : (dragState?.kind === "resize" || dragState?.kind === "place") && dragState.ghost
+        ? [dragState.ghost]
+        : dropGhost
+          ? [dropGhost]
+          : [];
   for (const ghost of ghosts) {
     const gy = HEADER_HEIGHT + ghost.rowIndex * height - scrollTop.value;
     if (gy + height < HEADER_HEIGHT || gy > rect.height) continue;
@@ -469,6 +498,15 @@ function draw(): void {
     ctx.strokeStyle = "rgba(140, 190, 255, 0.9)";
     ctx.strokeRect(bx, by, bw, bh);
   }
+}
+
+/**
+ * Where a row is on screen, under the pointer's x. The row rather than the pointer's y: a drag
+ * that drifted into the row above would otherwise open the picker over the span it is about.
+ */
+function anchorFor(clientX: number, rowIndex: number): PickerAnchor {
+  const top = (canvasRef.value?.getBoundingClientRect().top ?? 0) + HEADER_HEIGHT + rowIndex * rowHeight.value - scrollTop.value;
+  return { x: clientX, top, bottom: top + rowHeight.value };
 }
 
 /** The row index a y coordinate falls on, whether or not a row is actually there. */
@@ -659,13 +697,22 @@ function onPointerDown(e: PointerEvent): void {
   // What the press means is decided in lib/gridGesture.ts rather than by the shape of the
   // branching here: two gestures that both use shift once collided in this function, and the one
   // that lost simply stopped existing.
-  const gesture = gestureFor(hit, { shiftKey: e.shiftKey, hasPendingEffect: props.pendingEffectName !== null });
+  const gesture = gestureFor(hit, { shiftKey: e.shiftKey });
 
   if (gesture === "add-mark" && hit.kind === "ruler-empty") {
     emit("addMark", hit.trackIndex, hit.ms);
     return;
   }
   if (gesture === "none") return; // a mark: right-click deletes, nothing happens on press
+
+  // Every gesture from here on is a drag, and a drag that wanders off the canvas has to keep
+  // hearing the pointer - above all the release, or a span drawn out past the edge of the grid
+  // would never land.
+  try {
+    canvas.setPointerCapture(e.pointerId);
+  } catch {
+    // No such pointer (a synthetic event): the drag still works, it just can't leave the canvas.
+  }
 
   if (hit.kind === "effect") {
     // Shift picks the reference out of a block that already exists ("hold down shift and click the
@@ -683,24 +730,30 @@ function onPointerDown(e: PointerEvent): void {
     } else {
       dragState = {
         kind: "move",
+        effect: hit.effect,
         dragged: draggedBlock(hit.effect, rowIndex, next.selected),
         grabOffsetMs: xToMs(x) - hit.effect.startMs,
         fromRow: rowIndex,
+        fromX: x,
+        fromY: y,
+        moved: false,
         ghosts: [],
       };
     }
     return;
   }
 
+  // An empty row: a *drag* draws out an effect, a click seeks. Decided on pointerup rather than
+  // here, because which one it was isn't known until the pointer either moves or doesn't - and
+  // seeking on the way into a drag would drag the playhead along with it. The band below works
+  // the same way.
   if (gesture === "place" && hit.kind === "row-empty") {
-    emit("selectMany", [], null);
-    dragState = { kind: "place", row: hit.row, startMs: xToMs(x) };
+    const pressMs = xToMs(x);
+    const gap = freeGapAt(pressMs, effectsForRow(hit.row), props.durationMs);
+    dragState = { kind: "place", row: hit.row, rowIndex: rowIndexAt(y), pressMs, gap, fromX: x, fromY: y, ghost: null };
     return;
   }
 
-  // Empty grid: a *drag* draws a selection box, a click seeks. Decided on pointerup rather than
-  // here, because which one it was isn't known until the pointer either moves or doesn't - and
-  // seeking on the way into a band drag would drag the playhead along with the box.
   dragState = { kind: "band", fromX: x, fromY: y, toX: x, toY: y, dragging: false };
 }
 
@@ -737,7 +790,12 @@ function onPointerMove(e: PointerEvent): void {
   const ms = xToMs(x);
 
   if (dragState.kind === "place") {
-    // live preview by mutating a scratch copy isn't wired for M2 simplicity; commit on pointerup.
+    if (!dragState.ghost && !isDrag(dragState.fromX, dragState.fromY, x, y)) return;
+    // Both ends snap, like every other edge on the grid, and the span stays in the gap it was
+    // started in. Never blocked, for that reason: there is nothing in a gap to collide with.
+    const span = dragOutSpan(dragState.gap, snapMs(dragState.pressMs), snapMs(ms), props.minEffectMs ?? MINIMUM_EFFECT_MS);
+    dragState.ghost = { id: "place", rowIndex: dragState.rowIndex, ...span, blocked: false };
+    draw();
     return;
   }
   if (dragState.kind === "resize") {
@@ -767,6 +825,8 @@ function onPointerMove(e: PointerEvent): void {
     return;
   }
   if (dragState.kind === "move") {
+    if (!dragState.moved && !isDrag(dragState.fromX, dragState.fromY, x, y)) return;
+    dragState.moved = true;
     hoverCursor.value = "grabbing";
     // The delta is taken from the effect actually grabbed, then applied to the whole block, so the
     // block keeps its shape however far it is dragged.
@@ -798,10 +858,12 @@ function onPointerUp(e: PointerEvent): void {
   }
 
   if (dragState?.kind === "move") {
+    const { moved, effect, fromRow } = dragState;
     const moves = acceptedMoves(dragState.ghosts, dragState.dragged);
     dragState = null;
     grabbedEffectId = null;
     if (moves.length > 0) emit("moveMany", moves);
+    if (!moved) emit("effectClick", effect, anchorFor(e.clientX, fromRow));
     draw();
     return;
   }
@@ -816,17 +878,26 @@ function onPointerUp(e: PointerEvent): void {
   }
 
   if (dragState?.kind === "place") {
-    const canvas = canvasRef.value;
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left + scrollLeft.value;
-      const endMs = xToMs(x);
-      const startMs = Math.min(dragState.startMs, endMs);
-      const finalEnd = Math.max(dragState.startMs, endMs, startMs + 200);
-      emit("place", dragState.row, startMs, finalEnd);
+    const { row, rowIndex, ghost, fromX } = dragState;
+    dragState = null;
+    if (ghost) {
+      // What lands is exactly what the ghost showed, not a second calculation that could differ.
+      emit("place", row, ghost.startMs, ghost.endMs, anchorFor(e.clientX, rowIndex));
+    } else {
+      emit("selectMany", [], null);
+      emit("seek", xToMs(fromX));
     }
+    draw();
+    return;
   }
   dragState = null;
+}
+
+/** The drag was taken away (a touch scroll, the OS): nothing lands, and no ghost is left behind. */
+function onPointerCancel(): void {
+  dragState = null;
+  grabbedEffectId = null;
+  draw();
 }
 
 // A drag from the effect palette (SequencerPage.vue owns the gesture; this draws where it lands).
@@ -837,7 +908,7 @@ function onPointerUp(e: PointerEvent): void {
 let dropGhost: GhostPlacement | null = null;
 
 /** The row and snapped moment under a viewport point, or null when the point is off the rows. */
-function dropTargetAt(clientX: number, clientY: number): { row: GridRow; rowIndex: number; ms: number } | null {
+function dropTargetAt(clientX: number, clientY: number): { row: GridRow; rowIndex: number; ms: number; effect: SequenceEffect | null } | null {
   const canvas = canvasRef.value;
   if (!canvas) return null;
   const rect = canvas.getBoundingClientRect();
@@ -846,15 +917,20 @@ function dropTargetAt(clientX: number, clientY: number): { row: GridRow; rowInde
   const y = clientY - rect.top;
   const hit = hitTest(x, y);
   // Over an existing effect still reports the row: the ghost turns red there, which says "not
-  // here" better than the outline vanishing would.
+  // here" better than the outline vanishing would. The effect is reported too, because one kind
+  // is a fine place to drop: a placeholder is a span waiting for exactly this.
   if (hit.kind !== "row-empty" && hit.kind !== "effect") return null;
-  return { row: hit.row, rowIndex: rowIndexAt(y), ms: snapMs(xToMs(x)) };
+  return { row: hit.row, rowIndex: rowIndexAt(y), ms: snapMs(xToMs(x)), effect: hit.kind === "effect" ? hit.effect : null };
 }
 
-/** Draws the outline for a would-be drop, and says whether something is already there. */
-function showDropGhost(rowIndex: number, startMs: number, endMs: number): boolean {
+/**
+ * Draws the outline for a would-be drop, and says whether something is already there.
+ *
+ * `replacingId` is the placeholder a drop would fill, which can't be in its own way.
+ */
+function showDropGhost(rowIndex: number, startMs: number, endMs: number, replacingId?: string): boolean {
   const row = props.rows[rowIndex];
-  const blocked = !row || effectsForRow(row).some((e) => startMs < e.endMs && endMs > e.startMs);
+  const blocked = !row || effectsForRow(row).some((e) => e.id !== replacingId && startMs < e.endMs && endMs > e.startMs);
   dropGhost = { id: "drop", rowIndex, startMs, endMs, blocked };
   draw();
   return blocked;
@@ -936,6 +1012,7 @@ watch(
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
+        @pointercancel="onPointerCancel"
         @dblclick="onDoubleClick"
         @contextmenu="onContextMenu"
       ></canvas>
