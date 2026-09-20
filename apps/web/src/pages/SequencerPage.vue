@@ -1264,20 +1264,24 @@ const pickerPalette = ref<StoredSwatch[] | null>(null);
 // cost a walk over every effect each time one of them changes.
 const pickerUsage = computed(() => (picker.value ? effectUsage(store.body) : []));
 const savedPalettes = ref<StoredSwatch[][]>(loadSavedPalettes(typeof localStorage === "undefined" ? null : localStorage));
-// Sliced here rather than in the template, so the panel is handed the same array until the
-// sequence changes instead of a new one on every playhead tick.
-const usedPalettes = computed(() => paletteUsage(store.body).slice(0, 8).map((u) => u.palette));
-const usedColors = computed(() => colorUsage(store.body).slice(0, 12).map((u) => u.color));
+// Counted on the same terms as pickerUsage: only while something is showing them, which is the
+// picker or the Colors panel of a selected effect. Sliced here rather than in the template, so the
+// panel is handed the same array until the sequence changes instead of a new one on every
+// playhead tick.
+const showsQuickColors = computed(() => picker.value !== null || store.selectedEffectId !== null);
+const usedPalettes = computed(() => (showsQuickColors.value ? paletteUsage(store.body).slice(0, 8).map((u) => u.palette) : []));
+const usedColors = computed(() => (showsQuickColors.value ? colorUsage(store.body).slice(0, 12).map((u) => u.color) : []));
 /** Saved palettes first, then the sequence's most used that aren't already among them. */
 const quickPalettes = computed(() =>
   [...savedPalettes.value, ...usedPalettes.value.filter((used) => !savedPalettes.value.some((saved) => samePalette(saved, used)))].slice(0, 12),
 );
 
 function openPicker(effectId: string, anchor: PickerAnchor, fresh: boolean): void {
+  // Opened first: the palettes on offer are only counted while something is showing them.
+  picker.value = { effectId, anchor, fresh };
   // A kept palette that is no longer on offer would be applied without being visible anywhere.
   const kept = pickerPalette.value;
   if (kept && !quickPalettes.value.some((p) => samePalette(p, kept))) pickerPalette.value = null;
-  picker.value = { effectId, anchor, fresh };
 }
 
 function fillFromPicker(name: string): void {

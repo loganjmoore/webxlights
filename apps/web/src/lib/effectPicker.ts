@@ -159,8 +159,20 @@ export const MAX_SAVED_PALETTES = 24;
 /** xLights' own limit: "Some support just one, some support up to 8." */
 const MAX_SWATCHES = 8;
 
+const HEX = /^#[0-9a-f]{6}$/i;
+
 function isSwatch(entry: unknown): entry is StoredSwatch {
-  return (typeof entry === "string" && /^#[0-9a-f]{6}$/i.test(entry)) || isColorCurve(entry);
+  if (typeof entry === "string") return HEX.test(entry);
+  // The engine's isColorCurve only reads `kind`, which is enough for data the app wrote itself.
+  // This is storage, which anything can have written: a curve with no markers would throw in
+  // every chip that tried to show it, and in the renderer if it ever reached an effect.
+  if (!isColorCurve(entry)) return false;
+  const points: unknown = entry.points;
+  return (
+    Array.isArray(points) &&
+    points.length > 0 &&
+    points.every((p) => typeof p?.x === "number" && typeof p?.color === "string" && HEX.test(p.color))
+  );
 }
 
 /** Keeps what is a palette and drops what isn't, so a hand-edited bag can't break the picker. */

@@ -154,6 +154,13 @@ describe("saved palettes", () => {
     expect(sanitizePalettes([["#ff0000"], ["red"], [], "nope", [42], ["#ff0000"], Array(9).fill("#000000")])).toEqual([["#ff0000"]]);
   });
 
+  it("drops a colour curve with no usable markers, which would throw in every chip that showed it", () => {
+    const curve = { kind: "colorCurve", mode: "Time", blend: "Gradient", points: [{ x: 0, color: "#ff0000" }] };
+    expect(sanitizePalettes([[curve]])).toEqual([[curve]]);
+    expect(sanitizePalettes([[{ kind: "colorCurve" }], [{ ...curve, points: [] }], [{ ...curve, points: [{ x: 0 }] }], [{ ...curve, points: "red" }]])).toEqual([]);
+    expect(sanitizePalettes([[{ ...curve, points: [{ x: 0, color: "red" }] }], [{ ...curve, points: [null] }]])).toEqual([]);
+  });
+
   it("keeps the first ones when there are too many, which is why the page saves newest first", () => {
     const many = Array.from({ length: MAX_SAVED_PALETTES + 5 }, (_, i) => [`#${i.toString(16).padStart(6, "0")}`]);
     const kept = sanitizePalettes(many);
