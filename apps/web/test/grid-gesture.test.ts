@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { GRID_GESTURES, gestureFor, type GestureHit, type GridGesture } from "../src/lib/gridGesture";
 
-const plain = { shiftKey: false, hasPendingEffect: false };
-const shift = { shiftKey: true, hasPendingEffect: false };
-const armed = { shiftKey: false, hasPendingEffect: true };
+const plain = { shiftKey: false };
+const shift = { shiftKey: true };
 
 describe("what a press on the grid means", () => {
   it("tells the two shift gestures apart by where the pointer is", () => {
@@ -30,9 +29,10 @@ describe("what a press on the grid means", () => {
     expect(gestureFor({ kind: "ruler-empty" }, shift)).toBe("add-mark");
   });
 
-  it("draws an armed effect on empty grid, and a selection box otherwise", () => {
-    expect(gestureFor({ kind: "row-empty" }, armed)).toBe("place");
-    expect(gestureFor({ kind: "row-empty" }, plain)).toBe("band");
+  it("draws out an effect on an empty row, and a selection box with shift or below the rows", () => {
+    // Armed or not: what gets placed is the page's business, the gesture is the same drag.
+    expect(gestureFor({ kind: "row-empty" }, plain)).toBe("place");
+    expect(gestureFor({ kind: "row-empty" }, shift)).toBe("band");
     expect(gestureFor({ kind: "none" }, plain)).toBe("band");
   });
 });
@@ -48,8 +48,8 @@ describe("every gesture the grid has", () => {
       { hit: { kind: "effect", edge: "left" }, modifiers: shift },
       { hit: { kind: "effect", edge: "left" }, modifiers: plain },
       { hit: { kind: "effect", edge: null }, modifiers: plain },
-      { hit: { kind: "row-empty" }, modifiers: armed },
       { hit: { kind: "row-empty" }, modifiers: plain },
+      { hit: { kind: "row-empty" }, modifiers: shift },
     ];
     const produced = new Set<GridGesture>(hits.map(({ hit, modifiers }) => gestureFor(hit, modifiers)));
     for (const gesture of GRID_GESTURES) {
@@ -60,7 +60,7 @@ describe("every gesture the grid has", () => {
   it("is one of the declared set, whatever it is handed", () => {
     for (const kind of ["effect", "mark", "ruler-empty", "row-empty", "none"] as const) {
       for (const edge of [null, "left", "right"] as const) {
-        for (const modifiers of [plain, shift, armed]) {
+        for (const modifiers of [plain, shift]) {
           expect(GRID_GESTURES).toContain(gestureFor({ kind, edge }, modifiers));
         }
       }

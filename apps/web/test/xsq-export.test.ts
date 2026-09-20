@@ -39,6 +39,20 @@ describe("editable xLights sequence export", () => {
     expect(result.effectCount).toBe(2);
   });
 
+  it("leaves placeholders out rather than exporting them as an Off that paints black", () => {
+    const withPlaceholder: SequenceBody = {
+      ...body,
+      rows: [{ ...body.rows[0]!, effects: [...body.rows[0]!.effects, { id: "todo", name: "Placeholder", startMs: 1000, endMs: 1500, layerIndex: 5, params: {} }] }],
+    };
+    const result = exportSequenceToXsq(models, withPlaceholder, sequence);
+    expect(result.effectCount).toBe(2);
+    expect(result.xml).not.toContain("Placeholder");
+    expect(result.warnings).toContain("Placeholders with no effect chosen were left out.");
+    // Its layer goes with it: nothing else was up there.
+    expect(parser.parse(result.xml).xsequence.ElementEffects.Element[1].EffectLayer).toHaveLength(3);
+    expect(exportSequenceToXsq(models, body, sequence).warnings).not.toContain("Placeholders with no effect chosen were left out.");
+  });
+
   it("reverses layer order for xLights while retaining empty intermediate layers", () => {
     const root = parser.parse(exportSequenceToXsq(models, body, sequence).xml).xsequence;
     const layers = root.ElementEffects.Element[1].EffectLayer;

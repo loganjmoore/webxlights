@@ -144,6 +144,28 @@ export const useSequencerStore = defineStore("sequencer", () => {
   }
 
   /**
+   * Turns an effect into another kind where it stands: same id, span and layer.
+   *
+   * What choosing an effect for a placeholder does (lib/effectPicker.ts). The id stays, so the
+   * effect is still the selected one afterwards. `snapshot` is off when the choice completes the
+   * drag that made the placeholder a moment ago: drawing a span and naming its effect is one act,
+   * and should be one Ctrl+Z.
+   */
+  function replaceEffectKind(
+    effectId: string,
+    kind: Pick<SequenceEffect, "name" | "params" | "palette">,
+    snapshot = true,
+  ): void {
+    const effect = findEffect(effectId);
+    if (!effect) return;
+    if (snapshot) pushUndoSnapshot();
+    effect.name = kind.name;
+    effect.params = kind.params;
+    if (kind.palette) effect.palette = kind.palette;
+    else delete effect.palette;
+  }
+
+  /**
    * Moves an effect to another row, keeping its timing and its id.
    *
    * Same id deliberately: the effect the user is looking at should still be the selected one
@@ -505,6 +527,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     addEffects,
     updateEffect,
     updateEffectLive,
+    replaceEffectKind,
     deleteEffect,
     findEffect,
     copyEffect,

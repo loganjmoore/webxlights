@@ -11,8 +11,10 @@ import { ref } from "vue";
 // Open state is per-section and remembered for the session, not stored: it belongs to what you
 // are doing right now rather than to the show.
 
-const props = defineProps<{ title: string; defaultOpen?: boolean }>();
-const open = ref(props.defaultOpen !== false);
+// The default has to be declared: Vue casts a boolean prop that wasn't passed to false, so
+// "open unless told otherwise" written as `defaultOpen !== false` came out closed everywhere.
+const props = withDefaults(defineProps<{ title: string; defaultOpen?: boolean }>(), { defaultOpen: true });
+const open = ref(props.defaultOpen);
 </script>
 
 <template>

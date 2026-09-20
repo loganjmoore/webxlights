@@ -50,6 +50,32 @@ function isAudioReactive(name: string): boolean {
       <p>No xLights show handy? Click "Load sample project" from the Projects page for a working example with a layout, audio, and effects already placed.</p>
     </section>
 
+    <section id="adding-effects">
+      <h2>Adding effects</h2>
+      <p>
+        <strong>Drag on a row.</strong> Press on an empty stretch of any row and drag out the length you want. The span snaps to your timing
+        marks and stops at the effects on either side. When you let go, the effect picker opens beside the row with the search field ready:
+        type a few letters, use <kbd>↑</kbd> <kbd>↓</kbd> to move, and press <kbd>Enter</kbd> to place the highlighted effect. The effects
+        this sequence uses most are listed first.
+      </p>
+      <p>
+        <strong>Colors come along.</strong> The picker's Colors row holds your saved palettes and the ones this sequence already uses. Click
+        one, or press <kbd>Alt</kbd> with its number, and the effect arrives in it. The choice is kept for the next effect, so a run in one
+        palette is picked once. In Effect settings, Most used fills the swatches from left to right, one click per color, and Save keeps the
+        current palette for every sequence you open on this computer.
+      </p>
+      <p>
+        <strong>Placeholders.</strong> Press <kbd>Esc</kbd> and the span stays as a dashed placeholder. It plays nothing, in the preview and in
+        every export, until you give it an effect: click it to open the picker again, or drop an effect from the strip onto it. Placeholders
+        are left out of an xLights export.
+      </p>
+      <p>
+        The other ways still work: drag an effect from the strip onto a row, click one to arm it and then drag out its length, double-click
+        empty grid for the effect wheel, or use the effect shortcut keys. To select several effects with a box, hold <kbd>Shift</kbd> and
+        drag, or start the drag below the last row. A click on empty grid still moves the playhead.
+      </p>
+    </section>
+
     <section id="curves">
       <h2>Value curves</h2>
       <p>
@@ -144,6 +170,14 @@ code {
   padding: 0.1rem 0.35rem;
   border-radius: 3px;
   font-size: 0.9em;
+}
+kbd {
+  padding: 0 0.35rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 0.8em;
+  color: var(--text);
 }
 .effect {
   margin-bottom: 1.5rem;
