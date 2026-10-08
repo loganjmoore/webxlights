@@ -43,28 +43,29 @@ export function channelCountForModel(model: Pick<ModelRecord, "type" | "raw_attr
   }
 }
 
-// M11: real controller-routed addressing, not layout-order concatenation. controller.start_channel
-// is user-authoritative (not auto-allocated - the reference screenshot shows it hand-edited
-// directly), so a controller-assigned model's byte position is controller.start_channel - 1 +
-// controller_offset. Unassigned models keep writing sequentially, starting right after the
-// highest controller-routed span - this is a real, stated behavior change: the moment any
-// controller exists and has models assigned, unassigned models' byte positions shift from the
-// pre-M11 offset-0 start. See DECISIONS.md M11.
-export function exportSequenceToFseq(
+/**
+ * The whole house, frame by frame: every model's node colours with its group, strand and
+ * sub-model rows composited the way the preview does it. Shared by the .fseq export and Magic
+ * Sequence's fit score, so what gets scored is what gets exported.
+ *
+ * `renderAt` must be called with increasing times: the row sequencers step their stateful effects
+ * forward rather than replaying them (see createRowSequencer).
+ */
+export interface HouseRenderer {
+  /** The supported models, in the order renderAt returns them. */
+  models: ModelRecord[];
+  geometries: Array<ModelGeometry | null>;
+  renderAt(atMs: number): Array<RGBA[] | null>;
+}
+
+export function createHouseRenderer(
   models: ModelRecord[],
   body: SequenceBody,
-  sequence: SequenceRecord,
-  controllers: ControllerRecord[] = [],
-  // The analysed track, so an audio-reactive effect exports the same frames the preview shows.
-  // Omitted (no audio loaded) those effects render as "no audio", not as silence.
+  frameMs: number,
   audio?: AudioSeries,
-  // Model groups, so group rows export. Omitted, a sequence's group rows contribute nothing -
-  // which is what this export did for every group row before groups rendered at all.
   groups: ModelGroupRecord[] = [],
-): Uint8Array {
-  const frameMs = sequence.frame_ms;
-  const frameCount = Math.max(1, Math.ceil(sequence.duration_ms / frameMs));
-
+  blendBetweenModels = false,
+): HouseRenderer {
   const supported = models.filter((m) => m.supported);
   const geometries: Array<ModelGeometry | null> = supported.map((m) => {
     try {
@@ -73,31 +74,6 @@ export function exportSequenceToFseq(
       return null;
     }
   });
-  const rgbOrders = supported.map((m) => extractRgbOrder(m.string_type));
-  // A Channel Block's channels are single devices - relays, AC lights, a smoke machine - so each
-  // takes one byte, and which of the rendered pixel's channels drives it is the model's own
-  // Channel Color setting.
-  const singleChannel = supported.map((m) =>
-    m.type === "Channel Block"
-      ? { colors: channelColorsFrom(m.raw_attrs), fallback: defaultChannelColorFrom(m.raw_attrs) }
-      : null,
-  );
-  const byteCounts = geometries.map((g, i) => (g ? g.nodes.length * channelsPerNodeFor(supported[i]!.type) : 0));
-
-  const activeControllers = controllers.filter((c) => c.active);
-  const controllerSpanEnd = activeControllers.reduce((max, c) => Math.max(max, c.start_channel - 1 + c.channel_count), 0);
-
-  let unassignedCursor = controllerSpanEnd;
-  const byteOffsets = supported.map((m, i) => {
-    const controller = m.controller_id != null ? controllers.find((c) => c.id === m.controller_id) : undefined;
-    if (controller && m.controller_offset != null) {
-      return controller.start_channel - 1 + m.controller_offset;
-    }
-    const offset = unassignedCursor;
-    unassignedCursor += byteCounts[i]!;
-    return offset;
-  });
-  const channelCount = unassignedCursor;
 
   // One sequencer per model, created once and called in strictly increasing atMs order -
   // O(frames) instead of the O(frames^2) a fresh renderRowAtMs-per-frame call would cost for
@@ -162,30 +138,91 @@ export function exportSequenceToFseq(
     sequencer: createRowSequencer(job.row, frameMs, SEED, DEFAULT_PALETTE, audio),
   }));
 
+  return {
+    models: supported,
+    geometries,
+    renderAt(atMs) {
+      const groupBase = new Map<number, RGBA[]>();
+      for (const { job, sequencer } of groupSequencers) {
+        scatterGroupColors(job, sequencer.renderFrameAt(atMs), groupBase);
+      }
+      return supported.map((model, i) => {
+        const sequencer = sequencers[i];
+        if (!sequencer) return null;
+        const nodeColors = sequencer.renderFrameAt(atMs);
+        // A group is the less specific statement about a prop, so the model's own rows sit on top
+        // of it and its sub-models on top of those - the same order the preview uses.
+        applyGroupBase(nodeColors, groupBase.get(model.id), blendBetweenModels);
+        for (const sub of subSequencers[i] ?? []) {
+          const subColors = sub.sequencer.renderFrameAt(atMs);
+          subColors.forEach((c, n) => {
+            const parentIndex = sub.parentIndices[n];
+            if (parentIndex !== undefined && c.a > 0) nodeColors[parentIndex] = c;
+          });
+        }
+        return nodeColors;
+      });
+    },
+  };
+}
+
+// M11: real controller-routed addressing, not layout-order concatenation. controller.start_channel
+// is user-authoritative (not auto-allocated - the reference screenshot shows it hand-edited
+// directly), so a controller-assigned model's byte position is controller.start_channel - 1 +
+// controller_offset. Unassigned models keep writing sequentially, starting right after the
+// highest controller-routed span - this is a real, stated behavior change: the moment any
+// controller exists and has models assigned, unassigned models' byte positions shift from the
+// pre-M11 offset-0 start. See DECISIONS.md M11.
+export function exportSequenceToFseq(
+  models: ModelRecord[],
+  body: SequenceBody,
+  sequence: SequenceRecord,
+  controllers: ControllerRecord[] = [],
+  // The analysed track, so an audio-reactive effect exports the same frames the preview shows.
+  // Omitted (no audio loaded) those effects render as "no audio", not as silence.
+  audio?: AudioSeries,
+  // Model groups, so group rows export. Omitted, a sequence's group rows contribute nothing -
+  // which is what this export did for every group row before groups rendered at all.
+  groups: ModelGroupRecord[] = [],
+): Uint8Array {
+  const frameMs = sequence.frame_ms;
+  const frameCount = Math.max(1, Math.ceil(sequence.duration_ms / frameMs));
+
+  const house = createHouseRenderer(models, body, frameMs, audio, groups, sequence.blend_between_models === true);
+  const supported = house.models;
+  const geometries = house.geometries;
+  const rgbOrders = supported.map((m) => extractRgbOrder(m.string_type));
+  // A Channel Block's channels are single devices - relays, AC lights, a smoke machine - so each
+  // takes one byte, and which of the rendered pixel's channels drives it is the model's own
+  // Channel Color setting.
+  const singleChannel = supported.map((m) =>
+    m.type === "Channel Block"
+      ? { colors: channelColorsFrom(m.raw_attrs), fallback: defaultChannelColorFrom(m.raw_attrs) }
+      : null,
+  );
+  const byteCounts = geometries.map((g, i) => (g ? g.nodes.length * channelsPerNodeFor(supported[i]!.type) : 0));
+
+  const activeControllers = controllers.filter((c) => c.active);
+  const controllerSpanEnd = activeControllers.reduce((max, c) => Math.max(max, c.start_channel - 1 + c.channel_count), 0);
+
+  let unassignedCursor = controllerSpanEnd;
+  const byteOffsets = supported.map((m, i) => {
+    const controller = m.controller_id != null ? controllers.find((c) => c.id === m.controller_id) : undefined;
+    if (controller && m.controller_offset != null) {
+      return controller.start_channel - 1 + m.controller_offset;
+    }
+    const offset = unassignedCursor;
+    unassignedCursor += byteCounts[i]!;
+    return offset;
+  });
+  const channelCount = unassignedCursor;
+
   const frames: Uint8Array[] = [];
   for (let f = 0; f < frameCount; f++) {
-    const atMs = f * frameMs;
     const frame = new Uint8Array(channelCount);
-
-    const groupBase = new Map<number, RGBA[]>();
-    for (const { job, sequencer } of groupSequencers) {
-      scatterGroupColors(job, sequencer.renderFrameAt(atMs), groupBase);
-    }
-
-    supported.forEach((model, i) => {
-      const sequencer = sequencers[i];
-      if (!sequencer) return;
-      const nodeColors = sequencer.renderFrameAt(atMs);
-      // A group is the less specific statement about a prop, so the model's own rows sit on top
-      // of it and its sub-models on top of those - the same order the preview uses.
-      applyGroupBase(nodeColors, groupBase.get(model.id), sequence.blend_between_models === true);
-      for (const sub of subSequencers[i] ?? []) {
-        const subColors = sub.sequencer.renderFrameAt(atMs);
-        subColors.forEach((c, n) => {
-          const parentIndex = sub.parentIndices[n];
-          if (parentIndex !== undefined && c.a > 0) nodeColors[parentIndex] = c;
-        });
-      }
+    house.renderAt(f * frameMs).forEach((nodeColors, i) => {
+      if (!nodeColors) return;
+      const model = supported[i]!;
       const block = singleChannel[i];
       const bytes = block ? channelBlockBytes(nodeColors, block.colors, block.fallback) : nodeColorsToChannelBytes(nodeColors, rgbOrders[i]);
       try {
