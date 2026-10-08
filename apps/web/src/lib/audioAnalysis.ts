@@ -7,7 +7,7 @@ import { analyzeAudio, type AudioSeries } from "@webxlights/engine";
 
 // Down-mix to mono. Analysing only channel 0 (what the waveform strip does) would miss
 // anything panned hard right, which for a VU meter reads as the track randomly dropping out.
-function toMono(buffer: AudioBuffer): Float32Array {
+export function toMono(buffer: AudioBuffer): Float32Array {
   const channels = buffer.numberOfChannels;
   if (channels === 1) return buffer.getChannelData(0);
 
