@@ -1,4 +1,4 @@
-import { DEFAULT_PALETTE_HEX, EFFECT_SCHEMAS, defaultParamsFor, isValueCurve, resolveParam, isColorCurve } from "@webxlights/engine";
+import { BLEND_MODES, DEFAULT_PALETTE_HEX, EFFECT_SCHEMAS, LAYER_TRANSFORMS, RENDER_STYLES, TRANSITION_TYPES, defaultParamsFor, isValueCurve, resolveParam, isColorCurve, type BlendMode, type LayerTransform, type RenderStyle, type TransitionType } from "@webxlights/engine";
 import type { SequenceEffect } from "./api";
 
 // Native key names and choice values verified against xLights resources/effectmetadata
@@ -7,7 +7,7 @@ import type { SequenceEffect } from "./api";
 // degree slider, which newer xLights versions migrate to their cycle-count control.
 // https://github.com/xLightsSequencer/xLights/tree/master/resources/effectmetadata
 interface ParamMapping { key: string; choices?: string[]; boolean?: boolean; scale?: number; min?: number; max?: number }
-const PARAMS: Record<string, Record<string, ParamMapping>> = {
+export const PARAMS: Record<string, Record<string, ParamMapping>> = {
   "On": {
     startIntensity: {"key": "E_TEXTCTRL_Eff_On_Start","min": 0,"max": 100},
     endIntensity: {"key": "E_TEXTCTRL_Eff_On_End","min": 0,"max": 100},
@@ -501,4 +501,117 @@ export function exportEffectSettings(effect: SequenceEffect): XsqEffectSettings 
     }
   }
   return { name: nativeName, settings, palette, warnings: [...new Set(warnings)] };
+}
+
+/** The editable parts of an effect that an xLights settings string carries. */
+export type ImportedEffect = Pick<SequenceEffect, "name" | "params" | "palette" | "blendMode" | "mix" | "transition" | "colorAdjust" | "layer">;
+
+const CURVE_DIRECTIONS: Record<string, "Left to Right" | "Top to Bottom" | "Right to Left" | "Bottom to Top"> = { 1: "Left to Right", 2: "Top to Bottom", 3: "Right to Left", 4: "Bottom to Top" };
+
+/** xLights' name for an effect, as the web engine knows it. */
+export function engineEffectName(nativeName: string): string {
+  return nativeName === "Snowstorm" ? "Snow Storm" : nativeName === "Tendril" ? "Tendrils" : nativeName;
+}
+
+/** Distinct effect names in a parsed sequence that this app cannot render; they import inert. */
+export function unrenderableEffectNames(rows: readonly { elementType: string; effects: readonly { name: string }[] }[]): string[] {
+  const names = rows.filter((r) => r.elementType !== "timing").flatMap((r) => r.effects.map((e) => engineEffectName(e.name)));
+  return [...new Set(names.filter((name) => !Object.hasOwn(EFFECT_SCHEMAS, name)))];
+}
+
+/**
+ * The inverse of exportEffectSettings: an xLights effect's settings and palette strings, as
+ * engine params, driven by the same PARAMS table so the two directions cannot disagree.
+ *
+ * Anything the table doesn't name keeps the engine's default, and a value curve imports as its
+ * static value: xLights writes the static slider next to every curve, so that is never a guess.
+ */
+export function importEffectSettings(nativeName: string, settings: Record<string, string>, palette: Record<string, string> = {}): ImportedEffect {
+  const name = engineEffectName(nativeName);
+  const schema = EFFECT_SCHEMAS[name];
+  if (!schema) return { name, params: {} };
+  const params: SequenceEffect["params"] = { ...defaultParamsFor(name) };
+  for (const [key, mapping] of Object.entries(PARAMS[name] ?? {})) {
+    const raw = settings[mapping.key];
+    const spec = schema.params.find((p) => p.key === key);
+    if (raw === undefined || !spec) continue;
+    if (name === "Off" && key === "transparent") params[key] = raw === "Transparent";
+    else if (name === "Butterfly" && key === "reverse") params[key] = raw === "Reverse";
+    else if (name === "Wave" && key === "leftToRight") params[key] = raw === "Left to Right";
+    else if (spec.type === "checkbox") params[key] = raw === "1" || raw.toLowerCase() === "true";
+    else if (spec.type === "choice") {
+      const match = spec.options?.find((option) => normalizeChoice(option) === normalizeChoice(raw));
+      if (match !== undefined) params[key] = match;
+      else if (!spec.options?.length) params[key] = raw;
+    } else if (spec.type === "intSlider" || spec.type === "floatSlider") {
+      const value = parseFloat(raw) / (mapping.scale ?? 1);
+      if (Number.isFinite(value)) params[key] = Math.max(spec.min ?? -Infinity, Math.min(spec.max ?? Infinity, value));
+    } else params[key] = raw;
+  }
+  if (name === "Circles" && (settings.E_CHECKBOX_Circles_Bounce !== undefined || settings.E_CHECKBOX_Circles_Radial !== undefined)) {
+    params.movement = settings.E_CHECKBOX_Circles_Bounce === "1" ? "bounce" : settings.E_CHECKBOX_Circles_Radial === "1" ? "radial" : "none";
+  }
+
+  const imported: ImportedEffect = { name, params };
+  const swatches: NonNullable<SequenceEffect["palette"]> = [];
+  for (let id = 1; id <= 8; id++) {
+    const value = palette[`C_BUTTON_Palette${id}`];
+    if (palette[`C_CHECKBOX_Palette${id}`] !== "1" || !value) continue;
+    if (value.startsWith("Active=")) {
+      const fields = Object.fromEntries(value.split("|").map((part) => [part.slice(0, part.indexOf("=")), part.slice(part.indexOf("=") + 1)]));
+      const points = (fields.Values ?? "").split(";").map((p) => /x=([\d.]+)\^c=(#[0-9a-fA-F]{6})/.exec(p)).filter((m) => m !== null).map((m) => ({ x: Number(m[1]), color: m[2]!.toLowerCase() }));
+      if (points.length) {
+        const direction = CURVE_DIRECTIONS[fields.Timecurve ?? "0"];
+        swatches.push({ kind: "colorCurve", mode: direction ? "Spatial" : "Time", blend: fields.Type === "None" ? "None" : "Gradient", ...(direction ? { direction } : {}), points });
+      }
+    } else if (/^#[0-9a-fA-F]{6}$/.test(value)) swatches.push(value.toLowerCase());
+  }
+  if (swatches.length) imported.palette = swatches;
+
+  const brightness = palette.C_SLIDER_Brightness, contrast = palette.C_SLIDER_Contrast, sparkles = palette.C_SLIDER_SparkleFrequency, sparkleHex = palette.C_COLOURPICKERCTRL_SparklesColour;
+  const colorAdjust: NonNullable<SequenceEffect["colorAdjust"]> = {};
+  if (brightness !== undefined && Number(brightness) !== 100) colorAdjust.brightness = Number(brightness) - 100;
+  if (contrast !== undefined && Number(contrast) !== 0) colorAdjust.contrast = Number(contrast);
+  if (sparkles !== undefined && Number(sparkles) !== 0) colorAdjust.sparkles = Number(sparkles);
+  if (sparkleHex && /^#[0-9a-fA-F]{6}$/.test(sparkleHex)) {
+    const n = parseInt(sparkleHex.slice(1), 16);
+    colorAdjust.sparkleColor = { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+  if (Object.keys(colorAdjust).length) imported.colorAdjust = colorAdjust;
+
+  const method = settings.T_CHOICE_LayerMethod ?? "Normal";
+  const blend: BlendMode = settings.T_CHECKBOX_LayerMorph === "1" ? "Morph" : settings.T_CHECKBOX_Canvas === "1" ? "Canvas" : BLEND_MODES.find((m) => m === method) ?? "Normal";
+  if (blend !== "Normal") imported.blendMode = blend;
+  const nativeMix = Number(settings.T_SLIDER_EffectLayerMix ?? 0) / 100;
+  const mix = blend === "Effect 1" || blend === "Effect 2" ? 1 - nativeMix : nativeMix;
+  if (Number.isFinite(mix) && mix !== 0) imported.mix = mix;
+
+  const transition: NonNullable<SequenceEffect["transition"]> = {};
+  for (const side of ["in", "out"] as const) {
+    const seconds = Number(settings[`T_TEXTCTRL_Fade${side}`] ?? 0);
+    if (!(seconds > 0)) continue;
+    const title = side === "in" ? "In" : "Out";
+    transition[`${side}DurationMs`] = Math.round(seconds * 1000);
+    const type = settings[`T_CHOICE_${title}_Transition_Type`];
+    transition[`${side}Type`] = TRANSITION_TYPES.find((t: TransitionType) => t === type) ?? "Fade";
+    transition[`${side}Adjust`] = Number(settings[`T_SLIDER_${title}_Transition_Adjust`] ?? 50);
+    transition[`${side}Reverse`] = settings[`T_CHECKBOX_${title}_Transition_Reverse`] === "1";
+  }
+  if (Object.keys(transition).length) imported.transition = transition;
+
+  const layer: NonNullable<SequenceEffect["layer"]> = {};
+  const style = settings.B_CHOICE_BufferStyle, transform = settings.B_CHOICE_BufferTransform, blur = Number(settings.B_SLIDER_Blur ?? 1);
+  const renderStyle = RENDER_STYLES.find((r: RenderStyle) => r === style), layerTransform = LAYER_TRANSFORMS.find((t: LayerTransform) => t === transform);
+  if (renderStyle && renderStyle !== "Default") layer.renderStyle = renderStyle;
+  if (layerTransform && layerTransform !== "None") layer.transform = layerTransform;
+  if (blur > 1) layer.blur = blur;
+  if (settings.B_CHECKBOX_OverlayBkg === "1") layer.persistent = true;
+  if (Number(settings.B_SPINCTRL_SuppressEffectUntil) > 0) layer.suppressUntilFrame = Number(settings.B_SPINCTRL_SuppressEffectUntil);
+  if (Number(settings.B_SPINCTRL_FreezeEffectAtFrame) > 0) layer.freezeAtFrame = Number(settings.B_SPINCTRL_FreezeEffectAtFrame);
+  const sub = settings.B_CUSTOM_SubBuffer?.split("x").map(Number);
+  if (sub?.length === 4 && sub.every(Number.isFinite) && sub.join() !== "0,0,100,100") layer.subBuffer = { x1: sub[0]!, y1: sub[1]!, x2: sub[2]!, y2: sub[3]! };
+  const rotation = Number(settings.B_SLIDER_Rotation ?? 0) * 3.6, zoom = Number(settings.B_SLIDER_Zoom ?? 10) / 10;
+  if (rotation !== 0 || zoom !== 1) layer.rotoZoom = { rotation, zoom, pivotX: Number(settings.B_SLIDER_PivotPointX ?? 50), pivotY: Number(settings.B_SLIDER_PivotPointY ?? 50) };
+  if (Object.keys(layer).length) imported.layer = layer;
+  return imported;
 }

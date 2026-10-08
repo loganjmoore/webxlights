@@ -11,3 +11,6 @@ apps/api/.env
 apps/api/database/*.sqlite
 apps/web/dist
 .git
+# The sequence corpus is local research data (gitignored); only priors.json goes in the image.
+tools/sequence-corpus/.corpus
+tools/sequence-corpus/*.local.json

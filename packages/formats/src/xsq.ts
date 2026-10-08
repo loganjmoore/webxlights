@@ -18,80 +18,22 @@ export function parseSettingsString(s: string): Record<string, string> {
   return out;
 }
 
-// Normalizes an xLights UI choice string ("H-expand", "Left") into the lowercase/hyphenated
-// enum values this engine's effect params use ("h-expand", "left").
-function normalizeChoice(v: string | undefined): string | undefined {
-  return v?.toLowerCase().replace(/\s+/g, "-");
-}
-
-const num = (v: string | undefined, fallback: number): number => {
-  const n = v === undefined ? NaN : parseFloat(v);
-  return Number.isFinite(n) ? n : fallback;
-};
-const bool = (v: string | undefined): boolean => v === "1" || v?.toLowerCase() === "true";
-
-// SPEC ch7-8 E_* setting keys (as read directly off the source-derived tables) -> this
-// engine's typed *Params shape. Effects not listed here still import with their name/time
-// range intact (so they show up and are editable) but with schema-default params - a
-// documented ceiling, not data loss (raw settings are preserved on the parsed effect too).
-const PARAM_MAPPERS: Record<string, (s: Record<string, string>) => Record<string, unknown>> = {
-  On: (s) => ({
-    startIntensity: num(s.E_TEXTCTRL_Eff_On_Start, 100),
-    endIntensity: num(s.E_TEXTCTRL_Eff_On_End, 100),
-    transparencyPct: num(s.E_TEXTCTRL_On_Transparency, 0),
-    cycles: num(s.E_TEXTCTRL_On_Cycles, 1),
-    shimmer: bool(s.E_CHECKBOX_On_Shimmer),
-  }),
-  Bars: (s) => ({
-    paletteRep: num(s.E_SLIDER_Bars_BarCount, 1),
-    cycles: num(s.E_TEXTCTRL_Bars_Cycles, 1),
-    direction: normalizeChoice(s.E_CHOICE_Bars_Direction) ?? "up",
-    centerPercent: num(s.E_TEXTCTRL_Bars_Center, 0),
-    highlight: bool(s.E_CHECKBOX_Bars_Highlight),
-  }),
-  "Color Wash": (s) => ({
-    cycles: num(s.E_TEXTCTRL_ColorWash_Cycles, 1),
-    verticalFade: bool(s.E_CHECKBOX_ColorWash_VFade),
-    horizontalFade: bool(s.E_CHECKBOX_ColorWash_HFade),
-    reverseFades: bool(s.E_CHECKBOX_ColorWash_ReverseFades),
-    shimmer: bool(s.E_CHECKBOX_ColorWash_Shimmer),
-    circularPalette: bool(s.E_CHECKBOX_ColorWash_CircularPalette),
-  }),
-  Twinkle: (s) => ({
-    countPct: num(s.E_SLIDER_Twinkle_Count, 3),
-    steps: num(s.E_SLIDER_Twinkle_Steps, 30),
-  }),
-  Spirals: (s) => ({
-    paletteRep: num(s.E_SLIDER_Spirals_Count, 1),
-    spiralWraps: num(s.E_SLIDER_Spirals_Rotation, 2),
-    thicknessPct: num(s.E_SLIDER_Spirals_Thickness, 50),
-    movement: num(s.E_TEXTCTRL_Spirals_Movement, 1),
-    blend: bool(s.E_CHECKBOX_Spirals_Blend),
-  }),
-};
-
-export function translateEffectParams(name: string, rawAttrs: Record<string, string>): { params: Record<string, unknown>; translated: boolean } {
-  const mapper = PARAM_MAPPERS[name];
-  if (!mapper) return { params: {}, translated: false };
-  return { params: mapper(rawAttrs), translated: true };
-}
-
 export interface ParsedXsqEffect {
   name: string;
   startMs: number;
   endMs: number;
   /**
-   * Which <EffectLayer> the effect came from, 0 being the first in the file.
+   * The effect's layer, 0 being the bottom, as the app numbers them.
    *
-   * The file has always had these - this parser walked them to find the effects and then threw
-   * the layering away, flattening every layer onto one. That was all the app could represent
-   * until layers had an interface; now it is data loss, and the worst kind, because a flattened
-   * import still renders *something*.
+   * xLights writes the top layer first, so the first <EffectLayer> in the file is the highest
+   * index here. The writer reverses the same way, which is what makes import-then-export a
+   * round trip instead of a flip.
    */
   layerIndex: number;
+  /** The xLights settings string, unescaped. Translated to engine params by the app. */
   rawSettings: Record<string, string>;
-  params: Record<string, unknown>;
-  translated: boolean; // false = name/timing preserved but params are schema defaults
+  /** The effect's colour palette from <ColorPalettes>, unescaped; empty when it has none. */
+  rawPalette: Record<string, string>;
 }
 
 export interface ParsedXsqRow {
@@ -105,7 +47,6 @@ export interface ParsedXsq {
   durationMs: number;
   mediaFilename: string;
   rows: ParsedXsqRow[];
-  unsupportedEffectNames: string[]; // distinct effect names that imported without a param mapping
 }
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", textNodeName: "#text" });
@@ -136,13 +77,12 @@ export function parseXsq(xml: string): ParsedXsq {
   const durationMs = Math.round(parseFloat(String(head.sequenceDuration ?? "0")) * 1000);
   const mediaFilename = String(head.mediaFile ?? "").split(/[\\/]/).pop() ?? "";
 
-  const effectDb = asArray<string | Record<string, unknown>>(root.EffectDB?.Effect).map((e) =>
-    typeof e === "string" ? e : String((e as Record<string, unknown>)["#text"] ?? ""),
-  );
+  const textOf = (e: string | Record<string, unknown>) => (typeof e === "string" ? e : String(e["#text"] ?? ""));
+  const effectDb = asArray<string | Record<string, unknown>>(root.EffectDB?.Effect).map(textOf);
+  const palettes = asArray<string | Record<string, unknown>>(root.ColorPalettes?.ColorPalette).map(textOf);
 
   const elements = asArray<Record<string, unknown>>(root.ElementEffects?.Element);
   const rows: ParsedXsqRow[] = [];
-  const unsupported = new Set<string>();
 
   for (const el of elements) {
     const elementType = el.type === "timing" ? "timing" : "model";
@@ -150,30 +90,29 @@ export function parseXsq(xml: string): ParsedXsq {
     const layers = asArray<Record<string, unknown>>(el.EffectLayer as Record<string, unknown> | Record<string, unknown>[] | undefined);
     const effects: ParsedXsqEffect[] = [];
 
-    // Document order is bottom-to-top, which is the order this engine composites in - the first
-    // <EffectLayer> is the base the rest blend onto.
-    layers.forEach((layer, layerIndex) => {
+    // Document order is top-to-bottom: xLights writes its layer 0, the top, first.
+    layers.forEach((layer, documentIndex) => {
+      const layerIndex = layers.length - 1 - documentIndex;
       for (const effectEl of asArray<Record<string, unknown>>(layer.Effect as Record<string, unknown> | Record<string, unknown>[] | undefined)) {
         const startMs = parseInt(String(effectEl.startTime ?? "0"), 10);
         const endMs = parseInt(String(effectEl.endTime ?? "0"), 10);
         if (startMs >= endMs) continue; // SPEC: dropped on load
 
         if (elementType === "timing") {
-          effects.push({ name: String(effectEl.label ?? ""), startMs, endMs, rawSettings: {}, params: {}, translated: true, layerIndex });
+          effects.push({ name: String(effectEl.label ?? ""), startMs, endMs, rawSettings: {}, rawPalette: {}, layerIndex });
           continue;
         }
 
         const effectName = String(effectEl.name ?? "");
         if (effectName === "Random") continue; // SPEC: dropped on load
         const rawSettings = parseSettingsString(resolveSettingsString(effectEl, effectDb));
-        const { params, translated } = translateEffectParams(effectName, rawSettings);
-        if (!translated) unsupported.add(effectName);
-        effects.push({ name: effectName, startMs, endMs, rawSettings, params, translated, layerIndex });
+        const rawPalette = effectEl.palette === undefined ? {} : parseSettingsString(palettes[parseInt(String(effectEl.palette), 10)] ?? "");
+        effects.push({ name: effectName, startMs, endMs, rawSettings, rawPalette, layerIndex });
       }
     });
 
     rows.push({ elementType, name, effects });
   }
 
-  return { frameMs, durationMs, mediaFilename, rows, unsupportedEffectNames: [...unsupported] };
+  return { frameMs, durationMs, mediaFilename, rows };
 }

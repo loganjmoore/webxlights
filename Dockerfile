@@ -12,6 +12,8 @@ COPY packages/formats/package.json packages/formats/
 RUN npm ci
 COPY apps/web/ apps/web/
 COPY packages/ packages/
+# Magic Sequence's corpus statistics, bundled into the app at build time.
+COPY tools/sequence-corpus/priors.json tools/sequence-corpus/
 RUN npm run build -w apps/web
 
 FROM composer:2 AS vendor

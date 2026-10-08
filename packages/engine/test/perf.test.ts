@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeVerticalMatrixTopLeft } from "../src/models/matrix";
 import { createRowSequencer, type RenderableEffect } from "../src/renderFrame";
 import type { RGBA } from "../src/color";
+import { EFFECT_SCHEMAS } from "../src/effects/schema";
 
 // ROADMAP.md perf budget: "medium show = 20k channels, 3 min, 50ms frames: full render
 // <=60s on 4-core laptop". This is the single-threaded engine-only slice of that budget
@@ -23,10 +24,14 @@ describe("perf: medium show render budget", () => {
     // timeline plus a stateful one (the most expensive kind - see renderFrame.ts's
     // STATEFUL_EFFECTS replay-from-start note), matching real multi-layer sequencing.
     const effects: RenderableEffect[] = [
-      { name: "ColorWash", startMs: 0, endMs: durationMs, params: { cycles: 3 } },
+      { name: "Color Wash", startMs: 0, endMs: durationMs, params: { cycles: 3 } },
       { name: "Twinkle", startMs: 0, endMs: durationMs, params: { countPct: 10, steps: 30 } },
       { name: "Meteors", startMs: 0, endMs: durationMs, params: { count: 10, trailLength: 25, speed: 10 } },
     ];
+
+    // "ColorWash" matched no effect, so that layer rendered nothing and the budget was measured
+    // on two effects, not three.
+    for (const effect of effects) expect(EFFECT_SCHEMAS[effect.name], effect.name).toBeDefined();
 
     const sequencer = createRowSequencer({ geometry, effects }, frameMs, 12345, palette);
     const started = performance.now();
