@@ -1,3 +1,4 @@
 .corpus/
 *.local.json
 __pycache__/
+.songs/

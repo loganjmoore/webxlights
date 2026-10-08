@@ -3023,6 +3023,7 @@ watch(sequenceId, async (id) => {
       :groups="groupRecords"
       :audio="audioBuffer"
       :audio-file="audioFile"
+      :audio-series="audioSeries"
       :saved-palettes="savedPalettes"
       @close="showMagic = false"
       @layout-changed="loadRows"

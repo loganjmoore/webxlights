@@ -235,8 +235,8 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
           const name = unit.prop.dims === 1 && TWO_D_ONLY.has(chosen) ? families.find((f) => !TWO_D_ONLY.has(f)) : chosen;
           if (!name) return;
           const punctual = PUNCTUAL.has(name);
-          // Punctual effects fill to the next trigger: a beat apart when the section is loud, a
-          // bar apart when it is quiet. Textures run their corpus length back to back.
+          // Punctual effects trigger a beat apart when the section is loud, a bar or two apart when
+          // it is quiet. Textures run their corpus length back to back.
           let interval = punctual ? punctualInterval(sp.intensity, unit.prop.tier, sp.featured.includes(role), song.bpm) : textureBeats(name);
           interval = Math.max(step, Math.ceil(interval / step) * step);
           // Motion: a sweep across the role's props, one prop per beat.
@@ -252,7 +252,11 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
           }
           let variation = 0;
           for (let b = from + phase; b < to; b += interval) {
-            const end = punctual ? Math.min(b + interval, to) : Math.min(b + interval, to);
+            // A punctual effect on a prop that comes and goes lasts at most two beats (a bar on the
+            // slow songs' bar grid) and leaves the
+            // rest of its slot dark, the way the corpus's one-beat effects do; that gap is what
+            // makes the next trigger read as a beat. Heroes, lit all song, fill their slot.
+            const end = Math.min(b + (punctual && unit.prop.tier !== "hero" ? Math.min(interval, step === 1 ? 2 : step) : interval), to);
             const startMs = beatTime(b), endMs = beatTime(end);
             if (endMs <= startMs) continue;
             const { params, layer } = effectParams(name, end - b, variation + (sp.motion === "right-to-left" ? 1 : 0), feel, options.title);
@@ -280,9 +284,9 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
           last = t;
         }
       } else times = barStarts.slice();
-      // The heroes take the downbeats (every bar when it is loud, every other bar otherwise); beat
+      // The heroes take the downbeats; beat
       // and hit accents go to the frame of the house when it is carrying the section.
-      const bars = sp.intensity >= 0.7 ? barStarts : barStarts.filter((_, i) => i % 2 === 0);
+      const bars = barStarts;
       const accentUnits = [...lit].flatMap((r) => units.get(r)!).filter((u) => (u.prop.tier === "hero" && u.prop.dims === 2 && u.prop.role !== "singing_face") || (u.prop.tier === "frame" && sp.featured.includes(u.prop.role) && sp.accents !== "downbeats"));
       for (const unit of accentUnits) {
         const own = unit.prop.tier === "hero" ? bars : times;

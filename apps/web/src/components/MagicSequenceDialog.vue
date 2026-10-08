@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef } from "vue";
-import type { SongMap, SectionLabel, StoredSwatch } from "@webxlights/engine";
+import type { AudioSeries, SongMap, SectionLabel, StoredSwatch } from "@webxlights/engine";
 import ModalPanel from "./ModalPanel.vue";
 import { api, type ModelGroupRecord, type ModelRecord } from "../lib/api";
 import { confirm } from "../lib/confirm";
@@ -15,6 +15,7 @@ import { analyzeSongInWorker, audioHash, cachedSongMap, withCachedSongMap } from
 import { directPlan, planRequest } from "../lib/magic/aiDirector";
 import type { MagicStatus } from "../lib/magic/plan";
 import { loadKey, loadProvider } from "../lib/anthropicKey";
+import { bestCandidate, fitScore, type FitScore } from "../lib/magic/score";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 
 // Magic Sequence (docs/MAGIC-SEQUENCE.md 4): one press, an editable sequence across the user's
@@ -26,6 +27,8 @@ const props = defineProps<{
   groups: ModelGroupRecord[];
   audio: AudioBuffer;
   audioFile: File | null;
+  /** The track's per-frame analysis, so audio-reactive effects score as they will play. */
+  audioSeries: AudioSeries | null;
   savedPalettes: StoredSwatch[][];
 }>();
 const emit = defineEmits<{ close: []; layoutChanged: [] }>();
@@ -63,7 +66,7 @@ const notice = ref("");
 
 const busy = ref(false);
 const progress = ref("");
-const result = ref<{ added: number; skippedRows: number } | null>(null);
+const result = ref<{ added: number; skippedRows: number; fit: FitScore; candidates: number } | null>(null);
 // Undo and Try another touch the undo stack only when the top entry is still ours.
 const appliedAtDepth = ref<number | null>(null);
 const lastPlan = shallowRef<ShowPlan | null>(null);
@@ -157,9 +160,11 @@ async function ensureGroups(): Promise<void> {
   emit("layoutChanged");
   // The parent reloads its copy; this press needs the groups now.
   const groups = await api.listModelGroups(props.layoutId);
+  generationGroups.value = groups;
   generationProps.value = propMap(props.models, groups).filter((p) => !excluded.value.has(p.role));
 }
 const generationProps = shallowRef<PropInfo[] | null>(null);
+const generationGroups = shallowRef<ModelGroupRecord[] | null>(null);
 
 async function generate(again = false): Promise<void> {
   if (!song.value || !store.sequence || busy.value) return;
@@ -173,6 +178,7 @@ async function generate(again = false): Promise<void> {
     if (again && canUndo.value) store.undo();
     else {
       generationProps.value = null;
+      generationGroups.value = null;
       progress.value = "Grouping props…";
       await ensureGroups().catch(() => undefined);
     }
@@ -196,15 +202,34 @@ async function generate(again = false): Promise<void> {
       if (status.value?.available && !userKey) api.magicStatus().then((s) => (status.value = s), () => undefined);
     }
     lastPlan.value = plan;
-    const placements = choreograph(song.value, scope, plan, {
-      feel: feelSpec(feel.value, song.value), seed: seed.value, frameMs: store.sequence.frame_ms,
-      title: store.sequence.metadata?.song || store.sequence.name,
-    });
-    progress.value = `Placing ${placements.length.toLocaleString()} effects…`;
-    const applied = magicBody(store.body, placements, song.value, mode.value, newEffectId);
-    store.replaceBody(applied.body);
+    // A few arrangements of the plan, each rendered and scored against the song, and the best
+    // one kept (docs/MAGIC-SEQUENCE.md 2.6). Try another scores just the next one. Scoring a big
+    // house takes a while, so it stops early rather than keep anyone waiting.
+    const base = store.body;
+    const seeds = again ? [seed.value] : [seed.value, (seed.value + 1) >>> 0, (seed.value + 2) >>> 0];
+    const started = performance.now();
+    const candidates: { seed: number; applied: ReturnType<typeof magicBody>; fit: FitScore }[] = [];
+    for (const [i, candidateSeed] of seeds.entries()) {
+      progress.value = seeds.length > 1 ? `Scoring arrangement ${i + 1} of ${seeds.length}…` : "Scoring the arrangement…";
+      await new Promise((r) => setTimeout(r, 0));
+      const placements = choreograph(song.value, scope, plan, {
+        feel: feelSpec(feel.value, song.value), seed: candidateSeed, frameMs: store.sequence.frame_ms,
+        title: store.sequence.metadata?.song || store.sequence.name,
+      });
+      const applied = magicBody(base, placements, song.value, mode.value, newEffectId);
+      const fit = fitScore({
+        song: song.value, models: props.models, groups: generationGroups.value ?? props.groups, body: applied.body, placements,
+        frameMs: store.sequence.frame_ms, ...(props.audioSeries ? { audio: props.audioSeries } : {}), blendBetweenModels: store.sequence.blend_between_models === true,
+      });
+      candidates.push({ seed: candidateSeed, applied, fit });
+      if (performance.now() - started > 6000) break;
+    }
+    const best = bestCandidate(candidates, (c) => c.fit);
+    seed.value = best.seed;
+    progress.value = `Placing ${best.applied.added.toLocaleString()} effects…`;
+    store.replaceBody(best.applied.body);
     appliedAtDepth.value = store.undoDepth;
-    result.value = { added: applied.added, skippedRows: applied.skippedRows };
+    result.value = { added: best.applied.added, skippedRows: best.applied.skippedRows, fit: best.fit, candidates: candidates.length };
     progress.value = "";
   } finally {
     busy.value = false;
@@ -212,7 +237,7 @@ async function generate(again = false): Promise<void> {
 }
 
 function tryAnother(): void {
-  seed.value = (seed.value + 0x9e3779b1) >>> 0;
+  seed.value = (seed.value + 3) >>> 0;
   void generate(true);
 }
 
@@ -263,89 +288,93 @@ const strip = computed(() => {
         </template>
       </section>
 
-      <section aria-labelledby="magic-feel">
-        <h2 id="magic-feel">Feel</h2>
-        <select v-model="feel" aria-labelledby="magic-feel">
-          <option value="auto">From the song{{ song ? ` (${FEELS[resolvedFeel].label})` : "" }}</option>
-          <option v-for="(spec, key) in FEELS" :key="key" :value="key">{{ spec.label }}</option>
-        </select>
-      </section>
+      <div class="cols">
+        <section aria-labelledby="magic-feel">
+          <h2 id="magic-feel">Feel</h2>
+          <select v-model="feel" aria-labelledby="magic-feel">
+            <option value="auto">From the song{{ song ? ` (${FEELS[resolvedFeel].label})` : "" }}</option>
+            <option v-for="(spec, key) in FEELS" :key="key" :value="key">{{ spec.label }}</option>
+          </select>
+        </section>
 
-      <section v-if="aiAvailable" aria-labelledby="magic-director">
-        <h2 id="magic-director">Director</h2>
-        <label class="row"><input v-model="useAi" type="checkbox" /> Ask the AI director for the plan</label>
-        <textarea
-          v-if="useAi"
-          v-model="direction"
-          maxlength="500"
-          rows="2"
-          placeholder="Direction, if you have one: “icy blue and white, make the tree the star of the chorus”"
-          aria-label="Direction for the AI director"
-        />
-        <p v-if="useAi && status && !userKey && status.monthly_limit > 0" class="note">
-          <span class="num">{{ Math.max(0, status.monthly_limit - status.used_this_month) }}</span> of {{ status.monthly_limit }} free plans left this month.
-          Try another reuses the plan.
-        </p>
-      </section>
+        <section v-if="aiAvailable" class="wide" aria-labelledby="magic-director">
+          <h2 id="magic-director">Director</h2>
+          <label class="row"><input v-model="useAi" type="checkbox" /> Ask the AI director for the plan</label>
+          <textarea
+            v-if="useAi"
+            v-model="direction"
+            maxlength="500"
+            rows="2"
+            placeholder="Direction, if you have one: “icy blue and white, make the tree the star of the chorus”"
+            aria-label="Direction for the AI director"
+          />
+          <p v-if="useAi && status && !userKey && status.monthly_limit > 0" class="note">
+            <span class="num">{{ Math.max(0, status.monthly_limit - status.used_this_month) }}</span> of {{ status.monthly_limit }} free plans left this month.
+            Try another reuses the plan.
+          </p>
+        </section>
 
-      <section aria-labelledby="magic-colours">
-        <h2 id="magic-colours">Colours</h2>
-        <div class="palettes" role="radiogroup" aria-labelledby="magic-colours">
-          <button type="button" role="radio" :aria-checked="paletteChoice === -1" :class="{ current: paletteChoice === -1 }" @click="paletteChoice = -1">
-            <span class="swatches"><span v-for="c in feelPalette" :key="c" :style="{ background: c }" /></span>
-            From the feel
-          </button>
-          <button
-            v-for="(palette, i) in hexPalettes"
-            :key="i"
-            type="button"
-            role="radio"
-            :aria-checked="paletteChoice === i"
-            :class="{ current: paletteChoice === i }"
-            :title="palette.join(', ')"
-            @click="paletteChoice = i"
-          >
-            <span class="swatches"><span v-for="c in palette" :key="c" :style="{ background: c }" /></span>
-          </button>
-        </div>
-      </section>
+        <section aria-labelledby="magic-colours">
+          <h2 id="magic-colours">Colours</h2>
+          <div class="palettes" role="radiogroup" aria-labelledby="magic-colours">
+            <button type="button" role="radio" :aria-checked="paletteChoice === -1" :class="{ current: paletteChoice === -1 }" @click="paletteChoice = -1">
+              <span class="swatches"><span v-for="c in feelPalette" :key="c" :style="{ background: c }" /></span>
+              From the feel
+            </button>
+            <button
+              v-for="(palette, i) in hexPalettes"
+              :key="i"
+              type="button"
+              role="radio"
+              :aria-checked="paletteChoice === i"
+              :class="{ current: paletteChoice === i }"
+              :title="palette.join(', ')"
+              :aria-label="`Saved palette ${i + 1}`"
+              @click="paletteChoice = i"
+            >
+              <span class="swatches"><span v-for="c in palette" :key="c" :style="{ background: c }" /></span>
+            </button>
+          </div>
+        </section>
 
-      <section aria-labelledby="magic-props">
-        <h2 id="magic-props">Props</h2>
-        <div class="chips">
-          <button
-            v-for="{ role, count } in roleCounts"
-            :key="role"
-            type="button"
-            :aria-pressed="!excluded.has(role)"
-            :class="{ off: excluded.has(role) }"
-            :title="excluded.has(role) ? 'Left out. Click to include.' : 'Included. Click to leave out.'"
-            @click="toggleRole(role)"
-          >{{ ROLE_LABELS[role] }} <span class="num">{{ count }}</span></button>
-        </div>
-        <div class="row">
-          <label><input v-model="createGroups" type="checkbox" /> Create groups for roles without one</label>
-          <button type="button" class="link" :aria-expanded="fixingRoles" @click="fixingRoles = !fixingRoles">Fix roles…</button>
-        </div>
-        <ul v-if="fixingRoles" class="roles">
-          <li v-for="model in models" :key="model.id">
-            <span>{{ model.name }}</span>
-            <select :value="(model.params?.magicRole as string | undefined) ?? ''" :aria-label="`Role of ${model.name}`" @change="setRole(model, ($event.target as HTMLSelectElement).value)">
-              <option value="">{{ ROLE_LABELS[allProps.find((p) => p.key === `model:${model.id}`)?.role ?? "other"] }} (detected)</option>
-              <option v-for="role in ROLE_NAMES" :key="role" :value="role">{{ ROLE_LABELS[role] }}</option>
-            </select>
-          </li>
-        </ul>
-      </section>
+        <section aria-labelledby="magic-props">
+          <h2 id="magic-props">Props</h2>
+          <div class="chips">
+            <button
+              v-for="{ role, count } in roleCounts"
+              :key="role"
+              type="button"
+              :aria-pressed="!excluded.has(role)"
+              :class="{ off: excluded.has(role) }"
+              :title="excluded.has(role) ? 'Left out. Click to include.' : 'Included. Click to leave out.'"
+              @click="toggleRole(role)"
+            >{{ ROLE_LABELS[role] }} <span class="num">{{ count }}</span></button>
+          </div>
+          <div class="row">
+            <label><input v-model="createGroups" type="checkbox" /> Create groups for roles without one</label>
+            <button type="button" class="link" :aria-expanded="fixingRoles" @click="fixingRoles = !fixingRoles">Fix roles…</button>
+          </div>
+          <ul v-if="fixingRoles" class="roles">
+            <li v-for="model in models" :key="model.id">
+              <span>{{ model.name }}</span>
+              <select :value="(model.params?.magicRole as string | undefined) ?? ''" :aria-label="`Role of ${model.name}`" @change="setRole(model, ($event.target as HTMLSelectElement).value)">
+                <option value="">{{ ROLE_LABELS[allProps.find((p) => p.key === `model:${model.id}`)?.role ?? "other"] }} (detected)</option>
+                <option v-for="role in ROLE_NAMES" :key="role" :value="role">{{ ROLE_LABELS[role] }}</option>
+              </select>
+            </li>
+          </ul>
+        </section>
 
-      <section aria-labelledby="magic-mode">
-        <h2 id="magic-mode">Where</h2>
-        <div class="modes" role="radiogroup" aria-labelledby="magic-mode">
-          <label><input v-model="mode" type="radio" value="fill-empty" /> Fill empty rows</label>
-          <label><input v-model="mode" type="radio" value="replace" /> Replace everything</label>
-          <label><input v-model="mode" type="radio" value="new-layers" /> New layers on top</label>
-        </div>
-      </section>
+        <section aria-labelledby="magic-mode">
+          <h2 id="magic-mode">Where</h2>
+          <div class="modes" role="radiogroup" aria-labelledby="magic-mode">
+            <label><input v-model="mode" type="radio" value="fill-empty" /> Fill empty rows</label>
+            <label><input v-model="mode" type="radio" value="replace" /> Replace everything</label>
+            <label><input v-model="mode" type="radio" value="new-layers" /> New layers on top</label>
+          </div>
+        </section>
+
+      </div>
 
       <footer>
         <button type="button" class="primary" :disabled="!song || busy" @click="generate()">Generate</button>
@@ -358,7 +387,17 @@ const strip = computed(() => {
             {{ notice }}
           </template>
         </span>
+        <div v-if="result && !busy" class="fit" :title="`The best of ${result.candidates} arrangement${result.candidates === 1 ? '' : 's'}, scored by rendering the house against the song`">
+          <span class="fit-score"><span class="num">{{ result.fit.score }}</span><small>fit</small></span>
+          <div class="fit-parts">
+            <label v-for="part in (['loud', 'beat', 'lift'] as const)" :key="part">
+              <span>{{ { loud: "Follows loudness", beat: "Moves on the beat", lift: "Big parts look big" }[part] }}</span>
+              <meter min="0" max="1" low="0.4" high="0.7" optimum="1" :value="result.fit[part]" />
+            </label>
+          </div>
+        </div>
       </footer>
+
     </div>
   </ModalPanel>
 </template>
@@ -367,7 +406,7 @@ const strip = computed(() => {
 .magic {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.85rem;
   min-width: min(40rem, 90vw);
   font-size: 0.85rem;
   text-align: left;
@@ -403,6 +442,8 @@ textarea {
 }
 button,
 select {
+  flex-shrink: 0;
+  white-space: nowrap;
   height: 28px;
   padding: 0 0.65rem;
   font: inherit;
@@ -441,7 +482,7 @@ button.link {
 .strip {
   display: flex;
   gap: 2px;
-  height: 2.2rem;
+  height: 1.9rem;
 }
 .segment {
   flex-basis: 0;
@@ -502,7 +543,8 @@ button.link {
   cursor: pointer;
 }
 .modes {
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 .roles {
   list-style: none;
@@ -519,8 +561,51 @@ button.link {
   padding: 0.2rem 0;
   border-bottom: 1px solid var(--border);
 }
+.fit {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: auto;
+}
+.fit-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+.fit-score small {
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: var(--text-muted);
+}
+.fit-parts {
+  display: grid;
+  grid-template-columns: auto 5.5rem;
+  gap: 0.1rem 0.5rem;
+  align-items: center;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.fit-parts label {
+  display: contents;
+}
+.fit-parts meter {
+  width: 100%;
+  height: 8px;
+}
+.cols {
+  display: grid;
+  grid-auto-flow: row dense;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 1.5rem;
+}
+.cols .wide {
+  grid-column: 1 / -1;
+}
 footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   padding-top: 0.75rem;

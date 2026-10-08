@@ -31,9 +31,11 @@ export interface SubModelSpec {
  * meaningful rather than a mistake: it reverses the node order, which is how a sub-model is made
  * to run the other way along a string.
  */
-export function parseNodeRanges(spec: string): number[] {
+export function parseNodeRanges(spec: string | null | undefined): number[] {
   const out: number[] = [];
-  for (const part of spec.split(",")) {
+  // An empty row is "" in the file and comes back from the API as null (Laravel turns empty
+  // strings into nulls), so a stored sub-model can carry either.
+  for (const part of (spec ?? "").split(",")) {
     const piece = part.trim();
     if (!piece) continue;
     const dash = piece.indexOf("-", piece.startsWith("-") ? 1 : 0);

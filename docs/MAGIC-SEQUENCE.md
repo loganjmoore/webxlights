@@ -705,3 +705,50 @@ What was built, and where the code made a decision the spec didn't.
   director planned this one."), quoting the server for a cap or a refused direction.
 - Not done: the server-side refusal `fallbacks` parameter (a refusal falls back to the rules
   director instead), and asking for two or three candidate plans.
+
+### Phase 4: score and tune
+
+- `apps/web/src/lib/magic/score.ts` renders the house through `createHouseRenderer`, the
+  per-frame composition now shared with the `.fseq` export (groups, strands and sub-models
+  included), at 4 Hz with an 8-node stride, each prop weighted equally. Parts and weights: loud
+  0.3 (r >= 0.6 scores 1), beat 0.3 (after-beat over mid-beat change, ratio >= 2.5 scores 1), lift
+  0.2 (section r >= 0.7 scores 1), style 0.1 (the corpus's per-song JSD IQR maps 0.541 -> 0 and
+  0.378 -> 1), variety 0.1 (looks per repeat group, minus neighbours alike). Floors: loud 0.4,
+  beat 0.4, lift 0.5, style 0.3, variety 0.5. A flat all-on Color Wash scores 21; generated
+  sequences on the synthetic songs score 76-99.
+- **Candidate selection.** The dialog scores three arrangements of the plan (seeds) and keeps the
+  best that clears every floor, else the best; it stops early past 6 s on a big house. Try another
+  scores one more. Scoring takes about 1 s per candidate on the 32-prop test layout.
+- **Test songs** (`tools/sequence-corpus/test-songs.md`, fetched by `fetch-test-songs.mjs`, not
+  in git). Best of three seeds on `magic-layout.json`, every part above its floor:
+
+  | Song | Analysed | Score | loud | beat | lift | style | variety |
+  |---|---|---|---|---|---|---|---|
+  | Jingle Bells (upbeat) | 158.8 BPM, 6 sections | 89 | 0.64 | 1.00 | 1.00 | 0.98 | 1.00 |
+  | Silent Night (slow) | 86.9 BPM, 7 sections | 77 | 0.54 | 0.82 | 0.82 | 1.00 | 1.00 |
+  | Carol of the Bells (dramatic) | 87.9 BPM, 8 sections | 76 | 0.48 | 0.72 | 1.00 | 1.00 | 1.00 |
+
+- **Tuning that got there.** (1) A punctual effect on a non-hero prop lasts at most two beats (a
+  bar on the slow songs' bar grid) and leaves the rest of its slot dark; filling the slot kept
+  chases moving through mid-beat, and the beat part sat under its floor (synthetic 120 BPM ratio
+  1.54 -> 1.76; Silent Night 1.58 -> 2.22 on its best seed). (2) The heroes' downbeat accents fire
+  every bar whenever accents are on. (3) Selection prefers candidates that clear every floor.
+- **Two engine bugs found by scoring a real layout**, both fixed with tests: a Per Preview buffer
+  whose members share a height (two floods) was over a billion cells wide and stalled every frame
+  (preview and `.fseq` export too); and an empty sub-model row, stored by the API as null, crashed
+  `parseNodeRanges`.
+- **Real app.** A real community layout from the local corpus (32 models, 36 groups, 430
+  sub-models; not committed) with the Jingle Bells recording: 630-663 effects, fit 70-74. The
+  layout's own role groups (Roofline, Windows, Arches, Candy Canes, Mega Tree and Star) carry
+  their roles. Screenshots: `docs/magic-sequence/`.
+- Not done: a Beat This! ONNX "pro" analysis, a separate render benchmark beyond the timings the
+  score test logs, the fit score for the AI director's candidate plans, and anything in phase 5.
+
+## Blocked
+
+- **Logan signs off on three songs** (phase 4's last check). The scores above are measured; how
+  the shows look is a judgement only Logan can make. Open the sample project, add one of the test
+  songs, press Magic Sequence. Things worth a look: mid-chorus frames can read sparse, because a
+  SingleStrand chase lights a quarter of a prop (the corpus's median chase size) and non-hero
+  props now rest between beats; and a strophic carol (Silent Night) gets most of its verses
+  labelled chorus, since they are the loudest repeated group.
