@@ -8,6 +8,7 @@ import { relativeTime } from "../lib/relativeTime";
 import { useRoute, useRouter } from "vue-router";
 import { parseXsq } from "@webxlights/formats";
 import { describeMapping, mapXsqToBody } from "../lib/xsqConvert";
+import { unrenderableEffectNames } from "../lib/xsqEffectSettings";
 import { downloadFseq, exportSequenceToFseq } from "../lib/fseqExport";
 import { api, type MediaRecord, type ModelGroupRecord, type ModelRecord, type SequenceSummary } from "../lib/api";
 import { loadPreferences } from "../lib/preferences";
@@ -310,9 +311,8 @@ async function confirmImport(mapping: EffectMapping, timingTracks: string[]): Pr
     if (applied.unusedDonorNames.length) {
       parts.push(`left behind: ${applied.unusedDonorNames.join(", ")}`);
     }
-    if (parsed.unsupportedEffectNames.length) {
-      parts.push(`effects without full param translation: ${parsed.unsupportedEffectNames.join(", ")}`);
-    }
+    const unrenderable = unrenderableEffectNames(parsed.rows);
+    if (unrenderable.length) parts.push(`effects pixl can't render yet: ${unrenderable.join(", ")}`);
     importMessage.value = `Imported ${parts.join(" — ")}`;
 
     // The sequencer route is where the user actually looks - a message set here would be thrown

@@ -1,6 +1,7 @@
 import type { ParsedXsq } from "@webxlights/formats";
 import type { ModelGroupRecord, ModelRecord, SequenceBody } from "./api";
 import { applyMapping, autoMapping, donorRows, donorTimingTrackNames, mappingTargets } from "./importMapping";
+import { unrenderableEffectNames } from "./xsqEffectSettings";
 
 // Mapping a parsed `.xsq` onto this project's layout *without asking anybody*.
 //
@@ -39,8 +40,7 @@ export function describeMapping(mapped: MappedXsq, parsed: ParsedXsq): string {
   if (mapped.unmatchedNames.length) {
     parts.push(`${mapped.unmatchedNames.length} names had no match in this layout: ${mapped.unmatchedNames.join(", ")}`);
   }
-  if (parsed.unsupportedEffectNames.length) {
-    parts.push(`effects without full param translation: ${parsed.unsupportedEffectNames.join(", ")}`);
-  }
+  const unrenderable = unrenderableEffectNames(parsed.rows);
+  if (unrenderable.length) parts.push(`effects pixl can't render yet: ${unrenderable.join(", ")}`);
   return parts.join(" — ");
 }
