@@ -27,7 +27,7 @@ class OpenAiCompatibleDriver implements GeneratorDriver
         return (bool) ($key ?: config('services.shader.key') ?: config('services.shader.local'));
     }
 
-    public function complete(string $system, string $user, string $model, ?string $key, ?string $baseUrl = null): array
+    public function complete(string $system, string $user, string $model, ?string $key, ?string $baseUrl = null, ?array $responseFormat = null): array
     {
         $base = rtrim((string) ($baseUrl ?: config('services.shader.base_url')), '/');
         if ($base === '') {
@@ -51,6 +51,9 @@ class OpenAiCompatibleDriver implements GeneratorDriver
                 ['role' => 'user', 'content' => $user],
             ],
         ];
+        if ($responseFormat !== null) {
+            $payload['response_format'] = $responseFormat;
+        }
 
         $response = $request->post("{$base}/chat/completions", $payload);
 
@@ -90,5 +93,22 @@ class OpenAiCompatibleDriver implements GeneratorDriver
                 'output_tokens' => $body['usage']['completion_tokens'] ?? null,
             ],
         ];
+    }
+
+    public function completeJson(string $system, string $user, array $jsonSchema, string $model, ?string $key, ?string $baseUrl = null): array
+    {
+        // The same call as complete(), with the schema attached. A provider without json_schema
+        // support answers 400 and complete() throws; the caller falls back, which beats parsing
+        // prose for a plan.
+        $result = $this->complete($system, $user, $model, $key, $baseUrl, [
+            'type' => 'json_schema',
+            'json_schema' => ['name' => 'show_plan', 'schema' => $jsonSchema, 'strict' => true],
+        ]);
+        $data = json_decode($result['text'], true);
+        if (! is_array($data)) {
+            throw new UnusableOutput('The model did not return valid JSON.');
+        }
+
+        return ['data' => $data, 'usage' => $result['usage']];
     }
 }
