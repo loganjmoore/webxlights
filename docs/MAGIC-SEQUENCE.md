@@ -591,3 +591,32 @@ credit ledger, with its own caps: `MAGIC_DAILY_LIMIT`, `MAGIC_MONTHLY_LIMIT`, ro
 | 3. AI director | Endpoint, schema, validation, caps, fallback | Same flow with the toggle on; invalid plans degrade gracefully |
 | 4. Score and tune | Headless fit score, candidate selection, tuning pass | Generated stats inside corpus spread; Logan signs off on 3 songs |
 | 5. Later | Vocals, chat edits, learned picker | Separate specs |
+
+---
+
+## 11. Build log
+
+What was built, and where the code made a decision the spec didn't.
+
+### Phase 0: groundwork
+
+- `.xsq` settings translation lives in one place now. `packages/formats` returns each effect's raw
+  settings and palette strings (`rawSettings`, `rawPalette`); `importEffectSettings` in
+  `apps/web/src/lib/xsqEffectSettings.ts` turns them into engine params, palette, blending,
+  fades and layer settings, driven by the same `PARAMS` table as the export. The old five-effect
+  mapper in `formats` is gone, so there is no second table to drift.
+- The reader numbers the first `<EffectLayer>` as the top layer. Import-then-export is a round
+  trip (tested).
+- `propRoles.ts`: roles as in 2.2. Groups take the majority role of their members; with no
+  majority the name decides, and a mix of three or more roles with no name is `whole_house`. The
+  node-count outlier cut promotes at most the top three props. Sub-models get their own role from
+  their name, else their parent's, and are never heroes.
+- `priors.json` is imported by `apps/web/src/lib/magic/priors.ts`; the Docker web stage copies it
+  in, and `.dockerignore` keeps `.corpus/` out of the build context.
+- The effect whitelist per role (`apps/web/src/lib/magic/roleEffects.ts`): effects with at least
+  1.5% of a role's seconds or a lift of 1.5, minus effects that need a file, drawing or timing
+  track, Off everywhere but floods, Text everywhere but the matrix, and nothing on moving heads.
+  The API validates against a baked copy, `apps/api/database/data/magic-role-effects.json`; a test
+  fails when they differ.
+- `apps/web/test/fixtures/magic-layout.json` (32 models of real xLights types covering every role,
+  five groups) was made here rather than in phase 2, because the role tests need it.
