@@ -12,6 +12,9 @@ import { magicBody, sectionNames, type MagicMode } from "../lib/magic/apply";
 import { ROLE_EFFECTS } from "../lib/magic/roleEffects";
 import type { Feel, ShowPlan } from "../lib/magic/plan";
 import { analyzeSongInWorker, audioHash, cachedSongMap, withCachedSongMap } from "../lib/magic/songMapClient";
+import { directPlan, planRequest } from "../lib/magic/aiDirector";
+import type { MagicStatus } from "../lib/magic/plan";
+import { loadKey, loadProvider } from "../lib/anthropicKey";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 
 // Magic Sequence (docs/MAGIC-SEQUENCE.md 4): one press, an editable sequence across the user's
@@ -49,6 +52,14 @@ const excluded = ref<Set<Role>>(new Set());
 const createGroups = ref(true);
 const fixingRoles = ref(false);
 const mode = ref<MagicMode>("fill-empty");
+// The AI director: offered when the server has a provider or the user has their own key, the
+// same rules as the shader assistant.
+const status = ref<MagicStatus | null>(null);
+const userKey = loadKey();
+const aiAvailable = computed(() => !!status.value && (status.value.available || (status.value.accepts_user_keys && userKey !== null)));
+const useAi = ref(true);
+const direction = ref("");
+const notice = ref("");
 
 const busy = ref(false);
 const progress = ref("");
@@ -73,6 +84,7 @@ const canUndo = computed(() => appliedAtDepth.value !== null && store.undoDepth 
 const names = computed(() => (song.value ? sectionNames(song.value) : []));
 
 onMounted(async () => {
+  api.magicStatus().then((s) => (status.value = s), () => undefined);
   try {
     const hash = props.audioFile ? await audioHash(await props.audioFile.arrayBuffer()) : null;
     songHash.value = hash;
@@ -166,8 +178,23 @@ async function generate(again = false): Promise<void> {
     }
     const scope = generationProps.value ?? scopedProps.value;
     const palette = paletteChoice.value >= 0 ? hexPalettes.value[paletteChoice.value] : undefined;
-    progress.value = "Planning the sections…";
-    const plan = again && lastPlan.value ? lastPlan.value : rulesDirector({ song: song.value, props: scope, feel: feel.value, seed: seed.value, ...(palette ? { palette } : {}) });
+    notice.value = "";
+    let plan = again && lastPlan.value ? lastPlan.value : rulesDirector({ song: song.value, props: scope, feel: feel.value, seed: seed.value, ...(palette ? { palette } : {}) });
+    if (!again && aiAvailable.value && useAi.value) {
+      progress.value = "Asking the director…";
+      const meta = store.sequence.metadata;
+      const stored = loadProvider();
+      const directed = await directPlan(
+        store.sequence.id,
+        planRequest(song.value, scope, feel.value, { direction: direction.value, title: meta?.song || store.sequence.name, ...(meta?.artist ? { artist: meta.artist } : {}) }),
+        plan,
+        userKey ? { key: userKey, provider: stored.provider, model: stored.model } : undefined,
+      );
+      plan = directed.plan;
+      if (directed.notice) notice.value = directed.notice;
+      if (directed.dropped?.length) console.info("Magic Sequence: the director's plan lost", directed.dropped);
+      if (status.value?.available && !userKey) api.magicStatus().then((s) => (status.value = s), () => undefined);
+    }
     lastPlan.value = plan;
     const placements = choreograph(song.value, scope, plan, {
       feel: feelSpec(feel.value, song.value), seed: seed.value, frameMs: store.sequence.frame_ms,
@@ -244,6 +271,23 @@ const strip = computed(() => {
         </select>
       </section>
 
+      <section v-if="aiAvailable" aria-labelledby="magic-director">
+        <h2 id="magic-director">Director</h2>
+        <label class="row"><input v-model="useAi" type="checkbox" /> Ask the AI director for the plan</label>
+        <textarea
+          v-if="useAi"
+          v-model="direction"
+          maxlength="500"
+          rows="2"
+          placeholder="Direction, if you have one: “icy blue and white, make the tree the star of the chorus”"
+          aria-label="Direction for the AI director"
+        />
+        <p v-if="useAi && status && !userKey && status.monthly_limit > 0" class="note">
+          <span class="num">{{ Math.max(0, status.monthly_limit - status.used_this_month) }}</span> of {{ status.monthly_limit }} free plans left this month.
+          Try another reuses the plan.
+        </p>
+      </section>
+
       <section aria-labelledby="magic-colours">
         <h2 id="magic-colours">Colours</h2>
         <div class="palettes" role="radiogroup" aria-labelledby="magic-colours">
@@ -311,6 +355,7 @@ const strip = computed(() => {
           <template v-if="progress">{{ progress }}</template>
           <template v-else-if="result">
             Placed <span class="num">{{ result.added.toLocaleString() }}</span> effects<template v-if="result.skippedRows">, leaving {{ result.skippedRows }} rows that already had effects</template>.
+            {{ notice }}
           </template>
         </span>
       </footer>
@@ -343,6 +388,18 @@ h2 {
 }
 .num {
   font-variant-numeric: tabular-nums;
+}
+textarea {
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  box-sizing: border-box;
+  font: inherit;
+  resize: vertical;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
 }
 button,
 select {

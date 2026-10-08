@@ -4,6 +4,7 @@ import type { BackgroundImage } from "./backgroundImage";
 import type { SongBoundary } from "./songRegions";
 import type { BlendMode, ColorAdjust, FaceSpec, LayerSettings, PictureImage, StateSpec, StoredSwatch, SongMap, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
 import type { IsfInput } from "@webxlights/formats";
+import type { MagicPlanRequest, MagicPlanResponse, MagicStatus } from "./magic/plan";
 
 export class ApiError extends Error {
   status: number;
@@ -29,6 +30,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
+}
+
+/**
+ * The headers that carry a caller's own API key, for the endpoints that honour one (the shader
+ * assistant and Magic Sequence's AI director).
+ *
+ * The provider and model only travel with a key. Without one the server is spending its own
+ * money, and a header must not be able to redirect that somewhere the operator did not pick.
+ */
+function keyHeaders(credentials?: { key?: string | null; provider?: string | null; model?: string | null }): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (credentials?.key) {
+    headers["X-Shader-Key"] = credentials.key;
+    if (credentials.provider) headers["X-Shader-Provider"] = credentials.provider;
+    if (credentials.model) headers["X-Shader-Model"] = credentials.model;
+  }
+  return headers;
 }
 
 export interface Project {
@@ -534,20 +552,31 @@ export const api = {
     body: { description: string; previous_source?: string; compile_error?: string; target?: ShaderTarget },
     credentials?: { key?: string | null; provider?: string | null; model?: string | null },
   ) => {
-    const headers: Record<string, string> = {};
-    // The provider and model only travel with a key. Without one the server is spending its own
-    // money, and a header must not be able to redirect that somewhere the operator did not pick.
-    if (credentials?.key) {
-      headers["X-Shader-Key"] = credentials.key;
-      if (credentials.provider) headers["X-Shader-Provider"] = credentials.provider;
-      if (credentials.model) headers["X-Shader-Model"] = credentials.model;
-    }
     return request<GeneratedShader>("/v1/shaders/generate", {
       method: "POST",
       body: JSON.stringify(body),
-      headers,
+      headers: keyHeaders(credentials),
     });
   },
+
+  /** Whether to offer the AI director, and how much of the free allowance is left. */
+  magicStatus: () => request<MagicStatus>("/v1/magic/status"),
+
+  /**
+   * Asks the AI director for a ShowPlan. Any non-200 means "use the rules director"; the caller
+   * decides how loudly to say so. The key travels as the shader assistant's does, in headers
+   * and nowhere else.
+   */
+  magicPlan: (
+    sequenceId: number,
+    payload: MagicPlanRequest,
+    credentials?: { key?: string | null; provider?: string | null; model?: string | null },
+  ) =>
+    request<MagicPlanResponse>(`/v1/sequences/${sequenceId}/magic-plan`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: keyHeaders(credentials),
+    }),
 
   // Automatic lyric timing: paste the lyrics, poll until the server has listened to the song.
   alignLyrics: (sequenceId: number, lyrics: string) =>

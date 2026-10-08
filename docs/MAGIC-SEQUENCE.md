@@ -678,3 +678,30 @@ What was built, and where the code made a decision the spec didn't.
   0.378-0.541). Generated, over 3 tempos x 5 seeds on the test layout: mean 0.386.
 - Deferred: the hero texture layer (Twinkle or Shimmer at low mix) of 2.4 step 7, Off backdrops on
   floods, sub-model rows, and a draggable section strip (labels are editable).
+
+### Phase 3: AI director
+
+- `POST /v1/sequences/{sequence}/magic-plan` (`MagicPlanController`, `Services/Magic/`): editor
+  access, `throttle:10,1`, the shader assistant's bring-your-own-key headers, and its own caps on
+  the credit ledger (reasons `magic_plan` and `magic_plan_refund`, so a plan never uses up a
+  shader generation or the other way round). `GET /v1/magic/status` tells the dialog whether to
+  offer the director and how much of the allowance is left.
+- Defaults: `MAGIC_MODEL` unset means `claude-opus-5-5` on Anthropic (not `SHADER_MODEL`), effort
+  `medium`, adaptive thinking; `MAGIC_DAILY_LIMIT` 10 and `MAGIC_MONTHLY_LIMIT` 20 plans per
+  person. 20 rather than the shader assistant's 100 because a plan costs about 10-15 cents on
+  Opus 5.5, so the worst case is about $2.40 per active person a month; Try another reuses the
+  plan and costs nothing.
+- Structured output is `output_config.format` with a strict JSON schema, added to the driver
+  interface as `completeJson`. Records (palettes, families) travel as lists, because strict mode
+  can't express arbitrary keys, and are turned back into records by `PlanValidator::fromWire`.
+  A refusal, a cut-off reply or bad JSON is a 502 and a refund.
+- `PlanValidator` checks every field against `magic-role-effects.json`, hex colours, section
+  indices and the enums, keeps what passes and lists what it dropped. The client re-checks
+  against the roles in the layout and fills every gap from the rules plan (`completePlan`), so a
+  partial plan still gives a full sequence.
+- The direction goes through `RequestScreen::refusalForDirection`: the shader screen refused
+  ordinary show talk ("forget the previous section", "the Christmas program").
+- In the dialog, any failure falls back to the rules director with one line ("The built-in
+  director planned this one."), quoting the server for a cap or a refused direction.
+- Not done: the server-side refusal `fallbacks` parameter (a refusal falls back to the rules
+  director instead), and asking for two or three candidate plans.
