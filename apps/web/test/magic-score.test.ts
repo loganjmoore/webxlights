@@ -52,7 +52,8 @@ function readWav(path: URL): { samples: Float32Array; sampleRate: number } {
 }
 
 describe("the fit score", () => {
-  it("scores a generated sequence on a synthetic song above 60, every part above its floor", () => {
+  // Each score renders the whole house a few hundred times: about a second here, slower on CI.
+  it("scores a generated sequence on a synthetic song above 60, every part above its floor", { timeout: 60_000 }, () => {
     for (const bpm of [80, 120, 150]) {
       const started = performance.now();
       const s = generateAndScore(syntheticSong(bpm), 7);
@@ -61,7 +62,7 @@ describe("the fit score", () => {
     }
   });
 
-  it("tells a sequence that ignores the music from one that follows it", () => {
+  it("tells a sequence that ignores the music from one that follows it", { timeout: 60_000 }, () => {
     const song = syntheticSong(120);
     const plan = rulesDirector({ song, props, feel: "auto", seed: 7 });
     // Everything lit, the same effect, all song long: no loud/quiet shape, nothing on the beat.
