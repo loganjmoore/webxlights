@@ -2,7 +2,7 @@ import { checkUploadSize, uploadErrorMessage } from "./uploads";
 import type { EffectPreset } from "./effectPresets";
 import type { BackgroundImage } from "./backgroundImage";
 import type { SongBoundary } from "./songRegions";
-import type { BlendMode, ColorAdjust, FaceSpec, LayerSettings, PictureImage, StateSpec, StoredSwatch, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
+import type { BlendMode, ColorAdjust, FaceSpec, LayerSettings, PictureImage, StateSpec, StoredSwatch, SongMap, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
 import type { IsfInput } from "@webxlights/formats";
 
 export class ApiError extends Error {
@@ -376,6 +376,12 @@ export interface SequenceMetadata {
   album?: string;
   music_url?: string;
   comment?: string;
+  /**
+   * The analysis of this sequence's song, kept so it runs once per song. `hash` is the SHA-256 of
+   * the audio file it was made from: a different file means a different song, so the map is not
+   * reused. Not shown in the metadata tab; the server stores it with the rest.
+   */
+  songMap?: { hash: string; map: SongMap } | null;
 }
 
 export interface SequenceSummary {

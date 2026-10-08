@@ -620,3 +620,30 @@ What was built, and where the code made a decision the spec didn't.
   fails when they differ.
 - `apps/web/test/fixtures/magic-layout.json` (32 models of real xLights types covering every role,
   five groups) was made here rather than in phase 2, because the role tests need it.
+
+### Phase 1: song analysis
+
+- `analyzeSong(samples, sampleRate)` in `packages/engine/src/songAnalysis.ts` returns the SongMap
+  of 2.1 (plus `version: 1`; `energy` is a plain array so the map is JSON-safe). The port of
+  LightsAutoSequencer's `analysis.js` is in `packages/engine/src/song/` with attribution in each
+  file and in `NOTICE`. It uses the engine's `fftInPlace` and its own 1024-point frames at
+  22.05 kHz (a box-filter resampler, since a worker has no `OfflineAudioContext`); the existing
+  `onsets.ts` works on 16 coarse bands at the sequence frame rate and can't tell a kick from a
+  snare, so it isn't reused here.
+- Departures from the reference, each from a synthetic track it got wrong: the grid is fitted to
+  the kicks first when there are at least 24 strong ones (eighth-note hats otherwise cancel them
+  out); the kick envelope joins the rough-tempo autocorrelation; the half/double-time decision is
+  made from the rough tempo before the fit. A true 185-200 BPM track still reads as half time.
+- Meter: 3 or 4 beats per bar, 3 only when chord changes stack clearly harder on one beat of three.
+- Sections: a boundary must stand a standard deviation above mean novelty; merge under 2 bars,
+  split over 32, snap to bars then 4-bar phrases. Labels: the loudest repeated group (energy at
+  least 0.5) is `chorus`, the most repeated quieter group is `verse`, a once-only section after
+  the second chorus is `bridge`, leftovers are `verse` before the first chorus and `bridge` or
+  `solo` after it.
+- Impacts use a window of the whole number of beats nearest 1 s: a fixed 1 s window read a
+  steady drum loop as dozens of jumps.
+- The analysis runs in `apps/web/src/lib/magic/songAnalysis.worker.ts`. The SongMap is cached in
+  `metadata.songMap = { hash, map }`, keyed by the SHA-256 of the audio file.
+- Measured on synthetic audio in vitest: 90/120/150 BPM within 1 BPM with beat F >= 0.95 at
+  70 ms; A-B-A-B-C-B boundaries within a bar with the right groups and the B group as chorus; a
+  4-minute song in about 0.9 s. Real recordings are checked in phase 4.
