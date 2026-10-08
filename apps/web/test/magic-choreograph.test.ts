@@ -157,3 +157,55 @@ describe("the director", () => {
     expect(choreograph(song, props, merged, { feel: feelSpec("auto", song), frameMs: 25 }).length).toBeGreaterThan(0);
   });
 });
+
+describe("the deferred spec details", () => {
+  const song = syntheticSong(120);
+  const run = (layoutProps = props, seed = 7) =>
+    choreograph(song, layoutProps, rulesDirector({ song, props: layoutProps, feel: "auto", seed }), { feel: feelSpec("auto", song), frameMs: 25 });
+
+  it("sequences a sub-model that is a prop of its own, and leaves a part to its parent", () => {
+    const models = layout.models.map((m) =>
+      m.name === "Mega Tree" ? { ...m, sub_models: [{ name: "Topper Star", type: "ranges" as const, rows: ["1-100"] }] }
+      : m.name === "Arch 1" ? { ...m, sub_models: [{ name: "Upper", type: "ranges" as const, rows: ["10-40"] }] }
+      // A part whose name reads as a role (a flake's ring reads as a wreath) stays with its parent.
+      : m.name === "Snowflake 1" ? { ...m, sub_models: [{ name: "Circle 1", type: "ranges" as const, rows: ["1-10"] }] }
+      : m);
+    const withSubs = propMap(models, layout.groups);
+    const placements = run(withSubs);
+    const star = placements.filter((p) => p.elementType === "submodel");
+    expect(star.length).toBeGreaterThan(0);
+    expect(new Set(star.map((p) => `${p.subName}:${p.role}`))).toEqual(new Set(["Topper Star:star"]));
+    for (const p of star) expect(ROLE_EFFECTS.star).toContain(p.effect.name);
+  });
+
+  it("gives the heroes a low-mix texture layer in loud sections, and nobody else", () => {
+    const placements = run();
+    const textures = placements.filter((p) => p.effect.layerIndex === 2);
+    expect(textures.length).toBeGreaterThan(0);
+    for (const p of textures) {
+      expect(["mega_tree", "matrix", "singing_face"]).toContain(p.role);
+      expect(["Twinkle", "Shimmer"]).toContain(p.effect.name);
+      expect(p.effect.mix).toBe(0.6);
+      const section = song.sections.find((s) => p.effect.startMs >= s.startMs && p.effect.startMs < s.endMs)!;
+      expect(section.energy).toBeGreaterThan(0.5);
+    }
+  });
+
+  it("holds the floods on an Off backdrop while a whole-house background plays", () => {
+    let found = false;
+    for (let seed = 1; seed <= 30 && !found; seed++) {
+      const placements = run(props, seed);
+      for (const s of song.sections) {
+        const inside = (p: Placement) => p.effect.startMs >= s.startMs && p.effect.startMs < s.endMs;
+        const house = placements.some((p) => p.role === "whole_house" && !p.effect.layerIndex && inside(p));
+        const floods = placements.filter((p) => p.role === "flood" && !p.effect.layerIndex && inside(p));
+        if (!house) {
+          expect(floods.some((p) => p.effect.name === "Off"), `seed ${seed}`).toBe(false);
+          continue;
+        }
+        if (floods.length && floods.every((p) => p.effect.name === "Off")) found = true;
+      }
+    }
+    expect(found).toBe(true);
+  });
+});

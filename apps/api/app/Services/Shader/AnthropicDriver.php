@@ -28,6 +28,13 @@ class AnthropicDriver implements GeneratorDriver
         'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1',
     ];
 
+    /**
+     * Models that take the server-side refusal fallback: when one declines a request for policy
+     * reasons, the API retries it on the model's default fallback inside the same call, instead
+     * of the press falling back to the rules director.
+     */
+    private const REFUSAL_FALLBACK = ['claude-fable-5-1', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5'];
+
     public function __construct(private ?Client $client = null) {}
 
     public function configured(?string $key): bool
@@ -118,7 +125,9 @@ class AnthropicDriver implements GeneratorDriver
         }
         $params['outputConfig'] = $outputConfig;
 
-        $message = $client->messages->create(...$params);
+        $message = in_array($model, self::REFUSAL_FALLBACK, true)
+            ? $client->beta->messages->create(...$params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default')
+            : $client->messages->create(...$params);
 
         if (in_array($message->stopReason, ['refusal', 'max_tokens'], true)) {
             throw new UnusableOutput("The model stopped early ({$message->stopReason}).");

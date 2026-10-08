@@ -55,6 +55,16 @@ describe("applying a generated sequence", () => {
     expect(magicBody(mine, placements, song, "replace", newId).body.songBoundaries).toHaveLength(4);
   });
 
+  it("writes a sub-model's effects to its own row, and fills around one that is in use", () => {
+    const star: Placement = { elementType: "submodel", elementId: 1, subName: "Star", key: "submodel:1/Star", role: "star", effect: { name: "On", startMs: 0, endMs: 500, params: {} } };
+    const fresh = magicBody({ rows: [], timingTracks: [] }, [star, placement("model", 1, 0)], song, "fill-empty", newId).body;
+    expect(fresh.rows.map((r) => [r.elementType, r.elementId, r.subName ?? null, r.effects.length])).toEqual([["submodel", 1, "Star", 1], ["model", 1, null, 1]]);
+    const used: SequenceBody = { timingTracks: [], rows: [{ elementType: "submodel", elementId: 1, subName: "Star", effects: [{ id: "mine", name: "Bars", startMs: 0, endMs: 100, params: {} }] }] };
+    const filled = magicBody(used, [star, placement("model", 1, 0)], song, "fill-empty", newId);
+    expect(filled.skippedRows).toBe(1);
+    expect(filled.body.rows.find((r) => r.subName === "Star")!.effects.map((e) => e.id)).toEqual(["mine"]);
+  });
+
   it("undoes the whole thing with one Ctrl+Z", () => {
     setActivePinia(createPinia());
     const store = useSequencerStore();

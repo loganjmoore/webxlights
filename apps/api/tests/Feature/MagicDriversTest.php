@@ -76,6 +76,39 @@ class MagicDriversTest extends TestCase
         $this->assertArrayNotHasKey('tools', $body);
     }
 
+    public function test_the_newest_models_ask_for_the_server_side_refusal_fallback(): void
+    {
+        $driver = $this->anthropic([$this->message('{"seed": 7}')]);
+
+        $driver->completeJson('sys', 'user', self::SCHEMA, 'claude-opus-5-5', null);
+
+        $request = $this->sent[0]['request'];
+        $body = json_decode((string) $request->getBody(), true);
+        $this->assertSame('default', $body['fallbacks']);
+        $this->assertStringContainsString('server-side-fallback-2026-07-01', $request->getHeaderLine('anthropic-beta'));
+        $this->assertSame('json_schema', $body['output_config']['format']['type']);
+    }
+
+    public function test_a_fallback_block_in_the_reply_does_not_hide_the_plan(): void
+    {
+        $reply = $this->message('{"seed": 3}');
+        array_unshift($reply['content'], ['type' => 'fallback', 'from' => ['model' => 'claude-opus-5-5'], 'to' => ['model' => 'claude-opus-4-8']]);
+        $driver = $this->anthropic([$reply]);
+
+        $this->assertSame(['seed' => 3], $driver->completeJson('sys', 'user', self::SCHEMA, 'claude-opus-5-5', null)['data']);
+    }
+
+    public function test_older_models_go_without_the_fallback(): void
+    {
+        $driver = $this->anthropic([$this->message('{"seed": 7}')]);
+
+        $driver->completeJson('sys', 'user', self::SCHEMA, 'claude-haiku-4-5', null);
+
+        $request = $this->sent[0]['request'];
+        $this->assertArrayNotHasKey('fallbacks', json_decode((string) $request->getBody(), true));
+        $this->assertStringNotContainsString('server-side-fallback', $request->getHeaderLine('anthropic-beta'));
+    }
+
     public function test_a_model_without_adaptive_thinking_gets_neither_thinking_nor_effort(): void
     {
         $driver = $this->anthropic([$this->message('{"seed": 7}')]);
