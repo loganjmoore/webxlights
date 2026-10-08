@@ -1,0 +1,8813 @@
+{
+ "generatedAt": "2026-10-08",
+ "corpus": {
+  "sequences": 357,
+  "withLayout": 345,
+  "effects": 331260,
+  "skipped": 0,
+  "frameMs": {
+   "10": 5,
+   "15": 1,
+   "25": 284,
+   "40": 1,
+   "50": 66
+  },
+  "xlightsMajorVersions": {
+   "2020": 2,
+   "2021": 20,
+   "2022": 88,
+   "2023": 40,
+   "2024": 95,
+   "2025": 90,
+   "2026": 22
+  },
+  "durationS": {
+   "p10": 44.942,
+   "p25": 98.568,
+   "p50": 162.377,
+   "p75": 206.419,
+   "p90": 248.07
+  },
+  "elementsPerSequence": {
+   "p10": 9,
+   "p25": 16,
+   "p50": 28,
+   "p75": 44,
+   "p90": 87
+  },
+  "effectsPerSequence": {
+   "p10": 35,
+   "p25": 157,
+   "p50": 442,
+   "p75": 1026,
+   "p90": 2422
+  },
+  "effectsPerMinute": {
+   "p10": 33,
+   "p25": 79,
+   "p50": 179,
+   "p75": 405,
+   "p90": 894
+  },
+  "bpm": {
+   "p10": 89,
+   "p25": 104,
+   "p50": 126,
+   "p75": 150,
+   "p90": 160
+  }
+ },
+ "dedupe": {
+  "duplicateFilesSkipped": 4,
+  "overPackageCap": 6
+ },
+ "effectShareByCount": {
+  "On": 0.2303,
+  "SingleStrand": 0.1484,
+  "Shockwave": 0.0883,
+  "Color Wash": 0.0419,
+  "Spirals": 0.0379,
+  "Faces": 0.0374,
+  "Pinwheel": 0.0355,
+  "Ripple": 0.0344,
+  "Bars": 0.0256,
+  "Twinkle": 0.0254,
+  "Morph": 0.0214,
+  "VU Meter": 0.0213,
+  "Pictures": 0.0204,
+  "Curtain": 0.0189,
+  "Off": 0.0176,
+  "Fan": 0.0149,
+  "Butterfly": 0.0138,
+  "State": 0.0122,
+  "Video": 0.0118,
+  "Text": 0.0114,
+  "Garlands": 0.0113,
+  "Meteors": 0.0103,
+  "Marquee": 0.0099,
+  "Wave": 0.0097,
+  "Strobe": 0.0086,
+  "Fill": 0.0084,
+  "Shader": 0.0077,
+  "Circles": 0.0076,
+  "Snowflakes": 0.0072,
+  "Galaxy": 0.0058,
+  "Shape": 0.0048,
+  "Fire": 0.0042,
+  "Plasma": 0.0042,
+  "Warp": 0.0039,
+  "Music Effect": 0.0033,
+  "Liquid": 0.0029,
+  "Shimmer": 0.0023,
+  "Spirograph": 0.0023,
+  "Tree": 0.0021,
+  "Fireworks": 0.002,
+  "Life": 0.002,
+  "Snowstorm": 0.0018,
+  "Lightning": 0.0017,
+  "Lines": 0.0017,
+  "Tendril": 0.0016,
+  "DMX": 0.0013,
+  "Moving Head": 0.0008,
+  "Sketch": 0.0006,
+  "Kaleidoscope": 0.0005,
+  "Candle": 0.0004,
+  "Duplicate": 0,
+  "Piano": 0
+ },
+ "effectShareBySeconds": {
+  "On": 0.1631,
+  "SingleStrand": 0.1221,
+  "Faces": 0.0824,
+  "VU Meter": 0.0507,
+  "Pinwheel": 0.0472,
+  "Spirals": 0.0442,
+  "Twinkle": 0.0387,
+  "Color Wash": 0.0372,
+  "Shockwave": 0.0332,
+  "Off": 0.0262,
+  "Bars": 0.0259,
+  "Text": 0.0254,
+  "Ripple": 0.0217,
+  "Video": 0.0202,
+  "Butterfly": 0.0197,
+  "Snowflakes": 0.0194,
+  "Wave": 0.0172,
+  "Pictures": 0.0168,
+  "Marquee": 0.0166,
+  "Meteors": 0.0153,
+  "Fan": 0.0145,
+  "State": 0.0145,
+  "Shader": 0.0139,
+  "Curtain": 0.0124,
+  "DMX": 0.0112,
+  "Morph": 0.0103,
+  "Strobe": 0.0097,
+  "Garlands": 0.008,
+  "Plasma": 0.0062,
+  "Fire": 0.0058,
+  "Circles": 0.0056,
+  "Fill": 0.005,
+  "Shape": 0.0046,
+  "Galaxy": 0.0043,
+  "Tree": 0.0038,
+  "Snowstorm": 0.0036,
+  "Liquid": 0.0032,
+  "Music Effect": 0.0031,
+  "Warp": 0.0025,
+  "Life": 0.0024,
+  "Lines": 0.0023,
+  "Fireworks": 0.0019,
+  "Shimmer": 0.0016,
+  "Tendril": 0.0012,
+  "Spirograph": 0.001,
+  "Moving Head": 0.0009,
+  "Lightning": 0.0008,
+  "Kaleidoscope": 0.0008,
+  "Candle": 0.0007,
+  "Duplicate": 0.0006,
+  "Sketch": 0.0004,
+  "Piano": 0
+ },
+ "effectCountsRaw": {
+  "On": 72097,
+  "SingleStrand": 71521,
+  "Shockwave": 46360,
+  "Spirals": 17621,
+  "Ripple": 14946,
+  "Pinwheel": 10801,
+  "Bars": 10414,
+  "Color Wash": 9388,
+  "Curtain": 8765,
+  "Morph": 8311,
+  "Pictures": 4408,
+  "VU Meter": 4294,
+  "Off": 4283,
+  "Butterfly": 4225,
+  "Faces": 3870,
+  "Twinkle": 3762,
+  "Garlands": 3417,
+  "Fan": 2944,
+  "Wave": 2889,
+  "Marquee": 2562,
+  "Text": 2245,
+  "Shader": 2032,
+  "Circles": 1962,
+  "Warp": 1765,
+  "Meteors": 1724,
+  "Fill": 1713,
+  "Strobe": 1573,
+  "Snowflakes": 1274,
+  "Galaxy": 1027,
+  "Tree": 859,
+  "Plasma": 815,
+  "State": 747,
+  "Snowstorm": 703,
+  "Shape": 685,
+  "Video": 664,
+  "Liquid": 582,
+  "Fire": 487,
+  "Shimmer": 487,
+  "Moving Head": 448,
+  "DMX": 384,
+  "Music Effect": 372,
+  "Life": 342,
+  "Spirograph": 290,
+  "Lightning": 286,
+  "Lines": 259,
+  "Fireworks": 179,
+  "Tendril": 161,
+  "Candle": 138,
+  "Kaleidoscope": 114,
+  "Sketch": 51,
+  "Duplicate": 10,
+  "Piano": 4
+ },
+ "targetKind": {
+  "model": 0.51,
+  "group": 0.3513,
+  "submodel": 0.1321,
+  "unknown": 0.0065
+ },
+ "roles": {
+  "whole_house": {
+   "songs": 269,
+   "effects": 16371,
+   "seconds": 53169,
+   "effectShareBySeconds": {
+    "On": 0.1388,
+    "Twinkle": 0.0896,
+    "Snowflakes": 0.0833,
+    "SingleStrand": 0.0773,
+    "Shockwave": 0.0556,
+    "Pinwheel": 0.0544,
+    "Butterfly": 0.0499,
+    "Shader": 0.0499,
+    "Color Wash": 0.0354,
+    "Meteors": 0.0329,
+    "Bars": 0.0313,
+    "Ripple": 0.0257
+   },
+   "effectShareByCount": {
+    "On": 0.1679,
+    "Shockwave": 0.1029,
+    "SingleStrand": 0.1026,
+    "Twinkle": 0.0584,
+    "Pinwheel": 0.044,
+    "Color Wash": 0.0434,
+    "Snowflakes": 0.0419,
+    "Ripple": 0.0396,
+    "Butterfly": 0.0379,
+    "Bars": 0.0317,
+    "Shader": 0.0296,
+    "Garlands": 0.0275
+   },
+   "bufferStyle": {
+    "Default": 0.8086,
+    "Per Model Per Preview": 0.0745,
+    "Per Model Default": 0.046,
+    "Per Preview": 0.0225,
+    "Overlay - Centered": 0.0155
+   },
+   "coverage": {
+    "p10": 0.011,
+    "p25": 0.048,
+    "p50": 0.204,
+    "p75": 0.665,
+    "p90": 1
+   }
+  },
+  "flood": {
+   "songs": 88,
+   "effects": 5231,
+   "seconds": 8783,
+   "effectShareBySeconds": {
+    "On": 0.4203,
+    "Off": 0.1752,
+    "Color Wash": 0.1094,
+    "VU Meter": 0.0984,
+    "SingleStrand": 0.0507,
+    "DMX": 0.0252,
+    "Twinkle": 0.0197,
+    "Bars": 0.0153,
+    "Shockwave": 0.014,
+    "Curtain": 0.0115,
+    "Fan": 0.0087,
+    "Plasma": 0.0084
+   },
+   "effectShareByCount": {
+    "On": 0.513,
+    "Color Wash": 0.1203,
+    "Off": 0.1157,
+    "VU Meter": 0.0681,
+    "SingleStrand": 0.0392,
+    "Shockwave": 0.0289,
+    "Twinkle": 0.0238,
+    "Bars": 0.0145,
+    "DMX": 0.0112,
+    "Plasma": 0.0081,
+    "Pinwheel": 0.0072,
+    "Curtain": 0.007
+   },
+   "bufferStyle": {
+    "Default": 0.7924,
+    "Per Model Per Preview": 0.0604,
+    "Per Model Single Line": 0.0562,
+    "Per Model Default": 0.048,
+    "Default Model As A Pixel": 0.0105
+   },
+   "coverage": {
+    "p10": 0.011,
+    "p25": 0.035,
+    "p50": 0.171,
+    "p75": 0.669,
+    "p90": 0.945
+   }
+  },
+  "wreath": {
+   "songs": 119,
+   "effects": 10343,
+   "seconds": 35656,
+   "effectShareBySeconds": {
+    "SingleStrand": 0.222,
+    "On": 0.1581,
+    "Faces": 0.1054,
+    "Pinwheel": 0.0851,
+    "Color Wash": 0.0468,
+    "VU Meter": 0.0459,
+    "Off": 0.0374,
+    "Fan": 0.0367,
+    "Ripple": 0.0366,
+    "Spirals": 0.0359,
+    "Twinkle": 0.0279,
+    "Shockwave": 0.0221
+   },
+   "effectShareByCount": {
+    "SingleStrand": 0.245,
+    "On": 0.1686,
+    "Faces": 0.0854,
+    "Pinwheel": 0.0725,
+    "Color Wash": 0.0577,
+    "Shockwave": 0.0537,
+    "Ripple": 0.042,
+    "VU Meter": 0.0318,
+    "Spirals": 0.031,
+    "Fan": 0.0297,
+    "Off": 0.0296,
+    "Bars": 0.025
+   },
+   "bufferStyle": {
+    "Default": 0.7385,
+    "Per Model Default": 0.0735,
+    "Per Model Per Preview": 0.0685,
+    "Per Preview": 0.0518,
+    "Single Line": 0.0249
+   },
+   "coverage": {
+    "p10": 0.017,
+    "p25": 0.07,
+    "p50": 0.198,
+    "p75": 0.538,
+    "p90": 0.958
+   }
+  },
+  "window": {
+   "songs": 200,
+   "effects": 18098,
+   "seconds": 33953,
+   "effectShareBySeconds": {
+    "SingleStrand": 0.2528,
+    "On": 0.1471,
+    "VU Meter": 0.0771,
+    "Marquee": 0.0595,
+    "Pinwheel": 0.0549,
+    "Color Wash": 0.0532,
+    "Spirals": 0.0413,
+    "Shockwave": 0.0367,
+    "Bars": 0.0297,
+    "Twinkle": 0.0273,
+    "Morph": 0.0234,
+    "Off": 0.0201
+   },
+   "effectShareByCount": {
+    "SingleStrand": 0.2539,
+    "On": 0.2076,
+    "Shockwave": 0.0578,
+    "VU Meter": 0.048,
+    "Marquee": 0.0478,
+    "Color Wash": 0.0472,
+    "Pinwheel": 0.0384,
+    "Spirals": 0.0344,
+    "Morph": 0.0285,
+    "Bars": 0.0282,
+    "Ripple": 0.0225,
+    "Twinkle": 0.0209
+   },
+   "bufferStyle": {
+    "Default": 0.76,
+    "Per Model Default": 0.0825,
+    "Per Model Per Preview": 0.0804,
+    "Per Model Single Line": 0.0262,
+    "Per Preview": 0.0236
+   },
+   "coverage": {
+    "p10": 0.01,
+    "p25": 0.038,
+    "p50": 0.103,
+    "p75": 0.322,
+    "p90": 0.855
+   }
+  },
+  "bush": {
+   "songs": 60,
+   "effects": 1928,
+   "seconds": 4946,
+   "effectShareBySeconds": {
+    "Twinkle": 0.2494,
+    "On": 0.2334,
+    "SingleStrand": 0.135,
+    "Color Wash": 0.0517,
+    "VU Meter": 0.0511,
+    "Bars": 0.0434,
+    "Curtain": 0.0321,
+    "Shockwave": 0.0313,
+    "Butterfly": 0.0291,
+    "Plasma": 0.0201,
+    "Off": 0.0197,
+    "Shimmer": 0.0167
+   },
+   "effectShareByCount": {
+    "On": 0.2863,
+    "Twinkle": 0.2165,
+    "SingleStrand": 0.1159,
+    "Color Wash": 0.0708,
+    "VU Meter": 0.0441,
+    "Shockwave": 0.0332,
+    "Curtain": 0.0288,
+    "Butterfly": 0.0279,
+    "Morph": 0.0278,
+    "Bars": 0.0263,
+    "Off": 0.0202,
+    "Plasma": 0.0173
+   },
+   "bufferStyle": {
+    "Default": 0.735,
+    "Per Model Default": 0.0591,
+    "Single Line": 0.0576,
+    "Per Model Per Preview": 0.0508,
+    "Per Model Single Line": 0.0254
+   },
+   "coverage": {
+    "p10": 0.014,
+    "p25": 0.032,
+    "p50": 0.129,
+    "p75": 0.317,
+    "p90": 0.815
+   }
+  },
+  "star": {
+   "songs": 181,
+   "effects": 15978,
+   "seconds": 34030,
+   "effectShareBySeconds": {
+    "On": 0.1845,
+    "SingleStrand": 0.1128,
+    "Pinwheel": 0.092,
+    "VU Meter": 0.0823,
+    "Shockwave": 0.0728,
+    "Fan": 0.055,
+    "Color Wash": 0.0545,
+    "Twinkle": 0.0541,
+    "Ripple": 0.0445,
+    "Spirals": 0.0282,
+    "Bars": 0.02,
+    "Butterfly": 0.0193
+   },
+   "effectShareByCount": {
+    "On": 0.2214,
+    "SingleStrand": 0.1174,
+    "Shockwave": 0.1107,
+    "Pinwheel": 0.0746,
+    "VU Meter": 0.065,
+    "Color Wash": 0.0565,
+    "Ripple": 0.0539,
+    "Twinkle": 0.0484,
+    "Fan": 0.038,
+    "Bars": 0.0216,
+    "Off": 0.021,
+    "Spirals": 0.0208
+   },
+   "bufferStyle": {
+    "Default": 0.6697,
+    "Per Model Per Preview": 0.1329,
+    "Per Model Default": 0.1135,
+    "Single Line": 0.0234,
+    "Per Preview": 0.0233
+   },
+   "coverage": {
+    "p10": 0.022,
+    "p25": 0.065,
+    "p50": 0.246,
+    "p75": 0.701,
+    "p90": 0.992
+   }
+  },
+  "cane": {
+   "songs": 132,
+   "effects": 11293,
+   "seconds": 28723,
+   "effectShareBySeconds": {
+    "SingleStrand": 0.163,
+    "Spirals": 0.1257,
+    "VU Meter": 0.1243,
+    "On": 0.1107,
+    "Color Wash": 0.0644,
+    "Bars": 0.0556,
+    "Pinwheel": 0.05,
+    "Twinkle": 0.0479,
+    "Marquee": 0.0308,
+    "Shockwave": 0.029,
+    "Curtain": 0.0229,
+    "Off": 0.0211
+   },
+   "effectShareByCount": {
+    "SingleStrand": 0.1594,
+    "On": 0.1384,
+    "Spirals": 0.1081,
+    "VU Meter": 0.0985,
+    "Color Wash": 0.0653,
+    "Bars": 0.0623,
+    "Shockwave": 0.0581,
+    "Twinkle": 0.0403,
+    "Pinwheel": 0.0331,
+    "Marquee": 0.0315,
+    "Curtain": 0.029,
+    "Ripple": 0.0245
+   },
+   "bufferStyle": {
+    "Default": 0.7251,
+    "Per Model Default": 0.1342,
+    "Per Preview": 0.0538,
+    "Per Model Per Preview": 0.0282,
+    "Single Line": 0.0155
+   },
+   "coverage": {
+    "p10": 0.016,
+    "p25": 0.06,
+    "p50": 0.165,
+    "p75": 0.42,
+    "p90": 0.901
+   }
+  },
+  "snowflake": {
+   "songs": 229,
+   "effects": 31249,
+   "seconds": 69476,
+   "effectShareBySeconds": {
+    "SingleStrand": 0.1483,
+    "On": 0.1458,
+    "Pinwheel": 0.1071,
+    "Shockwave": 0.0881,
+    "Color Wash": 0.0592,
+    "Ripple": 0.0585,
+    "VU Meter": 0.0542,
+    "Twinkle": 0.0453,
+    "Fan": 0.0407,
+    "Spirals": 0.0336,
+    "Butterfly": 0.0324,
+    "Bars": 0.0316
+   },
+   "effectShareByCount": {
+    "On": 0.1952,
+    "SingleStrand": 0.1408,
+    "Shockwave": 0.1359,
+    "Pinwheel": 0.0883,
+    "Ripple": 0.075,
+    "Color Wash": 0.0536,
+    "VU Meter": 0.0366,
+    "Twinkle": 0.0328,
+    "Spirals": 0.0317,
+    "Fan": 0.0313,
+    "Bars": 0.0302,
+    "Butterfly": 0.026
+   },
+   "bufferStyle": {
+    "Default": 0.7242,
+    "Per Model Default": 0.078,
+    "Per Model Per Preview": 0.0585,
+    "Overlay - Centered": 0.0385,
+    "Per Preview": 0.0324
+   },
+   "coverage": {
+    "p10": 0.017,
+    "p25": 0.068,
+    "p50": 0.191,
+    "p75": 0.52,
+    "p90": 0.908
+   }
+  },
+  "mini_tree": {
+   "songs": 258,
+   "effects": 52259,
+   "seconds": 93631,
+   "effectShareBySeconds": {
+    "On": 0.1419,
+    "SingleStrand": 0.1372,
+    "Spirals": 0.0837,
+    "VU Meter": 0.0717,
+    "Twinkle": 0.0491,
+    "Color Wash": 0.044,
+    "Pinwheel": 0.0402,
+    "Wave": 0.037,
+    "Shockwave": 0.035,
+    "Curtain": 0.0336,
+    "Bars": 0.0284,
+    "Faces": 0.025
+   },
+   "effectShareByCount": {
+    "On": 0.2063,
+    "SingleStrand": 0.1406,
+    "Spirals": 0.0708,
+    "Shockwave": 0.0669,
+    "Color Wash": 0.0453,
+    "VU Meter": 0.0441,
+    "Curtain": 0.0365,
+    "Pinwheel": 0.035,
+    "Bars": 0.0349,
+    "Morph": 0.0344,
+    "Twinkle": 0.0341,
+    "Wave": 0.0224
+   },
+   "bufferStyle": {
+    "Default": 0.7748,
+    "Per Preview": 0.0704,
+    "Per Model Per Preview": 0.0605,
+    "Per Model Default": 0.0595,
+    "Single Line": 0.0103
+   },
+   "coverage": {
+    "p10": 0.01,
+    "p25": 0.043,
+    "p50": 0.172,
+    "p75": 0.684,
+    "p90": 1
+   }
+  },
+  "outline": {
+   "songs": 250,
+   "effects": 31333,
+   "seconds": 51477,
+   "effectShareBySeconds": {
+    "SingleStrand": 0.2393,
+    "On": 0.1808,
+    "VU Meter": 0.0772,
+    "Color Wash": 0.0627,
+    "Twinkle": 0.0549,
+    "Bars": 0.0525,
+    "Marquee": 0.0298,
+    "Butterfly": 0.0285,
+    "Shockwave": 0.0253,
+    "Spirals": 0.0232,
+    "Morph": 0.022,
+    "Pinwheel": 0.0212
+   },
+   "effectShareByCount": {
+    "On": 0.2451,
+    "SingleStrand": 0.2331,
+    "Color Wash": 0.0572,
+    "Bars": 0.0531,
+    "VU Meter": 0.0499,
+    "Shockwave": 0.0446,
+    "Twinkle": 0.0365,
+    "Morph": 0.0302,
+    "Garlands": 0.0232,
+    "Butterfly": 0.0228,
+    "Marquee": 0.0216,
+    "Curtain": 0.0206
+   },
+   "bufferStyle": {
+    "Default": 0.7953,
+    "Per Model Default": 0.0945,
+    "Per Model Per Preview": 0.0391,
+    "Per Model Single Line": 0.0199,
+    "Per Preview": 0.0152
+   },
+   "coverage": {
+    "p10": 0.015,
+    "p25": 0.043,
+    "p50": 0.125,
+    "p75": 0.348,
+    "p90": 0.866
+   }
+  },
+  "pathway": {
+   "songs": 95,
+   "effects": 8255,
+   "seconds": 15743,
+   "effectShareBySeconds": {
+    "SingleStrand": 0.2298,
+    "VU Meter": 0.0915,
+    "On": 0.0772,
+    "Wave": 0.0593,
+    "Bars": 0.0586,
+    "Curtain": 0.0514,
+    "Spirals": 0.0512,
+    "Shockwave": 0.0439,
+    "Color Wash": 0.0339,
+    "Marquee": 0.0332,
+    "Off": 0.0304,
+    "Meteors": 0.0276
+   },
+   "effectShareByCount": {
+    "SingleStrand": 0.2412,
+    "On": 0.1311,
+    "Shockwave": 0.0704,
+    "VU Meter": 0.0627,
+    "Bars": 0.0586,
+    "Spirals": 0.0556,
+    "Curtain": 0.0469,
+    "Color Wash": 0.0355,
+    "Wave": 0.0354,
+    "Marquee": 0.0287,
+    "Morph": 0.022,
+    "Meteors": 0.0208
+   },
+   "bufferStyle": {
+    "Default": 0.8361,
+    "Per Preview": 0.046,
+    "Per Model Default": 0.0338,
+    "Overlay - Centered": 0.02,
+    "Per Model Per Preview": 0.0188
+   },
+   "coverage": {
+    "p10": 0.005,
+    "p25": 0.022,
+    "p50": 0.213,
+    "p75": 0.552,
+    "p90": 0.861
+   }
+  },
+  "mega_tree": {
+   "songs": 241,
+   "effects": 25507,
+   "seconds": 95241,
+   "effectShareBySeconds": {
+    "Spirals": 0.1053,
+    "On": 0.0948,
+    "SingleStrand": 0.0774,
+    "Twinkle": 0.072,
+    "Pinwheel": 0.0606,
+    "Pictures": 0.0465,
+    "Snowflakes": 0.0364,
+    "VU Meter": 0.0351,
+    "Color Wash": 0.0345,
+    "Shockwave": 0.0335,
+    "Wave": 0.0303,
+    "Bars": 0.0262
+   },
+   "effectShareByCount": {
+    "On": 0.1392,
+    "SingleStrand": 0.0969,
+    "Spirals": 0.0891,
+    "Shockwave": 0.0721,
+    "Twinkle": 0.0592,
+    "Pictures": 0.0522,
+    "Pinwheel": 0.0484,
+    "Color Wash": 0.0339,
+    "Morph": 0.0337,
+    "Snowflakes": 0.0245,
+    "Bars": 0.0234,
+    "Off": 0.0214
+   },
+   "bufferStyle": {
+    "Default": 0.8218,
+    "Per Preview": 0.103,
+    "Per Model Default": 0.0203,
+    "Per Model Per Preview": 0.0185,
+    "Single Line": 0.0162
+   },
+   "coverage": {
+    "p10": 0.055,
+    "p25": 0.154,
+    "p50": 0.626,
+    "p75": 1,
+    "p90": 1
+   }
+  },
+  "matrix": {
+   "songs": 218,
+   "effects": 16378,
+   "seconds": 93745,
+   "effectShareBySeconds": {
+    "Text": 0.2405,
+    "Video": 0.1134,
+    "On": 0.0918,
+    "Pictures": 0.0841,
+    "Marquee": 0.0469,
+    "Faces": 0.0386,
+    "Pinwheel": 0.037,
+    "Snowflakes": 0.0319,
+    "SingleStrand": 0.0309,
+    "Butterfly": 0.03,
+    "Shockwave": 0.0266,
+    "Spirals": 0.0227
+   },
+   "effectShareByCount": {
+    "Text": 0.2385,
+    "Pictures": 0.1142,
+    "On": 0.0827,
+    "Video": 0.0771,
+    "Shockwave": 0.0708,
+    "SingleStrand": 0.038,
+    "Pinwheel": 0.0332,
+    "Marquee": 0.0314,
+    "Faces": 0.0252,
+    "Butterfly": 0.0249,
+    "Ripple": 0.0244,
+    "Snowflakes": 0.0239
+   },
+   "bufferStyle": {
+    "Default": 0.8649,
+    "Per Preview": 0.0616,
+    "Per Model Default": 0.0366,
+    "Overlay - Centered": 0.0116,
+    "Per Model Default Deep": 0.0056
+   },
+   "coverage": {
+    "p10": 0.067,
+    "p25": 0.244,
+    "p50": 0.771,
+    "p75": 1,
+    "p90": 1
+   }
+  },
+  "arch": {
+   "songs": 219,
+   "effects": 26455,
+   "seconds": 60699,
+   "effectShareBySeconds": {
+    "SingleStrand": 0.4342,
+    "VU Meter": 0.0795,
+    "On": 0.0493,
+    "Color Wash": 0.0456,
+    "Off": 0.0428,
+    "Ripple": 0.0403,
+    "Bars": 0.0302,
+    "Spirals": 0.03,
+    "Shockwave": 0.0298,
+    "Wave": 0.0209,
+    "Pinwheel": 0.0204,
+    "Twinkle": 0.0199
+   },
+   "effectShareByCount": {
+    "SingleStrand": 0.4658,
+    "On": 0.0862,
+    "VU Meter": 0.0537,
+    "Shockwave": 0.0451,
+    "Color Wash": 0.0443,
+    "Ripple": 0.0431,
+    "Bars": 0.0295,
+    "Spirals": 0.0294,
+    "Morph": 0.0233,
+    "Off": 0.0225,
+    "Curtain": 0.0171,
+    "Pinwheel": 0.0151
+   },
+   "bufferStyle": {
+    "Default": 0.6763,
+    "Per Model Default": 0.1225,
+    "Overlay - Centered": 0.043,
+    "Per Model Per Preview": 0.0383,
+    "Per Model Single Line": 0.0344
+   },
+   "coverage": {
+    "p10": 0.015,
+    "p25": 0.057,
+    "p50": 0.182,
+    "p75": 0.576,
+    "p90": 1
+   }
+  },
+  "other": {
+   "songs": 87,
+   "effects": 12283,
+   "seconds": 38097,
+   "effectShareBySeconds": {
+    "On": 0.1561,
+    "DMX": 0.1114,
+    "SingleStrand": 0.0806,
+    "Pinwheel": 0.0709,
+    "VU Meter": 0.0479,
+    "Snowflakes": 0.0415,
+    "Shockwave": 0.0393,
+    "Bars": 0.0365,
+    "Twinkle": 0.0327,
+    "Faces": 0.0325,
+    "Wave": 0.0304,
+    "State": 0.029
+   },
+   "effectShareByCount": {
+    "On": 0.222,
+    "Shockwave": 0.0903,
+    "SingleStrand": 0.0792,
+    "Pinwheel": 0.0783,
+    "Curtain": 0.0401,
+    "VU Meter": 0.0354,
+    "Bars": 0.0332,
+    "State": 0.0303,
+    "Snowflakes": 0.0295,
+    "Color Wash": 0.026,
+    "Fill": 0.025,
+    "Pictures": 0.0246
+   },
+   "bufferStyle": {
+    "Default": 0.763,
+    "Per Model Per Preview": 0.0923,
+    "Per Preview": 0.0833,
+    "Per Model Default": 0.0383,
+    "Per Model Single Line": 0.0064
+   },
+   "coverage": {
+    "p10": 0.004,
+    "p25": 0.01,
+    "p50": 0.048,
+    "p75": 0.468,
+    "p90": 1
+   }
+  },
+  "singing_face": {
+   "songs": 169,
+   "effects": 11405,
+   "seconds": 84064,
+   "effectShareBySeconds": {
+    "Faces": 0.5185,
+    "On": 0.1977,
+    "SingleStrand": 0.0524,
+    "Off": 0.0297,
+    "Pinwheel": 0.0238,
+    "VU Meter": 0.0219,
+    "Twinkle": 0.0214,
+    "Butterfly": 0.0146,
+    "Spirals": 0.0133,
+    "State": 0.0123,
+    "Fan": 0.0119,
+    "Curtain": 0.0106
+   },
+   "effectShareByCount": {
+    "Faces": 0.4261,
+    "On": 0.2134,
+    "SingleStrand": 0.0755,
+    "Shockwave": 0.0306,
+    "Pinwheel": 0.0297,
+    "Off": 0.0274,
+    "Twinkle": 0.0222,
+    "Spirals": 0.0203,
+    "State": 0.0189,
+    "VU Meter": 0.0163,
+    "Fan": 0.0157,
+    "Butterfly": 0.0138
+   },
+   "bufferStyle": {
+    "Default": 0.8803,
+    "Per Preview": 0.0604,
+    "Per Model Default": 0.0196,
+    "Single Line": 0.0139,
+    "Per Model Per Preview": 0.0117
+   },
+   "coverage": {
+    "p10": 0.099,
+    "p25": 0.354,
+    "p50": 0.967,
+    "p75": 1,
+    "p90": 1
+   }
+  },
+  "present": {
+   "songs": 24,
+   "effects": 1216,
+   "seconds": 3520,
+   "effectShareBySeconds": {
+    "VU Meter": 0.1541,
+    "On": 0.1418,
+    "Shockwave": 0.1008,
+    "Color Wash": 0.0933,
+    "Meteors": 0.0908,
+    "Fan": 0.0833,
+    "SingleStrand": 0.081,
+    "Wave": 0.0712,
+    "Spirals": 0.0428,
+    "Twinkle": 0.0357,
+    "Off": 0.0206,
+    "Plasma": 0.0151
+   },
+   "effectShareByCount": {
+    "On": 0.1691,
+    "Shockwave": 0.1517,
+    "Color Wash": 0.0935,
+    "VU Meter": 0.0921,
+    "SingleStrand": 0.0904,
+    "Fan": 0.0833,
+    "Meteors": 0.062,
+    "Spirals": 0.0576,
+    "Shader": 0.032,
+    "Bars": 0.0306,
+    "Wave": 0.0267,
+    "Twinkle": 0.0263
+   },
+   "bufferStyle": {
+    "Default": 0.9227,
+    "Per Preview": 0.0329,
+    "Overlaid X": 0.0156,
+    "Overlay - Centered": 0.0107,
+    "Per Model Per Preview": 0.0049
+   },
+   "coverage": {
+    "p10": 0.011,
+    "p25": 0.116,
+    "p50": 0.246,
+    "p75": 0.444,
+    "p90": 1
+   }
+  },
+  "spinner": {
+   "songs": 118,
+   "effects": 23404,
+   "seconds": 57119,
+   "effectShareBySeconds": {
+    "SingleStrand": 0.2219,
+    "Pinwheel": 0.1184,
+    "VU Meter": 0.086,
+    "On": 0.0854,
+    "Shockwave": 0.0641,
+    "Color Wash": 0.0591,
+    "Ripple": 0.0579,
+    "Off": 0.0367,
+    "Spirals": 0.0345,
+    "Fan": 0.0321,
+    "Butterfly": 0.0285,
+    "Twinkle": 0.0255
+   },
+   "effectShareByCount": {
+    "SingleStrand": 0.1974,
+    "Shockwave": 0.1213,
+    "On": 0.109,
+    "Pinwheel": 0.0902,
+    "Ripple": 0.0835,
+    "Color Wash": 0.0585,
+    "VU Meter": 0.0572,
+    "Spirals": 0.0308,
+    "Off": 0.0294,
+    "Fan": 0.0276,
+    "Butterfly": 0.0273,
+    "Marquee": 0.0214
+   },
+   "bufferStyle": {
+    "Default": 0.6096,
+    "Per Model Default": 0.1085,
+    "Per Preview": 0.1012,
+    "Per Model Per Preview": 0.0429,
+    "Overlay - Centered": 0.0369
+   },
+   "coverage": {
+    "p10": 0.034,
+    "p25": 0.109,
+    "p50": 0.275,
+    "p75": 0.83,
+    "p90": 1
+   }
+  },
+  "moving_head": {
+   "songs": 16,
+   "effects": 742,
+   "seconds": 3573,
+   "effectShareBySeconds": {
+    "DMX": 0.5,
+    "Moving Head": 0.4101,
+    "On": 0.073,
+    "Color Wash": 0.012,
+    "Shockwave": 0.005
+   },
+   "effectShareByCount": {
+    "DMX": 0.5,
+    "Moving Head": 0.3909,
+    "On": 0.1031,
+    "Color Wash": 0.0042,
+    "Shockwave": 0.0018
+   },
+   "bufferStyle": {
+    "Default": 0.7291,
+    "Per Model Default": 0.1577,
+    "Per Model Per Preview": 0.1024,
+    "Per Preview": 0.0108
+   },
+   "coverage": {
+    "p10": 0.004,
+    "p25": 0.01,
+    "p50": 0.27,
+    "p75": 0.531,
+    "p90": 1
+   }
+  },
+  "icicle": {
+   "songs": 64,
+   "effects": 2886,
+   "seconds": 7456,
+   "effectShareBySeconds": {
+    "SingleStrand": 0.2023,
+    "On": 0.122,
+    "Twinkle": 0.1056,
+    "VU Meter": 0.0951,
+    "Spirals": 0.0682,
+    "Wave": 0.0565,
+    "Bars": 0.0487,
+    "Off": 0.0392,
+    "Snowflakes": 0.0369,
+    "Meteors": 0.0365,
+    "Color Wash": 0.0311,
+    "Garlands": 0.0182
+   },
+   "effectShareByCount": {
+    "SingleStrand": 0.2149,
+    "On": 0.1613,
+    "Twinkle": 0.0852,
+    "VU Meter": 0.0723,
+    "Spirals": 0.0698,
+    "Wave": 0.0541,
+    "Bars": 0.0511,
+    "Meteors": 0.0432,
+    "Color Wash": 0.0305,
+    "Off": 0.0279,
+    "Snowflakes": 0.0277,
+    "Morph": 0.0224
+   },
+   "bufferStyle": {
+    "Default": 0.6251,
+    "Per Model Default": 0.2273,
+    "Per Model Per Preview": 0.0468,
+    "Overlay - Centered": 0.0385,
+    "Per Preview": 0.0378
+   },
+   "coverage": {
+    "p10": 0.034,
+    "p25": 0.137,
+    "p50": 0.422,
+    "p75": 0.759,
+    "p90": 0.99
+   }
+  },
+  "character": {
+   "songs": 66,
+   "effects": 8646,
+   "seconds": 35886,
+   "effectShareBySeconds": {
+    "On": 0.2559,
+    "SingleStrand": 0.1261,
+    "Twinkle": 0.1011,
+    "State": 0.0761,
+    "Bars": 0.0671,
+    "VU Meter": 0.0578,
+    "Pictures": 0.0356,
+    "Curtain": 0.0291,
+    "Color Wash": 0.0279,
+    "Faces": 0.0244,
+    "Snowflakes": 0.0242,
+    "Off": 0.0216
+   },
+   "effectShareByCount": {
+    "On": 0.3535,
+    "SingleStrand": 0.099,
+    "Twinkle": 0.0806,
+    "Faces": 0.0715,
+    "Bars": 0.0535,
+    "Curtain": 0.0371,
+    "Pictures": 0.0339,
+    "Color Wash": 0.027,
+    "VU Meter": 0.0268,
+    "State": 0.0265,
+    "Morph": 0.0171,
+    "Snowflakes": 0.0162
+   },
+   "bufferStyle": {
+    "Default": 0.9037,
+    "Per Preview": 0.0707,
+    "Per Model Default": 0.009,
+    "Single Line": 0.0067,
+    "Default Model As A Pixel": 0.0053
+   },
+   "coverage": {
+    "p10": 0.005,
+    "p25": 0.019,
+    "p50": 0.097,
+    "p75": 0.861,
+    "p90": 1
+   }
+  }
+ },
+ "roleLift": {
+  "whole_house": {
+   "Snowflakes": 4.29,
+   "Shader": 3.59,
+   "Garlands": 2.81,
+   "Butterfly": 2.53,
+   "Twinkle": 2.32,
+   "Life": 2.29,
+   "Shape": 2.26,
+   "Circles": 2.16,
+   "Galaxy": 2.16,
+   "Meteors": 2.15,
+   "Strobe": 1.89,
+   "Plasma": 1.89,
+   "Liquid": 1.88,
+   "Shockwave": 1.67,
+   "Lines": 1.65,
+   "Warp": 1.52,
+   "Lightning": 1.5,
+   "Sketch": 1.5,
+   "Fill": 1.42,
+   "Bars": 1.21,
+   "Spirograph": 1.2,
+   "Ripple": 1.18,
+   "Pinwheel": 1.15,
+   "Curtain": 1.14,
+   "Fan": 1.13,
+   "Shimmer": 1,
+   "Fire": 0.98,
+   "Color Wash": 0.95,
+   "Morph": 0.93,
+   "Pictures": 0.92,
+   "On": 0.85,
+   "Wave": 0.78,
+   "Music Effect": 0.71,
+   "Tendril": 0.67,
+   "SingleStrand": 0.63,
+   "Snowstorm": 0.61,
+   "Spirals": 0.56,
+   "Off": 0.5,
+   "VU Meter": 0.42,
+   "Video": 0.42,
+   "Fireworks": 0.37,
+   "Tree": 0.32,
+   "Marquee": 0.22,
+   "Text": 0.15
+  },
+  "flood": {
+   "Off": 6.69,
+   "Color Wash": 2.94,
+   "On": 2.58,
+   "DMX": 2.25,
+   "VU Meter": 1.94,
+   "Plasma": 1.35,
+   "Curtain": 0.93,
+   "Fan": 0.6,
+   "Bars": 0.59,
+   "Twinkle": 0.51,
+   "SingleStrand": 0.42,
+   "Shockwave": 0.42,
+   "Shader": 0.28,
+   "Butterfly": 0.25,
+   "Wave": 0.2,
+   "Garlands": 0.2,
+   "Circles": 0.18,
+   "Fire": 0.17,
+   "Pinwheel": 0.14,
+   "Fill": 0.12,
+   "Spirals": 0.08
+  },
+  "wreath": {
+   "Fan": 2.53,
+   "Music Effect": 2.03,
+   "SingleStrand": 1.82,
+   "Pinwheel": 1.8,
+   "Ripple": 1.69,
+   "Garlands": 1.61,
+   "Off": 1.43,
+   "Faces": 1.28,
+   "Color Wash": 1.26,
+   "Strobe": 1.26,
+   "Meteors": 1.08,
+   "On": 0.97,
+   "VU Meter": 0.91,
+   "Marquee": 0.91,
+   "Bars": 0.85,
+   "Shader": 0.83,
+   "Spirals": 0.81,
+   "Liquid": 0.81,
+   "Galaxy": 0.79,
+   "Twinkle": 0.72,
+   "Shockwave": 0.67,
+   "Butterfly": 0.38,
+   "Morph": 0.36,
+   "Fill": 0.26,
+   "Video": 0.24,
+   "Circles": 0.16,
+   "Wave": 0.09,
+   "Pictures": 0.08,
+   "Curtain": 0.08
+  },
+  "window": {
+   "Marquee": 3.58,
+   "Morph": 2.27,
+   "SingleStrand": 2.07,
+   "Liquid": 1.84,
+   "Garlands": 1.54,
+   "Strobe": 1.53,
+   "VU Meter": 1.52,
+   "Color Wash": 1.43,
+   "Meteors": 1.18,
+   "Pinwheel": 1.16,
+   "Bars": 1.15,
+   "Shockwave": 1.11,
+   "Music Effect": 1.1,
+   "Life": 1.08,
+   "Pictures": 0.98,
+   "Spirals": 0.93,
+   "Plasma": 0.92,
+   "On": 0.9,
+   "Wave": 0.88,
+   "Shape": 0.83,
+   "Circles": 0.82,
+   "Ripple": 0.81,
+   "Shimmer": 0.81,
+   "Curtain": 0.8,
+   "Fill": 0.8,
+   "Off": 0.77,
+   "Twinkle": 0.71,
+   "Butterfly": 0.68,
+   "Fire": 0.57,
+   "Fan": 0.48,
+   "Galaxy": 0.42,
+   "Shader": 0.33,
+   "Text": 0.21,
+   "Snowflakes": 0.13,
+   "Tree": 0
+  },
+  "bush": {
+   "Twinkle": 6.44,
+   "Curtain": 2.59,
+   "Life": 1.79,
+   "Bars": 1.68,
+   "On": 1.43,
+   "Morph": 1.42,
+   "Color Wash": 1.39,
+   "SingleStrand": 1.11,
+   "VU Meter": 1.01,
+   "Shockwave": 0.94,
+   "Off": 0.75,
+   "Marquee": 0.61,
+   "Fill": 0.46,
+   "Spirals": 0.25,
+   "Pinwheel": 0.18
+  },
+  "star": {
+   "Shimmer": 4.25,
+   "Snowstorm": 4.14,
+   "Fan": 3.79,
+   "Galaxy": 3.05,
+   "Liquid": 2.41,
+   "Spirograph": 2.4,
+   "Shockwave": 2.19,
+   "Ripple": 2.05,
+   "Circles": 2.05,
+   "Pinwheel": 1.95,
+   "VU Meter": 1.62,
+   "Plasma": 1.5,
+   "Color Wash": 1.47,
+   "Life": 1.46,
+   "Twinkle": 1.4,
+   "Strobe": 1.39,
+   "Garlands": 1.3,
+   "Fill": 1.18,
+   "On": 1.13,
+   "Butterfly": 0.98,
+   "SingleStrand": 0.92,
+   "Meteors": 0.92,
+   "Bars": 0.77,
+   "Music Effect": 0.68,
+   "Off": 0.66,
+   "Spirals": 0.64,
+   "Shader": 0.63,
+   "Curtain": 0.62,
+   "Marquee": 0.6,
+   "Morph": 0.53,
+   "Fire": 0.5,
+   "Wave": 0.25,
+   "Pictures": 0.14,
+   "Snowflakes": 0.06
+  },
+  "cane": {
+   "Music Effect": 4.03,
+   "Tendril": 3.25,
+   "Spirals": 2.84,
+   "VU Meter": 2.45,
+   "Lightning": 2.25,
+   "Bars": 2.15,
+   "Marquee": 1.86,
+   "Curtain": 1.85,
+   "Snowstorm": 1.75,
+   "Color Wash": 1.73,
+   "Fire": 1.62,
+   "SingleStrand": 1.33,
+   "Twinkle": 1.24,
+   "Garlands": 1.18,
+   "Plasma": 1.11,
+   "Fan": 1.07,
+   "Pinwheel": 1.06,
+   "Strobe": 0.9,
+   "Shockwave": 0.87,
+   "Life": 0.83,
+   "Off": 0.81,
+   "Butterfly": 0.81,
+   "Morph": 0.78,
+   "Ripple": 0.71,
+   "On": 0.68,
+   "Wave": 0.67,
+   "Galaxy": 0.44,
+   "Fill": 0.42,
+   "Meteors": 0.39,
+   "Circles": 0.34,
+   "Shader": 0.11,
+   "Snowflakes": 0.08
+  },
+  "snowflake": {
+   "Shimmer": 2.88,
+   "Fan": 2.81,
+   "Ripple": 2.7,
+   "Shockwave": 2.65,
+   "Shape": 2.57,
+   "Pinwheel": 2.27,
+   "Fireworks": 1.95,
+   "Butterfly": 1.64,
+   "Garlands": 1.61,
+   "Color Wash": 1.59,
+   "Life": 1.5,
+   "Bars": 1.22,
+   "SingleStrand": 1.21,
+   "Warp": 1.2,
+   "Twinkle": 1.17,
+   "Galaxy": 1.12,
+   "VU Meter": 1.07,
+   "Curtain": 0.98,
+   "On": 0.89,
+   "Plasma": 0.84,
+   "Shader": 0.79,
+   "Circles": 0.79,
+   "Meteors": 0.78,
+   "Spirals": 0.76,
+   "Morph": 0.76,
+   "Off": 0.7,
+   "Strobe": 0.7,
+   "Liquid": 0.69,
+   "Marquee": 0.66,
+   "Pictures": 0.33,
+   "Snowstorm": 0.28,
+   "Wave": 0.27,
+   "Snowflakes": 0.25,
+   "Fill": 0.22,
+   "Fire": 0.19,
+   "Video": 0.01,
+   "Text": 0
+  },
+  "mini_tree": {
+   "Tree": 3.82,
+   "Curtain": 2.71,
+   "Wave": 2.15,
+   "Morph": 2.09,
+   "Spirals": 1.89,
+   "Music Effect": 1.81,
+   "Lightning": 1.75,
+   "Fire": 1.74,
+   "VU Meter": 1.41,
+   "Fireworks": 1.37,
+   "Fill": 1.34,
+   "Fan": 1.33,
+   "Warp": 1.28,
+   "Twinkle": 1.27,
+   "Shape": 1.26,
+   "Meteors": 1.24,
+   "Strobe": 1.24,
+   "Color Wash": 1.18,
+   "SingleStrand": 1.12,
+   "Bars": 1.1,
+   "Shockwave": 1.05,
+   "Shimmer": 1,
+   "Tendril": 1,
+   "Circles": 0.95,
+   "Snowflakes": 0.91,
+   "Pictures": 0.91,
+   "Garlands": 0.9,
+   "Butterfly": 0.88,
+   "On": 0.87,
+   "Off": 0.87,
+   "Pinwheel": 0.85,
+   "Plasma": 0.84,
+   "Snowstorm": 0.75,
+   "Life": 0.75,
+   "Kaleidoscope": 0.75,
+   "Galaxy": 0.74,
+   "Lines": 0.74,
+   "Marquee": 0.71,
+   "Liquid": 0.66,
+   "Shader": 0.55,
+   "Faces": 0.3,
+   "Spirograph": 0.3,
+   "Ripple": 0.29,
+   "Video": 0.25,
+   "State": 0.22,
+   "Text": 0.21
+  },
+  "outline": {
+   "Plasma": 2.68,
+   "Garlands": 2.54,
+   "Morph": 2.14,
+   "Bars": 2.03,
+   "SingleStrand": 1.96,
+   "Tendril": 1.92,
+   "Shimmer": 1.81,
+   "Marquee": 1.8,
+   "Color Wash": 1.69,
+   "Fill": 1.6,
+   "VU Meter": 1.52,
+   "Fire": 1.48,
+   "Butterfly": 1.45,
+   "Twinkle": 1.42,
+   "Strobe": 1.38,
+   "Curtain": 1.27,
+   "Life": 1.21,
+   "On": 1.11,
+   "Meteors": 0.91,
+   "Circles": 0.91,
+   "Wave": 0.84,
+   "Music Effect": 0.84,
+   "Shockwave": 0.76,
+   "Shader": 0.76,
+   "Liquid": 0.72,
+   "Fan": 0.68,
+   "Spirals": 0.52,
+   "Pinwheel": 0.45,
+   "Off": 0.45,
+   "DMX": 0.35,
+   "Ripple": 0.28,
+   "Snowflakes": 0.23,
+   "Tree": 0.21
+  },
+  "pathway": {
+   "Music Effect": 5.23,
+   "Curtain": 4.15,
+   "Wave": 3.45,
+   "Fill": 2.58,
+   "Bars": 2.26,
+   "Morph": 2.23,
+   "Life": 2.21,
+   "Marquee": 2,
+   "SingleStrand": 1.88,
+   "Plasma": 1.82,
+   "VU Meter": 1.8,
+   "Meteors": 1.8,
+   "Strobe": 1.38,
+   "Shockwave": 1.32,
+   "Fan": 1.3,
+   "Lines": 1.17,
+   "Spirals": 1.16,
+   "Off": 1.16,
+   "Shimmer": 1.06,
+   "Color Wash": 0.91,
+   "Snowflakes": 0.81,
+   "Garlands": 0.81,
+   "Twinkle": 0.54,
+   "Ripple": 0.54,
+   "Galaxy": 0.51,
+   "On": 0.47,
+   "Butterfly": 0.35,
+   "Warp": 0.2,
+   "Pinwheel": 0.1
+  },
+  "mega_tree": {
+   "Tree": 3.68,
+   "Snowstorm": 3.19,
+   "Fireworks": 3.11,
+   "Pictures": 2.77,
+   "Lightning": 2.75,
+   "Fire": 2.64,
+   "Life": 2.58,
+   "Tendril": 2.58,
+   "Spirals": 2.38,
+   "Plasma": 2,
+   "Lines": 2,
+   "Kaleidoscope": 2,
+   "Spirograph": 1.9,
+   "Shape": 1.89,
+   "Snowflakes": 1.88,
+   "Twinkle": 1.86,
+   "Strobe": 1.86,
+   "Morph": 1.85,
+   "Circles": 1.8,
+   "Wave": 1.76,
+   "Meteors": 1.7,
+   "Warp": 1.64,
+   "Shader": 1.55,
+   "Music Effect": 1.55,
+   "Pinwheel": 1.28,
+   "Garlands": 1.28,
+   "Fan": 1.16,
+   "Galaxy": 1.14,
+   "Shockwave": 1.01,
+   "Bars": 1.01,
+   "Liquid": 0.97,
+   "Color Wash": 0.93,
+   "Butterfly": 0.92,
+   "Video": 0.9,
+   "Shimmer": 0.88,
+   "VU Meter": 0.69,
+   "Curtain": 0.67,
+   "Marquee": 0.65,
+   "SingleStrand": 0.63,
+   "Off": 0.62,
+   "On": 0.58,
+   "Text": 0.56,
+   "Fill": 0.44,
+   "Ripple": 0.31,
+   "Faces": 0.26,
+   "State": 0.19
+  },
+  "matrix": {
+   "Text": 9.47,
+   "Video": 5.61,
+   "Pictures": 5.01,
+   "Lightning": 4,
+   "Marquee": 2.83,
+   "Warp": 2.52,
+   "Spirograph": 2,
+   "Shape": 1.65,
+   "Snowflakes": 1.64,
+   "Butterfly": 1.52,
+   "Shader": 1.52,
+   "Liquid": 1.19,
+   "Kaleidoscope": 0.88,
+   "Music Effect": 0.81,
+   "Shockwave": 0.8,
+   "Fireworks": 0.79,
+   "Pinwheel": 0.78,
+   "Tendril": 0.75,
+   "Wave": 0.72,
+   "Circles": 0.71,
+   "Morph": 0.63,
+   "Fire": 0.62,
+   "Meteors": 0.59,
+   "Ripple": 0.57,
+   "On": 0.56,
+   "Off": 0.56,
+   "Twinkle": 0.52,
+   "Lines": 0.52,
+   "Spirals": 0.51,
+   "Faces": 0.47,
+   "Fan": 0.46,
+   "Plasma": 0.44,
+   "DMX": 0.41,
+   "Color Wash": 0.4,
+   "Curtain": 0.4,
+   "VU Meter": 0.36,
+   "Bars": 0.29,
+   "Tree": 0.29,
+   "Garlands": 0.26,
+   "SingleStrand": 0.25,
+   "Life": 0.25,
+   "Galaxy": 0.21,
+   "Shimmer": 0.19,
+   "Snowstorm": 0.17,
+   "Strobe": 0.14,
+   "Fill": 0.1
+  },
+  "arch": {
+   "SingleStrand": 3.56,
+   "Life": 1.92,
+   "Ripple": 1.86,
+   "Morph": 1.67,
+   "Off": 1.63,
+   "Liquid": 1.62,
+   "VU Meter": 1.57,
+   "Curtain": 1.31,
+   "Color Wash": 1.23,
+   "Wave": 1.22,
+   "Snowstorm": 1.22,
+   "Bars": 1.17,
+   "Meteors": 1.14,
+   "Fill": 1.08,
+   "Shockwave": 0.9,
+   "Marquee": 0.81,
+   "Garlands": 0.81,
+   "Spirals": 0.68,
+   "Plasma": 0.66,
+   "Fan": 0.58,
+   "Strobe": 0.53,
+   "Twinkle": 0.51,
+   "Butterfly": 0.5,
+   "Warp": 0.48,
+   "Pinwheel": 0.43,
+   "Fire": 0.4,
+   "Galaxy": 0.35,
+   "On": 0.3,
+   "Shader": 0.15,
+   "Faces": 0.13,
+   "Pictures": 0.08,
+   "Snowflakes": 0.06
+  },
+  "other": {
+   "DMX": 9.95,
+   "Fire": 2.9,
+   "Circles": 2.36,
+   "Snowflakes": 2.14,
+   "State": 2,
+   "Fill": 1.98,
+   "Shape": 1.93,
+   "Curtain": 1.85,
+   "Wave": 1.77,
+   "Shimmer": 1.69,
+   "Pinwheel": 1.5,
+   "Morph": 1.49,
+   "Fireworks": 1.47,
+   "Bars": 1.41,
+   "Pictures": 1.36,
+   "Shockwave": 1.18,
+   "Warp": 1.12,
+   "Liquid": 1.03,
+   "On": 0.96,
+   "VU Meter": 0.94,
+   "Marquee": 0.88,
+   "Twinkle": 0.84,
+   "Tendril": 0.83,
+   "Galaxy": 0.81,
+   "Off": 0.76,
+   "Text": 0.72,
+   "SingleStrand": 0.66,
+   "Fan": 0.63,
+   "Color Wash": 0.6,
+   "Ripple": 0.6,
+   "Spirals": 0.58,
+   "Lines": 0.52,
+   "Butterfly": 0.46,
+   "Garlands": 0.43,
+   "Faces": 0.39,
+   "Shader": 0.38,
+   "Plasma": 0.18,
+   "Meteors": 0.13,
+   "Strobe": 0.11
+  },
+  "singing_face": {
+   "Faces": 6.29,
+   "Shimmer": 3,
+   "On": 1.21,
+   "Off": 1.13,
+   "Plasma": 1.13,
+   "State": 0.85,
+   "Curtain": 0.85,
+   "Fan": 0.82,
+   "Butterfly": 0.74,
+   "Twinkle": 0.55,
+   "Pinwheel": 0.5,
+   "SingleStrand": 0.43,
+   "VU Meter": 0.43,
+   "Video": 0.33,
+   "Fill": 0.32,
+   "Spirals": 0.3,
+   "Snowflakes": 0.26,
+   "Color Wash": 0.24,
+   "Morph": 0.24,
+   "Circles": 0.23,
+   "Wave": 0.21,
+   "Shockwave": 0.19,
+   "Bars": 0.15,
+   "Shader": 0.14,
+   "Ripple": 0.12,
+   "Meteors": 0.1,
+   "Pictures": 0.07,
+   "Marquee": 0.05
+  },
+  "present": {
+   "Meteors": 5.93,
+   "Wave": 4.14,
+   "VU Meter": 3.04,
+   "Shockwave": 3.04,
+   "Tree": 2.53,
+   "Color Wash": 2.51,
+   "Shader": 0.88,
+   "On": 0.87,
+   "SingleStrand": 0.66,
+   "Marquee": 0.64,
+   "Bars": 0.55
+  },
+  "spinner": {
+   "Galaxy": 3.16,
+   "Ripple": 2.67,
+   "Pinwheel": 2.51,
+   "Shimmer": 2.5,
+   "Candle": 2.43,
+   "Fan": 2.21,
+   "Shockwave": 1.93,
+   "SingleStrand": 1.82,
+   "VU Meter": 1.7,
+   "Color Wash": 1.59,
+   "Butterfly": 1.45,
+   "Off": 1.4,
+   "Marquee": 1.37,
+   "Warp": 1.32,
+   "Liquid": 1.19,
+   "Shader": 0.96,
+   "Spirals": 0.78,
+   "Pictures": 0.77,
+   "Curtain": 0.77,
+   "Twinkle": 0.66,
+   "Shape": 0.63,
+   "On": 0.52,
+   "Morph": 0.52,
+   "Bars": 0.48,
+   "Lines": 0.48,
+   "Wave": 0.46,
+   "Meteors": 0.39,
+   "Circles": 0.38,
+   "Snowstorm": 0.33,
+   "Plasma": 0.31,
+   "Fill": 0.26,
+   "Tree": 0.26,
+   "Strobe": 0.24,
+   "Spirograph": 0.2,
+   "Garlands": 0.19,
+   "Faces": 0.1,
+   "Snowflakes": 0.02
+  },
+  "moving_head": {
+   "Moving Head": 455.67,
+   "DMX": 44.64,
+   "On": 0.45
+  },
+  "icicle": {
+   "Wave": 3.28,
+   "Twinkle": 2.73,
+   "Meteors": 2.39,
+   "Garlands": 2.28,
+   "Snowflakes": 1.9,
+   "VU Meter": 1.88,
+   "Bars": 1.88,
+   "SingleStrand": 1.66,
+   "Spirals": 1.54,
+   "Off": 1.5,
+   "Tree": 1.47,
+   "Morph": 1.19,
+   "Fill": 1.02,
+   "Color Wash": 0.84,
+   "On": 0.75,
+   "Curtain": 0.72,
+   "Butterfly": 0.7,
+   "Warp": 0.6,
+   "Pinwheel": 0.39,
+   "Snowstorm": 0.36,
+   "Shockwave": 0.19
+  },
+  "character": {
+   "State": 5.25,
+   "Tendril": 3.33,
+   "Twinkle": 2.61,
+   "Bars": 2.59,
+   "Curtain": 2.35,
+   "Pictures": 2.12,
+   "On": 1.57,
+   "Tree": 1.55,
+   "Circles": 1.43,
+   "Snowflakes": 1.25,
+   "VU Meter": 1.14,
+   "Shape": 1.13,
+   "SingleStrand": 1.03,
+   "Wave": 0.98,
+   "Morph": 0.86,
+   "Life": 0.83,
+   "Off": 0.82,
+   "Butterfly": 0.81,
+   "Color Wash": 0.75,
+   "Fill": 0.54,
+   "Meteors": 0.53,
+   "Shimmer": 0.31,
+   "Faces": 0.3,
+   "Fan": 0.28,
+   "Marquee": 0.27,
+   "Liquid": 0.22,
+   "Galaxy": 0.21,
+   "Fireworks": 0.16,
+   "Spirals": 0.15,
+   "Shockwave": 0.14,
+   "Garlands": 0.13,
+   "Plasma": 0.11,
+   "Pinwheel": 0.07,
+   "Ripple": 0.03,
+   "Shader": 0.02
+  }
+ },
+ "durationMsByEffect": {
+  "Strobe": {
+   "p10": 275,
+   "p25": 400,
+   "p50": 1000,
+   "p75": 4050,
+   "p90": 9550
+  },
+  "VU Meter": {
+   "p10": 925,
+   "p25": 2325,
+   "p50": 6200,
+   "p75": 13275,
+   "p90": 25775
+  },
+  "Color Wash": {
+   "p10": 325,
+   "p25": 375,
+   "p50": 575,
+   "p75": 2000,
+   "p90": 10100
+  },
+  "Shockwave": {
+   "p10": 150,
+   "p25": 300,
+   "p50": 500,
+   "p75": 800,
+   "p90": 1425
+  },
+  "Pinwheel": {
+   "p10": 500,
+   "p25": 900,
+   "p50": 1800,
+   "p75": 4750,
+   "p90": 12200
+  },
+  "Twinkle": {
+   "p10": 345,
+   "p25": 700,
+   "p50": 2150,
+   "p75": 7700,
+   "p90": 19350
+  },
+  "Meteors": {
+   "p10": 425,
+   "p25": 1000,
+   "p50": 2275,
+   "p75": 6850,
+   "p90": 14150
+  },
+  "Snowflakes": {
+   "p10": 200,
+   "p25": 1500,
+   "p50": 4750,
+   "p75": 13200,
+   "p90": 24650
+  },
+  "Marquee": {
+   "p10": 375,
+   "p25": 625,
+   "p50": 1700,
+   "p75": 4350,
+   "p90": 10275
+  },
+  "Plasma": {
+   "p10": 500,
+   "p25": 1925,
+   "p50": 2175,
+   "p75": 5475,
+   "p90": 10800
+  },
+  "Morph": {
+   "p10": 375,
+   "p25": 525,
+   "p50": 900,
+   "p75": 1250,
+   "p90": 2250
+  },
+  "Lines": {
+   "p10": 425,
+   "p25": 975,
+   "p50": 1825,
+   "p75": 5850,
+   "p90": 10750
+  },
+  "Fire": {
+   "p10": 950,
+   "p25": 2150,
+   "p50": 3150,
+   "p75": 6430,
+   "p90": 12150
+  },
+  "Off": {
+   "p10": 200,
+   "p25": 275,
+   "p50": 600,
+   "p75": 5300,
+   "p90": 16275
+  },
+  "Fan": {
+   "p10": 450,
+   "p25": 675,
+   "p50": 1800,
+   "p75": 4450,
+   "p90": 9250
+  },
+  "Bars": {
+   "p10": 275,
+   "p25": 400,
+   "p50": 1000,
+   "p75": 2925,
+   "p90": 6100
+  },
+  "Spirals": {
+   "p10": 500,
+   "p25": 675,
+   "p50": 700,
+   "p75": 2025,
+   "p90": 7400
+  },
+  "Butterfly": {
+   "p10": 250,
+   "p25": 325,
+   "p50": 1000,
+   "p75": 3200,
+   "p90": 8100
+  },
+  "SingleStrand": {
+   "p10": 375,
+   "p25": 500,
+   "p50": 725,
+   "p75": 1725,
+   "p90": 3775
+  },
+  "Text": {
+   "p10": 225,
+   "p25": 325,
+   "p50": 1000,
+   "p75": 3600,
+   "p90": 10650
+  },
+  "Curtain": {
+   "p10": 350,
+   "p25": 400,
+   "p50": 600,
+   "p75": 750,
+   "p90": 1400
+  },
+  "On": {
+   "p10": 125,
+   "p25": 200,
+   "p50": 400,
+   "p75": 850,
+   "p90": 2000
+  },
+  "Wave": {
+   "p10": 625,
+   "p25": 1050,
+   "p50": 2525,
+   "p75": 5550,
+   "p90": 13125
+  },
+  "Shader": {
+   "p10": 725,
+   "p25": 1000,
+   "p50": 2450,
+   "p75": 6825,
+   "p90": 14325
+  },
+  "Galaxy": {
+   "p10": 700,
+   "p25": 1125,
+   "p50": 1900,
+   "p75": 2925,
+   "p90": 6100
+  },
+  "Liquid": {
+   "p10": 1425,
+   "p25": 2150,
+   "p50": 3750,
+   "p75": 8000,
+   "p90": 11650
+  },
+  "Snowstorm": {
+   "p10": 465,
+   "p25": 800,
+   "p50": 1675,
+   "p75": 3525,
+   "p90": 13550
+  },
+  "Ripple": {
+   "p10": 350,
+   "p25": 450,
+   "p50": 975,
+   "p75": 1900,
+   "p90": 3600
+  },
+  "Pictures": {
+   "p10": 250,
+   "p25": 500,
+   "p50": 1300,
+   "p75": 3500,
+   "p90": 7725
+  },
+  "Faces": {
+   "p10": 175,
+   "p25": 400,
+   "p50": 1450,
+   "p75": 8025,
+   "p90": 35783
+  },
+  "Tree": {
+   "p10": 350,
+   "p25": 350,
+   "p50": 775,
+   "p75": 4400,
+   "p90": 12775
+  },
+  "Circles": {
+   "p10": 50,
+   "p25": 50,
+   "p50": 50,
+   "p75": 1600,
+   "p90": 6425
+  },
+  "Fill": {
+   "p10": 300,
+   "p25": 350,
+   "p50": 850,
+   "p75": 1350,
+   "p90": 3450
+  },
+  "Shape": {
+   "p10": 500,
+   "p25": 1175,
+   "p50": 3850,
+   "p75": 7650,
+   "p90": 18450
+  },
+  "Garlands": {
+   "p10": 100,
+   "p25": 150,
+   "p50": 500,
+   "p75": 2150,
+   "p90": 4225
+  },
+  "DMX": {
+   "p10": 175,
+   "p25": 175,
+   "p50": 225,
+   "p75": 3175,
+   "p90": 30275
+  },
+  "Lightning": {
+   "p10": 250,
+   "p25": 425,
+   "p50": 825,
+   "p75": 1850,
+   "p90": 3850
+  },
+  "Music Effect": {
+   "p10": 1100,
+   "p25": 1700,
+   "p50": 3500,
+   "p75": 7400,
+   "p90": 12550
+  },
+  "Tendril": {
+   "p10": 1800,
+   "p25": 3325,
+   "p50": 4600,
+   "p75": 7300,
+   "p90": 14550
+  },
+  "Fireworks": {
+   "p10": 1000,
+   "p25": 1850,
+   "p50": 3950,
+   "p75": 11175,
+   "p90": 23650
+  },
+  "Spirograph": {
+   "p10": 1000,
+   "p25": 1175,
+   "p50": 2150,
+   "p75": 3925,
+   "p90": 5300
+  },
+  "Video": {
+   "p10": 1425,
+   "p25": 3100,
+   "p50": 5920,
+   "p75": 13000,
+   "p90": 26150
+  },
+  "Life": {
+   "p10": 350,
+   "p25": 625,
+   "p50": 800,
+   "p75": 5650,
+   "p90": 9350
+  },
+  "Shimmer": {
+   "p10": 200,
+   "p25": 475,
+   "p50": 950,
+   "p75": 2200,
+   "p90": 4000
+  },
+  "Kaleidoscope": {
+   "p10": 1350,
+   "p25": 1350,
+   "p50": 4450,
+   "p75": 6600,
+   "p90": 11200
+  },
+  "State": {
+   "p10": 175,
+   "p25": 325,
+   "p50": 525,
+   "p75": 6225,
+   "p90": 92000
+  },
+  "Warp": {
+   "p10": 350,
+   "p25": 450,
+   "p50": 450,
+   "p75": 900,
+   "p90": 4875
+  },
+  "Sketch": {
+   "p10": 750,
+   "p25": 800,
+   "p50": 2625,
+   "p75": 3050,
+   "p90": 4800
+  },
+  "Candle": {
+   "p10": 500,
+   "p25": 1000,
+   "p50": 1925,
+   "p75": 2600,
+   "p90": 22525
+  },
+  "Moving Head": {
+   "p10": 750,
+   "p25": 1125,
+   "p50": 2025,
+   "p75": 3125,
+   "p90": 8075
+  }
+ },
+ "durationBeatsByEffect": {
+  "Strobe": {
+   "p10": 0.5,
+   "p25": 1.158,
+   "p50": 7.222,
+   "p75": 16.111,
+   "p90": 40.273
+  },
+  "VU Meter": {
+   "p10": 1.947,
+   "p25": 4.059,
+   "p50": 14.75,
+   "p75": 30.563,
+   "p90": 61.889
+  },
+  "Color Wash": {
+   "p10": 0.7,
+   "p25": 1,
+   "p50": 1.037,
+   "p75": 3.889,
+   "p90": 20.2
+  },
+  "Shockwave": {
+   "p10": 0.458,
+   "p25": 0.636,
+   "p50": 1,
+   "p75": 1.882,
+   "p90": 3.143
+  },
+  "Pinwheel": {
+   "p10": 1,
+   "p25": 1.95,
+   "p50": 3.053,
+   "p75": 7.733,
+   "p90": 19.143
+  },
+  "Twinkle": {
+   "p10": 1.667,
+   "p25": 3.333,
+   "p50": 8.75,
+   "p75": 20.941,
+   "p90": 49.444
+  },
+  "Meteors": {
+   "p10": 0.611,
+   "p25": 1.955,
+   "p50": 4.043,
+   "p75": 13.294,
+   "p90": 24.938
+  },
+  "Snowflakes": {
+   "p10": 0.444,
+   "p25": 1.947,
+   "p50": 8,
+   "p75": 25.067,
+   "p90": 49.143
+  },
+  "Marquee": {
+   "p10": 0.9,
+   "p25": 1,
+   "p50": 3.9,
+   "p75": 7.6,
+   "p90": 20.333
+  },
+  "Plasma": {
+   "p10": 1.05,
+   "p25": 2.962,
+   "p50": 4,
+   "p75": 11.885,
+   "p90": 16.412
+  },
+  "Morph": {
+   "p10": 0.615,
+   "p25": 1,
+   "p50": 2,
+   "p75": 3,
+   "p90": 5.429
+  },
+  "Lines": {
+   "p10": 0.353,
+   "p25": 1.762,
+   "p50": 3,
+   "p75": 23.889,
+   "p90": 23.889
+  },
+  "Fire": {
+   "p10": 1.9,
+   "p25": 3.909,
+   "p50": 5.25,
+   "p75": 10.333,
+   "p90": 21.364
+  },
+  "Off": {
+   "p10": 0.429,
+   "p25": 0.5,
+   "p50": 0.944,
+   "p75": 9,
+   "p90": 32.3
+  },
+  "Fan": {
+   "p10": 1,
+   "p25": 1.421,
+   "p50": 3.9,
+   "p75": 8.75,
+   "p90": 16.214
+  },
+  "Bars": {
+   "p10": 0.571,
+   "p25": 1,
+   "p50": 2,
+   "p75": 4.857,
+   "p90": 12.238
+  },
+  "Spirals": {
+   "p10": 0.955,
+   "p25": 1,
+   "p50": 2.8,
+   "p75": 7.923,
+   "p90": 23.308
+  },
+  "Butterfly": {
+   "p10": 0.476,
+   "p25": 0.571,
+   "p50": 1.714,
+   "p75": 4.458,
+   "p90": 15.105
+  },
+  "SingleStrand": {
+   "p10": 0.692,
+   "p25": 1,
+   "p50": 1.133,
+   "p75": 2.923,
+   "p90": 6.238
+  },
+  "Text": {
+   "p10": 0.471,
+   "p25": 0.7,
+   "p50": 1.5,
+   "p75": 3.647,
+   "p90": 15
+  },
+  "Curtain": {
+   "p10": 0.583,
+   "p25": 0.818,
+   "p50": 1,
+   "p75": 1.6,
+   "p90": 2.818
+  },
+  "On": {
+   "p10": 0.25,
+   "p25": 0.471,
+   "p50": 0.972,
+   "p75": 1.455,
+   "p90": 4
+  },
+  "Wave": {
+   "p10": 1.056,
+   "p25": 1.909,
+   "p50": 4.056,
+   "p75": 10.222,
+   "p90": 28.077
+  },
+  "Shader": {
+   "p10": 1.524,
+   "p25": 2.238,
+   "p50": 5,
+   "p75": 14.625,
+   "p90": 31.833
+  },
+  "Galaxy": {
+   "p10": 1.095,
+   "p25": 2.125,
+   "p50": 4.053,
+   "p75": 6.167,
+   "p90": 12.952
+  },
+  "Liquid": {
+   "p10": 1.955,
+   "p25": 3.8,
+   "p50": 7,
+   "p75": 9.722,
+   "p90": 29.05
+  },
+  "Snowstorm": {
+   "p10": 1.476,
+   "p25": 2.222,
+   "p50": 4.333,
+   "p75": 13.857,
+   "p90": 39.333
+  },
+  "Ripple": {
+   "p10": 0.579,
+   "p25": 0.875,
+   "p50": 1,
+   "p75": 2.25,
+   "p90": 4.143
+  },
+  "Pictures": {
+   "p10": 0.722,
+   "p25": 1.583,
+   "p50": 2.588,
+   "p75": 6.235,
+   "p90": 13.222
+  },
+  "Faces": {
+   "p10": 0.375,
+   "p25": 0.75,
+   "p50": 2.188,
+   "p75": 10.208,
+   "p90": 56.714
+  },
+  "Tree": {
+   "p10": 1,
+   "p25": 1,
+   "p50": 1.143,
+   "p75": 7,
+   "p90": 26.778
+  },
+  "Circles": {
+   "p10": 0.1,
+   "p25": 0.1,
+   "p50": 0.1,
+   "p75": 2.786,
+   "p90": 11
+  },
+  "Fill": {
+   "p10": 0.556,
+   "p25": 0.667,
+   "p50": 1,
+   "p75": 3.286,
+   "p90": 7.667
+  },
+  "Shape": {
+   "p10": 1.053,
+   "p25": 4.059,
+   "p50": 8.125,
+   "p75": 16.167,
+   "p90": 34.222
+  },
+  "Garlands": {
+   "p10": 0.25,
+   "p25": 0.25,
+   "p50": 0.267,
+   "p75": 2.116,
+   "p90": 6.111
+  },
+  "DMX": {
+   "p10": 1.778,
+   "p25": 4.778,
+   "p50": 17.36,
+   "p75": 79,
+   "p90": 337.947
+  },
+  "Lightning": {
+   "p10": 0.444,
+   "p25": 0.667,
+   "p50": 1.056,
+   "p75": 2.563,
+   "p90": 4.333
+  },
+  "Music Effect": {
+   "p10": 2.182,
+   "p25": 3.091,
+   "p50": 6.375,
+   "p75": 18.778,
+   "p90": 28.063
+  },
+  "Tendril": {
+   "p10": 2.176,
+   "p25": 2.977,
+   "p50": 6.846,
+   "p75": 9.85,
+   "p90": 14.154
+  },
+  "Fireworks": {
+   "p10": 2,
+   "p25": 3.3,
+   "p50": 5.111,
+   "p75": 11.286,
+   "p90": 17.385
+  },
+  "Spirograph": {
+   "p10": 2.389,
+   "p25": 2.611,
+   "p50": 3.938,
+   "p75": 5.278,
+   "p90": 8.333
+  },
+  "Video": {
+   "p10": 2.909,
+   "p25": 5.909,
+   "p50": 10.353,
+   "p75": 26.1,
+   "p90": 34.091
+  },
+  "Life": {
+   "p10": 0.583,
+   "p25": 0.583,
+   "p50": 1.417,
+   "p75": 15.826,
+   "p90": 26.111
+  },
+  "Shimmer": {
+   "p10": 0.444,
+   "p25": 0.909,
+   "p50": 2,
+   "p75": 5.429,
+   "p90": 8.588
+  },
+  "Kaleidoscope": {
+   "p10": 2.077,
+   "p25": 2.077,
+   "p50": 8.381,
+   "p75": 16.143,
+   "p90": 21.375
+  },
+  "State": {
+   "p10": 0.318,
+   "p25": 0.65,
+   "p50": 1.313,
+   "p75": 25.789,
+   "p90": 280.944
+  },
+  "Warp": {
+   "p10": 0.667,
+   "p25": 1,
+   "p50": 1,
+   "p75": 2.105,
+   "p90": 8.235
+  },
+  "Sketch": {
+   "p10": 2.8,
+   "p25": 3,
+   "p50": 5.083,
+   "p75": 7.625,
+   "p90": 7.625
+  },
+  "Candle": {
+   "p10": 0.706,
+   "p25": 2.222,
+   "p50": 3.476,
+   "p75": 6.944,
+   "p90": 59.964
+  },
+  "Moving Head": {
+   "p10": 1.389,
+   "p25": 2.278,
+   "p50": 4.125,
+   "p75": 6.056,
+   "p90": 16.1
+  }
+ },
+ "layers": {
+  "perElement": {
+   "1": 0.6572,
+   "2": 0.1511,
+   "3": 0.073,
+   "4": 0.043,
+   "5": 0.0268,
+   "6": 0.049
+  },
+  "layerIndexByEffect": {
+   "Strobe": {
+    "0": 0.733,
+    "1": 0.0712,
+    "2": 0.0572,
+    "3": 0.0451,
+    "4": 0.0935
+   },
+   "VU Meter": {
+    "0": 0.7697,
+    "1": 0.109,
+    "2": 0.0831,
+    "3": 0.0186,
+    "4": 0.0196
+   },
+   "Color Wash": {
+    "0": 0.7364,
+    "1": 0.1155,
+    "2": 0.0639,
+    "3": 0.0239,
+    "4": 0.0604
+   },
+   "Shockwave": {
+    "0": 0.6922,
+    "1": 0.1811,
+    "2": 0.0534,
+    "3": 0.0277,
+    "4": 0.0457
+   },
+   "Pinwheel": {
+    "0": 0.6437,
+    "1": 0.1621,
+    "2": 0.0699,
+    "3": 0.048,
+    "4": 0.0763
+   },
+   "Twinkle": {
+    "0": 0.6962,
+    "1": 0.1449,
+    "2": 0.0537,
+    "3": 0.034,
+    "4": 0.0712
+   },
+   "Meteors": {
+    "0": 0.4745,
+    "1": 0.2314,
+    "2": 0.0864,
+    "3": 0.1421,
+    "4": 0.0655
+   },
+   "Snowflakes": {
+    "0": 0.4215,
+    "1": 0.2017,
+    "2": 0.0738,
+    "3": 0.1429,
+    "4": 0.1601
+   },
+   "Marquee": {
+    "0": 0.8548,
+    "1": 0.0765,
+    "2": 0.0468,
+    "3": 0.0016,
+    "4": 0.0203
+   },
+   "Plasma": {
+    "0": 0.7202,
+    "1": 0.1509,
+    "2": 0.0785,
+    "3": 0.027,
+    "4": 0.0233
+   },
+   "Morph": {
+    "0": 0.615,
+    "1": 0.1215,
+    "2": 0.0547,
+    "3": 0.049,
+    "4": 0.1598
+   },
+   "Lines": {
+    "0": 0.8224,
+    "1": 0.0656,
+    "2": 0.0463,
+    "3": 0.027,
+    "4": 0.0386
+   },
+   "Fire": {
+    "0": 0.6181,
+    "1": 0.1417,
+    "2": 0.0678,
+    "3": 0.0452,
+    "4": 0.1273
+   },
+   "Off": {
+    "0": 0.6629,
+    "1": 0.1069,
+    "2": 0.1373,
+    "3": 0.0395,
+    "4": 0.0535
+   },
+   "Fan": {
+    "0": 0.6287,
+    "1": 0.2446,
+    "2": 0.0611,
+    "3": 0.034,
+    "4": 0.0316
+   },
+   "Bars": {
+    "0": 0.8012,
+    "1": 0.0932,
+    "2": 0.032,
+    "3": 0.0241,
+    "4": 0.0495
+   },
+   "Spirals": {
+    "0": 0.7223,
+    "1": 0.1192,
+    "2": 0.0636,
+    "3": 0.0386,
+    "4": 0.0564
+   },
+   "Butterfly": {
+    "0": 0.831,
+    "1": 0.111,
+    "2": 0.0222,
+    "3": 0.0099,
+    "4": 0.0258
+   },
+   "SingleStrand": {
+    "0": 0.7706,
+    "1": 0.1571,
+    "2": 0.0322,
+    "3": 0.0206,
+    "4": 0.0195
+   },
+   "Text": {
+    "0": 0.6258,
+    "1": 0.1898,
+    "2": 0.0633,
+    "3": 0.0655,
+    "4": 0.0557
+   },
+   "Curtain": {
+    "0": 0.8289,
+    "1": 0.1058,
+    "2": 0.0592,
+    "3": 0.0026,
+    "4": 0.0035
+   },
+   "On": {
+    "0": 0.8302,
+    "1": 0.1157,
+    "2": 0.0375,
+    "3": 0.0084,
+    "4": 0.0081
+   },
+   "Wave": {
+    "0": 0.4943,
+    "1": 0.1904,
+    "2": 0.0869,
+    "3": 0.0498,
+    "4": 0.1786
+   },
+   "Shader": {
+    "0": 0.6142,
+    "1": 0.1309,
+    "2": 0.0974,
+    "3": 0.0743,
+    "4": 0.0832
+   },
+   "Galaxy": {
+    "0": 0.7449,
+    "1": 0.1246,
+    "2": 0.0613,
+    "3": 0.0321,
+    "4": 0.037
+   },
+   "Liquid": {
+    "0": 0.5567,
+    "1": 0.1254,
+    "2": 0.1082,
+    "3": 0.0962,
+    "4": 0.1134
+   },
+   "Snowstorm": {
+    "0": 0.8279,
+    "1": 0.1181,
+    "2": 0.0228,
+    "3": 0.0199,
+    "4": 0.0114
+   },
+   "Ripple": {
+    "0": 0.6977,
+    "1": 0.1158,
+    "2": 0.1287,
+    "3": 0.0272,
+    "4": 0.0305
+   },
+   "Pictures": {
+    "0": 0.5333,
+    "1": 0.152,
+    "2": 0.1196,
+    "3": 0.0755,
+    "4": 0.1196
+   },
+   "Faces": {
+    "0": 0.6832,
+    "1": 0.1483,
+    "2": 0.0946,
+    "3": 0.0408,
+    "4": 0.0331
+   },
+   "Tree": {
+    "0": 0.6705,
+    "1": 0.0698,
+    "2": 0.1036,
+    "3": 0.0326,
+    "4": 0.1234
+   },
+   "Circles": {
+    "0": 0.8328,
+    "1": 0.0831,
+    "2": 0.0525,
+    "3": 0.0127,
+    "4": 0.0189
+   },
+   "Fill": {
+    "0": 0.7093,
+    "1": 0.1985,
+    "2": 0.0438,
+    "3": 0.0128,
+    "4": 0.0356
+   },
+   "Shape": {
+    "0": 0.419,
+    "1": 0.2146,
+    "2": 0.127,
+    "3": 0.1051,
+    "4": 0.1343
+   },
+   "Garlands": {
+    "0": 0.8941,
+    "1": 0.05,
+    "2": 0.0102,
+    "3": 0.0117,
+    "4": 0.0339
+   },
+   "DMX": {
+    "0": 0.8984,
+    "1": 0.0964,
+    "2": 0.0052
+   },
+   "Lightning": {
+    "0": 0.7587,
+    "1": 0.1049,
+    "2": 0.0594,
+    "3": 0.0175,
+    "4": 0.0594
+   },
+   "Music Effect": {
+    "0": 0.7957,
+    "1": 0.0484,
+    "2": 0.0968,
+    "3": 0.043,
+    "4": 0.0161
+   },
+   "Tendril": {
+    "0": 0.4534,
+    "1": 0.1366,
+    "2": 0.1242,
+    "3": 0.0559,
+    "4": 0.2298
+   },
+   "Fireworks": {
+    "0": 0.6592,
+    "1": 0.162,
+    "2": 0.0838,
+    "3": 0.0782,
+    "4": 0.0168
+   },
+   "Spirograph": {
+    "0": 0.3862,
+    "1": 0.3586,
+    "2": 0.131,
+    "3": 0.0207,
+    "4": 0.1034
+   },
+   "Video": {
+    "0": 0.6024,
+    "1": 0.1476,
+    "2": 0.1446,
+    "3": 0.0452,
+    "4": 0.0602
+   },
+   "Life": {
+    "0": 0.8743,
+    "1": 0.0673,
+    "2": 0.0292,
+    "3": 0.0029,
+    "4": 0.0263
+   },
+   "Shimmer": {
+    "0": 0.731,
+    "1": 0.1294,
+    "2": 0.0924,
+    "3": 0.0431,
+    "4": 0.0041
+   },
+   "Kaleidoscope": {
+    "0": 0.5614,
+    "1": 0.2018,
+    "2": 0.114,
+    "3": 0.0175,
+    "4": 0.1053
+   },
+   "State": {
+    "0": 0.4739,
+    "1": 0.1205,
+    "2": 0.0964,
+    "3": 0.1285,
+    "4": 0.1807
+   },
+   "Warp": {
+    "0": 0.7382,
+    "1": 0.1144,
+    "2": 0.0652,
+    "3": 0.0329,
+    "4": 0.0493
+   },
+   "Sketch": {
+    "0": 0.1373,
+    "1": 0.1569,
+    "2": 0.2353,
+    "3": 0.1569,
+    "4": 0.3137
+   },
+   "Candle": {
+    "0": 0.9203,
+    "1": 0.029,
+    "2": 0.0435,
+    "4": 0.0072
+   },
+   "Moving Head": {
+    "0": 0.9844,
+    "1": 0.0134,
+    "2": 0.0022
+   }
+  },
+  "method": {
+   "Normal": 0.9316,
+   "Layered": 0.0165,
+   "2 is Unmask": 0.0131,
+   "Effect 1": 0.008,
+   "1 reveals 2": 0.0059,
+   "Average": 0.0052,
+   "1 is Unmask": 0.0036,
+   "Additive": 0.0027,
+   "2 is Mask": 0.0027,
+   "2 reveals 1": 0.0026,
+   "1 is True Unmask": 0.0024,
+   "1 is Mask": 0.0021,
+   "2 is True Unmask": 0.001,
+   "Shadow 2 on 1": 0.0008,
+   "Max": 0.0005,
+   "Min": 0.0005,
+   "Subtractive": 0.0004,
+   "Brightness": 0.0003,
+   "Effect 2": 0.0001,
+   "Shadow 1 on 2": 0.0001,
+   "Bottom-Top": 0.0001,
+   "Highlight": 0,
+   "Highlight Vibrant": 0,
+   "Left-Right": 0
+  }
+ },
+ "transitions": {
+  "in": {
+   "Fade": 0.8798,
+   "Circle Explode": 0.0481,
+   "Wipe": 0.0453,
+   "Clock": 0.0043,
+   "Slide Bars": 0.0039,
+   "From Middle": 0.003,
+   "Zoom": 0.0026,
+   "Blinds": 0.0015,
+   "Fold": 0.0015,
+   "Pinwheel": 0.0015,
+   "Blend": 0.0014,
+   "Dissolve": 0.0012,
+   "Swap": 0.0011,
+   "Doorway": 0.001,
+   "Circular Swirl": 0.0007,
+   "Shatter": 0.0007,
+   "Square Explode": 0.0007,
+   "Bow Tie": 0.0005,
+   "Circles": 0.0004,
+   "Star": 0.0003,
+   "Blobs": 0.0002,
+   "Slide Checks": 0.0002
+  },
+  "out": {
+   "Fade": 0.9352,
+   "Wipe": 0.0224,
+   "Circle Explode": 0.0169,
+   "Zoom": 0.0042,
+   "Doorway": 0.0032,
+   "Shatter": 0.0029,
+   "Clock": 0.0028,
+   "Slide Bars": 0.0023,
+   "Dissolve": 0.0022,
+   "From Middle": 0.0019,
+   "Blobs": 0.0012,
+   "Square Explode": 0.0008,
+   "Circular Swirl": 0.0008,
+   "Pinwheel": 0.0006,
+   "Blend": 0.0005,
+   "Star": 0.0005,
+   "Blinds": 0.0005,
+   "Fold": 0.0005,
+   "Slide Checks": 0.0003,
+   "Bow Tie": 0.0002,
+   "Swap": 0.0002,
+   "Circles": 0
+  },
+  "fadeInShare": 0.11,
+  "fadeOutShare": 0.172
+ },
+ "bufferStyleByEffect": {
+  "Strobe": {
+   "Default": 0.747,
+   "Single Line": 0.1354,
+   "Per Model Default": 0.0623,
+   "Default Model As A Pixel": 0.0184
+  },
+  "VU Meter": {
+   "Default": 0.6546,
+   "Per Model Default": 0.1367,
+   "Per Model Per Preview": 0.0415,
+   "Single Line": 0.0403
+  },
+  "Color Wash": {
+   "Default": 0.8293,
+   "Per Model Default": 0.0817,
+   "Per Model Per Preview": 0.037,
+   "Per Preview": 0.0261
+  },
+  "Shockwave": {
+   "Default": 0.5731,
+   "Per Preview": 0.1612,
+   "Per Model Per Preview": 0.1569,
+   "Per Model Default": 0.0587
+  },
+  "Pinwheel": {
+   "Default": 0.7072,
+   "Per Preview": 0.1047,
+   "Per Model Default": 0.072,
+   "Per Model Per Preview": 0.0599
+  },
+  "Twinkle": {
+   "Default": 0.7018,
+   "Per Model Default": 0.1263,
+   "Single Line": 0.0449,
+   "Per Preview": 0.0375
+  },
+  "Meteors": {
+   "Default": 0.8463,
+   "Per Model Default": 0.1166,
+   "Per Preview": 0.0139,
+   "Per Model Per Preview": 0.0104
+  },
+  "Snowflakes": {
+   "Default": 0.8375,
+   "Per Model Default": 0.1177,
+   "Per Preview": 0.0204,
+   "Overlay - Centered": 0.0094
+  },
+  "Marquee": {
+   "Default": 0.6526,
+   "Single Line": 0.1331,
+   "Per Model Single Line": 0.0898,
+   "Per Model Default": 0.0675
+  },
+  "Plasma": {
+   "Default": 0.7117,
+   "Per Model Default": 0.1337,
+   "Per Preview": 0.0663,
+   "Per Model Per Preview": 0.0503
+  },
+  "Morph": {
+   "Default": 0.6487,
+   "Per Model Default": 0.1571,
+   "Per Preview": 0.1118,
+   "Per Model Per Preview": 0.0333
+  },
+  "Lines": {
+   "Default": 0.9266,
+   "Horizontal Per Model/Strand": 0.0463,
+   "Per Model Default": 0.0154,
+   "": 0.0077
+  },
+  "Fire": {
+   "Default": 0.8604,
+   "Per Model Default": 0.1027,
+   "Per Model Per Preview": 0.0144,
+   "Per Preview": 0.0123
+  },
+  "Off": {
+   "Default": 0.8195,
+   "Per Model Default": 0.148,
+   "Per Model Single Line": 0.0168,
+   "Per Model Per Preview": 0.0049
+  },
+  "Fan": {
+   "Default": 0.698,
+   "Per Model Per Preview": 0.1182,
+   "Per Model Default": 0.0873,
+   "Per Preview": 0.0571
+  },
+  "Bars": {
+   "Default": 0.8873,
+   "Per Preview": 0.0447,
+   "Per Model Default": 0.0282,
+   "Per Model Per Preview": 0.0157
+  },
+  "Spirals": {
+   "Default": 0.8459,
+   "Per Model Default": 0.0621,
+   "Single Line": 0.0184,
+   "Per Preview": 0.0149
+  },
+  "Butterfly": {
+   "Default": 0.7773,
+   "Per Model Default": 0.1325,
+   "Per Preview": 0.0282,
+   "Per Model Per Preview": 0.0267
+  },
+  "SingleStrand": {
+   "Default": 0.6004,
+   "Per Model Default": 0.1376,
+   "Per Model Per Preview": 0.0593,
+   "Per Model Single Line": 0.0422
+  },
+  "Text": {
+   "Default": 0.9929,
+   "Per Model Default": 0.0045,
+   "Per Preview": 0.0022,
+   "Overlay - Centered": 0.0004
+  },
+  "Curtain": {
+   "Default": 0.9153,
+   "Per Model Default": 0.0347,
+   "Per Preview": 0.0171,
+   "Per Model Per Preview": 0.0122
+  },
+  "On": {
+   "Default": 0.9444,
+   "Per Model Default": 0.0218,
+   "Per Preview": 0.0148,
+   "Per Model Per Preview": 0.006
+  },
+  "Wave": {
+   "Default": 0.7788,
+   "Per Model Per Preview": 0.0734,
+   "Per Model Default": 0.0533,
+   "Overlay - Centered": 0.0346
+  },
+  "Shader": {
+   "Default": 0.8691,
+   "Per Model Default": 0.0576,
+   "Per Model Per Preview": 0.034,
+   "Per Preview": 0.0285
+  },
+  "Galaxy": {
+   "Default": 0.9211,
+   "Per Model Default": 0.0331,
+   "Per Preview": 0.0263,
+   "Overlay - Centered": 0.0136
+  },
+  "Liquid": {
+   "Default": 0.8351,
+   "Per Model Per Preview": 0.0704,
+   "Per Model Default": 0.0567,
+   "Per Preview": 0.0378
+  },
+  "Snowstorm": {
+   "Default": 0.835,
+   "Single Line": 0.0697,
+   "Per Model Per Preview": 0.0541,
+   "Per Model Default": 0.0228
+  },
+  "Ripple": {
+   "Default": 0.7462,
+   "Per Model Per Preview": 0.0988,
+   "Per Preview": 0.0856,
+   "Per Model Default": 0.0612
+  },
+  "Pictures": {
+   "Default": 0.8689,
+   "Per Preview": 0.1157,
+   "Overlay - Centered": 0.0057,
+   "Per Model Default": 0.0057
+  },
+  "Faces": {
+   "Default": 0.9863,
+   "Per Model Default": 0.0114,
+   "Per Preview": 0.0013,
+   "Single Line": 0.001
+  },
+  "Tree": {
+   "Default": 0.9185,
+   "Per Model Default": 0.0722,
+   "Overlay - Centered": 0.0035,
+   "Per Model Single Line": 0.0023
+  },
+  "Circles": {
+   "Default": 0.9551,
+   "Per Model Single Line": 0.0148,
+   "Per Preview": 0.0076,
+   "Per Model Default": 0.0071
+  },
+  "Fill": {
+   "Default": 0.7017,
+   "Per Model Per Preview": 0.1185,
+   "Per Preview": 0.0794,
+   "Per Model Single Line": 0.0467
+  },
+  "Shape": {
+   "Default": 0.927,
+   "Per Model Per Preview": 0.0292,
+   "Per Preview": 0.0161,
+   "Per Model Default": 0.0131
+  },
+  "Garlands": {
+   "Default": 0.9216,
+   "Per Model Default": 0.0518,
+   "Per Preview": 0.0193,
+   "Per Model Per Preview": 0.002
+  },
+  "DMX": {
+   "Default": 0.7995,
+   "Per Model Per Preview": 0.2005
+  },
+  "Lightning": {
+   "Default": 0.5594,
+   "Per Model Default": 0.3916,
+   "Overlay - Centered": 0.0245,
+   "Per Preview": 0.014
+  },
+  "Music Effect": {
+   "Default": 0.8253,
+   "Per Model Default": 0.1075,
+   "Horizontal Stack - Scaled": 0.0269,
+   "Per Model Per Preview": 0.0108
+  },
+  "Tendril": {
+   "Default": 0.9068,
+   "Per Model Default": 0.0621,
+   "Per Preview": 0.0248,
+   "Per Model Per Preview": 0.0062
+  },
+  "Fireworks": {
+   "Default": 0.8436,
+   "Per Model Default": 0.067,
+   "Vertical Per Model/Strand": 0.067,
+   "Per Preview": 0.0112
+  },
+  "Spirograph": {
+   "Default": 0.9655,
+   "Per Model Default": 0.0138,
+   "Per Preview": 0.0138,
+   "Per Model Per Preview": 0.0069
+  },
+  "Video": {
+   "Default": 0.8946,
+   "Per Preview": 0.0542,
+   "Per Model Default": 0.0181,
+   "Overlay - Centered": 0.0151
+  },
+  "Life": {
+   "Default": 0.9357,
+   "Per Model Single Line": 0.0351,
+   "Single Line": 0.0175,
+   "Per Model Per Preview": 0.0117
+  },
+  "Shimmer": {
+   "Default": 0.9897,
+   "Per Model Per Preview": 0.0082,
+   "Per Model Default": 0.0021
+  },
+  "Kaleidoscope": {
+   "Default": 0.9737,
+   "Per Model Default": 0.0175,
+   "Per Model Single Line": 0.0088
+  },
+  "State": {
+   "Default": 0.913,
+   "Per Preview": 0.0509,
+   "Per Model Default": 0.0134,
+   "Per Model Per Preview": 0.012
+  },
+  "Warp": {
+   "Default": 0.97,
+   "Overlay - Centered": 0.0232,
+   "Per Model Default": 0.004,
+   "Per Preview": 0.0017
+  },
+  "Sketch": {
+   "Default": 1
+  },
+  "Candle": {
+   "Default": 0.8841,
+   "Overlay - Centered": 0.087,
+   "Per Preview": 0.029
+  },
+  "Moving Head": {
+   "Default": 0.8192,
+   "Per Model Default": 0.1808
+  }
+ },
+ "valueCurves": {
+  "shareByEffect": {
+   "Strobe": 0.007,
+   "VU Meter": 0.024,
+   "Color Wash": 0.007,
+   "Shockwave": 0.019,
+   "Pinwheel": 0.17,
+   "Twinkle": 0.02,
+   "Meteors": 0.031,
+   "Snowflakes": 0.02,
+   "Marquee": 0.016,
+   "Plasma": 0.016,
+   "Morph": 0.028,
+   "Lines": 0.089,
+   "Fire": 0.078,
+   "Off": 0.004,
+   "Fan": 0.199,
+   "Bars": 0.019,
+   "Spirals": 0.09,
+   "Butterfly": 0.008,
+   "SingleStrand": 0.024,
+   "Text": 0.018,
+   "Curtain": 0.003,
+   "On": 0.009,
+   "Wave": 0.16,
+   "Shader": 0.089,
+   "Galaxy": 0.051,
+   "Liquid": 0.158,
+   "Snowstorm": 0.001,
+   "Ripple": 0.094,
+   "Pictures": 0.1,
+   "Faces": 0.001,
+   "Tree": 0,
+   "Circles": 0.641,
+   "Fill": 0.724,
+   "Shape": 0.187,
+   "Garlands": 0.011,
+   "DMX": 0.008,
+   "Lightning": 0.017,
+   "Music Effect": 0.043,
+   "Tendril": 0.149,
+   "Fireworks": 0.095,
+   "Spirograph": 0.079,
+   "Video": 0.012,
+   "Life": 0.009,
+   "Shimmer": 0.002,
+   "Kaleidoscope": 0.07,
+   "State": 0,
+   "Warp": 0.234,
+   "Sketch": 0,
+   "Candle": 0.007,
+   "Moving Head": 0.411
+  },
+  "topKeys": {
+   "Fill:Fill_Position": 1233,
+   "Circles:Circles_Size": 1219,
+   "Ripple:Ripple_Scale": 854,
+   "Spirals:Spirals_Rotation": 780,
+   "Pinwheel:Pinwheel_Twist": 686,
+   "SingleStrand:T_VALUECURVE_Out_Transition_Adjust": 596,
+   "Pinwheel:PinwheelXC": 476,
+   "Shockwave:T_VALUECURVE_In_Transition_Adjust": 474,
+   "Spirals:Spirals_Movement": 473,
+   "SingleStrand:B_VALUECURVE_Rotation": 414,
+   "Warp:Warp_X": 407,
+   "Warp:Warp_Y": 407,
+   "On:B_VALUECURVE_Zoom": 401,
+   "SingleStrand:B_VALUECURVE_YRotation": 384,
+   "Pictures:B_VALUECURVE_Rotation": 363,
+   "Shockwave:Shockwave_End_Width": 346,
+   "SingleStrand:T_VALUECURVE_In_Transition_Adjust": 326,
+   "Fan:Fan_Revolutions": 326,
+   "Shockwave:Shockwave_End_Radius": 303,
+   "Shockwave:T_VALUECURVE_Out_Transition_Adjust": 302,
+   "Wave:Wave_Height": 284,
+   "Pinwheel:Pinwheel_Speed": 265,
+   "Pinwheel:PinwheelYC": 258,
+   "Pinwheel:T_VALUECURVE_Out_Transition_Adjust": 247,
+   "Spirals:B_VALUECURVE_Rotation": 236,
+   "Ripple:Ripple_Rotation": 233,
+   "Ripple:T_VALUECURVE_In_Transition_Adjust": 230,
+   "Ripple:T_VALUECURVE_Out_Transition_Adjust": 230,
+   "Pinwheel:Pinwheel_ArmSize": 218,
+   "Wave:Number_Waves": 213,
+   "SingleStrand:Color_Mix1": 201,
+   "Spirals:Spirals_Thickness": 192,
+   "Morph:B_VALUECURVE_Rotation": 190,
+   "Pinwheel:T_VALUECURVE_In_Transition_Adjust": 171,
+   "Spirals:T_VALUECURVE_In_Transition_Adjust": 154,
+   "Spirals:T_VALUECURVE_Out_Transition_Adjust": 145,
+   "Moving Head:MHPan": 144,
+   "Ripple:Ripple_XC": 120,
+   "On:T_VALUECURVE_In_Transition_Adjust": 111,
+   "Bars:B_VALUECURVE_Rotation": 110
+  }
+ },
+ "palette": {
+  "distinctColorsPerSequence": {
+   "p10": 4,
+   "p25": 6,
+   "p50": 9,
+   "p75": 18,
+   "p90": 33
+  },
+  "size": {
+   "p10": 1,
+   "p25": 1,
+   "p50": 2,
+   "p75": 2,
+   "p90": 3
+  },
+  "sizeShare": {
+   "1": 0.4863,
+   "2": 0.3236,
+   "3": 0.1054,
+   "4": 0.0483,
+   "5": 0.0182,
+   "6": 0.0104,
+   "7": 0.004,
+   "8": 0.0037
+  },
+  "topColors": {
+   "#FFFFFF": 0.2205,
+   "#FF0000": 0.1575,
+   "#00FF00": 0.0975,
+   "#0000FF": 0.0785,
+   "#FFFF00": 0.0515,
+   "#00FFFF": 0.0454,
+   "#000000": 0.0442,
+   "#FF00FF": 0.0362,
+   "#8000FF": 0.0224,
+   "curve": 0.0169,
+   "#FF8000": 0.0089,
+   "#FFFFE8": 0.0082,
+   "#008000": 0.0081,
+   "#C0C0C0": 0.0077,
+   "#FF8040": 0.0074,
+   "#009B00": 0.0062,
+   "#0080FF": 0.0058,
+   "#007A33": 0.0046,
+   "#FFEB3B": 0.0046,
+   "#0033CC": 0.0046,
+   "#C8102E": 0.0044,
+   "#FFFFCC": 0.0037,
+   "#FBE0B4": 0.0035,
+   "#F2AF81": 0.0035,
+   "#3535FF": 0.0033,
+   "#400080": 0.0031,
+   "#63C9FA": 0.003,
+   "#D70500": 0.003,
+   "#FDCC22": 0.0029,
+   "#007DFB": 0.0029
+  },
+  "sizeByEffect": {
+   "Strobe": 1,
+   "VU Meter": 2,
+   "Color Wash": 2,
+   "Shockwave": 1,
+   "Pinwheel": 2,
+   "Twinkle": 2,
+   "Meteors": 2,
+   "Snowflakes": 1,
+   "Marquee": 2,
+   "Plasma": 3,
+   "Morph": 2,
+   "Lines": 2,
+   "Fire": 2,
+   "Off": 2,
+   "Fan": 2,
+   "Bars": 2,
+   "Spirals": 2,
+   "Butterfly": 3,
+   "SingleStrand": 2,
+   "Text": 1,
+   "Curtain": 2,
+   "On": 1,
+   "Wave": 2,
+   "Shader": 2,
+   "Galaxy": 3,
+   "Liquid": 1,
+   "Snowstorm": 4,
+   "Ripple": 2,
+   "Pictures": 2,
+   "Faces": 2,
+   "Tree": 2,
+   "Circles": 1,
+   "Fill": 2,
+   "Shape": 2,
+   "Garlands": 2,
+   "DMX": 1,
+   "Lightning": 1,
+   "Music Effect": 3,
+   "Tendril": 1,
+   "Fireworks": 3,
+   "Spirograph": 3,
+   "Video": 2,
+   "Life": 2,
+   "Shimmer": 1,
+   "Kaleidoscope": 2,
+   "State": 2,
+   "Warp": 1,
+   "Sketch": 1,
+   "Candle": 5,
+   "Moving Head": 1
+  }
+ },
+ "timing": {
+  "trackKinds": {
+   "other": 0.5439,
+   "beats": 0.1893,
+   "lyrics": 0.1193,
+   "bars": 0.0672,
+   "note onsets": 0.0473,
+   "fixed interval": 0.0178,
+   "sections": 0.0151
+  },
+  "startOnAnyTimingMark": 0.722,
+  "startOnBeat": 0.544,
+  "startOnHalfBeat": 0.126,
+  "startOnBar": 0.112,
+  "beatSampleSize": 242255,
+  "onsetVsEffectStartsCorrelation": {
+   "p10": -0.103,
+   "p25": -0.045,
+   "p50": 0.088,
+   "p75": 0.234,
+   "p90": 0.41
+  }
+ },
+ "structure": {
+  "activityByTenthOfSong": [
+   0.401,
+   0.464,
+   0.466,
+   0.469,
+   0.466,
+   0.472,
+   0.474,
+   0.468,
+   0.472,
+   0.361
+  ],
+  "litShareQuietPhrase": {
+   "p25": 0.111,
+   "p50": 0.237,
+   "p75": 0.46
+  },
+  "litShareBusyPhrase": {
+   "p25": 0.336,
+   "p50": 0.516,
+   "p75": 0.755
+  },
+  "busyOverQuietPhrase": {
+   "p25": 1.391,
+   "p50": 1.91,
+   "p75": 3.094
+  },
+  "concurrentEffectTypes": {
+   "p10": 2,
+   "p25": 3,
+   "p50": 5,
+   "p75": 7,
+   "p90": 9
+  },
+  "bigHitsPerMinute": {
+   "p10": 0,
+   "p25": 0,
+   "p50": 0,
+   "p75": 1.483,
+   "p90": 4.518
+  },
+  "bigHitEffects": {
+   "SingleStrand": 0.2735,
+   "Spirals": 0.1986,
+   "Shockwave": 0.1921,
+   "On": 0.0701,
+   "Ripple": 0.0576,
+   "Curtain": 0.0272,
+   "Morph": 0.0244,
+   "Pinwheel": 0.0195,
+   "Twinkle": 0.0164,
+   "Off": 0.0135,
+   "VU Meter": 0.0128,
+   "Color Wash": 0.0128
+  },
+  "sameEffectShareAtSharedStarts": {
+   "p10": 0.444,
+   "p25": 0.571,
+   "p50": 0.875,
+   "p75": 1,
+   "p90": 1
+  }
+ },
+ "intensity": {
+  "songs": 51,
+  "activeShareOfProps": {
+   "low": {
+    "p25": 0.155,
+    "p50": 0.298,
+    "p75": 0.571
+   },
+   "mid": {
+    "p25": 0.173,
+    "p50": 0.315,
+    "p75": 0.588
+   },
+   "high": {
+    "p25": 0.182,
+    "p50": 0.364,
+    "p75": 0.61
+   }
+  },
+  "durationBeats": {
+   "low": {
+    "p25": 0.75,
+    "p50": 1,
+    "p75": 4.05
+   },
+   "mid": {
+    "p25": 0.9,
+    "p50": 1,
+    "p75": 3.455
+   },
+   "high": {
+    "p25": 0.727,
+    "p50": 1,
+    "p75": 3.125
+   }
+  },
+  "effectShare": {
+   "low": {
+    "On": 0.3534,
+    "SingleStrand": 0.1058,
+    "Shockwave": 0.0553,
+    "Spirals": 0.0535,
+    "Pinwheel": 0.0345,
+    "Bars": 0.0336,
+    "VU Meter": 0.0282,
+    "Twinkle": 0.0278,
+    "Pictures": 0.0259,
+    "Morph": 0.0251,
+    "Faces": 0.0249,
+    "Circles": 0.0222,
+    "Color Wash": 0.0204,
+    "Text": 0.0163
+   },
+   "mid": {
+    "On": 0.3177,
+    "SingleStrand": 0.1535,
+    "Shockwave": 0.0787,
+    "Spirals": 0.0629,
+    "Bars": 0.0489,
+    "Pinwheel": 0.0384,
+    "Pictures": 0.037,
+    "Circles": 0.0222,
+    "Morph": 0.0191,
+    "Twinkle": 0.0174,
+    "VU Meter": 0.0167,
+    "Fan": 0.0141,
+    "Color Wash": 0.0127,
+    "Text": 0.0115
+   },
+   "high": {
+    "On": 0.3051,
+    "SingleStrand": 0.1501,
+    "Shockwave": 0.0752,
+    "Spirals": 0.0533,
+    "Pinwheel": 0.0365,
+    "Bars": 0.0356,
+    "Morph": 0.0304,
+    "Circles": 0.0265,
+    "Twinkle": 0.025,
+    "Pictures": 0.0224,
+    "Color Wash": 0.0184,
+    "VU Meter": 0.0178,
+    "Ripple": 0.015,
+    "Faces": 0.0146
+   }
+  },
+  "highVsLowLift": {
+   "State": 3.23,
+   "Life": 3,
+   "Kaleidoscope": 2.5,
+   "Music Effect": 2.31,
+   "Shader": 2.12,
+   "Tree": 1.79,
+   "Garlands": 1.52,
+   "Fire": 1.51,
+   "Ripple": 1.43,
+   "SingleStrand": 1.42,
+   "Fan": 1.39,
+   "Shockwave": 1.36,
+   "Butterfly": 1.31,
+   "Morph": 1.21,
+   "Circles": 1.19,
+   "Shape": 1.19,
+   "Moving Head": 1.18,
+   "Warp": 1.17,
+   "Meteors": 1.14,
+   "Sketch": 1.11,
+   "Liquid": 1.1,
+   "Wave": 1.08,
+   "Pinwheel": 1.06,
+   "Bars": 1.06,
+   "Spirals": 1,
+   "Curtain": 1,
+   "Fireworks": 1,
+   "Shimmer": 1,
+   "Twinkle": 0.9,
+   "Color Wash": 0.9,
+   "Plasma": 0.9,
+   "Lightning": 0.88,
+   "On": 0.86,
+   "Pictures": 0.86,
+   "Fill": 0.82,
+   "Tendril": 0.79,
+   "Marquee": 0.74,
+   "Text": 0.73,
+   "Off": 0.69,
+   "VU Meter": 0.63,
+   "Faces": 0.59,
+   "Snowflakes": 0.56,
+   "Galaxy": 0.5,
+   "Lines": 0.39,
+   "Strobe": 0.32,
+   "Video": 0.24,
+   "Spirograph": 0.16,
+   "DMX": 0
+  },
+  "byRole": {
+   "whole_house|low": {
+    "On": 0.3167,
+    "Twinkle": 0.0687,
+    "Shockwave": 0.0685,
+    "Pinwheel": 0.0603,
+    "Snowflakes": 0.0589,
+    "SingleStrand": 0.0545
+   },
+   "matrix|high": {
+    "Pictures": 0.1623,
+    "On": 0.1443,
+    "Text": 0.1173,
+    "Shape": 0.1007,
+    "Shockwave": 0.0997,
+    "SingleStrand": 0.0558
+   },
+   "matrix|mid": {
+    "Pictures": 0.2031,
+    "On": 0.1663,
+    "Text": 0.1216,
+    "Shockwave": 0.0537,
+    "SingleStrand": 0.0472,
+    "Shader": 0.0441
+   },
+   "arch|mid": {
+    "SingleStrand": 0.4108,
+    "On": 0.1163,
+    "Spirals": 0.0882,
+    "Bars": 0.0841,
+    "Morph": 0.0607,
+    "Shockwave": 0.0554
+   },
+   "pathway|mid": {
+    "Bars": 0.2814,
+    "On": 0.2423,
+    "SingleStrand": 0.1295,
+    "Spirals": 0.125,
+    "Twinkle": 0.0846,
+    "Wave": 0.025
+   },
+   "mini_tree|mid": {
+    "On": 0.2698,
+    "SingleStrand": 0.156,
+    "Spirals": 0.0877,
+    "Bars": 0.0571,
+    "Shockwave": 0.0509,
+    "Pinwheel": 0.0473
+   },
+   "mini_tree|low": {
+    "On": 0.3279,
+    "SingleStrand": 0.1103,
+    "Spirals": 0.0754,
+    "Shockwave": 0.0522,
+    "Wave": 0.0446,
+    "Morph": 0.0445
+   },
+   "mini_tree|high": {
+    "On": 0.2873,
+    "SingleStrand": 0.1424,
+    "Spirals": 0.0608,
+    "Morph": 0.0593,
+    "Pinwheel": 0.0566,
+    "Bars": 0.0462
+   },
+   "moving_head|high": {
+    "Moving Head": 0.6667,
+    "On": 0.3333
+   },
+   "whole_house|high": {
+    "On": 0.2067,
+    "SingleStrand": 0.1137,
+    "Shockwave": 0.0943,
+    "Pinwheel": 0.0785,
+    "Bars": 0.0728,
+    "Butterfly": 0.0468
+   },
+   "whole_house|mid": {
+    "On": 0.2443,
+    "SingleStrand": 0.108,
+    "Pinwheel": 0.0775,
+    "Garlands": 0.0625,
+    "Bars": 0.0559,
+    "Shockwave": 0.0521
+   },
+   "window|mid": {
+    "On": 0.2957,
+    "SingleStrand": 0.1999,
+    "Spirals": 0.1099,
+    "Shockwave": 0.0966,
+    "Morph": 0.0614,
+    "Pinwheel": 0.0568
+   },
+   "window|high": {
+    "On": 0.2784,
+    "SingleStrand": 0.1506,
+    "Shockwave": 0.071,
+    "Spirals": 0.0622,
+    "VU Meter": 0.0619,
+    "Pinwheel": 0.0541
+   },
+   "mega_tree|mid": {
+    "On": 0.3037,
+    "Spirals": 0.0927,
+    "SingleStrand": 0.0729,
+    "Bars": 0.07,
+    "Pictures": 0.0599,
+    "Pinwheel": 0.0459
+   },
+   "mega_tree|high": {
+    "On": 0.3197,
+    "SingleStrand": 0.0909,
+    "Morph": 0.0753,
+    "Spirals": 0.0508,
+    "Shockwave": 0.0491,
+    "Pinwheel": 0.0474
+   },
+   "snowflake|mid": {
+    "SingleStrand": 0.2101,
+    "On": 0.1753,
+    "Shockwave": 0.1166,
+    "Warp": 0.0645,
+    "Spirals": 0.0638,
+    "Fan": 0.0545
+   },
+   "snowflake|low": {
+    "On": 0.3234,
+    "Shockwave": 0.1257,
+    "SingleStrand": 0.1053,
+    "Twinkle": 0.072,
+    "Spirals": 0.0593,
+    "Shape": 0.0373
+   },
+   "snowflake|high": {
+    "SingleStrand": 0.2231,
+    "On": 0.1791,
+    "Shockwave": 0.1286,
+    "VU Meter": 0.0771,
+    "Spirals": 0.047,
+    "Color Wash": 0.0409
+   },
+   "wreath|low": {
+    "On": 0.4512,
+    "SingleStrand": 0.1287,
+    "Faces": 0.0984,
+    "Strobe": 0.0524,
+    "Music Effect": 0.0429,
+    "Fill": 0.0429
+   },
+   "wreath|mid": {
+    "On": 0.3969,
+    "SingleStrand": 0.1545,
+    "Faces": 0.0985,
+    "Fill": 0.0606,
+    "Music Effect": 0.0444,
+    "Strobe": 0.0417
+   },
+   "arch|low": {
+    "SingleStrand": 0.3923,
+    "On": 0.128,
+    "VU Meter": 0.0594,
+    "Spirals": 0.0587,
+    "Wave": 0.0489,
+    "Morph": 0.0431
+   },
+   "cane|mid": {
+    "Spirals": 0.1938,
+    "SingleStrand": 0.1529,
+    "VU Meter": 0.1471,
+    "On": 0.1284,
+    "Meteors": 0.0588,
+    "Fan": 0.0588
+   },
+   "cane|low": {
+    "On": 0.1679,
+    "Spirals": 0.1582,
+    "SingleStrand": 0.1448,
+    "VU Meter": 0.1126,
+    "Color Wash": 0.0991,
+    "Meteors": 0.0882
+   },
+   "moving_head|mid": {
+    "Moving Head": 0.6667,
+    "On": 0.3198,
+    "Shockwave": 0.0135
+   },
+   "moving_head|low": {
+    "Moving Head": 0.6667,
+    "On": 0.3125,
+    "Shockwave": 0.0208
+   },
+   "wreath|high": {
+    "On": 0.2854,
+    "SingleStrand": 0.2195,
+    "Faces": 0.1224,
+    "Fan": 0.0787,
+    "Pinwheel": 0.0552,
+    "Music Effect": 0.0513
+   },
+   "singing_face|mid": {
+    "On": 0.3436,
+    "Faces": 0.274,
+    "Shockwave": 0.0777,
+    "VU Meter": 0.0772,
+    "Fan": 0.0517,
+    "Spirals": 0.0337
+   },
+   "singing_face|high": {
+    "On": 0.3745,
+    "Faces": 0.3246,
+    "Shockwave": 0.0639,
+    "Fan": 0.0432,
+    "Spirals": 0.0309,
+    "Twinkle": 0.028
+   },
+   "singing_face|low": {
+    "Faces": 0.3919,
+    "On": 0.3286,
+    "VU Meter": 0.0588,
+    "Spirals": 0.0487,
+    "Fan": 0.0381,
+    "Twinkle": 0.0268
+   },
+   "pathway|high": {
+    "SingleStrand": 0.2915,
+    "Meteors": 0.1515,
+    "Marquee": 0.0931,
+    "Spirals": 0.0909,
+    "On": 0.0566,
+    "Twinkle": 0.049
+   },
+   "pathway|low": {
+    "On": 0.2724,
+    "Spirals": 0.1563,
+    "SingleStrand": 0.0953,
+    "Music Effect": 0.086,
+    "Marquee": 0.0855,
+    "Wave": 0.0535
+   },
+   "icicle|mid": {
+    "On": 0.3616,
+    "Twinkle": 0.2047,
+    "Bars": 0.1533,
+    "Spirals": 0.1353,
+    "Meteors": 0.0445,
+    "SingleStrand": 0.0366
+   },
+   "icicle|high": {
+    "On": 0.5715,
+    "Spirals": 0.1267,
+    "Bars": 0.0517,
+    "Fill": 0.05,
+    "SingleStrand": 0.0485,
+    "Pinwheel": 0.0427
+   },
+   "icicle|low": {
+    "On": 0.3641,
+    "SingleStrand": 0.3077,
+    "Spirals": 0.0956,
+    "Snowflakes": 0.0769,
+    "Bars": 0.0491,
+    "Fill": 0.0308
+   },
+   "matrix|low": {
+    "Pictures": 0.179,
+    "Text": 0.1332,
+    "Video": 0.0886,
+    "SingleStrand": 0.0769,
+    "On": 0.0645,
+    "Shockwave": 0.0564
+   },
+   "cane|high": {
+    "Spirals": 0.2326,
+    "SingleStrand": 0.1912,
+    "On": 0.1514,
+    "Color Wash": 0.0907,
+    "Butterfly": 0.0556,
+    "Shockwave": 0.0422
+   },
+   "mega_tree|low": {
+    "On": 0.2701,
+    "Spirals": 0.0708,
+    "Shockwave": 0.067,
+    "Pinwheel": 0.064,
+    "Bars": 0.0571,
+    "SingleStrand": 0.052
+   },
+   "arch|high": {
+    "SingleStrand": 0.4654,
+    "On": 0.0643,
+    "Morph": 0.0553,
+    "Shockwave": 0.0523,
+    "Spirals": 0.0496,
+    "Twinkle": 0.0466
+   },
+   "character|mid": {
+    "On": 0.5604,
+    "Bars": 0.1487,
+    "SingleStrand": 0.1375,
+    "Strobe": 0.0625,
+    "Wave": 0.0412,
+    "Curtain": 0.0139
+   },
+   "character|low": {
+    "On": 0.5742,
+    "Bars": 0.1121,
+    "SingleStrand": 0.1054,
+    "Twinkle": 0.0743,
+    "Strobe": 0.0588,
+    "Pictures": 0.0294
+   },
+   "star|low": {
+    "On": 0.2075,
+    "VU Meter": 0.1174,
+    "SingleStrand": 0.1055,
+    "Shockwave": 0.0719,
+    "Color Wash": 0.0639,
+    "Butterfly": 0.0623
+   },
+   "outline|low": {
+    "On": 0.3782,
+    "SingleStrand": 0.197,
+    "Twinkle": 0.0764,
+    "Bars": 0.0712,
+    "VU Meter": 0.0583,
+    "Color Wash": 0.0407
+   },
+   "window|low": {
+    "On": 0.2492,
+    "SingleStrand": 0.1334,
+    "Pinwheel": 0.0852,
+    "Fire": 0.0682,
+    "VU Meter": 0.0662,
+    "Spirals": 0.0643
+   },
+   "outline|high": {
+    "On": 0.3732,
+    "SingleStrand": 0.2143,
+    "Twinkle": 0.0753,
+    "Bars": 0.0443,
+    "Color Wash": 0.0333,
+    "Morph": 0.0326
+   },
+   "outline|mid": {
+    "On": 0.3455,
+    "SingleStrand": 0.186,
+    "Bars": 0.1123,
+    "Twinkle": 0.0607,
+    "Garlands": 0.0418,
+    "Color Wash": 0.0397
+   },
+   "bush|low": {
+    "On": 0.7582,
+    "Twinkle": 0.128,
+    "Morph": 0.0517,
+    "Shockwave": 0.0165,
+    "Meteors": 0.0146,
+    "SingleStrand": 0.0146
+   },
+   "bush|high": {
+    "On": 0.7193,
+    "Twinkle": 0.1359,
+    "Fill": 0.0549,
+    "Garlands": 0.0417,
+    "Morph": 0.0163,
+    "SingleStrand": 0.016
+   },
+   "bush|mid": {
+    "On": 0.7134,
+    "Twinkle": 0.1138,
+    "Morph": 0.0519,
+    "Bars": 0.0457,
+    "SingleStrand": 0.0309,
+    "Fill": 0.0259
+   },
+   "spinner|low": {
+    "SingleStrand": 0.2169,
+    "On": 0.1443,
+    "Spirals": 0.1257,
+    "Butterfly": 0.0835,
+    "Fan": 0.0769,
+    "Shockwave": 0.0636
+   },
+   "spinner|high": {
+    "SingleStrand": 0.2779,
+    "Fan": 0.1667,
+    "Spirals": 0.1111,
+    "Pinwheel": 0.1037,
+    "On": 0.0954,
+    "Shockwave": 0.0523
+   },
+   "spinner|mid": {
+    "SingleStrand": 0.2392,
+    "Fan": 0.1685,
+    "On": 0.1346,
+    "Spirals": 0.1302,
+    "Pinwheel": 0.0826,
+    "Shockwave": 0.0739
+   },
+   "star|high": {
+    "On": 0.1781,
+    "SingleStrand": 0.137,
+    "Shockwave": 0.101,
+    "VU Meter": 0.0975,
+    "Color Wash": 0.0772,
+    "Circles": 0.0526
+   },
+   "star|mid": {
+    "SingleStrand": 0.1878,
+    "Shockwave": 0.1487,
+    "On": 0.1204,
+    "Color Wash": 0.0775,
+    "Bars": 0.0694,
+    "Fire": 0.0556
+   },
+   "flood|low": {
+    "On": 0.3375,
+    "Color Wash": 0.1086,
+    "VU Meter": 0.1069,
+    "SingleStrand": 0.094,
+    "Plasma": 0.0667,
+    "Shockwave": 0.0531
+   },
+   "flood|high": {
+    "On": 0.3037,
+    "Color Wash": 0.2568,
+    "Shockwave": 0.1772,
+    "VU Meter": 0.0997,
+    "Wave": 0.0439,
+    "SingleStrand": 0.0227
+   },
+   "other|low": {
+    "On": 0.3072,
+    "Pinwheel": 0.1287,
+    "Bars": 0.0994,
+    "Shockwave": 0.0922,
+    "SingleStrand": 0.0362,
+    "Shape": 0.0257
+   },
+   "other|mid": {
+    "On": 0.2997,
+    "Bars": 0.128,
+    "Pinwheel": 0.1065,
+    "Shockwave": 0.0752,
+    "SingleStrand": 0.0579,
+    "Pictures": 0.0578
+   },
+   "other|high": {
+    "On": 0.3195,
+    "SingleStrand": 0.0857,
+    "Bars": 0.0625,
+    "Pinwheel": 0.0616,
+    "Shockwave": 0.0596,
+    "VU Meter": 0.0511
+   },
+   "character|high": {
+    "On": 0.5509,
+    "Bars": 0.149,
+    "SingleStrand": 0.125,
+    "Twinkle": 0.0799,
+    "Curtain": 0.0356,
+    "Butterfly": 0.0292
+   }
+  }
+ },
+ "nextEffect": {
+  "Strobe": {
+   "Strobe": 0.6139,
+   "On": 0.0703,
+   "Shockwave": 0.051,
+   "Pinwheel": 0.0301,
+   "Off": 0.0247,
+   "Wave": 0.0232
+  },
+  "VU Meter": {
+   "VU Meter": 0.6024,
+   "On": 0.0974,
+   "SingleStrand": 0.0635,
+   "Pinwheel": 0.0313,
+   "Shockwave": 0.0284,
+   "Fan": 0.0238
+  },
+  "Color Wash": {
+   "Color Wash": 0.8345,
+   "On": 0.0303,
+   "SingleStrand": 0.0209,
+   "Garlands": 0.0178,
+   "Shockwave": 0.0102,
+   "Spirals": 0.0102
+  },
+  "Shockwave": {
+   "Shockwave": 0.9294,
+   "SingleStrand": 0.0161,
+   "Curtain": 0.0086,
+   "On": 0.008,
+   "Pinwheel": 0.007,
+   "Morph": 0.0026
+  },
+  "Pinwheel": {
+   "Pinwheel": 0.7287,
+   "SingleStrand": 0.0395,
+   "Spirals": 0.038,
+   "Shockwave": 0.028,
+   "Morph": 0.0143,
+   "On": 0.014
+  },
+  "Twinkle": {
+   "Twinkle": 0.6408,
+   "On": 0.0521,
+   "SingleStrand": 0.0501,
+   "Shockwave": 0.0364,
+   "Meteors": 0.0199,
+   "Strobe": 0.0168
+  },
+  "Meteors": {
+   "Meteors": 0.5463,
+   "Garlands": 0.0671,
+   "Spirals": 0.043,
+   "Pinwheel": 0.0322,
+   "Shockwave": 0.0302,
+   "Twinkle": 0.0235
+  },
+  "Snowflakes": {
+   "Snowflakes": 0.4184,
+   "SingleStrand": 0.0723,
+   "On": 0.0518,
+   "Strobe": 0.0479,
+   "Spirals": 0.0391,
+   "Color Wash": 0.0323
+  },
+  "Plasma": {
+   "Plasma": 0.5749,
+   "Bars": 0.049,
+   "Garlands": 0.0303,
+   "SingleStrand": 0.0288,
+   "Color Wash": 0.0245,
+   "Ripple": 0.0231
+  },
+  "Morph": {
+   "Morph": 0.8297,
+   "SingleStrand": 0.0291,
+   "Spirals": 0.0196,
+   "Pinwheel": 0.0145,
+   "Shockwave": 0.014,
+   "Lines": 0.0126
+  },
+  "Lines": {
+   "Candle": 0.4211,
+   "Lines": 0.1842,
+   "Spirals": 0.114,
+   "SingleStrand": 0.0439,
+   "On": 0.0263,
+   "Wave": 0.0263
+  },
+  "Fire": {
+   "Fire": 0.3342,
+   "VU Meter": 0.0653,
+   "On": 0.0628,
+   "Pinwheel": 0.0503,
+   "Wave": 0.0427,
+   "Shockwave": 0.0377
+  },
+  "Off": {
+   "Off": 0.5137,
+   "Butterfly": 0.2675,
+   "SingleStrand": 0.0361,
+   "Bars": 0.0274,
+   "Shockwave": 0.0222,
+   "On": 0.0214
+  },
+  "Marquee": {
+   "Marquee": 0.5623,
+   "Snowstorm": 0.0874,
+   "SingleStrand": 0.0774,
+   "Bars": 0.0454,
+   "Spirals": 0.0298,
+   "On": 0.0281
+  },
+  "Fan": {
+   "Fan": 0.6992,
+   "SingleStrand": 0.0359,
+   "On": 0.0341,
+   "VU Meter": 0.0291,
+   "Spirals": 0.0284,
+   "Pinwheel": 0.0201
+  },
+  "Bars": {
+   "Bars": 0.7385,
+   "SingleStrand": 0.0422,
+   "On": 0.026,
+   "Butterfly": 0.0251,
+   "Spirals": 0.0217,
+   "Twinkle": 0.018
+  },
+  "Butterfly": {
+   "Butterfly": 0.4583,
+   "Off": 0.2592,
+   "Bars": 0.05,
+   "On": 0.0433,
+   "SingleStrand": 0.0242,
+   "Marquee": 0.0178
+  },
+  "Spirals": {
+   "Spirals": 0.8429,
+   "SingleStrand": 0.0275,
+   "Pinwheel": 0.0169,
+   "Morph": 0.0129,
+   "Bars": 0.0101,
+   "Ripple": 0.0085
+  },
+  "SingleStrand": {
+   "SingleStrand": 0.9226,
+   "Shockwave": 0.01,
+   "On": 0.0093,
+   "Spirals": 0.0065,
+   "Bars": 0.0062,
+   "Pinwheel": 0.0061
+  },
+  "Curtain": {
+   "Curtain": 0.8313,
+   "Shockwave": 0.0523,
+   "SingleStrand": 0.0292,
+   "On": 0.0143,
+   "Galaxy": 0.0139,
+   "Spirals": 0.0138
+  },
+  "On": {
+   "On": 0.941,
+   "SingleStrand": 0.0101,
+   "Ripple": 0.0057,
+   "Shockwave": 0.0048,
+   "VU Meter": 0.0046,
+   "Color Wash": 0.004
+  },
+  "Wave": {
+   "Wave": 0.6679,
+   "SingleStrand": 0.0454,
+   "Spirals": 0.0342,
+   "Pinwheel": 0.0338,
+   "Bars": 0.0245,
+   "Shockwave": 0.0181
+  },
+  "Shader": {
+   "Shader": 0.654,
+   "Bars": 0.065,
+   "Pinwheel": 0.038,
+   "Color Wash": 0.0281,
+   "SingleStrand": 0.0259,
+   "On": 0.0215
+  },
+  "Galaxy": {
+   "Galaxy": 0.4592,
+   "Curtain": 0.1148,
+   "Spirals": 0.0442,
+   "On": 0.0364,
+   "SingleStrand": 0.0353,
+   "Shockwave": 0.0342
+  },
+  "Liquid": {
+   "Liquid": 0.5496,
+   "Shockwave": 0.0431,
+   "Spirals": 0.0366,
+   "On": 0.0345,
+   "Galaxy": 0.0323,
+   "Ripple": 0.0302
+  },
+  "Snowstorm": {
+   "Snowstorm": 0.26,
+   "Marquee": 0.1815,
+   "SingleStrand": 0.1675,
+   "Curtain": 0.1326,
+   "Bars": 0.1082,
+   "On": 0.0314
+  },
+  "Pictures": {
+   "Pictures": 0.7963,
+   "Text": 0.0372,
+   "Pinwheel": 0.0149,
+   "Video": 0.0122,
+   "Spirals": 0.01,
+   "Shockwave": 0.0098
+  },
+  "Faces": {
+   "Faces": 0.9557,
+   "State": 0.0129,
+   "Pictures": 0.0058,
+   "Video": 0.0043,
+   "Text": 0.0031,
+   "Music Effect": 0.0025
+  },
+  "Tree": {
+   "Tree": 0.5844,
+   "Pinwheel": 0.1394,
+   "SingleStrand": 0.0588,
+   "Color Wash": 0.0307,
+   "Spirals": 0.0294,
+   "Fan": 0.0141
+  },
+  "Circles": {
+   "Circles": 0.8216,
+   "Pinwheel": 0.0253,
+   "Shockwave": 0.0124,
+   "Wave": 0.0124,
+   "Morph": 0.0118,
+   "SingleStrand": 0.0091
+  },
+  "Fill": {
+   "Fill": 0.7029,
+   "On": 0.0774,
+   "Off": 0.0487,
+   "Bars": 0.03,
+   "SingleStrand": 0.0243,
+   "Spirals": 0.0225
+  },
+  "Text": {
+   "Text": 0.8144,
+   "Pictures": 0.0852,
+   "Video": 0.0102,
+   "Pinwheel": 0.0082,
+   "Shape": 0.0082,
+   "Marquee": 0.0066
+  },
+  "Shape": {
+   "Shape": 0.4563,
+   "Spirals": 0.0682,
+   "Pictures": 0.0612,
+   "Pinwheel": 0.0367,
+   "Wave": 0.028,
+   "Liquid": 0.028
+  },
+  "Garlands": {
+   "Garlands": 0.7129,
+   "Color Wash": 0.0436,
+   "SingleStrand": 0.0408,
+   "Bars": 0.0302,
+   "Meteors": 0.0249,
+   "Spirals": 0.0193
+  },
+  "DMX": {
+   "DMX": 1
+  },
+  "Lightning": {
+   "Lightning": 0.5794,
+   "Shockwave": 0.0754,
+   "On": 0.0317,
+   "Ripple": 0.0238,
+   "Curtain": 0.0159,
+   "SingleStrand": 0.0159
+  },
+  "Music Effect": {
+   "Music Effect": 0.4529,
+   "Morph": 0.0588,
+   "Shockwave": 0.0559,
+   "Meteors": 0.0559,
+   "Bars": 0.05,
+   "Faces": 0.0382
+  },
+  "Tendril": {
+   "Tendril": 0.4207,
+   "Wave": 0.0759,
+   "Pictures": 0.0483,
+   "Pinwheel": 0.0483,
+   "VU Meter": 0.0414,
+   "Color Wash": 0.0414
+  },
+  "Ripple": {
+   "Ripple": 0.885,
+   "On": 0.0265,
+   "SingleStrand": 0.0255,
+   "Pinwheel": 0.0102,
+   "Shockwave": 0.0092,
+   "Spirals": 0.0069
+  },
+  "Fireworks": {
+   "Fireworks": 0.2035,
+   "Spirals": 0.115,
+   "Ripple": 0.0796,
+   "Pictures": 0.0796,
+   "On": 0.0708,
+   "SingleStrand": 0.0354
+  },
+  "Spirograph": {
+   "Spirograph": 0.6324,
+   "Meteors": 0.0672,
+   "Spirals": 0.0593,
+   "Strobe": 0.0356,
+   "VU Meter": 0.0237,
+   "Pictures": 0.0198
+  },
+  "Life": {
+   "Life": 0.5931,
+   "Fan": 0.1136,
+   "On": 0.0568,
+   "Curtain": 0.0284,
+   "Morph": 0.0284,
+   "Ripple": 0.0189
+  },
+  "Video": {
+   "Video": 0.6493,
+   "Pictures": 0.069,
+   "Text": 0.0373,
+   "Faces": 0.0243,
+   "Snowflakes": 0.0224,
+   "SingleStrand": 0.0205
+  },
+  "Kaleidoscope": {
+   "Kaleidoscope": 0.3137,
+   "Warp": 0.1275,
+   "Wave": 0.0686,
+   "SingleStrand": 0.0588,
+   "Shockwave": 0.049,
+   "Snowflakes": 0.049
+  },
+  "Shimmer": {
+   "Shimmer": 0.6644,
+   "On": 0.0966,
+   "Shader": 0.0253,
+   "Fan": 0.0253,
+   "Twinkle": 0.023,
+   "Bars": 0.0184
+  },
+  "Warp": {
+   "Warp": 0.8159,
+   "SingleStrand": 0.0244,
+   "Spirals": 0.0191,
+   "Wave": 0.0143,
+   "Pinwheel": 0.0125,
+   "Shockwave": 0.0119
+  },
+  "Sketch": {
+   "Sketch": 0.3721,
+   "VU Meter": 0.1163,
+   "Morph": 0.0698,
+   "SingleStrand": 0.0698,
+   "Galaxy": 0.0698,
+   "Pinwheel": 0.0465
+  },
+  "State": {
+   "State": 0.915,
+   "Faces": 0.0629,
+   "Shape": 0.0102,
+   "SingleStrand": 0.0051,
+   "On": 0.0051,
+   "Bars": 0.0017
+  },
+  "Moving Head": {
+   "Moving Head": 1
+  },
+  "Candle": {
+   "Morph": 0.7767,
+   "Candle": 0.0777,
+   "Shockwave": 0.0388,
+   "Circles": 0.0194,
+   "Music Effect": 0.0194,
+   "Meteors": 0.0097
+  }
+ },
+ "style": {
+  "signatureEffectShare": {
+   "p10": 0.217,
+   "p25": 0.303,
+   "p50": 0.408,
+   "p75": 0.596,
+   "p90": 0.759
+  },
+  "distinctEffectsCovering90pct": {
+   "p10": 2,
+   "p25": 4,
+   "p50": 6,
+   "p75": 9,
+   "p90": 12
+  },
+  "identicalRepeatRunLength": {
+   "p50": 1,
+   "p75": 1,
+   "p90": 2,
+   "p99": 16
+  },
+  "layersByRole": {
+   "whole_house": {
+    "p50": 1,
+    "p90": 4
+   },
+   "flood": {
+    "p50": 1,
+    "p90": 2
+   },
+   "wreath": {
+    "p50": 1,
+    "p90": 3
+   },
+   "window": {
+    "p50": 1,
+    "p90": 3
+   },
+   "bush": {
+    "p50": 1,
+    "p90": 1
+   },
+   "star": {
+    "p50": 1,
+    "p90": 3
+   },
+   "cane": {
+    "p50": 1,
+    "p90": 3
+   },
+   "snowflake": {
+    "p50": 1,
+    "p90": 3
+   },
+   "mini_tree": {
+    "p50": 1,
+    "p90": 5
+   },
+   "outline": {
+    "p50": 1,
+    "p90": 3
+   },
+   "pathway": {
+    "p50": 1,
+    "p90": 3
+   },
+   "mega_tree": {
+    "p50": 2,
+    "p90": 7
+   },
+   "matrix": {
+    "p50": 2,
+    "p90": 6
+   },
+   "arch": {
+    "p50": 1,
+    "p90": 3
+   },
+   "other": {
+    "p50": 1,
+    "p90": 3
+   },
+   "singing_face": {
+    "p50": 2,
+    "p90": 4
+   },
+   "present": {
+    "p50": 1,
+    "p90": 2
+   },
+   "spinner": {
+    "p50": 1,
+    "p90": 6
+   },
+   "moving_head": {
+    "p50": 1,
+    "p90": 2
+   },
+   "icicle": {
+    "p50": 1,
+    "p90": 4
+   },
+   "character": {
+    "p50": 1,
+    "p90": 6
+   }
+  },
+  "beatAlignmentPerSong": {
+   "p10": 0.123,
+   "p25": 0.26,
+   "p50": 0.453,
+   "p75": 0.72,
+   "p90": 0.9
+  },
+  "beatAlignmentByTempo": {
+   "0-90bpm": {
+    "p25": 0.085,
+    "p50": 0.264,
+    "p75": 0.443
+   },
+   "90-120bpm": {
+    "p25": 0.302,
+    "p50": 0.522,
+    "p75": 0.755
+   },
+   "120-bpm": {
+    "p25": 0.269,
+    "p50": 0.485,
+    "p75": 0.748
+   }
+  }
+ },
+ "cyclesPerBeat": {
+  "Spirals": {
+   "E_SLIDER_Spirals_Rotation": {
+    "p25": 4.938,
+    "p50": 15,
+    "p75": 27.273
+   },
+   "E_TEXTCTRL_Spirals_Movement": {
+    "p25": 0.247,
+    "p50": 0.5,
+    "p75": 1
+   }
+  },
+  "SingleStrand": {
+   "E_TEXTCTRL_Chase_Rotations": {
+    "p25": 0.471,
+    "p50": 0.792,
+    "p75": 1
+   }
+  },
+  "Shockwave": {
+   "E_SLIDER_Shockwave_Cycles": {
+    "p25": 0.571,
+    "p50": 1,
+    "p75": 2
+   }
+  },
+  "Garlands": {
+   "E_TEXTCTRL_Garlands_Cycles": {
+    "p25": 0.474,
+    "p50": 3.75,
+    "p75": 4
+   }
+  },
+  "Tendril": {
+   "E_TEXTCTRL_Tendril_TuneMovement": {
+    "p25": 0.879,
+    "p50": 1.481,
+    "p75": 3.6
+   }
+  },
+  "Ripple": {
+   "E_TEXTCTRL_Ripple_Cycles": {
+    "p25": 0.444,
+    "p50": 1,
+    "p75": 1.143
+   },
+   "E_SLIDER_Ripple_Rotation": {
+    "p25": 32.4,
+    "p50": 126.9,
+    "p75": 126.9
+   }
+  },
+  "Color Wash": {
+   "E_TEXTCTRL_ColorWash_Cycles": {
+    "p25": 0.189,
+    "p50": 0.39,
+    "p75": 1
+   },
+   "E_TEXTCTRL_Chase_Rotations": {
+    "p25": 1.714,
+    "p50": 1.8,
+    "p75": 1.8
+   }
+  },
+  "Bars": {
+   "E_TEXTCTRL_Bars_Cycles": {
+    "p25": 0.314,
+    "p50": 0.548,
+    "p75": 1
+   }
+  },
+  "On": {
+   "E_TEXTCTRL_On_Cycles": {
+    "p25": 0.486,
+    "p50": 1.5,
+    "p75": 2.903
+   },
+   "E_TEXTCTRL_Eff_On_Cycles": {
+    "p25": 1.818,
+    "p50": 1.818,
+    "p75": 2
+   }
+  },
+  "Fire": {
+   "E_TEXTCTRL_Fire_GrowthCycles": {
+    "p25": 0.214,
+    "p50": 0.41,
+    "p75": 0.925
+   }
+  },
+  "Shimmer": {
+   "E_TEXTCTRL_Shimmer_Cycles": {
+    "p25": 0.5,
+    "p50": 2.25,
+    "p75": 6.75
+   }
+  },
+  "Shader": {
+   "E_SLIDER_SHADERXYZZY_Rotation": {
+    "p25": 8.621,
+    "p50": 16.667,
+    "p75": 16.883
+   }
+  },
+  "Kaleidoscope": {
+   "E_SLIDER_Kaleidoscope_Rotation": {
+    "p25": 2.346,
+    "p50": 3.517,
+    "p75": 8.936
+   }
+  },
+  "Moving Head": {
+   "E_SLIDER_MHCycles": {
+    "p25": 1.667,
+    "p50": 2.469,
+    "p75": 4.5
+   }
+  },
+  "Shape": {}
+ },
+ "durationBeatsByTempo": {
+  "0-100bpm": {
+   "p10": 0.421,
+   "p25": 0.615,
+   "p50": 1.028,
+   "p75": 2.077,
+   "p90": 6
+  },
+  "100-130bpm": {
+   "p10": 0.45,
+   "p25": 0.7,
+   "p50": 1,
+   "p75": 2.2,
+   "p90": 6.636
+  },
+  "130-bpm": {
+   "p10": 0.471,
+   "p25": 1,
+   "p50": 1.778,
+   "p75": 4.125,
+   "p90": 13.278
+  }
+ },
+ "parameterPresets": {
+  "Strobe": {
+   "E_CHECKBOX_Strobe_Music": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Number_Strobes": {
+    "type": "number",
+    "p10": 2,
+    "p25": 3,
+    "p50": 3,
+    "p75": 90,
+    "p90": 300
+   },
+   "E_SLIDER_Strobe_Duration": {
+    "type": "number",
+    "p10": 3,
+    "p25": 8,
+    "p50": 10,
+    "p75": 10,
+    "p90": 11
+   },
+   "E_SLIDER_Strobe_Type": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 3
+   }
+  },
+  "VU Meter": {
+   "E_CHECKBOX_Regex": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHOICE_VUMeter_Type": {
+    "type": "choice",
+    "shares": {
+     "Timing Event Color": 0.1525,
+     "Timing Event Alternate Timed Sweep 2": 0.098,
+     "Timing Event Alternate Timed Sweep": 0.0946,
+     "Pulse": 0.0876,
+     "Timing Event Pulse": 0.0817,
+     "Timing Event Pulse Color": 0.0631
+    }
+   },
+   "E_SLIDER_VUMeter_Bars": {
+    "type": "number",
+    "p10": 5,
+    "p25": 6,
+    "p50": 6,
+    "p75": 12,
+    "p90": 46
+   },
+   "E_SLIDER_VUMeter_Gain": {
+    "type": "number",
+    "p10": -12,
+    "p25": 0,
+    "p50": 0,
+    "p75": 15,
+    "p90": 54
+   },
+   "E_SLIDER_VUMeter_Sensitivity": {
+    "type": "number",
+    "p10": 70,
+    "p25": 70,
+    "p50": 70,
+    "p75": 70,
+    "p90": 70
+   }
+  },
+  "Color Wash": {
+   "E_TEXTCTRL_ColorWash_Cycles": {
+    "type": "number",
+    "p10": 0.5,
+    "p25": 1,
+    "p50": 2,
+    "p75": 6,
+    "p90": 8.6
+   },
+   "E_CHECKBOX_ColorWash_HFade": {
+    "type": "number",
+    "p10": 0,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_ColorWash_VFade": {
+    "type": "number",
+    "p10": 0,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   }
+  },
+  "Shockwave": {
+   "E_CHECKBOX_Shockwave_Blend_Edges": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_NOTEBOOK_Shockwave": {
+    "type": "choice",
+    "shares": {
+     "Position": 0.9819,
+     "Options": 0.0181
+    }
+   },
+   "E_SLIDER_Shockwave_Accel": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Shockwave_CenterX": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Shockwave_CenterY": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Shockwave_End_Radius": {
+    "type": "number",
+    "p10": 0,
+    "p25": 16,
+    "p50": 55,
+    "p75": 100,
+    "p90": 207
+   },
+   "E_SLIDER_Shockwave_End_Width": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 30,
+    "p75": 85,
+    "p90": 125
+   },
+   "E_SLIDER_Shockwave_Start_Radius": {
+    "type": "number",
+    "p10": 0,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_SLIDER_Shockwave_Start_Width": {
+    "type": "number",
+    "p10": 0,
+    "p25": 5,
+    "p50": 5,
+    "p75": 34,
+    "p90": 64
+   },
+   "E_CHECKBOX_Shockwave_Scale": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_SLIDER_Shockwave_Cycles": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   }
+  },
+  "Pinwheel": {
+   "E_CHECKBOX_Pinwheel_Rotation": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHOICE_Pinwheel_3D": {
+    "type": "choice",
+    "shares": {
+     "None": 0.5989,
+     "3D": 0.3037,
+     "3D Inverted": 0.055,
+     "Sweep": 0.0423
+    }
+   },
+   "E_CHOICE_Pinwheel_Style": {
+    "type": "choice",
+    "shares": {
+     "New Render Method": 0.9813,
+     "Old Render Method": 0.0187
+    }
+   },
+   "E_SLIDER_PinwheelXC": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_PinwheelYC": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Pinwheel_ArmSize": {
+    "type": "number",
+    "p10": 100,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 213
+   },
+   "E_SLIDER_Pinwheel_Arms": {
+    "type": "number",
+    "p10": 3,
+    "p25": 3,
+    "p50": 4,
+    "p75": 6,
+    "p90": 8
+   },
+   "E_SLIDER_Pinwheel_Offset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Pinwheel_Speed": {
+    "type": "number",
+    "p10": 4,
+    "p25": 8,
+    "p50": 10,
+    "p75": 10,
+    "p90": 20
+   },
+   "E_SLIDER_Pinwheel_Thickness": {
+    "type": "number",
+    "p10": 3,
+    "p25": 20,
+    "p50": 40,
+    "p75": 64,
+    "p90": 100
+   },
+   "E_SLIDER_Pinwheel_Twist": {
+    "type": "number",
+    "p10": -91,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 155
+   }
+  },
+  "Twinkle": {
+   "E_CHECKBOX_Twinkle_ReRandom": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Twinkle_Strobe": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHOICE_Twinkle_Style": {
+    "type": "choice",
+    "shares": {
+     "New Render Method": 0.8325,
+     "Old Render Method": 0.1675
+    }
+   },
+   "E_SLIDER_Twinkle_Count": {
+    "type": "number",
+    "p10": 5,
+    "p25": 20,
+    "p50": 35,
+    "p75": 74,
+    "p90": 100
+   },
+   "E_SLIDER_Twinkle_Steps": {
+    "type": "number",
+    "p10": 11,
+    "p25": 30,
+    "p50": 30,
+    "p75": 40,
+    "p90": 75
+   }
+  },
+  "Meteors": {
+   "E_CHECKBOX_Meteors_UseMusic": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHOICE_Meteors_Effect": {
+    "type": "choice",
+    "shares": {
+     "Down": 0.6514,
+     "Up": 0.1238,
+     "Explode": 0.1023,
+     "Left": 0.0378,
+     "Right": 0.0331,
+     "Implode": 0.0221
+    }
+   },
+   "E_CHOICE_Meteors_Type": {
+    "type": "choice",
+    "shares": {
+     "Palette": 0.81,
+     "Rainbow": 0.0965,
+     "Range": 0.0936
+    }
+   },
+   "E_SLIDER_Meteors_Count": {
+    "type": "number",
+    "p10": 7,
+    "p25": 10,
+    "p50": 10,
+    "p75": 34,
+    "p90": 76
+   },
+   "E_SLIDER_Meteors_Length": {
+    "type": "number",
+    "p10": 13,
+    "p25": 25,
+    "p50": 25,
+    "p75": 25,
+    "p90": 57
+   },
+   "E_SLIDER_Meteors_Speed": {
+    "type": "number",
+    "p10": 7,
+    "p25": 10,
+    "p50": 10,
+    "p75": 21,
+    "p90": 40
+   },
+   "E_SLIDER_Meteors_Swirl_Intensity": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 12
+   },
+   "E_SLIDER_Meteors_WamupFrames": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 20
+   },
+   "E_TEXTCTRL_Meteors_XOffset": {
+    "type": "number",
+    "p10": -2,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Meteors_YOffset": {
+    "type": "number",
+    "p10": -28,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Snowflakes": {
+   "E_CHOICE_Falling": {
+    "type": "choice",
+    "shares": {
+     "Driving": 0.7603,
+     "Falling": 0.1506,
+     "Falling &amp; Accumulating": 0.0891
+    }
+   },
+   "E_SLIDER_Snowflakes_Count": {
+    "type": "number",
+    "p10": 5,
+    "p25": 6,
+    "p50": 22,
+    "p75": 80,
+    "p90": 100
+   },
+   "E_SLIDER_Snowflakes_Speed": {
+    "type": "number",
+    "p10": 5,
+    "p25": 10,
+    "p50": 10,
+    "p75": 15,
+    "p90": 15
+   },
+   "E_SLIDER_Snowflakes_Type": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 2,
+    "p75": 2,
+    "p90": 5
+   },
+   "E_SLIDER_Snowflakes_WarmupFrames": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Marquee": {
+   "E_CHECKBOX_Marquee_PixelOffsets": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Marquee_Reverse": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHECKBOX_Marquee_WrapX": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Marquee_WrapY": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_NOTEBOOK_Marquee": {
+    "type": "choice",
+    "shares": {
+     "Settings": 0.9496,
+     "Position": 0.0504
+    }
+   },
+   "E_SLIDER_MarqueeXC": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_MarqueeYC": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Marquee_Band_Size": {
+    "type": "number",
+    "p10": 2,
+    "p25": 3,
+    "p50": 3,
+    "p75": 20,
+    "p90": 39
+   },
+   "E_SLIDER_Marquee_ScaleX": {
+    "type": "number",
+    "p10": 100,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Marquee_ScaleY": {
+    "type": "number",
+    "p10": 100,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Marquee_Skip_Size": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 5,
+    "p75": 15,
+    "p90": 38
+   },
+   "E_SLIDER_Marquee_Speed": {
+    "type": "number",
+    "p10": 3,
+    "p25": 3,
+    "p50": 3,
+    "p75": 7,
+    "p90": 15
+   },
+   "E_SLIDER_Marquee_Stagger": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 5,
+    "p90": 29
+   },
+   "E_SLIDER_Marquee_Start": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 48
+   },
+   "E_SLIDER_Marquee_Thickness": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 35,
+    "p90": 53
+   }
+  },
+  "Plasma": {
+   "E_CHOICE_Plasma_Color": {
+    "type": "choice",
+    "shares": {
+     "Normal": 0.8973,
+     "Preset Colors 3": 0.0483,
+     "Preset Colors 2": 0.0297,
+     "Preset Colors 1": 0.0149,
+     "Preset Colors 4": 0.005,
+     "Preset 1": 0.0025
+    }
+   },
+   "E_SLIDER_Plasma_Line_Density": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 2,
+    "p75": 3,
+    "p90": 6
+   },
+   "E_SLIDER_Plasma_Speed": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 18,
+    "p75": 70,
+    "p90": 88
+   },
+   "E_SLIDER_Plasma_Style": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 3,
+    "p90": 5
+   }
+  },
+  "Morph": {
+   "E_CHECKBOX_Morph_AutoRepeat": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Morph_End_Link": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Morph_Start_Link": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_ShowHeadAtStart": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_NOTEBOOK_Morph": {
+    "type": "choice",
+    "shares": {
+     "Start": 0.5899,
+     "Options": 0.3119,
+     "End": 0.0983
+    }
+   },
+   "E_SLIDER_MorphAccel": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_MorphDuration": {
+    "type": "number",
+    "p10": 20,
+    "p25": 20,
+    "p50": 20,
+    "p75": 60,
+    "p90": 65
+   },
+   "E_SLIDER_MorphEndLength": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 6
+   },
+   "E_SLIDER_MorphStartLength": {
+    "type": "number",
+    "p10": 0,
+    "p25": 1,
+    "p50": 1,
+    "p75": 11,
+    "p90": 71
+   },
+   "E_SLIDER_Morph_End_X1": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 100
+   },
+   "E_SLIDER_Morph_End_X2": {
+    "type": "number",
+    "p10": 0,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Morph_End_Y1": {
+    "type": "number",
+    "p10": 0,
+    "p25": 33,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Morph_End_Y2": {
+    "type": "number",
+    "p10": 1,
+    "p25": 56,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Morph_Repeat_Count": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Morph_Repeat_Skip": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_SLIDER_Morph_Stagger": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Morph_Start_X1": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 100
+   },
+   "E_SLIDER_Morph_Start_X2": {
+    "type": "number",
+    "p10": 0,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Morph_Start_Y1": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 14,
+    "p90": 76
+   },
+   "E_SLIDER_Morph_Start_Y2": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 41,
+    "p90": 100
+   }
+  },
+  "Lines": {
+   "E_CHECKBOX_Lines_FadeTrails": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_SLIDER_Lines_Objects": {
+    "type": "number",
+    "p10": 2,
+    "p25": 2,
+    "p50": 2,
+    "p75": 10,
+    "p90": 15
+   },
+   "E_SLIDER_Lines_Segments": {
+    "type": "number",
+    "p10": 3,
+    "p25": 3,
+    "p50": 3,
+    "p75": 4,
+    "p90": 6
+   },
+   "E_SLIDER_Lines_Speed": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 2,
+    "p75": 3,
+    "p90": 4
+   },
+   "E_SLIDER_Lines_Thickness": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 2,
+    "p90": 3
+   },
+   "E_SLIDER_Lines_Trails": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 1,
+    "p90": 5
+   },
+   "E_TEXTCTRL_Lines_Speed": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   }
+  },
+  "Fire": {
+   "E_CHECKBOX_Fire_GrowWithMusic": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHOICE_Fire_Location": {
+    "type": "choice",
+    "shares": {
+     "Bottom": 0.8971,
+     "Top": 0.0617,
+     "Left": 0.0206,
+     "Right": 0.0206
+    }
+   },
+   "E_SLIDER_Fire_HueShift": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 57
+   },
+   "E_SLIDER_Fire_Height": {
+    "type": "number",
+    "p10": 14,
+    "p25": 50,
+    "p50": 60,
+    "p75": 80,
+    "p90": 100
+   },
+   "E_TEXTCTRL_Fire_GrowthCycles": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 2,
+    "p90": 5
+   }
+  },
+  "Off": {},
+  "Fan": {
+   "E_CHECKBOX_Fan_Blend_Edges": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Fan_Reverse": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_NOTEBOOK_Fan": {
+    "type": "choice",
+    "shares": {
+     "Position": 0.6339,
+     "Options": 0.2173,
+     "Blades": 0.1489
+    }
+   },
+   "E_SLIDER_Fan_Accel": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Fan_Blade_Angle": {
+    "type": "number",
+    "p10": 0,
+    "p25": 90,
+    "p50": 90,
+    "p75": 90,
+    "p90": 90
+   },
+   "E_SLIDER_Fan_Blade_Width": {
+    "type": "number",
+    "p10": 66,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Fan_CenterX": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Fan_CenterY": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Fan_Duration": {
+    "type": "number",
+    "p10": 80,
+    "p25": 80,
+    "p50": 80,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Fan_Element_Width": {
+    "type": "number",
+    "p10": 100,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Fan_End_Radius": {
+    "type": "number",
+    "p10": 10,
+    "p25": 30,
+    "p50": 110,
+    "p75": 500,
+    "p90": 1010
+   },
+   "E_SLIDER_Fan_Num_Blades": {
+    "type": "number",
+    "p10": 2,
+    "p25": 3,
+    "p50": 3,
+    "p75": 3,
+    "p90": 6
+   },
+   "E_SLIDER_Fan_Num_Elements": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 2
+   },
+   "E_SLIDER_Fan_Revolutions": {
+    "type": "number",
+    "p10": 152,
+    "p25": 288,
+    "p50": 720,
+    "p75": 720,
+    "p90": 1800
+   },
+   "E_SLIDER_Fan_Start_Angle": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 24
+   },
+   "E_SLIDER_Fan_Start_Radius": {
+    "type": "number",
+    "p10": 0,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 95
+   },
+   "E_CHECKBOX_Fan_Scale": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   }
+  },
+  "Bars": {
+   "E_CHECKBOX_Bars_3D": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHECKBOX_Bars_Gradient": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHECKBOX_Bars_Highlight": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHOICE_Bars_Direction": {
+    "type": "choice",
+    "shares": {
+     "up": 0.3435,
+     "Right": 0.1612,
+     "Left": 0.1446,
+     "down": 0.0894,
+     "compress": 0.088,
+     "H-expand": 0.0725
+    }
+   },
+   "E_SLIDER_Bars_BarCount": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 2
+   },
+   "E_TEXTCTRL_Bars_Cycles": {
+    "type": "number",
+    "p10": 0.9,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 4
+   },
+   "E_CHECKBOX_Bars_UseFirstColorForHighlight": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Bars_Center": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Spirals": {
+   "E_CHECKBOX_Spirals_3D": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Spirals_Blend": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Spirals_Grow": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Spirals_Shrink": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Spirals_Count": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 2
+   },
+   "E_SLIDER_Spirals_Rotation": {
+    "type": "number",
+    "p10": -20,
+    "p25": 10,
+    "p50": 10,
+    "p75": 20,
+    "p90": 60
+   },
+   "E_SLIDER_Spirals_Thickness": {
+    "type": "number",
+    "p10": 20,
+    "p25": 47,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_TEXTCTRL_Spirals_Movement": {
+    "type": "number",
+    "p10": -1,
+    "p25": -1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 3.3
+   }
+  },
+  "Butterfly": {
+   "E_CHOICE_Butterfly_Colors": {
+    "type": "choice",
+    "shares": {
+     "Palette": 0.7662,
+     "Rainbow": 0.2338
+    }
+   },
+   "E_CHOICE_Butterfly_Direction": {
+    "type": "choice",
+    "shares": {
+     "Normal": 0.9304,
+     "Reverse": 0.0696
+    }
+   },
+   "E_SLIDER_Butterfly_Chunks": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 2
+   },
+   "E_SLIDER_Butterfly_Skip": {
+    "type": "number",
+    "p10": 2,
+    "p25": 2,
+    "p50": 2,
+    "p75": 2,
+    "p90": 2
+   },
+   "E_SLIDER_Butterfly_Speed": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 10,
+    "p75": 73,
+    "p90": 100
+   },
+   "E_SLIDER_Butterfly_Style": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 3
+   }
+  },
+  "SingleStrand": {
+   "E_CHECKBOX_Chase_Group_All": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHOICE_Chase_Type1": {
+    "type": "choice",
+    "shares": {
+     "Left-Right": 0.3635,
+     "Right-Left": 0.2563,
+     "From Middle": 0.1118,
+     "Bounce from Left": 0.0931,
+     "Dual Chase": 0.0654,
+     "To Middle": 0.0515
+    }
+   },
+   "E_CHOICE_Fade_Type": {
+    "type": "choice",
+    "shares": {
+     "None": 0.678,
+     "From Head": 0.2912,
+     "Head and Tail": 0.0136,
+     "From Tail": 0.0102,
+     "Middle": 0.007
+    }
+   },
+   "E_CHOICE_SingleStrand_Colors": {
+    "type": "choice",
+    "shares": {
+     "Palette": 0.9973,
+     "Rainbow": 0.0027
+    }
+   },
+   "E_CHOICE_SingleStrand_FX": {
+    "type": "choice",
+    "shares": {
+     "Fireworks 1D": 0.9336,
+     "Blink": 0.0273,
+     "Chase 3": 0.0131,
+     "Fireworks Starburst": 0.0098,
+     "Dancing Shadows": 0.0066,
+     "Glitter": 0.0017
+    }
+   },
+   "E_CHOICE_SingleStrand_FX_Palette": {
+    "type": "choice",
+    "shares": {
+     "* Colors Only": 0.9711,
+     "Default": 0.0275,
+     "Icefire": 0.0009,
+     "* Random Cycle": 0.0002,
+     "* Color Gradient": 0.0002,
+     "* Color 1": 0.0001
+    }
+   },
+   "E_CHOICE_Skips_Direction": {
+    "type": "choice",
+    "shares": {
+     "Left": 0.9762,
+     "Right": 0.0137,
+     "From Middle": 0.0087,
+     "To Middle": 0.0008,
+     "": 0.0007
+    }
+   },
+   "E_NOTEBOOK_SSEFFECT_TYPE": {
+    "type": "choice",
+    "shares": {
+     "Chase": 0.9724,
+     "Skips": 0.0192,
+     "FX": 0.0085
+    }
+   },
+   "E_SLIDER_Color_Mix1": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 25,
+    "p75": 50,
+    "p90": 60
+   },
+   "E_SLIDER_FX_Intensity": {
+    "type": "number",
+    "p10": 128,
+    "p25": 128,
+    "p50": 128,
+    "p75": 128,
+    "p90": 128
+   },
+   "E_SLIDER_FX_Speed": {
+    "type": "number",
+    "p10": 128,
+    "p25": 128,
+    "p50": 128,
+    "p75": 128,
+    "p90": 128
+   },
+   "E_SLIDER_Number_Chases": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 2
+   },
+   "E_SLIDER_Skips_Advance": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Skips_BandSize": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_SLIDER_Skips_SkipSize": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_SLIDER_Skips_StartPos": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_TEXTCTRL_Chase_Offset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Chase_Rotations": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 3
+   },
+   "E_CHECKBOX_Chase_3dFade1": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 1,
+    "p90": 1
+   }
+  },
+  "Text": {
+   "E_CHECKBOX_TextToCenter": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Text_Color_PerWord": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Text_PixelOffsets": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHOICE_Text_Count": {
+    "type": "choice",
+    "shares": {
+     "none": 0.9987,
+     "seconds": 0.0013
+    }
+   },
+   "E_CHOICE_Text_Dir": {
+    "type": "choice",
+    "shares": {
+     "none": 0.6731,
+     "left": 0.2218,
+     "vector": 0.0468,
+     "up": 0.0183,
+     "down": 0.0147,
+     "right": 0.0094
+    }
+   },
+   "E_CHOICE_Text_Effect": {
+    "type": "choice",
+    "shares": {
+     "normal": 0.9296,
+     "vert text down": 0.0557,
+     "rotate up 45": 0.008,
+     "rotate up 90": 0.0018,
+     "vert text up": 0.0018,
+     "rotate down 90": 0.0018
+    }
+   },
+   "E_CHOICE_Text_Font": {
+    "type": "choice",
+    "shares": {
+     "Use OS Fonts": 0.6444,
+     "5-5x5 Mono": 0.1434,
+     "10-12x12 Bold": 0.0703,
+     "12-15x15 Bold": 0.0428,
+     "8-8x8 Thin": 0.025,
+     "10-12x12 Thin": 0.025
+    }
+   },
+   "E_SLIDER_Text_XEnd": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Text_XStart": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 3
+   },
+   "E_SLIDER_Text_YEnd": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Text_YStart": {
+    "type": "number",
+    "p10": -8,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 19
+   }
+  },
+  "Curtain": {
+   "E_CHECKBOX_Curtain_Repeat": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHOICE_Curtain_Edge": {
+    "type": "choice",
+    "shares": {
+     "left": 0.4606,
+     "top": 0.254,
+     "center": 0.1053,
+     "bottom": 0.1004,
+     "right": 0.0736,
+     "middle": 0.0061
+    }
+   },
+   "E_CHOICE_Curtain_Effect": {
+    "type": "choice",
+    "shares": {
+     "open": 0.7427,
+     "close": 0.1758,
+     "open then close": 0.0555,
+     "close then open": 0.0259
+    }
+   },
+   "E_SLIDER_Curtain_Swag": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 3,
+    "p75": 3,
+    "p90": 3
+   },
+   "E_TEXTCTRL_Curtain_Speed": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   }
+  },
+  "On": {
+   "E_TEXTCTRL_Eff_On_End": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 9
+   }
+  },
+  "Wave": {
+   "E_CHECKBOX_Mirror_Wave": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHOICE_Fill_Colors": {
+    "type": "choice",
+    "shares": {
+     "None": 0.5732,
+     "Palette": 0.334,
+     "Color 1": 0.0678,
+     "Rainbow": 0.0249
+    }
+   },
+   "E_CHOICE_Wave_Direction": {
+    "type": "choice",
+    "shares": {
+     "Right to Left": 0.585,
+     "Left to Right": 0.415
+    }
+   },
+   "E_CHOICE_Wave_Type": {
+    "type": "choice",
+    "shares": {
+     "Sine": 0.6999,
+     "Triangle": 0.2523,
+     "Square": 0.0412,
+     "Decaying Sine": 0.0048,
+     "Fractal/ivy": 0.0017
+    }
+   },
+   "E_SLIDER_Number_Waves": {
+    "type": "number",
+    "p10": 300,
+    "p25": 882,
+    "p50": 900,
+    "p75": 1242,
+    "p90": 2000
+   },
+   "E_SLIDER_Thickness_Percentage": {
+    "type": "number",
+    "p10": 5,
+    "p25": 5,
+    "p50": 17,
+    "p75": 30,
+    "p90": 52
+   },
+   "E_SLIDER_Wave_Height": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 60,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Wave_YOffset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Wave_Speed": {
+    "type": "number",
+    "p10": 6,
+    "p25": 10,
+    "p50": 10,
+    "p75": 19.7,
+    "p90": 30
+   }
+  },
+  "Shader": {
+   "E_SLIDER_Shader_Speed": {
+    "type": "number",
+    "p10": 100,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 184
+   },
+   "E_TEXTCTRL_Shader_LeadIn": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Shader_Offset_X": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Shader_Offset_Y": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Shader_Zoom": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_SLIDER_SHADERXYZZY_rate": {
+    "type": "number",
+    "p10": -8,
+    "p25": -1,
+    "p50": 100,
+    "p75": 150,
+    "p90": 150
+   }
+  },
+  "Galaxy": {
+   "E_CHECKBOX_Galaxy_Blend_Edges": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Galaxy_Inward": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Galaxy_Reverse": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHECKBOX_Galaxy_Scale": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_NOTEBOOK_Galaxy": {
+    "type": "choice",
+    "shares": {
+     "Start": 0.5482,
+     "End": 0.3612,
+     "Options": 0.0906
+    }
+   },
+   "E_SLIDER_Galaxy_Accel": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Galaxy_CenterX": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Galaxy_CenterY": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Galaxy_Duration": {
+    "type": "number",
+    "p10": 20,
+    "p25": 20,
+    "p50": 20,
+    "p75": 20,
+    "p90": 20
+   },
+   "E_SLIDER_Galaxy_End_Radius": {
+    "type": "number",
+    "p10": 0,
+    "p25": 10,
+    "p50": 10,
+    "p75": 75,
+    "p90": 153
+   },
+   "E_SLIDER_Galaxy_End_Width": {
+    "type": "number",
+    "p10": 5,
+    "p25": 5,
+    "p50": 5,
+    "p75": 36,
+    "p90": 76
+   },
+   "E_SLIDER_Galaxy_Revolutions": {
+    "type": "number",
+    "p10": 720,
+    "p25": 1440,
+    "p50": 1440,
+    "p75": 2880,
+    "p90": 3249
+   },
+   "E_SLIDER_Galaxy_Start_Angle": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Galaxy_Start_Radius": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 23,
+    "p90": 76
+   },
+   "E_SLIDER_Galaxy_Start_Width": {
+    "type": "number",
+    "p10": 5,
+    "p25": 5,
+    "p50": 20,
+    "p75": 40,
+    "p90": 120
+   }
+  },
+  "Liquid": {
+   "E_CHECKBOX_BottomBarrier": {
+    "type": "number",
+    "p10": 0,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Enabled2": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Enabled3": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Enabled4": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_FlowMusic1": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_HoldColor": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_LeftBarrier": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_MixColors": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHECKBOX_RightBarrier": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_TopBarrier": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHOICE_ParticleType": {
+    "type": "choice",
+    "shares": {
+     "Elastic": 0.6873,
+     "Powder": 0.1014,
+     "Repulsive": 0.0773,
+     "Spring": 0.0515,
+     "Tensile": 0.0309,
+     "Static Pressure": 0.0189
+    }
+   },
+   "E_NOTEBOOK1": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_TEXTCTRL_Despeckle": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Direction1": {
+    "type": "number",
+    "p10": 152,
+    "p25": 270,
+    "p50": 270,
+    "p75": 270,
+    "p90": 270
+   },
+   "E_TEXTCTRL_Flow1": {
+    "type": "number",
+    "p10": 8,
+    "p25": 100,
+    "p50": 100,
+    "p75": 200,
+    "p90": 650
+   },
+   "E_TEXTCTRL_LifeTime": {
+    "type": "number",
+    "p10": 100,
+    "p25": 1000,
+    "p50": 1000,
+    "p75": 1000,
+    "p90": 1000
+   },
+   "E_TEXTCTRL_Liquid_Gravity": {
+    "type": "number",
+    "p10": 0,
+    "p25": 10,
+    "p50": 10,
+    "p75": 10,
+    "p90": 10
+   },
+   "E_TEXTCTRL_Liquid_GravityAngle": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Liquid_SourceSize1": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_TEXTCTRL_Size": {
+    "type": "number",
+    "p10": 60,
+    "p25": 500,
+    "p50": 500,
+    "p75": 500,
+    "p90": 854
+   },
+   "E_TEXTCTRL_Velocity1": {
+    "type": "number",
+    "p10": 21,
+    "p25": 100,
+    "p50": 100,
+    "p75": 146,
+    "p90": 1000
+   },
+   "E_TEXTCTRL_WarmUpFrames": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_X1": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_TEXTCTRL_Y1": {
+    "type": "number",
+    "p10": 50,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   }
+  },
+  "Snowstorm": {
+   "E_SLIDER_Snowstorm_Count": {
+    "type": "number",
+    "p10": 15,
+    "p25": 25,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Snowstorm_Length": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 55,
+    "p90": 79
+   },
+   "E_SLIDER_Snowstorm_Speed": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 10,
+    "p75": 34,
+    "p90": 34
+   }
+  },
+  "Ripple": {
+   "E_CHECKBOX_Ripple3D": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHOICE_Ripple_Draw_Style": {
+    "type": "choice",
+    "shares": {
+     "Old": 0.4301,
+     "Highlight Inward": 0.1563,
+     "Highlight Outward": 0.1295,
+     "Lines Both Ripple": 0.1043,
+     "Lines Inward Ripple": 0.0565,
+     "Lines Outward Ripple": 0.0345
+    }
+   },
+   "E_CHOICE_Ripple_Movement": {
+    "type": "choice",
+    "shares": {
+     "Explode": 0.9056,
+     "Implode": 0.0891,
+     "None": 0.0053
+    }
+   },
+   "E_CHOICE_Ripple_Object_To_Draw": {
+    "type": "choice",
+    "shares": {
+     "Circle": 0.8978,
+     "Star": 0.0715,
+     "Square": 0.0098,
+     "Heart": 0.0079,
+     "Snow Flake": 0.0066,
+     "Tree": 0.0039
+    }
+   },
+   "E_SLIDER_Ripple_Thickness": {
+    "type": "number",
+    "p10": 3,
+    "p25": 3,
+    "p50": 3,
+    "p75": 13,
+    "p90": 20
+   },
+   "E_SLIDER_Ripple_XC": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Ripple_YC": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Ripple_Cycles": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 2
+   },
+   "E_SLIDER_Ripple_Direction": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Ripple_Rotation": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Ripple_Scale": {
+    "type": "number",
+    "p10": 100,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_TEXTCTRL_Ripple_Outline": {
+    "type": "number",
+    "p10": 1,
+    "p25": 2,
+    "p50": 3,
+    "p75": 4,
+    "p90": 4
+   },
+   "E_TEXTCTRL_Ripple_Spacing": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 4,
+    "p90": 4
+   },
+   "E_TEXTCTRL_Ripple_Twist": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 14.5
+   },
+   "E_TEXTCTRL_Ripple_Velocity": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Pictures": {
+   "E_CHECKBOX_Pictures_PixelOffsets": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Pictures_Shimmer": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Pictures_TransparentBlack": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Pictures_WrapX": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHOICE_Pictures_Direction": {
+    "type": "choice",
+    "shares": {
+     "none": 0.72,
+     "vector": 0.0837,
+     "left": 0.0613,
+     "right": 0.0406,
+     "up": 0.0229,
+     "tile-left": 0.0086
+    }
+   },
+   "E_CHOICE_Scaling": {
+    "type": "choice",
+    "shares": {
+     "Scale Keep Aspect Ratio": 0.3399,
+     "No Scaling": 0.3227,
+     "Scale To Fit": 0.2929,
+     "Scale Keep Aspect Ratio Crop": 0.0445
+    }
+   },
+   "E_SLIDER_PicturesXC": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_PicturesYC": {
+    "type": "number",
+    "p10": -18,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 4
+   },
+   "E_SLIDER_Pictures_EndScale": {
+    "type": "number",
+    "p10": 25,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Pictures_StartScale": {
+    "type": "number",
+    "p10": 20,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_TEXTCTRL_Pictures_FrameRateAdj": {
+    "type": "number",
+    "p10": 0,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_TEXTCTRL_Pictures_Speed": {
+    "type": "number",
+    "p10": 0.9,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_TEXTCTRL_Pictures_TransparentBlack": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_LoopGIF": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHECKBOX_SuppressGIFBackground": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   }
+  },
+  "Faces": {
+   "E_CHECKBOX_Faces_Outline": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHOICE_Faces_EyeBlinkFrequency": {
+    "type": "choice",
+    "shares": {
+     "Normal": 0.9929,
+     "Slowest": 0.0042,
+     "Fastest": 0.0025,
+     "Fast": 0.0004
+    }
+   },
+   "E_CHOICE_Faces_Eyes": {
+    "type": "choice",
+    "shares": {
+     "Auto": 0.8832,
+     "Closed": 0.0729,
+     "Open": 0.0439
+    }
+   },
+   "E_CHOICE_Faces_EyeBlinkDuration": {
+    "type": "choice",
+    "shares": {
+     "Normal": 0.9973,
+     "Longer": 0.0014,
+     "Short": 0.0007,
+     "Long": 0.0007
+    }
+   },
+   "E_CHOICE_Faces_Phoneme": {
+    "type": "choice",
+    "shares": {
+     "AI": 0.2801,
+     "O": 0.2062,
+     "E": 0.1734,
+     "etc": 0.0942,
+     "rest": 0.0942,
+     "U": 0.055
+    }
+   }
+  },
+  "Tree": {
+   "E_CHECKBOX_Tree_ShowLights": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_SLIDER_Tree_Branches": {
+    "type": "number",
+    "p10": 2,
+    "p25": 3,
+    "p50": 3,
+    "p75": 3,
+    "p90": 6
+   },
+   "E_SLIDER_Tree_Speed": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 10,
+    "p75": 22,
+    "p90": 22
+   }
+  },
+  "Circles": {
+   "E_CHECKBOX_Circles_Bounce": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Circles_Bubbles": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Circles_Collide": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Circles_Linear_Fade": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Circles_Plasma": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Circles_Radial": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Circles_Radial_3D": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Circles_Random_m": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Circles_Count": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 3,
+    "p90": 8
+   },
+   "E_SLIDER_Circles_Size": {
+    "type": "number",
+    "p10": 3,
+    "p25": 5,
+    "p50": 5,
+    "p75": 11,
+    "p90": 18
+   },
+   "E_SLIDER_Circles_Speed": {
+    "type": "number",
+    "p10": 4,
+    "p25": 10,
+    "p50": 30,
+    "p75": 30,
+    "p90": 30
+   }
+  },
+  "Fill": {
+   "E_CHECKBOX_Fill_Color_Time": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Fill_Offset_In_Pixels": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Fill_Wrap": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHOICE_Fill_Direction": {
+    "type": "choice",
+    "shares": {
+     "Up": 0.5698,
+     "Right": 0.2116,
+     "Left": 0.1181,
+     "Down": 0.1005
+    }
+   },
+   "E_SLIDER_Fill_Band_Size": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Fill_Offset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Fill_Position": {
+    "type": "number",
+    "p10": 40,
+    "p25": 90,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_SLIDER_Fill_Skip_Size": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Shape": {
+   "E_CHECKBOX_Shape_FadeAway": {
+    "type": "number",
+    "p10": 0,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Shape_FireTiming": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHECKBOX_Shape_HoldColour": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Shape_RandomInitial": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Shape_RandomLocation": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Shape_UseMusic": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Shapes_RandomMovement": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHOICE_Shape_ObjectToDraw": {
+    "type": "choice",
+    "shares": {
+     "Circle": 0.4321,
+     "Star": 0.2453,
+     "Emoji": 0.108,
+     "Heart": 0.0978,
+     "Snowflake": 0.0277,
+     "Present": 0.0263
+    }
+   },
+   "E_SLIDER_Shape_CentreX": {
+    "type": "number",
+    "p10": 39,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Shape_CentreY": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 61
+   },
+   "E_SLIDER_Shape_Growth": {
+    "type": "number",
+    "p10": 0,
+    "p25": 10,
+    "p50": 10,
+    "p75": 37,
+    "p90": 75
+   },
+   "E_SLIDER_Shape_Lifetime": {
+    "type": "number",
+    "p10": 5,
+    "p25": 5,
+    "p50": 15,
+    "p75": 43,
+    "p90": 100
+   },
+   "E_SLIDER_Shape_StartSize": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 3,
+    "p75": 11,
+    "p90": 26
+   },
+   "E_SLIDER_Shape_Thickness": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 10,
+    "p75": 23,
+    "p90": 67
+   },
+   "E_SLIDER_Shapes_Direction": {
+    "type": "number",
+    "p10": 71,
+    "p25": 90,
+    "p50": 90,
+    "p75": 90,
+    "p90": 125
+   },
+   "E_SLIDER_Shapes_Velocity": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_TEXTCTRL_Shape_Count": {
+    "type": "number",
+    "p10": 1,
+    "p25": 2,
+    "p50": 5,
+    "p75": 14,
+    "p90": 31
+   },
+   "E_TEXTCTRL_Shapes_Direction": {
+    "type": "number",
+    "p10": 71,
+    "p25": 90,
+    "p50": 90,
+    "p75": 90,
+    "p90": 173
+   },
+   "E_TEXTCTRL_Shapes_Velocity": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_SLIDER_Shape_Points": {
+    "type": "number",
+    "p10": 5,
+    "p25": 5,
+    "p50": 5,
+    "p75": 8,
+    "p90": 9
+   },
+   "E_SLIDER_Shape_Rotation": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Garlands": {
+   "E_CHOICE_Garlands_Direction": {
+    "type": "choice",
+    "shares": {
+     "Up": 0.4359,
+     "Left": 0.177,
+     "Right": 0.1323,
+     "Up then Down": 0.072,
+     "Down": 0.0676,
+     "Left then Right": 0.0538
+    }
+   },
+   "E_SLIDER_Garlands_Spacing": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 10,
+    "p75": 10,
+    "p90": 28
+   },
+   "E_SLIDER_Garlands_Type": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 2
+   },
+   "E_TEXTCTRL_Garlands_Cycles": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1.4
+   }
+  },
+  "DMX": {
+   "E_CHECKBOX_INVDMX1": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_INVDMX2": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_DMX1": {
+    "type": "number",
+    "p10": 0,
+    "p25": 50,
+    "p50": 105,
+    "p75": 255,
+    "p90": 255
+   },
+   "E_SLIDER_DMX2": {
+    "type": "number",
+    "p10": 0,
+    "p25": 1,
+    "p50": 90,
+    "p75": 255,
+    "p90": 255
+   },
+   "E_SLIDER_DMX10": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 255,
+    "p75": 255,
+    "p90": 255
+   },
+   "E_SLIDER_DMX11": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_DMX12": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_DMX13": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_DMX14": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_DMX15": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_DMX16": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_DMX3": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 255,
+    "p75": 255,
+    "p90": 255
+   },
+   "E_SLIDER_DMX4": {
+    "type": "number",
+    "p10": 0,
+    "p25": 150,
+    "p50": 255,
+    "p75": 255,
+    "p90": 255
+   },
+   "E_SLIDER_DMX5": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 85,
+    "p75": 255,
+    "p90": 255
+   },
+   "E_SLIDER_DMX6": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 255,
+    "p90": 255
+   },
+   "E_SLIDER_DMX7": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 85,
+    "p75": 255,
+    "p90": 255
+   },
+   "E_SLIDER_DMX8": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_DMX9": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Lightning": {
+   "E_CHECKBOX_ForkedLightning": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHOICE_Lightning_Direction": {
+    "type": "choice",
+    "shares": {
+     "Down": 0.6303,
+     "Up": 0.3697
+    }
+   },
+   "E_SLIDER_Lightning_BOTX": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Lightning_TopX": {
+    "type": "number",
+    "p10": -4,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 3
+   },
+   "E_SLIDER_Lightning_TopY": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Lightning_WIDTH": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 2,
+    "p90": 5
+   },
+   "E_SLIDER_Number_Bolts": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 10,
+    "p75": 10,
+    "p90": 20
+   },
+   "E_SLIDER_Number_Segments": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 5,
+    "p75": 5,
+    "p90": 10
+   },
+   "E_SLIDER_Lightning_BOTY": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Music Effect": {
+   "E_CHECKBOX_Music_Fade": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHECKBOX_Music_LogarithmicX": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Music_Scale": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHOICE_Music_Colour": {
+    "type": "choice",
+    "shares": {
+     "Blend": 0.4435,
+     "Distinct": 0.4247,
+     "Cycle": 0.1317
+    }
+   },
+   "E_CHOICE_Music_Scaling": {
+    "type": "choice",
+    "shares": {
+     "Individual Notes": 0.6425,
+     "None": 0.2419,
+     "All Notes": 0.1156
+    }
+   },
+   "E_CHOICE_Music_Type": {
+    "type": "choice",
+    "shares": {
+     "Morph": 0.828,
+     "Bounce": 0.1102,
+     "Separate": 0.0349,
+     "Collide": 0.0188,
+     "On": 0.0081
+    }
+   },
+   "E_SLIDER_Music_Bars": {
+    "type": "number",
+    "p10": 8,
+    "p25": 16,
+    "p50": 20,
+    "p75": 20,
+    "p90": 41
+   },
+   "E_SLIDER_Music_EndNote": {
+    "type": "number",
+    "p10": 80,
+    "p25": 80,
+    "p50": 80,
+    "p75": 80,
+    "p90": 90
+   },
+   "E_SLIDER_Music_Offset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Music_Sensitivity": {
+    "type": "number",
+    "p10": 36,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Music_StartNote": {
+    "type": "number",
+    "p10": 44,
+    "p25": 60,
+    "p50": 60,
+    "p75": 60,
+    "p90": 60
+   }
+  },
+  "Tendril": {
+   "E_CHOICE_Tendril_Movement": {
+    "type": "choice",
+    "shares": {
+     "Horizontal Zig Zag": 0.2298,
+     "Circle": 0.2112,
+     "Vert. Zig Zag Return": 0.1801,
+     "Music Circle": 0.1056,
+     "Random": 0.0932,
+     "Music Line": 0.0932
+    }
+   },
+   "E_TEXTCTRL_Tendril_Dampening": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 10,
+    "p75": 10,
+    "p90": 18
+   },
+   "E_TEXTCTRL_Tendril_Friction": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 10,
+    "p75": 10,
+    "p90": 11
+   },
+   "E_TEXTCTRL_Tendril_Length": {
+    "type": "number",
+    "p10": 35,
+    "p25": 48,
+    "p50": 60,
+    "p75": 60,
+    "p90": 80
+   },
+   "E_TEXTCTRL_Tendril_Speed": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 10,
+    "p75": 10,
+    "p90": 10
+   },
+   "E_TEXTCTRL_Tendril_Tension": {
+    "type": "number",
+    "p10": 13,
+    "p25": 13,
+    "p50": 20,
+    "p75": 20,
+    "p90": 20
+   },
+   "E_TEXTCTRL_Tendril_Thickness": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 2,
+    "p75": 4,
+    "p90": 12
+   },
+   "E_TEXTCTRL_Tendril_Trails": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 3,
+    "p75": 6,
+    "p90": 9
+   },
+   "E_TEXTCTRL_Tendril_TuneMovement": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 10,
+    "p75": 10,
+    "p90": 12
+   },
+   "E_TEXTCTRL_Tendril_XOffset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 6
+   },
+   "E_TEXTCTRL_Tendril_YOffset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Fireworks": {
+   "E_CHECKBOX_FIRETIMING": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_CHECKBOX_Fireworks_Gravity": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Fireworks_HoldColour": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_Fireworks_UseMusic": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_SLIDER_Fireworks_Count": {
+    "type": "number",
+    "p10": 25,
+    "p25": 50,
+    "p50": 50,
+    "p75": 93,
+    "p90": 100
+   },
+   "E_SLIDER_Fireworks_Explosions": {
+    "type": "number",
+    "p10": 10,
+    "p25": 16,
+    "p50": 23,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Fireworks_Fade": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 89
+   },
+   "E_SLIDER_Fireworks_Velocity": {
+    "type": "number",
+    "p10": 2,
+    "p25": 2,
+    "p50": 2,
+    "p75": 4,
+    "p90": 8
+   },
+   "E_SLIDER_Fireworks_XLocation": {
+    "type": "number",
+    "p10": -1,
+    "p25": -1,
+    "p50": -1,
+    "p75": -1,
+    "p90": -1
+   },
+   "E_SLIDER_Fireworks_XVelocity": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_Fireworks_YLocation": {
+    "type": "number",
+    "p10": -1,
+    "p25": -1,
+    "p50": -1,
+    "p75": -1,
+    "p90": -1
+   },
+   "E_SLIDER_Fireworks_YVelocity": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Fireworks_XLocation": {
+    "type": "number",
+    "p10": -1,
+    "p25": -1,
+    "p50": -1,
+    "p75": -1,
+    "p90": -1
+   },
+   "E_TEXTCTRL_Fireworks_XVelocity": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Fireworks_YLocation": {
+    "type": "number",
+    "p10": -1,
+    "p25": -1,
+    "p50": -1,
+    "p75": -1,
+    "p90": -1
+   },
+   "E_TEXTCTRL_Fireworks_YVelocity": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Spirograph": {
+   "E_SLIDER_Spirograph_R": {
+    "type": "number",
+    "p10": 17,
+    "p25": 33,
+    "p50": 41,
+    "p75": 90,
+    "p90": 100
+   },
+   "E_SLIDER_Spirograph_d": {
+    "type": "number",
+    "p10": 20,
+    "p25": 27,
+    "p50": 30,
+    "p75": 32,
+    "p90": 48
+   },
+   "E_SLIDER_Spirograph_r": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 5,
+    "p75": 10,
+    "p90": 12
+   },
+   "E_TEXTCTRL_Spirograph_Animate": {
+    "type": "number",
+    "p10": -12,
+    "p25": -12,
+    "p50": 8,
+    "p75": 14,
+    "p90": 18
+   },
+   "E_TEXTCTRL_Spirograph_Length": {
+    "type": "number",
+    "p10": 4,
+    "p25": 14,
+    "p50": 20,
+    "p75": 30,
+    "p90": 38
+   },
+   "E_TEXTCTRL_Spirograph_Speed": {
+    "type": "number",
+    "p10": 9,
+    "p25": 10,
+    "p50": 18,
+    "p75": 30,
+    "p90": 35
+   },
+   "E_TEXTCTRL_Spirograph_Width": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 9,
+    "p90": 48
+   }
+  },
+  "Video": {
+   "E_CHECKBOX_SynchroniseWithAudio": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Video_AspectRatio": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Video_TransparentBlack": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHOICE_Video_DurationTreatment": {
+    "type": "choice",
+    "shares": {
+     "Normal": 0.552,
+     "Loop": 0.2534,
+     "Manual and Loop": 0.1011,
+     "Slow/Accelerate": 0.0543,
+     "Manual": 0.0377,
+     "Normal No Blue": 0.0015
+    }
+   },
+   "E_TEXTCTRL_SampleSpacing": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Video_CropBottom": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_TEXTCTRL_Video_CropLeft": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 4
+   },
+   "E_TEXTCTRL_Video_CropRight": {
+    "type": "number",
+    "p10": 100,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_TEXTCTRL_Video_CropTop": {
+    "type": "number",
+    "p10": 100,
+    "p25": 100,
+    "p50": 100,
+    "p75": 100,
+    "p90": 100
+   },
+   "E_TEXTCTRL_Video_Starttime": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 20
+   },
+   "E_TEXTCTRL_Video_TransparentBlack": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Life": {
+   "E_SLIDER_Life_Count": {
+    "type": "number",
+    "p10": 25,
+    "p25": 25,
+    "p50": 50,
+    "p75": 74,
+    "p90": 100
+   },
+   "E_SLIDER_Life_Seed": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 4,
+    "p90": 4
+   },
+   "E_SLIDER_Life_Speed": {
+    "type": "number",
+    "p10": 5,
+    "p25": 5,
+    "p50": 10,
+    "p75": 10,
+    "p90": 14
+   }
+  },
+  "Shimmer": {
+   "E_CHECKBOX_PRE_2017_7": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_Shimmer_Use_All_Colors": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_SLIDER_Shimmer_Duty_Factor": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_TEXTCTRL_Shimmer_Cycles": {
+    "type": "number",
+    "p10": 0,
+    "p25": 1,
+    "p50": 1,
+    "p75": 8,
+    "p90": 200
+   }
+  },
+  "Kaleidoscope": {
+   "E_CHOICE_Kaleidoscope_Type": {
+    "type": "choice",
+    "shares": {
+     "Square": 0.693,
+     "Triangle": 0.193,
+     "6-Fold": 0.0526,
+     "Radial": 0.0526,
+     "12-Fold": 0.0088
+    }
+   },
+   "E_SLIDER_Kaleidoscope_Rotation": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 16,
+    "p90": 110
+   },
+   "E_SLIDER_Kaleidoscope_Size": {
+    "type": "number",
+    "p10": 4,
+    "p25": 5,
+    "p50": 23,
+    "p75": 51,
+    "p90": 71
+   },
+   "E_SLIDER_Kaleidoscope_X": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Kaleidoscope_Y": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   }
+  },
+  "State": {
+   "E_CHOICE_State_Color": {
+    "type": "choice",
+    "shares": {
+     "Graduate": 0.8179,
+     "Cycle": 0.1031,
+     "Allocate": 0.079
+    }
+   },
+   "E_CHOICE_State_Mode": {
+    "type": "choice",
+    "shares": {
+     "Default": 1
+    }
+   },
+   "E_SLIDER_State_Fade_Time": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 200
+   },
+   "E_CHOICE_State_State": {
+    "type": "choice",
+    "shares": {
+     "eyes": 0.2557,
+     "<ALL>": 0.1197,
+     "rightwink": 0.0906,
+     "leftwink": 0.0858,
+     "eyestoright": 0.0453,
+     "midright": 0.0437
+    }
+   }
+  },
+  "Warp": {
+   "E_CHOICE_Warp_Treatment_APPLYLAST": {
+    "type": "choice",
+    "shares": {
+     "constant": 0.9416,
+     "out": 0.0459,
+     "in": 0.0125
+    }
+   },
+   "E_CHOICE_Warp_Type": {
+    "type": "choice",
+    "shares": {
+     "dissolve": 0.4589,
+     "mirror": 0.2164,
+     "circle reveal": 0.1637,
+     "wavy": 0.0408,
+     "water drops": 0.0351,
+     "banded swirl": 0.0193
+    }
+   },
+   "E_SLIDER_Warp_X": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Warp_Y": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_TEXTCTRL_Warp_X": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_TEXTCTRL_Warp_Y": {
+    "type": "number",
+    "p10": 50,
+    "p25": 50,
+    "p50": 50,
+    "p75": 50,
+    "p90": 50
+   },
+   "E_SLIDER_Warp_Cycle_Count": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_TEXTCTRL_Warp_Cycle_Count": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   }
+  },
+  "Sketch": {
+   "E_CHECKBOX_MotionEnabled": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_SLIDER_DrawPercentage": {
+    "type": "number",
+    "p10": 16,
+    "p25": 20,
+    "p50": 21,
+    "p75": 40,
+    "p90": 100
+   },
+   "E_SLIDER_SketchBackgroundOpacity": {
+    "type": "number",
+    "p10": 48,
+    "p25": 48,
+    "p50": 48,
+    "p75": 48,
+    "p90": 48
+   },
+   "E_SLIDER_Thickness": {
+    "type": "number",
+    "p10": 2,
+    "p25": 2,
+    "p50": 13,
+    "p75": 25,
+    "p90": 25
+   },
+   "E_SLIDER_MotionPercentage": {
+    "type": "number",
+    "p10": 36,
+    "p25": 36,
+    "p50": 56,
+    "p75": 56,
+    "p90": 56
+   }
+  },
+  "Candle": {
+   "E_CHECKBOX_PerNode": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 1
+   },
+   "E_TEXTCTRL_Candle_FlameAgility": {
+    "type": "number",
+    "p10": 2,
+    "p25": 2,
+    "p50": 2,
+    "p75": 2,
+    "p90": 8
+   },
+   "E_TEXTCTRL_Candle_WindBaseline": {
+    "type": "number",
+    "p10": 30,
+    "p25": 30,
+    "p50": 30,
+    "p75": 30,
+    "p90": 99
+   },
+   "E_TEXTCTRL_Candle_WindCalmness": {
+    "type": "number",
+    "p10": 2,
+    "p25": 2,
+    "p50": 2,
+    "p75": 2,
+    "p90": 2
+   },
+   "E_TEXTCTRL_Candle_WindVariability": {
+    "type": "number",
+    "p10": 5,
+    "p25": 5,
+    "p50": 5,
+    "p75": 5,
+    "p90": 5
+   },
+   "E_CHECKBOX_UsePalette": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  },
+  "Moving Head": {
+   "E_CHECKBOX_MHIgnorePan": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_MHIgnoreTilt": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_MHCycles": {
+    "type": "number",
+    "p10": 10,
+    "p25": 10,
+    "p50": 10,
+    "p75": 10,
+    "p90": 10
+   },
+   "E_SLIDER_MHGroupings": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_SLIDER_MHPan": {
+    "type": "number",
+    "p10": -500,
+    "p25": -450,
+    "p50": 0,
+    "p75": 450,
+    "p90": 650
+   },
+   "E_SLIDER_MHPathScale": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_MHTilt": {
+    "type": "number",
+    "p10": 450,
+    "p25": 450,
+    "p50": 450,
+    "p75": 600,
+    "p90": 700
+   },
+   "E_SLIDER_MHTiltOffset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_MHTimeOffset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_MHPanOffset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_AUTO_SHUTTER": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHECKBOX_MHPatternEnable": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_CHECKBOX_MHShutterEnable": {
+    "type": "number",
+    "p10": 1,
+    "p25": 1,
+    "p50": 1,
+    "p75": 1,
+    "p90": 1
+   },
+   "E_CHOICE_MHPattern": {
+    "type": "choice",
+    "shares": {
+     "Circle": 1
+    }
+   },
+   "E_SLIDER_MHPatternHeight": {
+    "type": "number",
+    "p10": 45,
+    "p25": 45,
+    "p50": 45,
+    "p75": 45,
+    "p90": 45
+   },
+   "E_SLIDER_MHPatternPhaseOffset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_MHPatternRotation": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_MHPatternStartOffset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_MHPatternWidth": {
+    "type": "number",
+    "p10": 90,
+    "p25": 90,
+    "p50": 90,
+    "p75": 90,
+    "p90": 90
+   },
+   "E_SLIDER_MHPatternXOffset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   },
+   "E_SLIDER_MHPatternYOffset": {
+    "type": "number",
+    "p10": 0,
+    "p25": 0,
+    "p50": 0,
+    "p75": 0,
+    "p90": 0
+   }
+  }
+ },
+ "roleTaxonomy": [
+  [
+   "moving_head",
+   "moving.?head|\\bmh-?\\d|dmx.?moving|laser|beam"
+  ],
+  [
+   "singing_face",
+   "face|mouth|sing|carol(l)?er|santa.?head|elf.?head|snowman.?face|pumpkin.?face|ppd|boscoyo.*(face|santa)|quartet|hattitude|choir"
+  ],
+  [
+   "matrix",
+   "matrix|p5|p10|panel|tune.?to|sign|screen|billboard"
+  ],
+  [
+   "mega_tree",
+   "mega|big ?tree|bigtree|main ?tree|tree.?360|tree.?270|tree.?180|spiral.?tree|pixel.?tree|tom.?tree"
+  ],
+  [
+   "mini_tree",
+   "mini.?tree|tree|tomato|cone|spiral"
+  ],
+  [
+   "arch",
+   "arch|rainbow|bridge"
+  ],
+  [
+   "cane",
+   "cane"
+  ],
+  [
+   "spinner",
+   "spinner|spin|hypnotic|fuzion|showstopper|wheel|pinwheel|flower|lollipop|starburst|burst|rosa|dahlia"
+  ],
+  [
+   "snowflake",
+   "flake|snow.?flake|chromaflake|crystal"
+  ],
+  [
+   "star",
+   "star|bethlehem|topper"
+  ],
+  [
+   "window",
+   "window|win\\b|frame|door|garage|porch.?column|column|pillar"
+  ],
+  [
+   "outline",
+   "outline|roof|eaves?|eves\\b|gutter|peak|ridge|topline|midline|house.?line|line|ledge|fence|rail|trim|rafter|gable|soffit|cornice|border|edge"
+  ],
+  [
+   "icicle",
+   "icicle|drip"
+  ],
+  [
+   "wreath",
+   "wreath|ring|circle|halo|ornament|bulb|sphere|ball|globe|orb"
+  ],
+  [
+   "bush",
+   "bush|shrub|hedge|garland|swag|bow"
+  ],
+  [
+   "flood",
+   "flood|wash|par\\b|spot"
+  ],
+  [
+   "present",
+   "present|gift|box|package|cube"
+  ],
+  [
+   "character",
+   "santa|reindeer|rudolph|snowman|elf|grinch|nutcracker|angel|penguin|bear|sleigh|nativity|deer|candy|gingerbread|soldier|train|ghost|bat|spider|witch|skull|pumpkin|tomb|dasher|dancer|prancer|vixen|comet|cupid|donner|blitzen|cactus|wing|merry|noel"
+  ],
+  [
+   "pathway",
+   "path|walk|driveway|stake|pole|lamp|mini.?pole|post|ground"
+  ],
+  [
+   "whole_house",
+   "^(all|everything|whole|house|full|entire|every|global|main)\\b|all.?(props|models|pixels|house|elements)|^all$"
+  ]
+ ]
+}
