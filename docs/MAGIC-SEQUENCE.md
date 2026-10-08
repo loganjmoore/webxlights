@@ -676,8 +676,9 @@ What was built, and where the code made a decision the spec didn't.
   seconds-weighted Jensen-Shannon divergence of its effect-by-role mix from the corpus's, over each
   role's top effects minus those Magic Sequence never places. Corpus median 0.456 (IQR
   0.378-0.541). Generated, over 3 tempos x 5 seeds on the test layout: mean 0.386.
-- Deferred: the hero texture layer (Twinkle or Shimmer at low mix) of 2.4 step 7, Off backdrops on
-  floods, sub-model rows, and a draggable section strip (labels are editable).
+- Built after phase 4 (see "Finishing" below): the hero texture layer, Off backdrops on floods and
+  sub-model rows. The section strip's labels are editable; dragging its boundaries is the spec's
+  "later" and is not built.
 
 ### Phase 3: AI director
 
@@ -703,8 +704,9 @@ What was built, and where the code made a decision the spec didn't.
   ordinary show talk ("forget the previous section", "the Christmas program").
 - In the dialog, any failure falls back to the rules director with one line ("The built-in
   director planned this one."), quoting the server for a cap or a refused direction.
-- Not done: the server-side refusal `fallbacks` parameter (a refusal falls back to the rules
-  director instead), and asking for two or three candidate plans.
+- The server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`)
+  was added after phase 4 (see "Finishing"). Asking for two or three candidate plans, which 2.3
+  leaves optional, is not built: it would double or triple the cost of a press.
 
 ### Phase 4: score and tune
 
@@ -744,8 +746,42 @@ What was built, and where the code made a decision the spec didn't.
 - Not done: a Beat This! ONNX "pro" analysis, a separate render benchmark beyond the timings the
   score test logs, the fit score for the AI director's candidate plans, and anything in phase 5.
 
+### Finishing: the details phases 2 and 3 deferred
+
+- **Sub-model rows.** A sub-model that is a prop of its own carries its role on its own row: a
+  star or a singing face on a prop of another role (the star on a mega tree, a face on a singing
+  tree). Every other sub-model is treated as a part and left to its parent. Wider than that, part
+  names misread as roles: on a real layout with 430 sub-models, a flake's "Circle 1" became a
+  wreath and a spinner's "Burst 2" another spinner, and 650 effects became 3,971. Sub-model rows
+  render over their parent, as sub-models do everywhere.
+- **Hero texture layer** (2.4 step 7). In sections at intensity 0.75 and up, the heroes with a 2D
+  buffer take a third layer: Twinkle or Shimmer, whichever the role allows, at mix 0.6 (40%
+  opacity over Normal blend), one per phrase.
+- **Off backdrops on floods** (2.4 step 1). While a whole-house group plays a background, floods
+  that are dark in that section hold Off, so the group doesn't show through them.
+- **Refusal fallback** on the AI director's Anthropic call for the models that take it (Fable 5.1,
+  Opus 5.5, Opus 5, Sonnet 5.5): a policy decline is retried server-side on the model's default
+  fallback inside the same call. Tested against the real SDK with a mocked transport, including a
+  reply that carries a `fallback` block.
+- Fit scores after these changes (best of three seeds): Jingle Bells 89, Silent Night 77, Carol
+  of the Bells 76, unchanged within a point. On the real layout with Jingle Bells: 640 effects
+  (289 a minute), fit 76, 19 texture-layer effects on the heroes.
+
+## Out of scope by this build's own terms
+
+`MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)
+"is out of scope on purpose", and that "Beat This! ONNX, Demucs, Whisper and hosted section models
+are out of scope for this goal". So the pro analysis path of 2.1 (and its "Use pro analysis"
+toggle) and everything in 6.3 wait for their own specs.
+
 ## Blocked
 
+- **The AI director against a real provider.** There is no model key on the machine this was
+  built on, so the director has only run against a faked provider (PHP tests) and the real SDK
+  with a mocked transport. Production has the key (`SHADER_API_KEY` / `ANTHROPIC_API_KEY` on
+  Render) and the route is live (`/api/v1/magic/status` answers 401 to a signed-out request).
+  The first press on pixl.community with the toggle on is the real check; a failure there falls
+  back to the rules director with a one-line notice.
 - **Logan signs off on three songs** (phase 4's last check). The scores above are measured; how
   the shows look is a judgement only Logan can make. Open the sample project, add one of the test
   songs, press Magic Sequence. Things worth a look: mid-chorus frames can read sparse, because a

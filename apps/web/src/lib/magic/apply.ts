@@ -32,14 +32,14 @@ export interface MagicResult {
 export function magicBody(current: SequenceBody, placements: readonly Placement[], song: SongMap, mode: MagicMode, newId: () => string): MagicResult {
   const body = JSON.parse(JSON.stringify(current)) as SequenceBody;
   if (mode === "replace") body.rows = [];
-  const rowKey = (elementType: string, elementId: number) => `${elementType}:${elementId}`;
-  const busy = new Set(body.rows.filter((r) => r.effects.length > 0 && !r.subName).map((r) => rowKey(r.elementType, r.elementId)));
+  const rowKey = (elementType: string, elementId: number, subName?: string) => `${elementType}:${elementId}:${subName ?? ""}`;
+  const busy = new Set(body.rows.filter((r) => r.effects.length > 0).map((r) => rowKey(r.elementType, r.elementId, r.subName)));
   const offsets = new Map<string, number>();
   if (mode === "new-layers") {
     for (const row of body.rows) {
-      if (row.subName || row.effects.length === 0) continue;
+      if (row.effects.length === 0) continue;
       const top = Math.max(...row.effects.map((e) => e.layerIndex ?? 0));
-      const key = rowKey(row.elementType, row.elementId);
+      const key = rowKey(row.elementType, row.elementId, row.subName);
       offsets.set(key, Math.max(offsets.get(key) ?? 0, top + 1));
     }
   }
@@ -47,13 +47,13 @@ export function magicBody(current: SequenceBody, placements: readonly Placement[
   let added = 0;
   const skipped = new Set<string>();
   for (const p of placements) {
-    const key = rowKey(p.elementType, p.elementId);
+    const key = rowKey(p.elementType, p.elementId, p.subName);
     if (mode === "fill-empty" && busy.has(key)) {
       skipped.add(key);
       continue;
     }
-    let row = body.rows.find((r) => r.elementType === p.elementType && r.elementId === p.elementId && !r.subName);
-    if (!row) body.rows.push((row = { elementType: p.elementType, elementId: p.elementId, effects: [] }));
+    let row = body.rows.find((r) => r.elementType === p.elementType && r.elementId === p.elementId && (r.subName ?? undefined) === p.subName);
+    if (!row) body.rows.push((row = { elementType: p.elementType, elementId: p.elementId, ...(p.subName !== undefined ? { subName: p.subName } : {}), effects: [] }));
     const layerIndex = (p.effect.layerIndex ?? 0) + (offsets.get(key) ?? 0);
     const effect: SequenceEffect = { ...JSON.parse(JSON.stringify(p.effect)), id: newId() };
     if (layerIndex) effect.layerIndex = layerIndex;

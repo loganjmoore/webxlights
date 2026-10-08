@@ -13,9 +13,12 @@ import type { SongMap } from "@webxlights/engine";
 // 2.4). Pure and seeded, so a generated sequence can be reproduced, tested and regenerated.
 
 export interface Placement {
-  elementType: Extract<RowElementType, "model" | "group">;
+  elementType: Extract<RowElementType, "model" | "group" | "submodel">;
+  /** The model or group; a sub-model's parent model. */
   elementId: number;
-  /** The prop this lands on, "model:12" or "group:3". */
+  /** A sub-model's name. */
+  subName?: string;
+  /** The prop this lands on, "model:12", "group:3" or "submodel:12/Star". */
   key: string;
   role: Role;
   effect: Omit<SequenceEffect, "id">;
@@ -37,8 +40,8 @@ const TIER_PRIORITY: Record<Tier, number> = { fill: 0, frame: 1, feature: 2, her
 const LIT_SHARE_QUIET = priors.structure.litShareQuietPhrase.p50;
 const LIT_SHARE_BUSY = priors.structure.litShareBusyPhrase.p50;
 
-interface Unit { prop: PropInfo; elementType: "model" | "group"; elementId: number; order: number }
-interface Draft { unit: Unit; layer: number; startMs: number; endMs: number; name: string; params: SequenceEffect["params"]; palette: string[]; layerSettings?: SequenceEffect["layer"]; fadeInMs?: number; fadeOutMs?: number; hit?: boolean }
+interface Unit { prop: PropInfo; elementType: Placement["elementType"]; elementId: number; subName?: string; order: number }
+interface Draft { unit: Unit; layer: number; startMs: number; endMs: number; name: string; params: SequenceEffect["params"]; palette: string[]; layerSettings?: SequenceEffect["layer"]; mix?: number; fadeInMs?: number; fadeOutMs?: number; hit?: boolean }
 
 const presetCache = new Map<string, SequenceEffect["params"]>();
 /** The corpus's typical settings for an effect, as engine params. */
@@ -125,13 +128,29 @@ function effectParams(name: string, beats: number, variation: number, feel: Feel
   return { params, ...(layer ? { layer } : {}) };
 }
 
-/** Who carries each role: the user's role group if it covers the role, else each model. */
+/**
+ * Sub-model roles that mean a separate prop rather than a part: the star on a mega tree, a face on
+ * a singing tree. Part names read as roles too often to trust the rest: a snowflake's "Circle 1"
+ * is not a wreath, and a spinner's "Burst 2" is not another spinner (a real layout's 430
+ * sub-models turned 650 effects into 4,000 before this list).
+ */
+const SUBMODEL_PROPS = new Set<Role>(["star", "singing_face"]);
+
+/**
+ * Who carries each role: the user's role group if it covers the role, else each model. A
+ * sub-model that is a prop of its own carries its own role; a part is left to its parent.
+ */
 function unitsByRole(props: readonly PropInfo[]): Map<Role, Unit[]> {
-  const models = props.filter((p) => p.key.startsWith("model:") && p.nodes > 0);
-  const groups = props.filter((p) => p.key.startsWith("group:") && (p.members?.length ?? 0) >= 2);
   const byKey = new Map(props.map((p) => [p.key, p]));
+  const parentOf = (p: PropInfo) => byKey.get(`model:${p.key.slice("submodel:".length).split("/")[0]}`);
+  const models = props.filter((p) => p.nodes > 0 && (p.key.startsWith("model:") || (p.key.startsWith("submodel:") && SUBMODEL_PROPS.has(p.role) && parentOf(p) !== undefined && parentOf(p)!.role !== p.role)));
+  const groups = props.filter((p) => p.key.startsWith("group:") && (p.members?.length ?? 0) >= 2);
   const out = new Map<Role, Unit[]>();
-  const unit = (prop: PropInfo, order: number): Unit => ({ prop, elementType: prop.key.startsWith("group:") ? "group" : "model", elementId: Number(prop.key.split(":")[1]), order });
+  const unit = (prop: PropInfo, order: number): Unit => {
+    if (!prop.key.startsWith("submodel:")) return { prop, elementType: prop.key.startsWith("group:") ? "group" : "model", elementId: Number(prop.key.split(":")[1]), order };
+    const [id, ...name] = prop.key.slice("submodel:".length).split("/");
+    return { prop, elementType: "submodel", elementId: Number(id), subName: name.join("/"), order };
+  };
   const roles = new Set(models.map((m) => m.role));
   for (const role of roles) {
     if (role === "whole_house" || ROLE_EFFECTS[role].length === 0) continue;
@@ -211,6 +230,13 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
     }
     // A whole-house texture sits under everything, so it only plays when the house is busy.
     if (units.has("whole_house") && sp.intensity >= 0.6 && keyedRandom(seed, `house:${sp.look}`) < 0.5) lit.add("whole_house");
+    // A dark flood under a lit whole-house group would show the group: floods hold an Off backdrop
+    // instead (18% of flood time in the corpus is Off).
+    if (lit.has("whole_house") && units.has("flood") && !lit.has("flood")) {
+      for (const unit of units.get("flood")!) {
+        drafts.push({ unit, layer: 0, startMs: section.startMs, endMs: section.endMs, name: "Off", params: { ...defaultParamsFor("Off") }, palette: [] });
+      }
+    }
 
     // 2-4. Per phrase (4 bars), one family per role, re-triggered on the grid, coordinated.
     const barStarts = song.downbeats.filter((d) => d >= section.startMs - 1 && d < section.endMs - 1);
@@ -266,6 +292,20 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
             variation++;
           }
         });
+      }
+    }
+
+    // 7. Heroes take a third layer in the loud sections: a texture at low mix over their base
+    // (the corpus's mega trees and matrices run 2 layers at the median, 6-7 at p90).
+    if (sp.intensity >= 0.75) {
+      for (const unit of [...lit].flatMap((r) => units.get(r)!).filter((u) => u.prop.tier === "hero" && u.prop.dims === 2)) {
+        const name = ["Twinkle", "Shimmer"].find((n) => ROLE_EFFECTS[unit.prop.role].includes(n));
+        if (!name) continue;
+        for (let p = 0; p + 1 < phraseBeats.length; p++) {
+          const [from, to] = [phraseBeats[p]!, phraseBeats[p + 1]!];
+          const { params } = effectParams(name, to - from, p, feel, options.title);
+          drafts.push({ unit, layer: 2, startMs: beatTime(from), endMs: beatTime(to), name, params, palette: [palette[(p + 1) % palette.length]!], mix: 0.6 });
+        }
       }
     }
 
@@ -425,10 +465,12 @@ function finish(drafts: Draft[], song: SongMap, frameMs: number, seed: number, t
       const transition: SequenceEffect["transition"] = {};
       if (d.fadeInMs) Object.assign(transition, { inType: "Fade", inDurationMs: Math.round(Math.min(d.fadeInMs, (d.endMs - d.startMs) / 2)) });
       if (d.fadeOutMs) Object.assign(transition, { outType: "Fade", outDurationMs: Math.round(Math.min(d.fadeOutMs, (d.endMs - d.startMs) / 2)) });
-      const effect: Omit<SequenceEffect, "id"> = { name: d.name, startMs: d.startMs, endMs: d.endMs, params: d.params, palette: d.palette };
+      const effect: Omit<SequenceEffect, "id"> = { name: d.name, startMs: d.startMs, endMs: d.endMs, params: d.params };
+      if (d.palette.length) effect.palette = d.palette;
       if (d.layer) effect.layerIndex = d.layer;
       if (d.layerSettings) effect.layer = d.layerSettings;
+      if (d.mix !== undefined) effect.mix = d.mix;
       if (Object.keys(transition).length) effect.transition = transition;
-      return { elementType: d.unit.elementType, elementId: d.unit.elementId, key: d.unit.prop.key, role: d.unit.prop.role, effect };
+      return { elementType: d.unit.elementType, elementId: d.unit.elementId, ...(d.unit.subName !== undefined ? { subName: d.unit.subName } : {}), key: d.unit.prop.key, role: d.unit.prop.role, effect };
     });
 }
