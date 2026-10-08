@@ -62,6 +62,8 @@ export interface Priors {
     layersByRole: Record<string, { p50: number; p90: number }>;
     beatAlignmentPerSong: Quantiles;
     beatAlignmentByTempo: Record<string, Quantiles>;
+    /** Jensen-Shannon divergence of one song's effect-by-role mix from the corpus's. */
+    roleEffectJsd: { perRole: Quantiles; perSong: Quantiles };
   };
   /** effect -> xLights key -> cycles per beat of effect length. */
   cyclesPerBeat: Record<string, Record<string, Quantiles>>;
