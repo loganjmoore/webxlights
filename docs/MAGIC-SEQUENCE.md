@@ -776,15 +776,13 @@ toggle) and everything in 6.3 wait for their own specs.
 
 ## Blocked
 
-- **The AI director against a real provider.** There is no model key on the machine this was
-  built on, so the director has only run against a faked provider (PHP tests) and the real SDK
-  with a mocked transport. Production has the key (`SHADER_API_KEY` / `ANTHROPIC_API_KEY` on
-  Render) and the route is live (`/api/v1/magic/status` answers 401 to a signed-out request).
-  The first press on pixl.community with the toggle on is the real check; a failure there falls
-  back to the rules director with a one-line notice.
-- **Logan signs off on three songs** (phase 4's last check). The scores above are measured; how
-  the shows look is a judgement only Logan can make. Open the sample project, add one of the test
-  songs, press Magic Sequence. Things worth a look: mid-chorus frames can read sparse, because a
-  SingleStrand chase lights a quarter of a prop (the corpus's median chase size) and non-hero
-  props now rest between beats; and a strophic carol (Silent Night) gets most of its verses
-  labelled chorus, since they are the loudest repeated group.
+Nothing. Two items waited on Logan:
+
+- **Sign-off on three songs** (phase 4's last check): signed off by Logan on 2026-10-08. Worth
+  watching in real use: mid-chorus frames
+  can read sparse (a SingleStrand chase lights a quarter of a prop, the corpus's median), and a
+  strophic carol gets most of its verses labelled chorus.
+- **The AI director against a real provider**: there is no model key on the machine this was
+  built on, so before production it ran only against a faked provider and the real SDK with a
+  mocked transport. Logan is checking it on pixl.community, where the key is set; a failure there
+  falls back to the rules director with a one-line notice.
