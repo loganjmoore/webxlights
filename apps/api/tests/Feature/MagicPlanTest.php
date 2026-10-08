@@ -355,10 +355,10 @@ class MagicPlanTest extends TestCase
         $this->assertCount(2, $fake->calls);
     }
 
-    public function test_the_defaults_are_ten_a_day_and_sixty_a_month(): void
+    public function test_the_defaults_are_ten_a_day_and_twenty_a_month(): void
     {
         $this->assertSame(10, config('services.magic.daily_limit'));
-        $this->assertSame(60, config('services.magic.monthly_limit'));
+        $this->assertSame(20, config('services.magic.monthly_limit'));
         $this->assertNull(config('services.magic.model'));
     }
 
