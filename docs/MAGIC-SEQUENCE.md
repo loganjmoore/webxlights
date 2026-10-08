@@ -647,3 +647,34 @@ What was built, and where the code made a decision the spec didn't.
 - Measured on synthetic audio in vitest: 90/120/150 BPM within 1 BPM with beat F >= 0.95 at
   70 ms; A-B-A-B-C-B boundaries within a bar with the right groups and the B group as chorus; a
   4-minute song in about 0.9 s. Real recordings are checked in phase 4.
+
+### Phase 2: rules generator and UI
+
+- `apps/web/src/lib/magic/`: `feels.ts`, `director.ts` (rules director and `completePlan`, which
+  fills an AI plan's gaps field by field), `choreograph.ts` (pure, seeded), `apply.ts`, `plan.ts`.
+  The dialog is `components/MagicSequenceDialog.vue`, opened from the toolbar's Magic button, the
+  Sequence menu and the command palette, and disabled until the song is loaded.
+- **Who carries a role.** A user's group whose members are at least 75% that role carries it as
+  one row (it renders as the same effect on each member); other props of the role are their own
+  rows. Whole-house groups carry a background texture in busy sections only: a group is the base
+  under every member's own effects (`applyGroupBase`), so a whole-house effect in a quiet section
+  would light the whole house. Sub-models are not sequenced yet.
+- **Lit or dark** is decided per look (repeat group), not per phrase: a role is lit for the whole
+  section, from the heroes up to a target share of rows that runs from 0.6x the corpus's
+  quietest-phrase median to its busiest-phrase median as intensity goes from 0 to 1. Roles that
+  sat out earlier looks move up the order, so every role gets sections. The feel scales section
+  intensity rather than shifting it, so a loud feel keeps its quiet sections quiet.
+- **Re-trigger rate.** Punctual effects fill to the next trigger. A role carrying a section
+  (featured, not a hero) triggers every 1-2 beats when loud; everything else every 4 or 8 beats;
+  heroes a bar or two apart; doubled above 130 BPM. That puts the effect rate inside the corpus's
+  IQR (about 170, 310 and 330 a minute at 80, 120 and 150 BPM on the test layout); triggering
+  every lit prop on every beat gave 915.
+- **Big hits.** Any moment where 40% of rows would start together and the plan didn't ask for a
+  hit is thinned: the lowest-tier rows hold their previous effect across that beat instead.
+- **Singing faces** lead with VU Meter: Faces needs a lyric track the generator can't make.
+- **Style threshold.** `analyze.mjs` now records `style.roleEffectJsd`: per song, the
+  seconds-weighted Jensen-Shannon divergence of its effect-by-role mix from the corpus's, over each
+  role's top effects minus those Magic Sequence never places. Corpus median 0.456 (IQR
+  0.378-0.541). Generated, over 3 tempos x 5 seeds on the test layout: mean 0.386.
+- Deferred: the hero texture layer (Twinkle or Shimmer at low mix) of 2.4 step 7, Off backdrops on
+  floods, sub-model rows, and a draggable section strip (labels are editable).

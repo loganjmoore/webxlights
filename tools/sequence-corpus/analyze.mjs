@@ -119,7 +119,7 @@ const A = {
   valueCurveByEffect: {}, valueCurveKeys: {}, paletteSize: [], colors: {}, paletteSizeByEffect: {}, settingsByEffect: {},
   timingTrackNames: {}, bpm: [], startAlignAny: { n: 0, hit: 0 }, startAlignBeat: { n: 0, hit: 0, half: 0, bar: 0 },
   nextEffect: {}, coverageByRole: {}, activityShape: [], onsetCorrelation: [], bigHits: { perMinute: [], effects: {} },
-  concurrentEffectTypes: [], sameEffectAcrossElements: [], perSeq: [], cyclesPerBeat: {}, colorsPerSeq: [], repeatRuns: [], layersByRole: {}, signatureShare: [], effectsFor90: [], beatAlignPerSeq: [], duplicates: 0, overCap: 0, effectCountW: {}, effectSecondsW: {}, effectByRoleW: {}, effectSecondsByRoleW: {}, roleSeqs: {}, effectByIntensityW: {}, roleEffectByIntensityW: {}, intensitySongs: 0, phraseSwing: [], activityByIntensity: {}, effectByIntensity: {}, roleEffectByIntensity: {}, durBeatsByIntensity: {},
+  concurrentEffectTypes: [], sameEffectAcrossElements: [], songRoleSeconds: [], perSeq: [], cyclesPerBeat: {}, colorsPerSeq: [], repeatRuns: [], layersByRole: {}, signatureShare: [], effectsFor90: [], beatAlignPerSeq: [], duplicates: 0, overCap: 0, effectCountW: {}, effectSecondsW: {}, effectByRoleW: {}, effectSecondsByRoleW: {}, roleSeqs: {}, effectByIntensityW: {}, roleEffectByIntensityW: {}, intensitySongs: 0, phraseSwing: [], activityByIntensity: {}, effectByIntensity: {}, roleEffectByIntensity: {}, durBeatsByIntensity: {},
 };
 
 const dirs = readdirSync(corpusDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
@@ -421,6 +421,7 @@ function analyzeSequence(key, seq, layout) {
     }
   }
 
+  A.songRoleSeconds.push(seqRoleSec);
   A.colorsPerSeq.push(seqColors.size);
   mergeNormalized(A.effectCountW, seqEffects);
   mergeNormalized(A.effectSecondsW, seqEffSec);
@@ -441,6 +442,43 @@ function analyzeSequence(key, seq, layout) {
   if (seqBeat.n >= 30) A.beatAlignPerSeq.push([beatMs ? Math.round(60000 / beatMs) : 0, seqBeat.hit / seqBeat.n]);
   A.perSeq.push({ key, frameMs, durationS: durMs / 1000, elements: elementsUsed.size, effects: effectsTotal, bpm: beatMs ? Math.round(60000 / beatMs) : null, timingTracks: Object.keys(timing).length, layout: layout.models.size > 0, effectsPerMinute: Math.round(effectsTotal / (durMs / 60000)) });
   return true;
+}
+
+const NEVER_PLACED = new Set(["Faces", "Pictures", "Video", "Shader", "State", "DMX", "Moving Head", "Sketch", "Kaleidoscope", "Warp", "Piano", "Guitar", "Liquid", "Off"]);
+
+export function jsd(p, q) {
+  const sum = (d) => Object.values(d).reduce((a, b) => a + b, 0) || 1;
+  const sp = sum(p), sq = sum(q);
+  let s = 0;
+  for (const k of new Set([...Object.keys(p), ...Object.keys(q)])) {
+    const a = (p[k] ?? 0) / sp, b = (q[k] ?? 0) / sq, m = (a + b) / 2;
+    if (a > 0) s += 0.5 * a * Math.log2(a / m);
+    if (b > 0) s += 0.5 * b * Math.log2(b / m);
+  }
+  return s;
+}
+
+function roleEffectSpread() {
+  const prior = {};
+  for (const [role, counts] of Object.entries(A.effectSecondsByRoleW)) {
+    prior[role] = Object.fromEntries(top(share(counts), 12).filter(([e]) => !NEVER_PLACED.has(e)));
+  }
+  const perRole = [], perSong = [];
+  for (const song of A.songRoleSeconds) {
+    let weighted = 0, weight = 0;
+    for (const [role, secs] of Object.entries(song)) {
+      if (!prior[role]) continue;
+      const mine = Object.fromEntries(Object.entries(secs).filter(([e]) => e in prior[role]));
+      const total = Object.values(mine).reduce((a, b) => a + b, 0);
+      if (total < 10) continue;
+      const d = jsd(mine, prior[role]);
+      perRole.push(d);
+      weighted += d * total;
+      weight += total;
+    }
+    if (weight) perSong.push(weighted / weight);
+  }
+  return { perRole: pct(perRole, [25, 50, 75]), perSong: pct(perSong, [25, 50, 75]) };
 }
 
 function mergeNormalized(into, counts) {
@@ -570,6 +608,10 @@ const priors = {
     identicalRepeatRunLength: pct(A.repeatRuns, [50, 75, 90, 99]),
     layersByRole: Object.fromEntries(Object.entries(A.layersByRole).filter(([, xs]) => xs.length >= 10).map(([r, xs]) => [r, pct(xs, [50, 90])])),
     beatAlignmentPerSong: pct(A.beatAlignPerSeq.map(([, a]) => a)),
+    // How far one song's effect-by-role mix sits from the corpus's: the yardstick for a generated
+    // sequence's style. Jensen-Shannon divergence (base 2) over each role's top effects, leaving out
+    // the ones Magic Sequence never places (they need a file, a face or a fixture).
+    roleEffectJsd: roleEffectSpread(),
     beatAlignmentByTempo: Object.fromEntries([[0, 90], [90, 120], [120, 999]].map(([lo, hi]) => [`${lo}-${hi === 999 ? "" : hi}bpm`, pct(A.beatAlignPerSeq.filter(([b]) => b >= lo && b < hi).map(([, a]) => a), [25, 50, 75])])),
   },
   // Median cycles per beat for each speed-like setting: multiply by an effect's length in beats
