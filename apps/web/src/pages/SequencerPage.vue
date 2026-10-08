@@ -17,6 +17,7 @@ import { effectIcon } from "../lib/effectIcons";
 import { filterRanked, isDefaultStrandName } from "../lib/listFilter";
 import { useTearOff } from "../lib/tearOff";
 import ModalPanel from "../components/ModalPanel.vue";
+import MagicSequenceDialog from "../components/MagicSequenceDialog.vue";
 import MenuButton, { type MenuItem } from "../components/MenuButton.vue";
 import AppBar from "../components/AppBar.vue";
 import { FPP_CONNECT_ENABLED, getFppSystemInfo, isChromiumLanCapable, syncPlaylist, uploadFseqToFpp, type FppSystemInfo } from "../lib/fppConnect";
@@ -156,6 +157,10 @@ const audioLoaded = ref(false);
 // "could not be cloned" on it. Nothing reads inside the series reactively anyway; it is
 // replaced wholesale when a track is analysed.
 const audioSeries = shallowRef<AudioSeries | null>(null);
+// The decoded song and its file, for Magic Sequence: it analyses the one and hashes the other.
+const audioBuffer = shallowRef<AudioBuffer | null>(null);
+const audioFile = shallowRef<File | null>(null);
+const showMagic = ref(false);
 const analyzingAudio = ref(false);
 const playheadMs = ref(0);
 const playing = ref(false);
@@ -954,6 +959,8 @@ function onAudioFilePicked(e: Event): void {
 
 async function loadAudioFile(file: File): Promise<void> {
   const buffer = await decodeAudioFile(file);
+  audioBuffer.value = buffer;
+  audioFile.value = file;
   peaks.value = computePeaks(buffer, 800);
   audioUrl.value = URL.createObjectURL(file);
   audioLoaded.value = true;
@@ -2361,6 +2368,8 @@ const sequenceMenu = computed<MenuItem[]>(() => [
   { label: "Export .fseq", disabled: !store.sequence, run: exportFseq },
   { kind: "separator" },
   { label: "Share to library…", disabled: !store.sequence, run: openShare },
+  { kind: "separator" },
+  { label: "Magic Sequence…", disabled: !store.sequence || !audioBuffer.value, run: () => (showMagic.value = true) },
 ]);
 
 const commands = computed(() =>
@@ -2450,6 +2459,7 @@ const commands = computed(() =>
       paletteOpen.value = true;
     },
     exportXsq,
+    ...(audioBuffer.value && store.sequence ? { magicSequence: () => (showMagic.value = true) } : {}),
     exportFseq,
     snapshot: () => void snapshotNow(),
   }),
@@ -2707,6 +2717,9 @@ watch(sequenceId, async (id) => {
   await store.load(id);
   audioLoaded.value = false;
   audioSeries.value = null;
+  audioBuffer.value = null;
+  audioFile.value = null;
+  showMagic.value = false;
   analyzingAudio.value = false;
 });
 </script>
@@ -2762,6 +2775,14 @@ watch(sequenceId, async (id) => {
       <div class="group">
         <MenuButton label="Windows" :items="windowsMenu" :active="anyPanelOpen" />
         <MenuButton label="Sequence" :items="sequenceMenu" />
+        <button
+          :disabled="!audioBuffer || !store.sequence"
+          :title="audioBuffer ? 'Magic Sequence: a whole sequence from the song, across your props' : 'Magic Sequence follows the song: load the sequence\'s audio first'"
+          @click="showMagic = true"
+        >
+          <svg class="magic-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /><path d="M18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" /></svg>
+          Magic
+        </button>
         <button title="Command palette (⌘K or Ctrl+K): type any command or effect" @click="paletteOpen = true">⌘K</button>
       </div>
       <div class="status">
@@ -2995,6 +3016,17 @@ watch(sequenceId, async (id) => {
     </ModalPanel>
 
     <CommandPalette :open="paletteOpen" :commands="commands" @close="paletteOpen = false" />
+    <MagicSequenceDialog
+      v-if="showMagic && audioBuffer"
+      :layout-id="layoutId"
+      :models="modelRecords"
+      :groups="groupRecords"
+      :audio="audioBuffer"
+      :audio-file="audioFile"
+      :saved-palettes="savedPalettes"
+      @close="showMagic = false"
+      @layout-changed="loadRows"
+    />
     <EffectWheel
       :shortcuts="shortcutsInForce" v-if="wheel" :x="wheel.x" :y="wheel.y" @pick="placeFromWheel" @close="wheel = null" />
 
@@ -3814,6 +3846,15 @@ watch(sequenceId, async (id) => {
   width: 30px;
   padding: 0;
   justify-content: center;
+}
+.toolbar .magic-icon {
+  width: 15px;
+  height: 15px;
+  margin-right: 0.35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
 }
 .toolbar button.icon svg {
   width: 16px;

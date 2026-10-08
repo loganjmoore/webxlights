@@ -56,6 +56,8 @@ export const useSequencerStore = defineStore("sequencer", () => {
 
   const canUndo = computed(() => undoStack.value.length > 0);
   const canRedo = computed(() => redoStack.value.length > 0);
+  /** How many steps back Ctrl+Z goes: lets a caller tell whether the top entry is still its own. */
+  const undoDepth = computed(() => undoStack.value.length);
 
   async function load(sequenceId: number): Promise<void> {
     suppressAutosave = true;
@@ -532,6 +534,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     takeTheirs,
     canUndo,
     canRedo,
+    undoDepth,
     load,
     undo,
     redo,
