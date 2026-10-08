@@ -195,6 +195,7 @@ class PlanValidator
         foreach (is_array($section['families'] ?? null) ? $section['families'] : [] as $role => $effects) {
             if (! isset($allowed[$role])) {
                 $dropped[] = "{$at}.families.{$role}: role not in the request";
+
                 continue;
             }
             $keep = [];

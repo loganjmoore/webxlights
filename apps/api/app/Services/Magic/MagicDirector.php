@@ -3,6 +3,7 @@
 namespace App\Services\Magic;
 
 use App\Services\Shader\Providers;
+use App\Services\Shader\UnusableOutput;
 use App\Services\ShaderGenerator;
 
 /**
@@ -75,7 +76,7 @@ class MagicDirector
      * @return array{plan: array, dropped: string[], usage: array, model: string}
      *
      * @throws \RuntimeException not configured, or the provider refused
-     * @throws \App\Services\Shader\UnusableOutput a refusal, a cut-off reply or bad JSON
+     * @throws UnusableOutput a refusal, a cut-off reply or bad JSON
      */
     public function plan(array $request, ?string $userKey = null, ?string $providerName = null, ?string $modelName = null): array
     {

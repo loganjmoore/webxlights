@@ -11,6 +11,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMemberController;
 use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\LyricAlignmentController;
+use App\Http\Controllers\MagicPlanController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\SequenceController;
 use App\Http\Controllers\SequencerViewController;
@@ -55,6 +56,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('shaders/generate', [ShaderGenerationController::class, 'generate'])
             ->middleware('throttle:10,1');
         Route::get('credits', [ShaderGenerationController::class, 'credits']);
+
+        // Magic Sequence's AI director: a paid model call per press, so it is throttled and
+        // capped like the shader assistant. The status route says whether to offer it at all.
+        Route::post('sequences/{sequence}/magic-plan', [MagicPlanController::class, 'plan'])->middleware('throttle:10,1');
+        Route::get('magic/status', [MagicPlanController::class, 'status']);
 
         Route::apiResource('projects', ProjectController::class)->only(['index', 'store', 'show']);
         Route::get('projects/{project}/layouts', [LayoutController::class, 'index']);
