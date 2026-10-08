@@ -3,11 +3,12 @@
 //
 // Changed from the original: boundaries are snapped to 4-bar phrases when the phrase line is
 // within a bar, sections under 2 bars are merged into a neighbour and any over 32 bars are split
-// at their strongest internal novelty peak; labels come out as the engine's SectionLabel set
-// (intro, verse, prechorus, chorus, bridge, breakdown, solo, outro) instead of the original's free
-// text; the chorus must be a high-energy repeated group and the bridge comes after the second
-// chorus; section energy comes from the per-beat curve rather than a separate loudness pass; and
-// the novelty peaks' separation is reported as a confidence.
+// at their strongest internal novelty peak; a boundary must stand a deviation above the mean
+// novelty rather than just reach it; labels come out as the engine's SectionLabel set (intro,
+// verse, prechorus, chorus, bridge, breakdown, solo, outro) instead of the original's free text;
+// the chorus must be a high-energy repeated group, the verse the most repeated quieter one, and
+// the bridge comes after the second chorus; section energy comes from the per-beat curve rather
+// than a separate loudness pass; and the novelty peaks' separation is reported as a confidence.
 
 import type { SectionLabel } from "../songMap";
 import { meanStd, timeFrame, type SongFeatures } from "./features";

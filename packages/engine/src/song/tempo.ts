@@ -4,8 +4,12 @@
 // Changed from the original: typed, and split out of the closure into plain functions. The
 // algorithm is the original's: an autocorrelation for a rough tempo, a circular-concentration fit
 // of the onsets against a grid for the fine tempo and phase, a kick-gap test for half and double
-// time, and a snap to a whole BPM when that fits as well. `detectTempo` also reports the fit
-// quality (R) and returns a plain fallback instead of garbage when there are too few onsets.
+// time, and a snap to a whole BPM when that fits as well. Three things differ, each found by a
+// synthetic track the original's order of steps got wrong: the autocorrelation also uses the
+// kick-band envelope, the grid is fitted to the kicks from the start (not only polished against
+// them at the end), and the octave is decided from the rough tempo before any grid is fitted.
+// `detectTempo` also reports the fit quality (R) and returns a plain fallback instead of garbage
+// when there are too few onsets.
 
 import { FPS, type Onset } from "./features";
 
