@@ -69,6 +69,7 @@ export * from "./effects/vuMeter";
 export * from "./effects/schema";
 export * from "./audio";
 export * from "./onsets";
+export * from "./songMap";
 export * from "./rng";
 export * from "./blend";
 export * from "./nodeMapping";
