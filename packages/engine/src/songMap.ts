@@ -51,7 +51,7 @@ export interface SongAnalysisProgress {
   (fraction: number, step: string): void;
 }
 
-export { analyzeSong } from "./songAnalysis";
+export { analyzeSong, type SongAnalysisOptions } from "./songAnalysis";
 
 /** The index of the last beat at or before `ms`, or -1 before the first beat. */
 export function beatIndexAt(map: Pick<SongMap, "beats">, ms: number): number {

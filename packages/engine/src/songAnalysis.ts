@@ -9,7 +9,7 @@
 
 import type { SongAnalysisProgress, SongHit, SongMap, SongSection } from "./songMap";
 import { detrend, FPS, frameTime, pickPeaks, resampleMono, sdThreshold, spectralFeatures, type Onset, type SongFeatures, type SongModel } from "./song/features";
-import { buildGrid, gridFit, rmsDb } from "./song/grid";
+import { buildGrid, gridFit, gridFromBeats, proBeats, rmsDb } from "./song/grid";
 import { detectBoundaries, groupSections, labelSections, spansFromBoundaries } from "./song/sections";
 import { detectTempo } from "./song/tempo";
 
@@ -154,7 +154,15 @@ function meanEnergy(beats: readonly number[], energy: readonly number[], startMs
   return energy[nearest] ?? 0.5;
 }
 
-export function analyzeSong(samples: Float32Array, sampleRate: number, onProgress?: SongAnalysisProgress): SongMap {
+export interface SongAnalysisOptions {
+  /**
+   * Beats and downbeats (seconds) from Beat This!, the pro tracker, used instead of this engine's
+   * own tempo and beat grid. Sections, energy, hits and impacts are still this engine's.
+   */
+  grid?: { beats: readonly number[]; downbeats: readonly number[] };
+}
+
+export function analyzeSong(samples: Float32Array, sampleRate: number, onProgress?: SongAnalysisProgress, options: SongAnalysisOptions = {}): SongMap {
   if (!(sampleRate > 0)) throw new Error(`analyzeSong: sample rate ${sampleRate} is not positive`);
   const progress = onProgress ?? (() => {});
   const duration = samples.length / sampleRate;
@@ -189,10 +197,13 @@ export function analyzeSong(samples: Float32Array, sampleRate: number, onProgres
 
   progress(0.8, "Fitting the tempo");
   const tempo = detectTempo(onsets);
-  const T = 60 / tempo.bpm;
+  const pro = options.grid && options.grid.beats.length >= 8 ? proBeats(model, options.grid.beats, options.grid.downbeats) : undefined;
+  const ibis = pro ? pro.beats.slice(1).map((b, i) => b - pro.beats[i]!).sort((a, b) => a - b) : [];
+  const bpm = pro ? Math.round((60 / ibis[Math.floor(ibis.length / 2)]!) * 1000) / 1000 : tempo.bpm;
+  const T = 60 / bpm;
 
   progress(0.86, "Finding bars and sections");
-  const grid = buildGrid(model, tempo.bpm, tempo.offset);
+  const grid = pro ? gridFromBeats(model, pro.beats, pro.downbeats) : buildGrid(model, tempo.bpm, tempo.offset);
   const beatsMs = grid.beats.map(ms);
   const energy = beatEnergy(feat, grid.beats, T, grid.beatsPerBar).map((v) => Math.round(v * 1000) / 1000);
 
@@ -226,14 +237,17 @@ export function analyzeSong(samples: Float32Array, sampleRate: number, onProgres
 
   progress(0.94, "Finding hits and impacts");
   const strong = tempo.anchor.filter((o) => o.s > 0.3);
-  const beatConfidence = tempo.found
-    ? clamp01(0.5 * Math.min(1, tempo.R / 0.8) + 0.5 * gridFit(strong, grid.beats, T))
-    : 0;
+  // The pro grid is a neural net's, not a fit: judge it by how many strong onsets sit on it.
+  const beatConfidence = pro
+    ? clamp01(gridFit(strong, grid.beats, T))
+    : tempo.found
+      ? clamp01(0.5 * Math.min(1, tempo.R / 0.8) + 0.5 * gridFit(strong, grid.beats, T))
+      : 0;
 
   const map: SongMap = {
     version: 1,
     durationMs,
-    bpm: tempo.bpm,
+    bpm,
     beats: beatsMs,
     downbeats: grid.downbeats.map(ms),
     beatsPerBar: grid.beatsPerBar,
@@ -242,7 +256,7 @@ export function analyzeSong(samples: Float32Array, sampleRate: number, onProgres
     hits: findHits(feat, onsets.envelope, onsets.kickEnvelope, active),
     impacts: findImpacts(feat, T),
     confidence: { beats: Math.round(beatConfidence * 1000) / 1000, sections: Math.round((detection?.confidence ?? 0) * 1000) / 1000 },
-    source: "browser",
+    source: pro ? "pro" : "browser",
   };
   progress(1, "Done");
   return map;

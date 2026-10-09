@@ -47,6 +47,8 @@ const song = shallowRef<SongMap | null>(null);
 const songHash = ref<string | null>(null);
 const analysis = ref("Reading the song…");
 const analysisFailed = ref(false);
+const proStatus = ref("");
+const sequenceId = store.sequence?.id;
 const selectedSection = ref<number | null>(null);
 
 const feel = ref<Feel>("auto");
@@ -108,13 +110,43 @@ onMounted(async () => {
   }
 });
 
-/** Kept on the sequence so the song is analysed once. A viewer can't save; that's fine. */
+/**
+ * Kept on the sequence so the song is analysed once. A viewer can't save; that's fine. An analysis
+ * that finishes after the user has moved to another sequence is not saved onto that one.
+ */
 async function saveSongMap(map: SongMap): Promise<void> {
-  if (!songHash.value || !store.sequence) return;
+  if (!songHash.value || !store.sequence || store.sequence.id !== sequenceId) return;
   try {
     await store.saveSettings({ metadata: withCachedSongMap(store.sequence.metadata, songHash.value, map) });
   } catch {
     /* the next press analyses again */
+  }
+}
+
+/**
+ * Analyses the song again, the beats from Beat This! (`pro`) or from the browser's tracker; the
+ * sections are found again on them, so a plan made for the old ones is dropped.
+ */
+async function reanalyse(pro: boolean): Promise<void> {
+  if (busy.value) return;
+  busy.value = true;
+  proStatus.value = pro ? "Loading the beat model…" : "Finding beats…";
+  try {
+    const map = await analyzeSongInWorker(props.audio, (_fraction, step) => (proStatus.value = `${step}…`), pro);
+    if (pro && map.source !== "pro") {
+      proStatus.value = "Beat This! found too few beats in this song, so the browser's beats stay.";
+      return;
+    }
+    song.value = map;
+    selectedSection.value = null;
+    lastPlan.value = null;
+    result.value = null;
+    proStatus.value = "";
+    void saveSongMap(map);
+  } catch (err) {
+    proStatus.value = `Pro analysis failed${err instanceof Error ? ` (${err.message})` : ""}, so the browser's beats stay.`;
+  } finally {
+    busy.value = false;
   }
 }
 
@@ -264,8 +296,21 @@ const strip = computed(() => {
         <template v-else>
           <p class="note">
             <span class="num">{{ Math.round(song.bpm) }}</span> BPM · {{ song.beatsPerBar }}/4 · {{ song.sections.length }} sections
+            <span v-if="song.source === 'pro'"> · pro beats ·
+              <button type="button" class="link" :disabled="busy" title="Back to the beats this browser finds itself" @click="reanalyse(false)">Use browser analysis</button>
+            </span>
             <span v-if="song.confidence.beats < 0.5"> · the beat is hard to hear in this song, so check the Magic Beats track</span>
+            <span v-if="song.source === 'browser'"> ·
+              <button
+                type="button"
+                class="link"
+                :disabled="busy"
+                title="Tracks the beats with Beat This!, a neural network that runs in your browser. The first time downloads about 25 MB."
+                @click="reanalyse(true)"
+              >Use pro analysis</button>
+            </span>
           </p>
+          <p v-if="proStatus" class="note" role="status">{{ proStatus }}</p>
           <div class="strip" role="group" aria-label="Sections">
             <button
               v-for="seg in strip"

@@ -154,22 +154,107 @@ export function buildGrid(model: SongModel, bpm: number, offset: number): Grid {
     if (!(t < model.songEnd + 0.5 * T && t < model.duration)) break;
     beats.push(t);
   }
+  return gridFromBeats(model, beats);
+}
 
-  const beatsPerBar = beats.length > 16 ? chooseMeter(model, beats) : 4;
-  const shift = beats.length > beatsPerBar * 2 ? chooseDownbeat(model, beats, beatsPerBar) : 0;
+/**
+ * The bar length, in beats, that a tracker's downbeats give: their usual spacing when they make
+ * bars of a steady length (at least four bars and three in five the same 2-7 beats long), else 0.
+ */
+function barLength(beats: readonly number[], downbeats: readonly number[]): number {
+  const given = downbeats.map((d) => beats.indexOf(d)).filter((i) => i >= 0);
+  const lengths = given.slice(1).map((i, n) => i - given[n]!);
+  const counts = new Map<number, number>();
+  for (const l of lengths) counts.set(l, (counts.get(l) ?? 0) + 1);
+  const [mode, modeCount] = [...counts].sort((a, b) => b[1] - a[1])[0] ?? [0, 0];
+  return lengths.length >= 4 && mode >= 2 && mode <= 7 && modeCount >= 0.6 * lengths.length ? mode : 0;
+}
 
-  const downbeats: number[] = [];
+/** Above this a tracker's beat is a subdivision for lighting: the corpus counts beats a person would tap. */
+const MAX_PRO_BPM = 200;
+
+const medianGap = (beats: readonly number[]): number => {
+  const gaps = beats.slice(1).map((b, i) => b - beats[i]!).sort((a, b) => a - b);
+  return gaps[gaps.length >> 1] ?? 0.5;
+};
+
+/**
+ * Beat This!'s beats and downbeats (seconds) made into what gridFromBeats takes.
+ *
+ * - Above 200 BPM the tracker has the quarter note of a fast 3/4 or the eighth of a fast 4/4
+ *   (Carol of the Bells comes back at 250). An even bar keeps every other beat from each
+ *   downbeat; an odd one makes its downbeats the beats, and this engine then finds the bars.
+ * - The tracker reports only the beats it is sure of, so a free intro or a loose ending has none.
+ *   The grid is carried on at the local tempo to the ends of the audible song, as buildGrid's is.
+ */
+export function proBeats(model: SongModel, beats: readonly number[], downbeats: readonly number[]): { beats: number[]; downbeats: number[] } {
+  let b = [...beats];
+  let d = [...downbeats];
+  while (b.length > 16 && 60 / medianGap(b) > MAX_PRO_BPM) {
+    const bar = barLength(b, d);
+    if (bar % 2 === 1) {
+      b = d.filter((t) => b.includes(t));
+      d = [];
+      continue;
+    }
+    if (!bar) d = []; // downbeats that make no steady bar (every beat one, say) don't steer the halving
+    const set = new Set(d);
+    let k = Math.max(0, b.indexOf(d[0] ?? NaN)) % 2; // a pickup keeps the first downbeat's step
+    const before = b.length;
+    b = b.filter((t) => {
+      if (set.has(t)) k = 0;
+      return k++ % 2 === 0;
+    });
+    if (b.length === before) break;
+  }
+  if (b.length < 2) return { beats: b, downbeats: d };
+  const head = medianGap(b.slice(0, 9));
+  const tail = medianGap(b.slice(-9));
+  const before: number[] = [];
+  for (let t = b[0]! - head; t >= Math.max(0, model.songStart - 0.1 * head); t -= head) before.unshift(t);
+  const after: number[] = [];
+  for (let t = b[b.length - 1]! + tail; t < model.songEnd + 0.5 * tail && t < model.duration; t += tail) after.push(t);
+  return { beats: [...before, ...b, ...after], downbeats: d };
+}
+
+/**
+ * Bars over a given list of beats (seconds).
+ *
+ * With `downbeats` (from Beat This!, the pro tracker) they are used as they come when they make
+ * bars of a steady length (barLength), and the bar carries on at that length before the first of
+ * them and after the last. A tracker that marks every beat a downbeat, or none, gets this
+ * engine's own meter and downbeat choice over its beats instead.
+ */
+export function gridFromBeats(model: SongModel, beats: readonly number[], downbeats?: readonly number[]): Grid {
+  const T = beats.length > 1 ? (beats[beats.length - 1]! - beats[0]!) / (beats.length - 1) : 0.5;
+  const mode = barLength(beats, downbeats ?? []);
+
+  let isDownbeat: (i: number) => boolean;
+  let beatsPerBar: number;
+  if (mode) {
+    const given = (downbeats ?? []).map((d) => beats.indexOf(d)).filter((i) => i >= 0);
+    const set = new Set(given);
+    const first = given[0]!, last = given[given.length - 1]!;
+    isDownbeat = (i) => (i < first ? (first - i) % mode === 0 : i > last ? (i - last) % mode === 0 : set.has(i));
+    beatsPerBar = mode;
+  } else {
+    beatsPerBar = beats.length > 16 ? chooseMeter(model, beats) : 4;
+    const shift = beats.length > beatsPerBar * 2 ? chooseDownbeat(model, beats, beatsPerBar) : 0;
+    isDownbeat = (i) => ((i - shift) % beatsPerBar + beatsPerBar) % beatsPerBar === 0;
+  }
+
+  const downbeatTimes: number[] = [];
   const bars: Bar[] = [];
   for (let i = 0; i < beats.length; i++) {
     const beatEnd = i + 1 < beats.length ? beats[i + 1]! : Math.min(model.duration, beats[i]! + T);
-    if (((i - shift) % beatsPerBar + beatsPerBar) % beatsPerBar === 0) {
-      downbeats.push(beats[i]!);
+    if (isDownbeat(i)) {
+      downbeatTimes.push(beats[i]!);
       bars.push({ s: beats[i]!, e: beatEnd });
     } else if (bars.length > 0) {
       bars[bars.length - 1]!.e = beatEnd;
     }
   }
-  return { beats, downbeats, beatsPerBar, bars };
+  return { beats: [...beats], downbeats: downbeatTimes, beatsPerBar, bars };
 }
 
 /**
