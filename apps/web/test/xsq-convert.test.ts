@@ -11,7 +11,6 @@ function parsed(over: Partial<ParsedXsq> = {}): ParsedXsq {
     frameMs: 50,
     durationMs: 10_000,
     mediaFilename: "song.mp3",
-    unsupportedEffectNames: [],
     rows: [],
     ...over,
   } as ParsedXsq;
@@ -20,7 +19,7 @@ function parsed(over: Partial<ParsedXsq> = {}): ParsedXsq {
 describe("mapping an .xsq onto a layout", () => {
   it("matches rows to models by name", () => {
     const mapped = mapXsqToBody(
-      parsed({ rows: [{ name: "Mega Tree", elementType: "model", effects: [{ name: "On", startMs: 0, endMs: 500, params: {}, translated: true }] }] as never }),
+      parsed({ rows: [{ name: "Mega Tree", elementType: "model", effects: [{ name: "On", startMs: 0, endMs: 500, rawSettings: {}, rawPalette: {} }] }] as never }),
       models,
       groups,
     );
@@ -33,7 +32,7 @@ describe("mapping an .xsq onto a layout", () => {
     // The .xsq writes type="model" for groups too, so a name miss has to try groups before being
     // reported unmatched - real sequences target groups constantly.
     const mapped = mapXsqToBody(
-      parsed({ rows: [{ name: "ALL", elementType: "model", effects: [{ name: "On", startMs: 0, endMs: 500, params: {}, translated: true }] }] as never }),
+      parsed({ rows: [{ name: "ALL", elementType: "model", effects: [{ name: "On", startMs: 0, endMs: 500, rawSettings: {}, rawPalette: {} }] }] as never }),
       models,
       groups,
     );
@@ -46,7 +45,7 @@ describe("mapping an .xsq onto a layout", () => {
     const mapped = mapXsqToBody(
       parsed({
         rows: [
-          { name: "Nonexistent", elementType: "model", effects: [{ name: "On", startMs: 0, endMs: 500, params: {}, translated: true }] },
+          { name: "Nonexistent", elementType: "model", effects: [{ name: "On", startMs: 0, endMs: 500, rawSettings: {}, rawPalette: {} }] },
         ] as never,
       }),
       models,
@@ -72,7 +71,7 @@ describe("mapping an .xsq onto a layout", () => {
     // The renderers don't all null-guard every field, so `{}` could render as NaN geometry and
     // throw on export - which is what this fallback exists to prevent.
     const mapped = mapXsqToBody(
-      parsed({ rows: [{ name: "Mega Tree", elementType: "model", effects: [{ name: "Bars", startMs: 0, endMs: 500, params: {}, translated: false }] }] as never }),
+      parsed({ rows: [{ name: "Mega Tree", elementType: "model", effects: [{ name: "Bars", startMs: 0, endMs: 500, rawSettings: {}, rawPalette: {} }] }] as never }),
       models,
       groups,
     );
@@ -81,7 +80,7 @@ describe("mapping an .xsq onto a layout", () => {
 
   it("keeps real params when the effect was translated", () => {
     const mapped = mapXsqToBody(
-      parsed({ rows: [{ name: "Mega Tree", elementType: "model", effects: [{ name: "Bars", startMs: 0, endMs: 500, params: { cycles: 7 }, translated: true }] }] as never }),
+      parsed({ rows: [{ name: "Mega Tree", elementType: "model", effects: [{ name: "Bars", startMs: 0, endMs: 500, rawSettings: { E_TEXTCTRL_Bars_Cycles: "7" }, rawPalette: {} }] }] as never }),
       models,
       groups,
     );
@@ -92,8 +91,8 @@ describe("mapping an .xsq onto a layout", () => {
     const mapped = mapXsqToBody(
       parsed({
         rows: [{ name: "Mega Tree", elementType: "model", effects: [
-          { name: "On", startMs: 0, endMs: 100, params: {}, translated: true },
-          { name: "On", startMs: 200, endMs: 300, params: {}, translated: true },
+          { name: "On", startMs: 0, endMs: 100, rawSettings: {}, rawPalette: {} },
+          { name: "On", startMs: 200, endMs: 300, rawSettings: {}, rawPalette: {} },
         ] }] as never,
       }),
       models,
@@ -105,7 +104,7 @@ describe("mapping an .xsq onto a layout", () => {
 
   it("turns timing rows into timing tracks", () => {
     const mapped = mapXsqToBody(
-      parsed({ rows: [{ name: "Beats", elementType: "timing", effects: [{ name: "", startMs: 0, endMs: 0, params: {}, translated: true }, { name: "", startMs: 500, endMs: 0, params: {}, translated: true }] }] as never }),
+      parsed({ rows: [{ name: "Beats", elementType: "timing", effects: [{ name: "", startMs: 0, endMs: 0, rawSettings: {}, rawPalette: {} }, { name: "", startMs: 500, endMs: 0, rawSettings: {}, rawPalette: {} }] }] as never }),
       models,
       groups,
     );
@@ -118,12 +117,12 @@ describe("describing what a mapping did", () => {
     expect(describeMapping({ body: { rows: [], timingTracks: [] }, unmatchedNames: [] }, parsed())).toBe("0 rows");
   });
 
-  it("names what didn't match and what wasn't translated", () => {
+  it("names what didn't match and what can't render", () => {
     const text = describeMapping(
       { body: { rows: [], timingTracks: [] }, unmatchedNames: ["Ghost"] },
-      parsed({ unsupportedEffectNames: ["Warp"] }),
+      parsed({ rows: [{ name: "Matrix", elementType: "model", effects: [{ name: "Video", startMs: 0, endMs: 500, rawSettings: {}, rawPalette: {}, layerIndex: 0 }] }] }),
     );
     expect(text).toContain("Ghost");
-    expect(text).toContain("Warp");
+    expect(text).toContain("Video");
   });
 });

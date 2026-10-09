@@ -42,6 +42,17 @@ return [
         'monthly_limit' => (int) env('SHADER_MONTHLY_LIMIT', 100),
     ],
 
+    // Magic Sequence's AI director (docs/MAGIC-SEQUENCE.md 2.3). It borrows the shader
+    // assistant's provider, key and bring-your-own-key rules and has its own allowance, counted
+    // from the same credit ledger under its own reasons, so a plan never uses up a shader
+    // generation or the other way round. 0 means uncapped; your own key bypasses both.
+    'magic' => [
+        // Empty means claude-opus-5-5 on Anthropic, or the provider's own default otherwise.
+        'model' => env('MAGIC_MODEL'),
+        'daily_limit' => (int) env('MAGIC_DAILY_LIMIT', 10),
+        'monthly_limit' => (int) env('MAGIC_MONTHLY_LIMIT', 20),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

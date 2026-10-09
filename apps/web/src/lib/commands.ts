@@ -50,6 +50,8 @@ export interface CommandContext {
   moveSelectedEffectVertically: (direction: -1 | 1) => void;
   openPalette: () => void;
   exportXsq: () => void;
+  /** Opens Magic Sequence; absent while the sequence has no song loaded. */
+  magicSequence?: () => void;
   exportFseq: () => void;
   snapshot: () => void;
   /**
@@ -345,6 +347,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
     // In the palette but with no key of their own: the palette is meant to reach everything, and
     // a command that can only be got at through a menu is exactly what it exists to replace.
     { id: "file.export-xsq", label: "Export for xLights (.xsq)", group: "File", run: ctx.exportXsq },
+    ...(ctx.magicSequence ? [{ id: "sequence.magic", label: "Magic Sequence…", group: "Sequence", run: ctx.magicSequence }] : []),
     { id: "file.export", label: "Export .fseq", group: "File", run: ctx.exportFseq },
     { id: "file.snapshot", label: "Save a snapshot", group: "File", run: ctx.snapshot },
   ];

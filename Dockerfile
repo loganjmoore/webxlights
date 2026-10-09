@@ -12,6 +12,8 @@ COPY packages/formats/package.json packages/formats/
 RUN npm ci
 COPY apps/web/ apps/web/
 COPY packages/ packages/
+# Magic Sequence's corpus statistics, bundled into the app at build time.
+COPY tools/sequence-corpus/priors.json tools/sequence-corpus/
 RUN npm run build -w apps/web
 
 FROM composer:2 AS vendor
@@ -38,6 +40,11 @@ COPY apps/api/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Laravel's log also goes to stderr, which php-fpm forwards (catch_workers_output) and Render
+# keeps. Without it a reported exception (an AI provider error, say) lands only in a file inside
+# the container, out of reach from Render's logs.
+ENV LOG_STACK=single,stderr
 
 EXPOSE 10000
 # Prepares the Render persistent disk, applies pending migrations, then starts nginx +

@@ -1,0 +1,23 @@
+webXLights is licensed under the GNU General Public License v3.0 (see LICENSE).
+
+Third-party code
+================
+
+LightsAutoSequencer
+  Copyright (c) computergeek1507
+  https://github.com/computergeek1507/LightsAutoSequencer
+  Licensed under the GNU General Public License v3.0, the same licence as this repository.
+
+  Ported from js/analysis.js at commit b55d5b3f1e5162b41aa01aa29530e7d7fb4dceef: the audio
+  feature extraction, onset peak picking, tempo detection (autocorrelation with a log-normal
+  prior, circular-concentration phase fit, kick-gap octave test, whole-BPM snap), beat grid and
+  downbeat evidence, bar-synchronous self-similarity and Foote novelty section detection, and
+  repeat grouping. The port is in:
+
+    packages/engine/src/songAnalysis.ts
+    packages/engine/src/song/features.ts
+    packages/engine/src/song/tempo.ts
+    packages/engine/src/song/grid.ts
+    packages/engine/src/song/sections.ts
+
+  Each of those files carries a header that says what was changed from the original.

@@ -1,7 +1,7 @@
-import { defaultParamsFor } from "@webxlights/engine";
 import type { ParsedXsq } from "@webxlights/formats";
 import { newEffectId } from "../stores/sequencer";
 import type { ModelGroupRecord, ModelRecord, SequenceBody } from "./api";
+import { importEffectSettings } from "./xsqEffectSettings";
 
 // xLights' Import Effects mapping (manual: Menus > Import).
 //
@@ -125,13 +125,12 @@ export function applyMapping(
       elementId: target.elementId,
       effects: donor.effects.map((eff) => ({
         id: newEffectId(),
-        name: eff.name,
+        // Every setting the export table knows, translated back, with the engine's schema
+        // defaults under it: the renderers don't all null-guard every field, so an effect with
+        // `{}` could render as NaN geometry and throw on export.
+        ...importEffectSettings(eff.name, eff.rawSettings, eff.rawPalette),
         startMs: eff.startMs,
         endMs: eff.endMs,
-        // An effect whose params weren't translated gets the engine's own schema defaults rather
-        // than an empty bag: the renderers don't all null-guard every field, so an untranslated
-        // effect with `{}` could render as NaN geometry and throw on export.
-        params: (eff.translated ? eff.params : defaultParamsFor(eff.name)) as Record<string, number | boolean | string>,
         // The donor's own layer. A real xLights sequence uses layers freely, and flattening them
         // onto one would stack every layer's effects on top of each other at the same instant -
         // which still renders, just not as anything the author wrote.

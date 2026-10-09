@@ -116,6 +116,76 @@ class SequenceTest extends TestCase
             ->assertForbidden();
     }
 
+    // Magic Sequence analyses a song once and keeps the result on the sequence, keyed by a hash of
+    // the audio, so the next press doesn't pay for it again.
+    public function test_a_song_map_round_trips_through_the_sequence_metadata(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+        $sequence = $project->sequences()->create([
+            'name' => 'S', 'frame_ms' => 50, 'duration_ms' => 1000, 'body' => ['timingTracks' => [], 'rows' => []],
+        ]);
+        $songMap = [
+            'hash' => str_repeat('ab', 32),
+            'map' => [
+                'version' => 1, 'durationMs' => 96000, 'bpm' => 120.5, 'beats' => [0, 500, 1000],
+                'sections' => [['startMs' => 0, 'endMs' => 96000, 'label' => 'verse', 'group' => 'A', 'energy' => 0.5, 'rank' => 0]],
+                'confidence' => ['beats' => 0.9, 'sections' => 0.4], 'source' => 'browser',
+            ],
+        ];
+
+        $this->actingAs($user)->patchJson("/api/v1/sequences/{$sequence->id}", [
+            'metadata' => ['author' => 'Someone', 'songMap' => $songMap],
+        ])->assertOk();
+
+        $this->actingAs($user)->getJson("/api/v1/sequences/{$sequence->id}")
+            ->assertOk()
+            ->assertJsonPath('metadata.author', 'Someone')
+            ->assertJsonPath('metadata.songMap.hash', $songMap['hash'])
+            ->assertJsonPath('metadata.songMap.map.bpm', 120.5)
+            ->assertJsonPath('metadata.songMap.map.sections.0.label', 'verse')
+            ->assertJsonPath('metadata.songMap.map.beats', [0, 500, 1000]);
+    }
+
+    public function test_a_song_map_can_be_cleared_and_must_be_an_object(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user, 'owner')->create();
+        $sequence = $project->sequences()->create([
+            'name' => 'S', 'frame_ms' => 50, 'duration_ms' => 1000, 'body' => ['timingTracks' => [], 'rows' => []],
+            'metadata' => ['songMap' => ['hash' => 'x', 'map' => ['version' => 1]]],
+        ]);
+
+        $this->actingAs($user)
+            ->patchJson("/api/v1/sequences/{$sequence->id}", ['metadata' => ['songMap' => 'not a map']])
+            ->assertStatus(422);
+
+        $this->actingAs($user)
+            ->patchJson("/api/v1/sequences/{$sequence->id}", ['metadata' => ['song' => 'Carol', 'songMap' => null]])
+            ->assertOk()
+            ->assertJsonPath('metadata.song', 'Carol')
+            ->assertJsonPath('metadata.songMap', null);
+    }
+
+    public function test_a_viewer_cannot_set_the_song_map(): void
+    {
+        $owner = User::factory()->create();
+        $viewer = User::factory()->create();
+        $project = Project::factory()->for($owner, 'owner')->create();
+        $this->actingAs($owner)->postJson("/api/v1/projects/{$project->id}/members", [
+            'email' => $viewer->email, 'role' => 'viewer',
+        ])->assertCreated();
+        $sequence = $project->sequences()->create([
+            'name' => 'S', 'frame_ms' => 50, 'duration_ms' => 1000, 'body' => ['timingTracks' => [], 'rows' => []],
+        ]);
+
+        $this->actingAs($viewer)
+            ->patchJson("/api/v1/sequences/{$sequence->id}", ['metadata' => ['songMap' => ['hash' => 'x', 'map' => []]]])
+            ->assertForbidden();
+
+        $this->assertNull($sequence->fresh()->metadata);
+    }
+
     // The "animated" type has existed since Sequence Settings landed and nothing could produce
     // one: every path to a new sequence went through picking an audio file.
     public function test_a_sequence_can_be_created_without_audio(): void

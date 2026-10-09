@@ -87,6 +87,10 @@ class SequenceController extends Controller
             'metadata.album' => ['nullable', 'string', 'max:255'],
             'metadata.music_url' => ['nullable', 'string', 'max:255'],
             'metadata.comment' => ['nullable', 'string', 'max:2000'],
+            // The analysis of the sequence's song, { hash, map }, kept so it runs once per song
+            // (Magic Sequence). Only the browser writes it and only the browser reads it back, so
+            // the server checks that it is an object and nothing about what is inside.
+            'metadata.songMap' => ['nullable', 'array'],
         ]);
 
         $sequence->update($data);

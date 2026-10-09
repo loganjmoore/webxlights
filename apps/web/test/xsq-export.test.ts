@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { parseSettingsString, parseXsq } from "@webxlights/formats";
 import { exportSequenceToXsq, xsqSettingsString } from "../src/lib/xsqExport";
+import { importEffectSettings } from "../src/lib/xsqEffectSettings";
+import { applyMapping, mappingTargets } from "../src/lib/importMapping";
 import type { ModelRecord, SequenceBody, SequenceRecord } from "../src/lib/api";
 
 const models = [{ id: 1, name: 'Arch & "one"', type: "Arches" }] as ModelRecord[];
@@ -34,7 +36,7 @@ describe("editable xLights sequence export", () => {
     expect(parsed.durationMs).toBe(2000);
     expect(parsed.rows[1]!.name).toBe(models[0]!.name);
     const on = parsed.rows[1]!.effects.find((e) => e.name === "On")!;
-    expect(on.params).toMatchObject({ startIntensity: 30, endIntensity: 80 });
+    expect(importEffectSettings(on.name, on.rawSettings, on.rawPalette)).toMatchObject({ params: { startIntensity: 30, endIntensity: 80 }, palette: ["#123456"] });
     expect(result.xml).toContain("C_BUTTON_Palette1=#123456");
     expect(result.effectCount).toBe(2);
   });
@@ -60,6 +62,25 @@ describe("editable xLights sequence export", () => {
     expect(layers[0].Effect.name).toBe("Bars");
     expect(layers[1]).toBe("");
     expect(layers[2].Effect.name).toBe("On");
+  });
+
+  it("round-trips layers: an exported xsq imports and re-exports to the same native layers", () => {
+    // The reader used to take the first <EffectLayer> as the bottom while the writer (correctly)
+    // writes the top first, so every import-then-export flipped a layered sequence.
+    const twoLayers = `<?xml version="1.0" encoding="UTF-8"?>
+<xsequence><head><sequenceTiming>50 ms</sequenceTiming><sequenceDuration>2.000</sequenceDuration></head>
+<EffectDB><Effect>E_SLIDER_Bars_BarCount=2</Effect><Effect>E_TEXTCTRL_Eff_On_Start=30</Effect></EffectDB>
+<ElementEffects><Element type="model" name="Arch 1">
+<EffectLayer><Effect ref="0" name="Bars" startTime="500" endTime="1000"/></EffectLayer>
+<EffectLayer><Effect ref="1" name="On" startTime="0" endTime="2000"/></EffectLayer>
+</Element></ElementEffects></xsequence>`;
+    const arch = [{ id: 1, name: "Arch 1", type: "Arches" }] as ModelRecord[];
+    const imported = applyMapping(parseXsq(twoLayers), mappingTargets(arch, []), { "model:Arch 1": "Arch 1" }, []).body;
+    const effects = imported.rows[0]!.effects;
+    expect(effects.find((e) => e.name === "Bars")!.layerIndex).toBe(1);
+    expect(effects.find((e) => e.name === "On")!.layerIndex ?? 0).toBe(0);
+    const layers = parser.parse(exportSequenceToXsq(arch, imported, sequence).xml).xsequence.ElementEffects.Element.EffectLayer;
+    expect(layers.map((l: { Effect: { name: string } }) => l.Effect.name)).toEqual(["Bars", "On"]);
   });
 
   it("keeps labeled and unlabeled timing cells without native fixed-interval regeneration", () => {

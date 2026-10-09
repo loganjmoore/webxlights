@@ -14,6 +14,7 @@ import {
 import { rgba } from "../src/color";
 import { createRowSequencer, renderRowAtMs } from "../src/renderFrame";
 import { computeSingleLine } from "../src/models/line";
+import { applyRenderStyle } from "../src/renderStyle";
 import { computeVerticalMatrixTopLeft } from "../src/models/matrix";
 import type { ModelGeometry } from "../src/models/types";
 
@@ -555,5 +556,26 @@ describe("Per Preview matches where the view draws the members", () => {
       return Math.max(...xs) - Math.min(...xs);
     };
     expect(spreadOf(0)).toBeLessThan(geometry.width * 0.15);
+  });
+});
+
+describe("Per Preview buffers for props on one line", () => {
+  it("stay about one cell per node when the members share a height", () => {
+    // Two single-node floods at opposite ends of the yard, at the same height: the footprint has
+    // no height, and the aspect ratio of that once made a buffer 1.36 billion cells wide.
+    const flood: ModelGeometry = { width: 1, height: 1, nodes: [{ bufX: 0, bufY: 0, screenX: 0, screenY: 0, string: 0, indexInString: 0 }] };
+    const at = (x: number) => ({ x, y: 0, transform: {}, unitScale: 1 });
+    const { geometry } = composeGroupBuffer([{ modelId: 1, geometry: flood, placement: at(-480) }, { modelId: 2, geometry: flood, placement: at(480) }], "Per Preview");
+    expect(geometry.width).toBe(2);
+    expect(geometry.height).toBe(1);
+    expect(geometry.nodes.map((n) => n.bufX)).toEqual([0, 1]);
+  });
+
+  it("caps a single straight model the same way", () => {
+    const line: ModelGeometry = { width: 50, height: 1, nodes: Array.from({ length: 50 }, (_, i) => ({ bufX: i, bufY: 0, screenX: i, screenY: 0, string: 0, indexInString: i })) };
+    const rendered = applyRenderStyle(line, "Per Preview");
+    // One cell per node along the line; the short side keeps its usual square-root height.
+    expect(rendered.width).toBe(50);
+    expect(new Set(rendered.nodes.map((n) => n.bufX)).size).toBe(50);
   });
 });

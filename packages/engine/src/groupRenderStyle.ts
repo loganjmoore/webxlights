@@ -1,7 +1,7 @@
 import type { RGBA } from "./color";
 import type { ModelGeometry, ModelNode } from "./models/types";
 import type { RenderableEffect, RenderableRow } from "./renderFrame";
-import { applyRenderStyle, type RenderStyle } from "./renderStyle";
+import { applyRenderStyle, perPreviewSize, type RenderStyle } from "./renderStyle";
 import { geometryCenter, nodeWorldOffset, type ScreenTransform } from "./models/transform";
 
 /** One member of a group, as the planner sees it. */
@@ -416,8 +416,7 @@ function perPreview(members: GroupMember[], memberStarts: number[]): GroupBuffer
   const spanY = Math.max(maxY - minY, 1e-6);
   // Roughly one cell per node, shaped like the group's own footprint - the same rule the
   // single-model Per Preview uses, so a one-model group renders as that model does.
-  const width = Math.max(1, Math.round(Math.sqrt(total) * (spanX >= spanY ? spanX / spanY : 1)));
-  const height = Math.max(1, Math.round(Math.sqrt(total) * (spanY > spanX ? spanY / spanX : 1)));
+  const { width, height } = perPreviewSize(total, spanX, spanY);
 
   return place(
     members.map((m) => m.geometry),

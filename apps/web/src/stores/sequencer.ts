@@ -56,6 +56,8 @@ export const useSequencerStore = defineStore("sequencer", () => {
 
   const canUndo = computed(() => undoStack.value.length > 0);
   const canRedo = computed(() => redoStack.value.length > 0);
+  /** How many steps back Ctrl+Z goes: lets a caller tell whether the top entry is still its own. */
+  const undoDepth = computed(() => undoStack.value.length);
 
   async function load(sequenceId: number): Promise<void> {
     suppressAutosave = true;
@@ -327,6 +329,19 @@ export const useSequencerStore = defineStore("sequencer", () => {
     for (const p of placements) ensureRow(p.elementType, p.elementId, p.subName).effects.push(p.effect);
   }
 
+  /**
+   * Replaces the whole body under one undo entry.
+   *
+   * Magic Sequence writes hundreds of effects, three timing tracks and the song regions at once,
+   * and "one Ctrl+Z removes the lot" is the promise that makes pressing it safe.
+   */
+  function replaceBody(next: SequenceBody): void {
+    pushUndoSnapshot();
+    body.value = next;
+    selectedEffectIds.value = [];
+    selectedEffectId.value = null;
+  }
+
   function addTimingMark(trackIndex: number, ms: number): void {
     addTimingMarks(trackIndex, [ms]);
   }
@@ -519,12 +534,14 @@ export const useSequencerStore = defineStore("sequencer", () => {
     takeTheirs,
     canUndo,
     canRedo,
+    undoDepth,
     load,
     undo,
     redo,
     saveSettings,
     addEffect,
     addEffects,
+    replaceBody,
     updateEffect,
     updateEffectLive,
     replaceEffectKind,

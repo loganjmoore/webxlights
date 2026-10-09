@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PALETTE_HEX } from "@webxlights/engine";
+import { DEFAULT_PALETTE_HEX, EFFECT_SCHEMAS, defaultParamsFor } from "@webxlights/engine";
 import type { SequenceEffect } from "../src/lib/api";
-import { exportEffectSettings } from "../src/lib/xsqEffectSettings";
+import { PARAMS, engineEffectName, exportEffectSettings, importEffectSettings } from "../src/lib/xsqEffectSettings";
+import { priors } from "../src/lib/magic/priors";
 
 const effect = (name: string, extra: Partial<SequenceEffect> = {}): SequenceEffect => ({ id: "test", name, startMs: 0, endMs: 1000, params: {}, ...extra });
 
@@ -104,5 +105,101 @@ describe("native xLights effect settings", () => {
     const result = exportEffectSettings(effect("Future Web Effect"));
     expect(result.name).toBe("Off");
     expect(result.warnings.join(" ")).toContain("Off placeholder");
+  });
+});
+
+describe("importing native xLights effect settings", () => {
+  const normal = (v: string) => v.toLowerCase().replace(/[\s-]+/g, "");
+
+  /** A value for every mapped param that differs from its default and survives both ranges. */
+  function probeParams(name: string): SequenceEffect["params"] {
+    const params: SequenceEffect["params"] = { ...defaultParamsFor(name) };
+    for (const [key, mapping] of Object.entries(PARAMS[name]!)) {
+      const spec = EFFECT_SCHEMAS[name]!.params.find((p) => p.key === key);
+      if (!spec) continue;
+      if (spec.type === "checkbox") params[key] = !spec.default;
+      else if (spec.type === "choice") {
+        const nativeChoices = mapping.choices ?? [];
+        const usable = (spec.options ?? []).filter((o) => nativeChoices.length === 0 || nativeChoices.some((c) => normal(c) === normal(o)));
+        params[key] = usable.find((o) => o !== spec.default) ?? usable[0] ?? spec.default;
+      } else if (spec.type === "text") params[key] = "Joy, love & <light>";
+      else {
+        const scale = mapping.scale ?? 1;
+        const lo = Math.max(spec.min ?? -Infinity, (mapping.min ?? -Infinity) / scale);
+        const hi = Math.min(spec.max ?? Infinity, (mapping.max ?? Infinity) / scale);
+        const mid = (lo + hi) / 2;
+        params[key] = spec.type === "intSlider" ? Math.round(mid) : Math.round(mid * 10) / 10;
+      }
+    }
+    return params;
+  }
+
+  it("round-trips every PARAMS entry engine -> xLights -> engine", () => {
+    let checked = 0;
+    for (const name of Object.keys(PARAMS)) {
+      const params = probeParams(name);
+      const exported = exportEffectSettings(effect(name, { params }));
+      const imported = importEffectSettings(exported.name, exported.settings, exported.palette);
+      expect(imported.name, name).toBe(name);
+      for (const key of Object.keys(PARAMS[name]!)) {
+        if (!(key in params) || exported.warnings.some((w) => w.includes(` ${key} `))) continue;
+        expect(imported.params[key], `${name}.${key}`).toEqual(params[key]);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(200);
+  });
+
+  it("round-trips palettes, colour curves, blending, fades and layer settings", () => {
+    const original = effect("Bars", {
+      palette: ["#ff0000", { kind: "colorCurve", mode: "Spatial", blend: "None", direction: "Top to Bottom", points: [{ x: 0, color: "#ff0000" }, { x: 1, color: "#0000ff" }] }],
+      blendMode: "Average", mix: 0.4,
+      transition: { inType: "Fade", inDurationMs: 1250, inAdjust: 50, inReverse: false },
+      colorAdjust: { brightness: -25, contrast: 10 },
+      layer: { renderStyle: "Per Preview", transform: "Flip Horizontal", subBuffer: { x1: 10, y1: 20, x2: 90, y2: 80 }, persistent: true },
+    });
+    const exported = exportEffectSettings(original);
+    const imported = importEffectSettings(exported.name, exported.settings, exported.palette);
+    expect(imported).toMatchObject({
+      palette: original.palette, blendMode: "Average", mix: 0.4, transition: original.transition,
+      colorAdjust: { brightness: -25, contrast: 10 }, layer: original.layer,
+    });
+  });
+
+  it("maps xLights' names for Snowstorm and Tendril back to the engine's", () => {
+    expect(importEffectSettings("Snowstorm", {}).name).toBe("Snow Storm");
+    expect(importEffectSettings("Tendril", {}).name).toBe("Tendrils");
+  });
+
+  it("keeps an effect the engine doesn't have, inert, rather than inventing params", () => {
+    expect(importEffectSettings("Video", { E_FILEPICKERCTRL_Video_Filename: "x.mp4" })).toEqual({ name: "Video", params: {} });
+  });
+
+  it("imports the corpus presets (medians and modal choices) as the matching engine params", () => {
+    // Magic Sequence starts every effect from these, so each one has to land on a real param.
+    let checked = 0;
+    for (const [nativeName, preset] of Object.entries(priors.parameterPresets)) {
+      const name = engineEffectName(nativeName);
+      const mappings = PARAMS[name];
+      if (!mappings) continue;
+      const settings: Record<string, string> = {};
+      for (const [key, stat] of Object.entries(preset)) {
+        settings[key] = stat.type === "choice" ? Object.entries(stat.shares).sort((a, b) => b[1] - a[1])[0]![0] : String(stat.p50);
+      }
+      const imported = importEffectSettings(nativeName, settings);
+      for (const [param, mapping] of Object.entries(mappings)) {
+        const raw = settings[mapping.key];
+        const spec = EFFECT_SCHEMAS[name]!.params.find((p) => p.key === param);
+        if (raw === undefined || !spec) continue;
+        let expected: unknown;
+        if (spec.type === "checkbox") expected = mapping.choices ? imported.params[param] : raw === "1";
+        else if (spec.type === "choice") expected = spec.options?.find((o) => normal(o) === normal(raw)) ?? (spec.options?.length ? spec.default : raw);
+        else if (spec.type === "text") expected = raw;
+        else expected = Math.max(spec.min ?? -Infinity, Math.min(spec.max ?? Infinity, Number(raw) / (mapping.scale ?? 1)));
+        expect(imported.params[param], `${name}.${param} from ${mapping.key}=${raw}`).toEqual(expected);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(60);
   });
 });

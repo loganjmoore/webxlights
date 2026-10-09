@@ -70,6 +70,21 @@ export function applyRenderStyle(geo: ModelGeometry, style: RenderStyle | undefi
   }
 }
 
+/**
+ * A Per Preview buffer's size: roughly one cell per node, shaped like the footprint.
+ *
+ * Each side is capped at the node count. Nodes on one line (two floods at the same height, a
+ * roofline) have a footprint with no height, and the aspect ratio of that, against a 1e-6 floor,
+ * once made a buffer over a billion cells wide that stalled every frame.
+ */
+export function perPreviewSize(count: number, spanX: number, spanY: number): { width: number; height: number } {
+  const side = Math.sqrt(count);
+  return {
+    width: Math.max(1, Math.min(count, Math.round(side * (spanX >= spanY ? spanX / spanY : 1)))),
+    height: Math.max(1, Math.min(count, Math.round(side * (spanY > spanX ? spanY / spanX : 1)))),
+  };
+}
+
 function perPreview(geo: ModelGeometry): ModelGeometry {
   let minX = Infinity;
   let maxX = -Infinity;
@@ -87,8 +102,7 @@ function perPreview(geo: ModelGeometry): ModelGeometry {
   // Keep the buffer around the size of the model's own node count in each direction, so an
   // effect has roughly one cell per node rather than a buffer so coarse that neighbouring nodes
   // collide or so fine that most of it is empty.
-  const width = Math.max(1, Math.round(Math.sqrt(geo.nodes.length) * (spanX >= spanY ? spanX / spanY : 1)));
-  const height = Math.max(1, Math.round(Math.sqrt(geo.nodes.length) * (spanY > spanX ? spanY / spanX : 1)));
+  const { width, height } = perPreviewSize(geo.nodes.length, spanX, spanY);
 
   return remap(geo, width, height, (node) => ({
     bufX: Math.min(width - 1, Math.round(((node.screenX - minX) / spanX) * (width - 1))),
