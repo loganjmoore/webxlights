@@ -1,8 +1,9 @@
 import { hashRandom01 } from "@webxlights/engine";
 import type { PropInfo, Role } from "../propRoles";
 import { FAVOUR, feelSpec, type FeelSpec } from "./feels";
-import type { Accents, Feel, MagicPlanResponse, Motion, SectionPlan, ShowPlan } from "./plan";
+import type { Accents, Feel, MagicPlanResponse, Motion, SectionPlan, ShowPlan, Style } from "./plan";
 import { priors } from "./priors";
+import picker from "./picker.json";
 import { ROLE_EFFECTS } from "./roleEffects";
 import type { SongMap } from "@webxlights/engine";
 
@@ -11,6 +12,23 @@ import type { SongMap } from "@webxlights/engine";
 
 const HERO_ROLES = new Set<Role>(["mega_tree", "matrix", "singing_face"]);
 const MOTIONS: Motion[] = ["left-to-right", "right-to-left", "centre-out", "alternate", "unison"];
+const SWEEPS: Motion[] = ["left-to-right", "right-to-left", "centre-out"];
+/** The show style's loud and quiet: one colour a bar above, outlines only below. */
+export const SHOW_LOUD = 0.7;
+export const SHOW_QUIET = 0.4;
+
+/**
+ * Which sections a show plays loud: at least SHOW_LOUD, and of a kind (repeat group) that has a
+ * section in this song's louder half. Ranked by intensity, with ties (a feel can lift several
+ * sections to the top) broken by the song's own energy and choruses first, so a song that is
+ * loud all through still has verses that hold back, and a chorus plays alike every time.
+ */
+export function showLoud(song: SongMap, intensities: readonly number[]): boolean[] {
+  const score = (i: number) => (intensities[i] ?? 0) + 0.01 * song.sections[i]!.energy + (song.sections[i]!.label === "chorus" ? 0.005 : 0);
+  const ranked = song.sections.map((_, i) => i).sort((a, b) => score(b) - score(a));
+  const loudGroups = new Set(ranked.slice(0, Math.ceil(ranked.length / 2)).map((i) => song.sections[i]!.group));
+  return song.sections.map((s, i) => (intensities[i] ?? 0) >= SHOW_LOUD && loudGroups.has(s.group));
+}
 /** The corpus keys a few effects by xLights' own name. */
 export const nativeEffectName = (name: string) => (name === "Snow Storm" ? "Snowstorm" : name === "Tendrils" ? "Tendril" : name === "Music" ? "Music Effect" : name);
 
@@ -31,16 +49,19 @@ export function weightedOrder<T>(items: readonly T[], weight: (item: T) => numbe
     .map((x) => x.item);
 }
 
-function effectWeight(role: Role, name: string, feel: FeelSpec, intensity: number): number {
+export function effectWeight(role: Role, name: string, feel: FeelSpec, intensity: number): number {
   if (feel.avoids.includes(name) || name === "Off") return 0;
   const native = nativeEffectName(name);
   const share = priors.roles[role]?.effectShareBySeconds[native] ?? 0.01;
   const lift = priors.roleLift[role]?.[native] ?? 1;
   const loud = priors.intensity.highVsLowLift[native] ?? 1;
   const intensityLift = intensity >= 0.66 ? loud : intensity <= 0.33 ? 1 / loud : 1;
+  // What people kept and added in the Magic Sequences they shared (train-picker.mjs): 1 until
+  // enough of them have.
+  const learned = (picker.multipliers as Record<string, Record<string, number> | undefined>)[role]?.[name] ?? 1;
   // Squared: a song only has a handful of looks, so sampling by plain share leaves too much to
   // chance and lands further from the corpus's mix than a typical real song does.
-  return Math.pow(share * Math.pow(lift, feel.character) * (feel.favours.includes(name) ? FAVOUR : 1) * intensityLift, 2);
+  return Math.pow(share * Math.pow(lift, feel.character) * (feel.favours.includes(name) ? FAVOUR : 1) * intensityLift * learned, 2);
 }
 
 function sectionIntensity(song: SongMap, index: number, feel: FeelSpec): number {
@@ -58,9 +79,11 @@ export interface DirectorInput {
   seed: number;
   /** A saved palette the user chose instead of the feel's. */
   palette?: string[];
+  style?: Style;
 }
 
-export function rulesDirector({ song, props, feel: feelName, seed, palette }: DirectorInput): ShowPlan {
+export function rulesDirector({ song, props, feel: feelName, seed, palette, style = "classic" }: DirectorInput): ShowPlan {
+  const show = style === "show";
   const feel = feelSpec(feelName, song);
   const roles = [...new Set(props.filter((p) => !p.key.startsWith("submodel:")).map((p) => p.role))].filter((r) => ROLE_EFFECTS[r].length > 0);
   const palettes: Record<string, string[]> = {};
@@ -72,6 +95,7 @@ export function rulesDirector({ song, props, feel: feelName, seed, palette }: Di
   const chorusGroup = song.sections.find((s) => s.label === "chorus")?.group;
   const lookOrder = chorusGroup ? [chorusGroup, ...looks.filter((g) => g !== chorusGroup)] : looks;
 
+  const loudness = showLoud(song, song.sections.map((_, i) => sectionIntensity(song, i, feel)));
   const sections: SectionPlan[] = song.sections.map((section, index) => {
     const intensity = sectionIntensity(song, index, feel);
     const look = section.group;
@@ -91,8 +115,12 @@ export function rulesDirector({ song, props, feel: feelName, seed, palette }: Di
     const others = weightedOrder(roles.filter((r) => !HERO_ROLES.has(r) && r !== "whole_house"), (r) => priors.roles[r]?.coverage.p50 ?? 0.1, seed, `feat:${look}`);
     const featured = [...heroes, ...others.slice(0, intensity >= 0.66 ? 2 : intensity >= 0.35 ? 1 : 0)];
     const motionRoll = keyedRandom(seed, `motion:${look}`);
-    const motion: Motion = intensity < 0.3 ? "unison" : MOTIONS[Math.floor(motionRoll * MOTIONS.length)]!;
-    const accents: Accents = intensity >= 0.7 ? (song.bpm < 110 ? "beats" : "downbeats") : intensity >= 0.45 ? "downbeats" : "none";
+    // A show's loud parts move as one, changing colour together on the bar; elsewhere a sweep
+    // crosses the whole front of the house.
+    const motion: Motion = show
+      ? loudness[index] ? "unison" : SWEEPS[Math.floor(motionRoll * SWEEPS.length)]!
+      : intensity < 0.3 ? "unison" : MOTIONS[Math.floor(motionRoll * MOTIONS.length)]!;
+    const accents: Accents = intensity >= 0.7 ? (song.bpm < 110 || show ? "beats" : "downbeats") : intensity >= 0.45 ? "downbeats" : "none";
     return {
       index, look, intensity, palette: `p${lookIndex % paletteList.length}`, featured, families, motion,
       accents: accents !== "none" && ["rock", "powerful"].includes(feelName) && song.hits.length > 0 ? "hits" : accents,
@@ -118,11 +146,12 @@ export function rulesDirector({ song, props, feel: feelName, seed, palette }: Di
   }
 
   const last = song.sections[song.sections.length - 1];
-  return { seed, palettes, sections, ending: last && last.energy >= 0.6 ? "hit-then-dark" : "fade" };
+  return { seed, palettes, sections, ending: last && last.energy >= 0.6 ? "hit-then-dark" : "fade", style };
 }
 
 /**
- * The AI director's plan with every gap filled from the rules director's.
+ * The AI director's plan with every gap filled from the rules director's (or, for a chat edit,
+ * from the plan being edited).
  *
  * The server has already dropped whatever failed validation; this re-checks against what the
  * client knows (the roles actually in this layout) and takes each field independently, so one
@@ -156,5 +185,5 @@ export function completePlan(ai: MagicPlanResponse["plan"], rules: ShowPlan, rol
     };
   });
   const ending = ai.ending && ["fade", "hit-then-dark", "hold"].includes(ai.ending) ? ai.ending : rules.ending;
-  return { seed: rules.seed, palettes, sections, ending };
+  return { seed: rules.seed, palettes, sections, ending, ...(rules.style ? { style: rules.style } : {}), ...(rules.avoid ? { avoid: rules.avoid } : {}) };
 }

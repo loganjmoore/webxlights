@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toRenderableEffects } from "../src/lib/renderableEffects";
+import { subModelSource, toRenderableEffects } from "../src/lib/renderableEffects";
 import type { ModelRecord, SequenceEffect, TimingTrack } from "../src/lib/api";
 
 function effect(over: Partial<SequenceEffect> = {}): SequenceEffect {
@@ -91,5 +91,20 @@ describe("resolving a face definition", () => {
   it("picks nothing when several faces exist and the effect names none", () => {
     const [resolved] = toRenderableEffects([effect({ name: "Faces", params: {} })], { model: FACE_MODEL });
     expect(resolved!.data).toBeUndefined();
+  });
+});
+
+describe("definitions on a sub-model", () => {
+  it("renumbers the parent's face and state ranges into the sub-model's own nodes, dropping the rest", () => {
+    // A sub-model of parent nodes 21-80: parent node 31 is its node 11.
+    const parentIndices = Array.from({ length: 60 }, (_, i) => 20 + i);
+    const source = subModelSource({
+      states: [{ name: "S", entries: [{ name: "wink", nodes: "31,90" }] }],
+      faces: [{ name: "Face", mouths: [{ name: "AI", nodes: "31-33" }, { name: "MBP", nodes: "5-6" }], eyesOpen: "21-22" }],
+    }, parentIndices);
+    expect(source.faces![0]!.mouths).toEqual([{ name: "AI", nodes: "11,12,13" }, { name: "MBP", nodes: "" }]);
+    expect(source.faces![0]!.eyesOpen).toBe("1,2");
+    expect(source.faces![0]!.outline).toBeUndefined();
+    expect(source.states![0]!.entries[0]!.nodes).toBe("11");
   });
 });

@@ -123,13 +123,26 @@ export function propMap(models: readonly ModelRecord[], groups: readonly ModelGr
   const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   const norm = (v: number, lo: number, hi: number) => (hi > lo ? (v - lo) / (hi - lo) : 0.5);
 
+  const geometries = new Map(models.map((m) => [m.id, geometryOf(m)]));
+  // Trees by size. The name rules are the corpus's, and on a real layout they read backwards: the
+  // word "tree" made its two 6,400-node trees mini trees, and DisplayAs made its 29 bare-named
+  // 150-node trees mega trees, all heroes lit all song. A Tree model whose name doesn't say mini
+  // or mega is a mega tree when it is big (400 nodes and at least half the largest tree), and a
+  // mini tree otherwise.
+  const isTree = (m: ModelRecord) => (m.raw_attrs.DisplayAs ?? m.type).startsWith("Tree");
+  const largestTree = Math.max(0, ...models.filter(isTree).map((m) => geometries.get(m.id)?.nodes.length ?? 0));
+
   const props: PropInfo[] = [];
   const byModelId = new Map<number, PropInfo>();
   for (const model of models) {
-    const geometry = geometryOf(model);
+    const geometry = geometries.get(model.id) ?? null;
     const override = validOverride(model.params?.magicRole);
     let role = override ?? roleOf(model.name, model.raw_attrs.DisplayAs ?? model.type);
     if (!override && role === "other" && isDenseCustom(model, geometry)) role = "matrix";
+    if (!override && isTree(model) && (role === "mega_tree" || role === "mini_tree") && !/mini|mega|big|main/i.test(model.name)) {
+      const nodes = geometry?.nodes.length ?? 0;
+      role = nodes >= 400 && nodes >= largestTree / 2 ? "mega_tree" : "mini_tree";
+    }
     const x = norm(model.screen.x ?? 0, minX, maxX), y = norm(model.screen.y ?? 0, minY, maxY);
     const prop: PropInfo = {
       key: `model:${model.id}`, name: model.name, role, tier: TIER_BY_ROLE[role],

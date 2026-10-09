@@ -180,11 +180,13 @@ class MagicPlanTest extends TestCase
         $fake = $this->fakeDriver($this->wire());
         $user = User::factory()->create();
 
-        $this->plan($user, $this->sequenceFor($user), $this->payload(['feel' => 'peaceful', 'direction' => 'make the tree the star of the chorus']))->assertOk();
+        $this->plan($user, $this->sequenceFor($user), $this->payload(['feel' => 'peaceful', 'style' => 'show', 'direction' => 'make the tree the star of the chorus']))->assertOk();
 
         $call = $fake->calls[0];
         $brief = json_decode($call['user'], true);
         $this->assertSame('peaceful', $brief['feel']);
+        $this->assertSame('show', $brief['style']);
+        $this->assertStringContainsString('Style: show means the house plays as one instrument', $call['system']);
         $this->assertSame('make the tree the star of the chorus', $brief['direction']);
         $this->assertSame('Carol of the Bells', $brief['song']['title']);
         $this->assertCount(3, $brief['song']['sections']);
@@ -196,6 +198,31 @@ class MagicPlanTest extends TestCase
         $this->assertStringContainsString('beats, bar positions, timestamps', $call['system']);
         $this->assertSame('claude-opus-5-5', $call['model']);
         $this->assertNull($call['key']);
+    }
+
+    public function test_a_chat_edit_sends_the_ask_and_the_plan_it_changes(): void
+    {
+        $fake = $this->fakeDriver($this->wire());
+        $user = User::factory()->create();
+        $current = ['seed' => 7, 'palettes' => ['p0' => ['#ff0000', '#ffffff']], 'sections' => [['index' => 0, 'intensity' => 0.4]], 'ending' => 'fade'];
+
+        $this->plan($user, $this->sequenceFor($user), $this->payload(['edit' => 'make the second chorus bigger', 'plan' => $current]))->assertOk();
+
+        $brief = json_decode($fake->calls[0]['user'], true);
+        $this->assertSame('make the second chorus bigger', $brief['edit']);
+        $this->assertEquals($current, $brief['currentPlan']);
+        $this->assertStringContainsString('only what the edit asks for changed', $fake->calls[0]['system']);
+    }
+
+    public function test_an_edit_without_its_plan_is_422_and_an_abusive_edit_is_refused_before_spending(): void
+    {
+        $fake = $this->fakeDriver($this->wire());
+        $user = User::factory()->create();
+        $sequence = $this->sequenceFor($user);
+
+        $this->plan($user, $sequence, $this->payload(['edit' => 'bigger please']))->assertStatus(422)->assertJsonValidationErrors('plan');
+        $this->plan($user, $sequence, $this->payload(['plan' => ['sections' => []]]))->assertStatus(422)->assertJsonValidationErrors('edit');
+        $this->assertCount(0, $fake->calls);
     }
 
     public function test_every_object_in_the_schema_is_strict(): void
@@ -243,6 +270,7 @@ class MagicPlanTest extends TestCase
             'too many groups' => [fn (array $p) => data_set($p, 'props.groups', array_fill(0, 41, 'g')), 'props.groups'],
             'long group name' => [fn (array $p) => data_set($p, 'props.groups.0', str_repeat('g', 101)), 'props.groups.0'],
             'unknown feel' => [fn (array $p) => data_set($p, 'feel', 'spooky'), 'feel'],
+            'unknown style' => [fn (array $p) => data_set($p, 'style', 'disco'), 'style'],
             'long direction' => [fn (array $p) => data_set($p, 'direction', str_repeat('d', 501)), 'direction'],
         ];
     }

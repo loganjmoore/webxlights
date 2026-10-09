@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
+import { labelsFromTrack } from "@webxlights/engine";
 import { magicBody, sectionNames } from "../src/lib/magic/apply";
 import type { Placement } from "../src/lib/magic/choreograph";
 import type { SequenceBody } from "../src/lib/api";
@@ -47,7 +48,11 @@ describe("applying a generated sequence", () => {
     expect(body.timingTracks.map((t) => t.name)).toEqual(["Lyrics", "Magic Beats", "Magic Bars", "Magic Sections"]);
     expect(body.timingTracks.slice(1).every((t) => t.fixed)).toBe(true);
     expect(body.timingTracks[1]!.marks).toHaveLength(song.beats.length);
-    expect(body.timingTracks[3]!.labels).toEqual(["Intro", "Chorus 1", "Verse", "Chorus 2"]);
+    expect(body.timingTracks[3]!.labels).toEqual(["Intro", "Chorus 1", "Verse", "Chorus 2", ""]);
+    // Every section is a cell, the last one running to the end of the song.
+    const cells = labelsFromTrack(body.timingTracks[3]!.marks, body.timingTracks[3]!.labels);
+    expect(cells.map((c) => c.label)).toEqual(["Intro", "Chorus 1", "Verse", "Chorus 2"]);
+    expect(cells[cells.length - 1]!.endMs).toBe(Math.round(song.durationMs));
     expect(body.songBoundaries!.map((b) => b.name)).toEqual(["Intro", "Chorus 1", "Verse", "Chorus 2"]);
     // A user's own regions survive a fill; a replace takes them over.
     const mine = { ...existing, songBoundaries: [{ ms: 0, name: "Mine" }] };

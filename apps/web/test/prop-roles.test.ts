@@ -21,6 +21,32 @@ function sampleLayout(): { models: ModelRecord[]; groups: ModelGroupRecord[] } {
   return { models, groups };
 }
 
+describe("trees by size", () => {
+  const tree = (id: number, name: string, strings: number, perString: number): ModelRecord => ({
+    id, name, type: "Tree 360", supported: true, params: {}, screen: { x: id * 100, y: 0 },
+    raw_attrs: { DisplayAs: "Tree 360", StringType: "RGB Nodes", NumStrings: String(strings), NodesPerString: String(perString) },
+  }) as unknown as ModelRecord;
+
+  it("makes the big trees mega trees and the small ones mini trees when the names don't say", () => {
+    // The real layout this came from: two 6,400-node trees called "Seed Tree" and "Tree", and
+    // bare-named 150-node trees.
+    const models = [tree(1, "Seed Tree", 64, 100), tree(2, "Tree", 64, 100), tree(3, "MTL1", 6, 25), tree(4, "PTR2", 6, 25), tree(5, "MTL3", 6, 25)];
+    const roles = Object.fromEntries(propMap(models, []).map((p) => [p.name, [p.role, p.tier]]));
+    expect(roles["Seed Tree"]).toEqual(["mega_tree", "hero"]);
+    expect(roles["Tree"]).toEqual(["mega_tree", "hero"]);
+    for (const name of ["MTL1", "PTR2", "MTL3"]) expect(roles[name], name).toEqual(["mini_tree", "feature"]);
+  });
+
+  it("leaves a tree its name calls mini or mega, and one the user set, alone", () => {
+    const models = [tree(1, "Mini Tree 9", 64, 100), tree(2, "Mega Tree", 4, 25), { ...tree(3, "T3", 4, 25), params: { magicRole: "mega_tree" } }];
+    const roles = Object.fromEntries(propMap(models, []).map((p) => [p.name, p.role]));
+    expect(roles).toEqual({ "Mini Tree 9": "mini_tree", "Mega Tree": "mega_tree", T3: "mega_tree" });
+    // And the test layout reads as before: one mega tree, four minis.
+    const fixture = propMap(layout.models, layout.groups).filter((p) => p.key.startsWith("model:") && p.role.endsWith("_tree"));
+    expect(fixture.map((p) => p.role).sort()).toEqual(["mega_tree", "mini_tree", "mini_tree", "mini_tree", "mini_tree"]);
+  });
+});
+
 describe("prop roles", () => {
   it("uses exactly the classifier the corpus priors were measured with", () => {
     expect(ROLES.map(([role, re]) => [role, re.source, re.flags])).toEqual((CORPUS_ROLES as [string, RegExp][]).map(([role, re]) => [role, re.source, re.flags]));

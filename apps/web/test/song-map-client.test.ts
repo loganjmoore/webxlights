@@ -31,8 +31,11 @@ describe("song map cache on the sequence", () => {
   });
 
   it("will not read a map written in another version of the format", () => {
-    const future = { ...map, version: 2 } as unknown as typeof map;
-    expect(cachedSongMap({ songMap: { hash: "aaa", map: future } }, "aaa")).toBeNull();
+    // Version 1 had no rests: such a map is analysed again rather than read without them.
+    for (const version of [1, 3]) {
+      const other = { ...map, version } as unknown as typeof map;
+      expect(cachedSongMap({ songMap: { hash: "aaa", map: other } }, "aaa")).toBeNull();
+    }
   });
 
   it("keeps the rest of the metadata and does not change what it was given", () => {

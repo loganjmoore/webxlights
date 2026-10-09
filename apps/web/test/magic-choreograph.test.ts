@@ -2,13 +2,16 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { propMap, type Role } from "../src/lib/propRoles";
-import { completePlan, rulesDirector } from "../src/lib/magic/director";
+import { completePlan, rulesDirector, SHOW_QUIET, showLoud } from "../src/lib/magic/director";
 import { choreograph, PUNCTUAL, type MagicShader, type Placement } from "../src/lib/magic/choreograph";
 import { feelSpec } from "../src/lib/magic/feels";
 import { songMotifs } from "../src/lib/magic/motifs";
 import { ROLE_EFFECTS, TWO_D_ONLY } from "../src/lib/magic/roleEffects";
 import { priors } from "../src/lib/magic/priors";
 import type { ModelGroupRecord, ModelRecord } from "../src/lib/api";
+import type { FaceSpec, RGBA, SongMap } from "@webxlights/engine";
+import { magicBody } from "../src/lib/magic/apply";
+import { createHouseRenderer } from "../src/lib/fseqExport";
 import { syntheticSong } from "./fixtures/syntheticSong";
 import { metrics } from "./fixtures/magicMetrics";
 
@@ -210,6 +213,207 @@ describe("the deferred spec details", () => {
       }
     }
     expect(found).toBe(true);
+  });
+});
+
+describe("the show style", () => {
+  const showRun = (song: SongMap, seed = 7) => {
+    const plan = rulesDirector({ song, props, feel: "auto", seed, style: "show" });
+    return { plan, placements: choreograph(song, props, plan, { feel: feelSpec("auto", song), frameMs: 25, title: "Jingle Bells" }) };
+  };
+  const shows = TEMPOS.map((bpm) => ({ bpm, song: syntheticSong(bpm), ...showRun(syntheticSong(bpm)) }));
+  const inSection = (s: SongMap["sections"][number]) => (p: Placement) => p.effect.startMs >= s.startMs - 1 && p.effect.startMs < s.endMs - 1;
+  const heroes = ["mega_tree", "matrix", "singing_face"];
+
+  it("is a valid sequence on the grid, with each role's own effects", () => {
+    const dims = new Map(props.map((p) => [p.key, p.dims]));
+    for (const { bpm, song, placements } of shows) {
+      const lanes = new Map<string, Placement[]>();
+      for (const p of placements) {
+        expect(p.effect.startMs).toBeGreaterThanOrEqual(0);
+        expect(p.effect.endMs).toBeLessThanOrEqual(song.durationMs);
+        if (p.effect.name !== "Pictures") expect(ROLE_EFFECTS[p.role], `${p.role}: ${p.effect.name}`).toContain(p.effect.name);
+        if (dims.get(p.key) === 1) expect(TWO_D_ONLY.has(p.effect.name)).toBe(false);
+        (lanes.get(`${p.key}|${p.effect.layerIndex ?? 0}`) ?? lanes.set(`${p.key}|${p.effect.layerIndex ?? 0}`, []).get(`${p.key}|${p.effect.layerIndex ?? 0}`)!).push(p);
+      }
+      for (const list of lanes.values()) {
+        list.sort((a, b) => a.effect.startMs - b.effect.startMs);
+        for (let i = 1; i < list.length; i++) expect(list[i]!.effect.startMs).toBeGreaterThanOrEqual(list[i - 1]!.effect.endMs);
+      }
+      const m = metrics(song, placements);
+      expect(bpm < 90 ? m.onBar : m.onGrid, `${bpm} BPM`).toBeGreaterThanOrEqual(0.85);
+    }
+  });
+
+  it("plays the loud sections in one colour across the house, changing on the bar", () => {
+    for (const { bpm, song, plan, placements } of shows) {
+      const loud = showLoud(song, plan.sections.map((s) => s.intensity));
+      expect(loud.some(Boolean)).toBe(true);
+      song.sections.forEach((section, si) => {
+        if (!loud[si]) return;
+        const bars = song.downbeats.filter((d) => d >= section.startMs && d < section.endMs);
+        const colourOfBar = bars.map((d, b) => {
+          // Everything showing in the middle of the bar but the focal prop (the star) wears the
+          // bar's colour: nothing holds the last bar's colour over.
+          const mid = (d + (bars[b + 1] ?? section.endMs)) / 2;
+          const showing = placements.filter((p) => !p.effect.layerIndex && p.role !== "star" && p.effect.name !== "Pictures" && p.effect.startMs <= mid && p.effect.endMs > mid);
+          const colours = new Set(showing.flatMap((p) => p.effect.palette ?? []));
+          expect(colours.size, `${bpm} BPM section ${si} bar ${b}: ${[...colours]}`).toBeLessThanOrEqual(1);
+          return [...colours][0];
+        }).filter((c) => c !== undefined);
+        for (let b = 1; b < colourOfBar.length; b++) expect(colourOfBar[b], `${bpm} BPM section ${si} bar ${b}`).not.toBe(colourOfBar[b - 1]);
+      });
+    }
+  });
+
+  it("lights only the outlines in quiet sections, dimmed, with no showpieces", () => {
+    for (const { bpm, song, plan, placements } of shows) {
+      song.sections.forEach((section, si) => {
+        // The bridge between two choruses is a breakdown, tested below.
+        if (plan.sections[si]!.intensity >= SHOW_QUIET || section.label === "bridge") return;
+        const base = placements.filter((p) => !p.effect.layerIndex && inSection(section)(p));
+        expect(base.length, `${bpm} BPM section ${si}`).toBeGreaterThan(0);
+        for (const p of base) {
+          expect(["outline", "window", "icicle"], `${bpm} BPM section ${si}: ${p.role}`).toContain(p.role);
+          for (const c of p.effect.palette ?? []) expect(Math.max(...[1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)))).toBeLessThanOrEqual(128);
+        }
+      });
+    }
+  });
+
+  it("answers a breakdown on one role and its answer, the rest of the house dark", () => {
+    for (const { bpm, song, placements } of shows) {
+      const bridge = song.sections.find((s) => s.label === "bridge")!;
+      const inside = placements.filter((p) => !p.effect.layerIndex && inSection(bridge)(p));
+      const roles = new Set(inside.map((p) => p.role));
+      expect(roles.size, `${bpm} BPM: ${[...roles]}`).toBeGreaterThanOrEqual(1);
+      expect(roles.size).toBeLessThanOrEqual(2);
+      for (const r of roles) expect(heroes).not.toContain(r);
+      // Each flash a new colour.
+      const call = inside.filter((p) => p.role === inside[0]!.role).sort((a, b) => a.effect.startMs - b.effect.startMs);
+      const starts = [...new Set(call.map((p) => p.effect.startMs))];
+      const colourAt = (t: number) => call.find((p) => p.effect.startMs === t)!.effect.palette![0];
+      for (let i = 1; i < starts.length; i++) expect(colourAt(starts[i]!)).not.toBe(colourAt(starts[i - 1]!));
+    }
+  });
+
+  it("goes dark on the song's rests and for the beat before a drop", () => {
+    const song = syntheticSong(120);
+    const beatMs = 500;
+    const verse = song.sections[1]!;
+    song.rests = [{ startMs: verse.startMs + 8 * beatMs, endMs: verse.startMs + 9 * beatMs }];
+    const { plan, placements } = showRun(song);
+    const lit = (a: number, b: number) => placements.filter((p) => !p.effect.layerIndex || p.effect.layerIndex === 2 || (p.effect.layerIndex === 1 && p.effect.endMs - p.effect.startMs <= beatMs)).filter((p) => p.effect.startMs < b && p.effect.endMs > a);
+    expect(lit(song.rests[0]!.startMs, song.rests[0]!.endMs)).toEqual([]);
+    const chorus = plan.sections.find((s) => s.wholeHouseHit)!;
+    const drop = song.sections[chorus.index]!.startMs;
+    expect(placements.some((p) => p.effect.startMs === drop && p.effect.layerIndex === 1)).toBe(true);
+    expect(placements.filter((p) => p.effect.startMs < drop && p.effect.endMs > drop - beatMs)).toEqual([]);
+  });
+
+  it("paints the frame of the house solid in the loud sections", () => {
+    for (const { bpm, song, plan, placements } of shows) {
+      const loud = showLoud(song, plan.sections.map((s) => s.intensity));
+      song.sections.forEach((section, si) => {
+        if (!loud[si]) return;
+        const frame = placements.filter((p) => !p.effect.layerIndex && ["outline", "window", "icicle", "flood"].includes(p.role) && inSection(section)(p));
+        expect(frame.length, `${bpm} BPM section ${si}`).toBeGreaterThan(0);
+        for (const p of frame) expect(p.effect.name, `${bpm} BPM section ${si} ${p.role}`).toBe("On");
+      });
+    }
+  });
+
+  it("flashes white on the backbeats, over the frame of the house", () => {
+    const { song, placements } = shows[1]!;
+    const accents = placements.filter((p) => p.effect.layerIndex === 1 && !heroes.includes(p.role) && p.effect.endMs - p.effect.startMs <= 250);
+    expect(accents.length).toBeGreaterThan(0);
+    for (const p of accents) {
+      const beat = song.beats.findIndex((b) => Math.abs(b - p.effect.startMs) <= 1);
+      const bar = song.downbeats.filter((d) => d <= p.effect.startMs + 1).length - 1;
+      expect((beat - song.beats.indexOf(song.downbeats[bar]!)) % 2).toBe(1);
+      expect(["#ffffff"]).toContain(p.effect.palette![0]);
+    }
+  });
+
+  it("scores the same kinds of thing the corpus measures, a colour change a bar at most dearer", () => {
+    for (const { bpm, song, placements } of shows) {
+      // A colour a bar is an effect per lit row per bar: up to twice the corpus's p75 on this
+      // 32-row layout, where the user's role groups would carry it in fewer rows.
+      expect(metrics(song, placements).effectsPerMinute, `${bpm} BPM`).toBeLessThanOrEqual(2 * priors.corpus.effectsPerMinute.p75);
+      const lit = metrics(song, placements).litShare;
+      const byEnergy = song.sections.map((s, i) => ({ e: s.energy, lit: lit[i]! })).sort((a, b) => a.e - b.e);
+      expect(byEnergy[byEnergy.length - 1]!.lit / byEnergy[0]!.lit, `${bpm} BPM`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("keeps classic the default for a plan without a style", () => {
+    const song = syntheticSong(120);
+    const plan = rulesDirector({ song, props, feel: "auto", seed: 7 });
+    expect(plan.style).toBe("classic");
+    const unstyled = { ...plan };
+    delete unstyled.style;
+    expect(choreograph(song, props, unstyled, { feel: feelSpec("auto", song), frameMs: 25, title: "Jingle Bells" })).toEqual(runs[1]!.placements);
+  });
+});
+
+describe("singing faces", () => {
+  it("sing the lyric track all song on a face with a definition, the mouth on the phonemes", () => {
+    const song = syntheticSong(120);
+    const faceModel = layout.models.find((m) => m.name === "Singing Face")!;
+    const face: FaceSpec = { name: "Face", mouths: [{ name: "AI", nodes: "46-51" }, { name: "MBP", nodes: "34-39" }], eyesOpen: "20-21" };
+    const models = layout.models.map((m) => (m === faceModel ? { ...m, faces: [face] } : m));
+    const key = `model:${faceModel.id}`;
+    const singing = { track: "Lyrics — Phonemes", faces: new Map([[key, "Face"]]) };
+    const plan = rulesDirector({ song, props, feel: "auto", seed: 7, style: "show" });
+    const placements = choreograph(song, props, plan, { feel: feelSpec("auto", song), frameMs: 25, singing });
+
+    const mine = placements.filter((p) => p.key === key && p.effect.layerIndex !== 1);
+    expect(mine.map((p) => [p.effect.name, p.effect.startMs, p.effect.endMs, p.effect.params.timingTrack, p.effect.params.faceDefinition])).toEqual([["Faces", 0, song.durationMs, "Lyrics — Phonemes", "Face"]]);
+
+    // Rendered through the app's renderer, the mouth follows the track by its name.
+    const track = { name: "Lyrics — Phonemes", marks: [10000, 10500, 11000], labels: ["AI", "MBP", ""] };
+    const body = magicBody({ rows: [], timingTracks: [track] }, placements, song, "replace", (() => { let n = 0; return () => `e${n++}`; })()).body;
+    const house = createHouseRenderer(models, body, 25, undefined, layout.groups);
+    const at = (ms: number) => house.renderAt(ms)[house.models.findIndex((m) => m.id === faceModel.id)]!;
+    const lit = (nodes: RGBA[], from: number, to: number) => nodes.slice(from - 1, to).every((c) => c.a > 0 && c.r + c.g + c.b > 0);
+    const dark = (nodes: RGBA[], from: number, to: number) => nodes.slice(from - 1, to).every((c) => c.a === 0 || c.r + c.g + c.b === 0);
+    expect(lit(at(10200), 46, 51) && dark(at(10200), 34, 39)).toBe(true);
+    const later = at(10700);
+    expect(lit(later, 34, 39) && dark(later, 46, 51)).toBe(true);
+  });
+
+  it("sing on a sub-model of a prop with a face definition, the face renumbered into it", () => {
+    const song = syntheticSong(120);
+    const tree = layout.models.find((m) => m.name === "Mega Tree")!;
+    // The face is drawn on the tree; the sub-model holds parent nodes 21-80.
+    const face: FaceSpec = { name: "Tree Face", mouths: [{ name: "AI", nodes: "31-36" }, { name: "MBP", nodes: "41-46" }] };
+    const models = layout.models.map((m) => (m === tree ? { ...m, faces: [face], sub_models: [{ name: "Singing Face", type: "ranges" as const, rows: ["21-80"] }] } : m));
+    const withSub = propMap(models, layout.groups);
+    const singing = { track: "Lyrics — Phonemes", faces: new Map([[`model:${tree.id}`, "Tree Face"]]) };
+    const placements = choreograph(song, withSub, rulesDirector({ song, props: withSub, feel: "auto", seed: 7 }), { feel: feelSpec("auto", song), frameMs: 25, singing });
+
+    const sung = placements.filter((p) => p.elementType === "submodel" && p.effect.name === "Faces");
+    expect(sung.map((p) => [p.subName, p.role, p.effect.params.faceDefinition])).toEqual([["Singing Face", "singing_face", "Tree Face"]]);
+    // The tree itself is a mega tree, not a face: it keeps its own effects.
+    expect(placements.some((p) => p.key === `model:${tree.id}` && p.effect.name === "Faces")).toBe(false);
+
+    // Rendered alone, the sub-model's mouth lights the tree's own mouth nodes.
+    const track = { name: "Lyrics — Phonemes", marks: [10000, 10500, 11000], labels: ["AI", "MBP", ""] };
+    const body = magicBody({ rows: [], timingTracks: [track] }, sung, song, "replace", () => "f").body;
+    const house = createHouseRenderer(models, body, 25, undefined, layout.groups);
+    const at = (ms: number) => house.renderAt(ms)[house.models.findIndex((m) => m.id === tree.id)]!;
+    const on = (nodes: RGBA[], from: number, to: number) => nodes.slice(from - 1, to).every((c) => c.a > 0 && c.r + c.g + c.b > 0);
+    const off = (nodes: RGBA[], from: number, to: number) => nodes.slice(from - 1, to).every((c) => c.a === 0 || c.r + c.g + c.b === 0);
+    const ai = at(10200);
+    expect(on(ai, 31, 36) && off(ai, 41, 46) && off(ai, 51, 56)).toBe(true);
+    const mbp = at(10700);
+    expect(on(mbp, 41, 46) && off(mbp, 31, 36)).toBe(true);
+  });
+
+  it("keep their own effects without lyric timing", () => {
+    const song = syntheticSong(120);
+    const placements = choreograph(song, props, rulesDirector({ song, props, feel: "auto", seed: 7 }), { feel: feelSpec("auto", song), frameMs: 25 });
+    expect(placements.some((p) => p.effect.name === "Faces")).toBe(false);
   });
 });
 

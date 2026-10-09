@@ -46,8 +46,10 @@ class MagicPlanController extends Controller
 
         // Refuse before spending, own key or not: the screen runs ahead of the ledger and the
         // provider, so a refusal costs nobody anything.
-        if (isset($data['direction']) && $refusal = app(RequestScreen::class)->refusalForDirection($data['direction'])) {
-            return response()->json(['message' => $refusal, 'code' => 'off_topic'], 422);
+        foreach (['direction', 'edit'] as $said) {
+            if (isset($data[$said]) && $refusal = app(RequestScreen::class)->refusalForDirection($data[$said])) {
+                return response()->json(['message' => $refusal, 'code' => 'off_topic'], 422);
+            }
         }
 
         if (! $ownKey && ($limit = (int) config('services.magic.daily_limit')) > 0 && $this->usedSince($user, now('UTC')->startOfDay()) >= $limit) {
@@ -179,7 +181,19 @@ class MagicPlanController extends Controller
             'props.groups' => ['nullable', 'array', 'max:40'],
             'props.groups.*' => ['string', 'max:100'],
             'feel' => ['required', Rule::in(['auto', 'traditional', 'joyful', 'peaceful', 'powerful', 'magical', 'rock'])],
+            'style' => ['nullable', Rule::in(['show', 'classic'])],
             'direction' => ['nullable', 'string', 'max:500'],
+            // A chat edit: the user's ask and the plan it changes. The plan is context for the
+            // model only; what comes back is validated like any plan.
+            'edit' => ['nullable', 'string', 'max:300', 'required_with:plan'],
+            'plan' => ['nullable', 'array', 'required_with:edit'],
+            'plan.sections' => ['required_with:plan', 'array', 'max:64'],
+            'plan.palettes' => ['nullable', 'array', 'max:12'],
+            'plan.seed' => ['nullable', 'integer'],
+            'plan.ending' => ['nullable', 'string', 'max:20'],
+            'plan.style' => ['nullable', 'string', 'max:20'],
+            'plan.avoid' => ['nullable', 'array', 'max:40'],
+            'plan.avoid.*' => ['string', 'max:40'],
         ];
     }
 }

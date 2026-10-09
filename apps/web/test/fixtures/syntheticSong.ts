@@ -23,5 +23,5 @@ export function syntheticSong(bpm = 120, plan: [SectionLabel, string, number, nu
   [...sections].sort((a, b) => b.energy - a.energy).forEach((s, i) => (s.rank = i));
   const durationMs = beat * beatMs;
   const impacts = sections.slice(1).filter((s, i) => s.energy > sections[i]!.energy * 1.8).map((s) => s.startMs);
-  return { version: 1, durationMs, bpm, beats, downbeats, beatsPerBar: 4, sections, energy, hits, impacts, confidence: { beats: 1, sections: 1 }, source: "browser" };
+  return { version: 2, durationMs, bpm, beats, downbeats, beatsPerBar: 4, sections, energy, hits, impacts, rests: [], confidence: { beats: 1, sections: 1 }, source: "browser" };
 }

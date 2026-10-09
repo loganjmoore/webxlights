@@ -91,6 +91,9 @@ class SequenceController extends Controller
             // (Magic Sequence). Only the browser writes it and only the browser reads it back, so
             // the server checks that it is an object and nothing about what is inside.
             'metadata.songMap' => ['nullable', 'array'],
+            // What the last Magic Sequence press placed, per row, so its user can later share what
+            // they changed. Browser-only, like songMap.
+            'metadata.magic' => ['nullable', 'array'],
         ]);
 
         $sequence->update($data);

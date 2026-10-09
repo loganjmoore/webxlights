@@ -5,6 +5,7 @@ import type { SongBoundary } from "./songRegions";
 import type { BlendMode, ColorAdjust, FaceSpec, LayerSettings, PictureImage, StateSpec, StoredSwatch, SongMap, SubModelSpec, TransitionSpec, ValueCurve } from "@webxlights/engine";
 import type { IsfInput } from "@webxlights/formats";
 import type { MagicPlanRequest, MagicPlanResponse, MagicStatus } from "./magic/plan";
+import type { MagicFeedback, MagicRecord } from "./magic/feedback";
 
 export class ApiError extends Error {
   status: number;
@@ -400,6 +401,8 @@ export interface SequenceMetadata {
    * reused. Not shown in the metadata tab; the server stores it with the rest.
    */
   songMap?: { hash: string; map: SongMap } | null;
+  /** What the last Magic Sequence press placed, so its user can share what they changed. */
+  magic?: MagicRecord | null;
 }
 
 export interface SequenceSummary {
@@ -567,6 +570,8 @@ export const api = {
    * decides how loudly to say so. The key travels as the shader assistant's does, in headers
    * and nowhere else.
    */
+  magicFeedback: (sequenceId: number, payload: MagicFeedback) =>
+    request<{ shared: boolean }>(`/v1/sequences/${sequenceId}/magic-feedback`, { method: "POST", body: JSON.stringify(payload) }),
   magicPlan: (
     sequenceId: number,
     payload: MagicPlanRequest,
