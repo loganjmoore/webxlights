@@ -19,7 +19,7 @@ class MagicFeedbackController extends Controller
         $sequence->project->authorize($user, 'editor');
         $payload = $request->validate([
             'v' => ['required', 'integer', Rule::in([1])],
-            'style' => ['required', Rule::in(['show', 'classic'])],
+            'style' => ['required', Rule::in(['show', 'mood', 'classic'])],
             'feel' => ['required', Rule::in(['auto', 'traditional', 'joyful', 'peaceful', 'powerful', 'magical', 'rock'])],
             'bpm' => ['required', 'numeric', 'between:40,250'],
             'sections' => ['required', 'array', 'min:1', 'max:64'],

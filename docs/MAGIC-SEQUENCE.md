@@ -961,6 +961,48 @@ and tempo waits for enough data, and the payload already carries those.
 **Also fixed.** The Magic Sections timing track had no closing mark, so the last section's label
 never made a cell; it ends at the song's end now.
 
+### The mood style (2026-10-09)
+
+Logan asked for sequences more like a second reference: Miranda Family Lights' "Carol of the
+Bells (Dubstep Remix)" show (2022, 2:16). Frames were pulled every 2 s for the shape and every
+0.25 s through four 3 s windows (a hand-off between halves at 0:42, the first drop at 1:04, the
+pulsing section at 1:24, the second drop at 1:44), and the lit pixels of every quarter second
+were counted by hue. It is not the BetGeorge show (above) turned down; it does different things:
+
+| In the video | In the mood style (`plan.style` "mood", the dialog's default now) |
+|---|---|
+| One colour family all song: of the lit pixels 56% blue, 22% violet, 11% teal, 11% white; red, green, gold and pink together under 2% | One palette for every section: the feel's `mood` family, three neighbours on the colour wheel, home colour first, no white (`feels.ts`). Magical is the video's blue, violet and teal; traditional is red, amber and warm white |
+| Two colours at once: 38% of moments show two hue families, 48% one, 3% three | The house splits down the middle: each half wears one colour of a pair, every pair holds the home colour (home with violet, teal with home, ...), moving on with the show style's bar clock. The focal prop wears the other half's colour |
+| The halves answer each other: left lit violet, then the right alone in teal, then the left again (0:40-0:45) | Half of the middle sections are "alternate", which a mood plays as halves: one side lit, the other dark, swapping with the colour. The heroes carry on through both |
+| The drops are not a flood: the house goes dim indigo and the spinners and arches flicker white | No solid blocks in the loud sections, no whole-house wash; punctual effects leave a gap after each beat; the features sparkle white (Twinkle at 0.6 mix) over their colour |
+| The outro twinkles white across the house and dims away (2:04-2:14) | The last four bars, unless the song ends loud: every prop that can twinkle, in a dim white, fading |
+
+Role groups across the middle would paint both halves one colour, so a mood leaves such a role to
+its members (`unitsByRole(props, split)`); a group on one side still carries.
+
+**What did not survive the fit score.** The first cut copied the drop literally: loud sections
+as sparse as the busiest middle, the backbeat flashes on the features rather than the frame, and
+a full-white twinkle to close. It scored 31-44 on Silent Night and 39-44 on Jingle Bells: the
+house got darker as the music got louder, and the score's loud and lift parts (does brightness
+follow loudness) went to zero. That inversion is the dubstep's, not a rule for every song. Each
+change was measured on its own: loud coverage back to the show style's (+10 on Jingle Bells),
+the twinkle at 30% white (full white cost about 10 more), the backbeat flashes back on the frame
+but in the other half's colour, which kept the palette and marked the beat better than white
+did (Silent Night beat 0.35-0.51 to 0.58-0.87).
+
+**Measured** (best of three seeds, the 32-model test layout, real audio, feel from the song):
+
+| | Synthetic 80 / 120 / 150 BPM | Jingle Bells | Silent Night | Carol of the Bells |
+|---|---|---|---|---|
+| show | 97 / 97 / 97 | 94 | 82 | 95 |
+| mood | 99 / 90 / 98 | 81 | 87 | 97 |
+
+`docs/magic-sequence/mood-style.jpg` renders Carol of the Bells on the Magical feel at the same
+moments in both, show on the left and mood on the right: the intro, two bars of a middle section
+(the halves taking turns), three moments of the first loud chorus (the split pair, then the next
+pair on the next bar) and the last chorus. The AI director is told what a mood means and asked
+for one palette of three neighbouring colours. The video's own frames are not in the repo.
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)

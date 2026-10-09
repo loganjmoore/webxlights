@@ -56,7 +56,7 @@ describe("the fit score", () => {
   // Each score renders the whole house a few hundred times: about a second here, slower on CI.
   it("scores a generated sequence on a synthetic song above 60, every part above its floor", { timeout: 60_000 }, () => {
     for (const bpm of [80, 120, 150]) {
-      for (const style of ["classic", "show"] as const) {
+      for (const style of ["classic", "show", "mood"] as const) {
         const started = performance.now();
         const s = generateAndScore(syntheticSong(bpm), 7, undefined, style);
         console.log(`${describeScore(`synthetic ${bpm} BPM ${style}`, s)} in ${(performance.now() - started).toFixed(0)} ms`);
@@ -104,7 +104,7 @@ describe.skipIf(!songs.every((s) => existsSync(s.wav)))("the fit score on the pu
       const song = analyzeSong(samples, sampleRate);
       const audio = analyzeAudio(samples, sampleRate, 25);
       console.log(`${id}: ${song.bpm} BPM, ${song.sections.map((s) => `${s.label}/${s.group}/${s.energy.toFixed(2)}`).join(" ")}, ${song.rests.length} rests`);
-      for (const style of ["classic", "show"] as const) {
+      for (const style of ["classic", "show", "mood"] as const) {
         const scores = [1, 2, 3].map((seed) => generateAndScore(song, seed, audio, style));
         scores.forEach((s, i) => console.log(describeScore(`${id} ${style} seed ${i + 1}`, s)));
         expectGood(bestCandidate(scores, (s) => s));
