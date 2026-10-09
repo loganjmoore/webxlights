@@ -355,3 +355,13 @@ describe("arrow keys move the selected effect", () => {
     expect(ctx.nudgePlayhead).toHaveBeenCalled();
   });
 });
+
+describe("Magic Sequence in the palette", () => {
+  it("is offered only when there is a song to follow", () => {
+    expect(buildCommands(context()).some((c) => c.id === "sequence.magic")).toBe(false);
+    const open = vi.fn();
+    const command = buildCommands({ ...context(), magicSequence: open }).find((c) => c.id === "sequence.magic");
+    command?.run();
+    expect(open).toHaveBeenCalledOnce();
+  });
+});

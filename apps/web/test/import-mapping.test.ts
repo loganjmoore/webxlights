@@ -13,15 +13,14 @@ import {
 } from "../src/lib/importMapping";
 import type { ModelGroupRecord, ModelRecord } from "../src/lib/api";
 
-function donorEffect(name: string, startMs: number, translated = true) {
-  return { name, startMs, endMs: startMs + 500, params: { cycles: 2 }, translated };
+function donorEffect(name: string, startMs: number, rawSettings: Record<string, string> = {}) {
+  return { name, startMs, endMs: startMs + 500, rawSettings, rawPalette: {}, layerIndex: 0 };
 }
 
 const PARSED: ParsedXsq = {
   frameMs: 50,
   durationMs: 10000,
   mediaFilename: "song.mp3",
-  unsupportedEffectNames: [],
   rows: [
     { name: "Vendor Arch 1", elementType: "model", effects: [donorEffect("Bars", 0), donorEffect("On", 1000)] },
     { name: "Vendor Arch 2", elementType: "model", effects: [donorEffect("On", 0)] },
@@ -122,14 +121,25 @@ describe("applying a mapping", () => {
     expect(applied.body.rows).toEqual([]);
   });
 
-  it("falls back to schema defaults for an effect whose params weren't translated", () => {
-    const untranslated = {
+  it("falls back to schema defaults for settings the file doesn't carry", () => {
+    const bare = {
       ...PARSED,
-      rows: [{ name: "V", elementType: "model", effects: [donorEffect("On", 0, false)] }],
+      rows: [{ name: "V", elementType: "model", effects: [donorEffect("On", 0)] }],
     } as unknown as ParsedXsq;
-    const applied = applyMapping(untranslated, targets, { "model:Arch 1": "V" }, []);
+    const applied = applyMapping(bare, targets, { "model:Arch 1": "V" }, []);
     // Not `{}`: the renderers don't all null-guard, and an empty bag can render as NaN geometry.
     expect(applied.body.rows[0]!.effects[0]!.params).toHaveProperty("startIntensity");
+  });
+
+  it("translates the donor's settings for every effect the export table knows", () => {
+    // Only five effects used to import with their settings; a Spirals or Shockwave came in
+    // with defaults and looked nothing like what the author made.
+    const donor = {
+      ...PARSED,
+      rows: [{ name: "V", elementType: "model", effects: [donorEffect("Shockwave", 0, { E_SLIDER_Shockwave_End_Radius: "40", E_CHECKBOX_Shockwave_Blend_Edges: "1" })] }],
+    } as unknown as ParsedXsq;
+    const effect = applyMapping(donor, targets, { "model:Arch 1": "V" }, []).body.rows[0]!.effects[0]!;
+    expect(effect.params).toMatchObject({ endRadius: 40, blendEdges: true });
   });
 });
 
@@ -168,8 +178,8 @@ describe("importing a layered donor", () => {
           elementType: "model" as const,
           name: "Tree",
           effects: [
-            { name: "On", startMs: 0, endMs: 1000, rawSettings: {}, params: {}, translated: true, layerIndex: 0 },
-            { name: "Bars", startMs: 0, endMs: 1000, rawSettings: {}, params: {}, translated: true, layerIndex: 2 },
+            { name: "On", startMs: 0, endMs: 1000, rawSettings: {}, rawSettings: {}, rawPalette: {}, layerIndex: 0 },
+            { name: "Bars", startMs: 0, endMs: 1000, rawSettings: {}, rawSettings: {}, rawPalette: {}, layerIndex: 2 },
           ],
         },
       ],

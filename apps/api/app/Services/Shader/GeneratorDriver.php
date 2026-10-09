@@ -23,6 +23,22 @@ interface GeneratorDriver
      */
     public function complete(string $system, string $user, string $model, ?string $key, ?string $baseUrl = null): array;
 
+    /**
+     * One completion constrained to a JSON schema, decoded.
+     *
+     * For callers that need data back rather than prose. The schema must set
+     * `additionalProperties: false` and list every property in `required`, which is what
+     * strict structured output on both wire formats demands. A refusal, a truncated reply or
+     * text that is not valid JSON throws UnusableOutput; callers must still validate the
+     * decoded values, since the schema constrains shape and not meaning.
+     *
+     * @param  array<string, mixed>  $jsonSchema
+     * @return array{data: array, usage: array}
+     *
+     * @throws UnusableOutput
+     */
+    public function completeJson(string $system, string $user, array $jsonSchema, string $model, ?string $key, ?string $baseUrl = null): array;
+
     /** Whether this driver can run at all - i.e. whether there is a key to use. */
     public function configured(?string $key): bool;
 }

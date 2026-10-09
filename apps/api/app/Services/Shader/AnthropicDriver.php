@@ -25,7 +25,15 @@ class AnthropicDriver implements GeneratorDriver
     private const ADAPTIVE_THINKING = [
         'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7',
         'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-fable-5',
+        'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1',
     ];
+
+    /**
+     * Models that take the server-side refusal fallback: when one declines a request for policy
+     * reasons, the API retries it on the model's default fallback inside the same call, instead
+     * of the press falling back to the rules director.
+     */
+    private const REFUSAL_FALLBACK = ['claude-fable-5-1', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5'];
 
     public function __construct(private ?Client $client = null) {}
 
@@ -34,9 +42,14 @@ class AnthropicDriver implements GeneratorDriver
         return (bool) ($key ?: config('services.shader.key'));
     }
 
-    public function complete(string $system, string $user, string $model, ?string $key, ?string $baseUrl = null): array
+    /**
+     * The client for one call.
+     *
+     * Not cached on the instance: a per-request key must not leak into the next request's
+     * client, which in a long-lived worker would mean billing the wrong person.
+     */
+    private function client(?string $key): Client
     {
-        // $baseUrl is unused on purpose: the official SDK knows Anthropic's endpoint.
         $resolved = $key ?: config('services.shader.key');
         if (! $resolved) {
             throw new RuntimeException('No API key is configured for the shader assistant.');
@@ -51,9 +64,14 @@ class AnthropicDriver implements GeneratorDriver
                 'The configured key looks like an OpenAI key, but the provider is Anthropic. Set SHADER_PROVIDER=openai (and SHADER_MODEL, e.g. gpt-5-mini) to match the key.',
             );
         }
-        // Not cached on the instance: a per-request key must not leak into the next request's
-        // client, which in a long-lived worker would mean billing the wrong person.
-        $client = $this->client ?? new Client(apiKey: $resolved);
+
+        return $this->client ?? new Client(apiKey: $resolved);
+    }
+
+    public function complete(string $system, string $user, string $model, ?string $key, ?string $baseUrl = null): array
+    {
+        // $baseUrl is unused on purpose: the official SDK knows Anthropic's endpoint.
+        $client = $this->client($key);
 
         $params = [
             'model' => $model,
@@ -78,6 +96,56 @@ class AnthropicDriver implements GeneratorDriver
 
         return [
             'text' => $text,
+            'usage' => [
+                'input_tokens' => $message->usage->inputTokens ?? null,
+                'output_tokens' => $message->usage->outputTokens ?? null,
+            ],
+        ];
+    }
+
+    public function completeJson(string $system, string $user, array $jsonSchema, string $model, ?string $key, ?string $baseUrl = null): array
+    {
+        $client = $this->client($key);
+
+        // Structured output through output_config.format, not forced tool use: Claude Opus 5.5
+        // and Sonnet 5.5 answer a forced tool_choice with a 400. The room for thinking comes out
+        // of max_tokens, so it is generous; the plan itself is a couple of thousand tokens.
+        $outputConfig = ['format' => ['type' => 'json_schema', 'schema' => $jsonSchema]];
+        $params = [
+            'model' => $model,
+            'maxTokens' => 16000,
+            'system' => $system,
+            'messages' => [['role' => 'user', 'content' => $user]],
+        ];
+        if (in_array($model, self::ADAPTIVE_THINKING, true)) {
+            // Never `disabled` and never a budget: the newest models always think, and a budget
+            // is a 400. Effort is the dial, and older models reject it, hence the check.
+            $params['thinking'] = ['type' => 'adaptive'];
+            $outputConfig['effort'] = 'medium';
+        }
+        $params['outputConfig'] = $outputConfig;
+
+        $message = in_array($model, self::REFUSAL_FALLBACK, true)
+            ? $client->beta->messages->create(...$params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default')
+            : $client->messages->create(...$params);
+
+        if (in_array($message->stopReason, ['refusal', 'max_tokens'], true)) {
+            throw new UnusableOutput("The model stopped early ({$message->stopReason}).");
+        }
+
+        $text = '';
+        foreach ($message->content as $block) {
+            if ($block->type === 'text') {
+                $text .= $block->text;
+            }
+        }
+        $data = json_decode($text, true);
+        if (! is_array($data)) {
+            throw new UnusableOutput('The model did not return valid JSON.');
+        }
+
+        return [
+            'data' => $data,
             'usage' => [
                 'input_tokens' => $message->usage->inputTokens ?? null,
                 'output_tokens' => $message->usage->outputTokens ?? null,

@@ -87,3 +87,12 @@ describe("SubModel geometry", () => {
     expect(computeSubModelGeometry(MATRIX, { name: "Bad", type: "subbuffer", rows: [] })).toBeNull();
   });
 });
+
+describe("empty sub-model rows", () => {
+  it("reads a row stored as null (an empty line after a save) as no nodes", () => {
+    // xLights writes an empty row as ""; the API stores it as null; parsing it used to throw and
+    // took the sequencer's Magic Sequence dialog and the .fseq export down with it.
+    expect(parseNodeRanges(null)).toEqual([]);
+    expect(parseNodeRanges(undefined)).toEqual([]);
+  });
+});

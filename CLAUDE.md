@@ -13,8 +13,9 @@ GPL-3.0.
 
 - `apps/web`: Vue 3 + TypeScript + Vite + Pinia. Marketing site is static HTML in `public/site/`.
 - `apps/api`: Laravel, Sanctum cookie sessions, Postgres in production, SQLite in tests.
-- `packages/engine`: the render engine. DOM-free, CPU-first, worker pool, SharedArrayBuffer
-  frame store, seeded RNG. Shared by the app and its tests.
+- `packages/engine`: the render engine. DOM-free, CPU-first, seeded RNG, single-threaded today
+  (no worker pool or SharedArrayBuffer frame store yet). Shared by the app and its tests. Song
+  analysis for Magic Sequence runs it in a Web Worker.
 - `packages/formats`: xLights file parsers and writers (`xlights_rgbeffects.xml`, `.xsq`,
   `.fseq`), plus ISF, MIDI and Papagayo.
 - `packages/shaders/library`: the built-in ISF shaders. Not in the runtime image; baked into
@@ -31,9 +32,13 @@ Do not change these without recording why in this file.
 - **One Docker image** serves the SPA and the API: nginx in front of php-fpm, the Vue build
   copied into `public/app`. `render.yaml` runs it as a web service plus a queue worker.
 - **Cross-origin isolation from day one.** COOP `same-origin` and COEP `require-corp` on every
-  response, because the engine needs `SharedArrayBuffer`. The Vite dev server sets them too.
+  response, so the engine can adopt `SharedArrayBuffer` without a header change. The Vite dev
+  server sets them too.
 - **Content-Security-Policy forbids inline and third-party scripts.** Shaders are user content
-  that runs on the GPU; the page never evaluates a byte of it as JavaScript.
+  that runs on the GPU; the page never evaluates a byte of it as JavaScript. `script-src` carries
+  `'wasm-unsafe-eval'` (added 2026-10-08 for Magic Sequence's pro analysis: onnxruntime-web runs
+  the Beat This! model as WebAssembly). It permits compiling WebAssembly only, never `eval`, and
+  the WASM is the app's own build asset.
 - **Timeline grid is a custom virtualized canvas.** No DOM grid or timeline libraries.
 - **House preview is Three.js.**
 - **Migrations run at container start** (`apps/api/docker/entrypoint.sh`), not by hand and not
