@@ -36,6 +36,7 @@ import PaletteChip from "./PaletteChip.vue";
 import { clonePalette, isPlaceholder, keepOrder, samePalette, swatchHex, type PickerAnchor } from "../lib/effectPicker";
 import PixelEditor from "./PixelEditor.vue";
 import { decodeImageForEffect } from "../lib/pictureImport";
+import { SPRITES, spriteById } from "../lib/magic/sprites";
 import ShaderPicker from "./ShaderPicker.vue";
 import SketchEditor from "./SketchEditor.vue";
 import ValueCurveEditor from "./ValueCurveEditor.vue";
@@ -113,13 +114,35 @@ watch(
   { immediate: true },
 );
 
+// A library picture (magic/sprites.ts) is named in `picture`; a file or a drawing is stored in
+// the image param. Choosing one clears the other, or the library one would keep showing.
+function setImage(key: string, image: PictureImage): void {
+  if (!props.effect) return;
+  const params = { ...props.effect.params, [key]: image };
+  delete params.picture;
+  emit("update", params);
+}
+function pickFromLibrary(key: string, e: Event): void {
+  const select = e.target as HTMLSelectElement;
+  const sprite = spriteById(select.value);
+  select.value = "";
+  if (!props.effect || !sprite) return;
+  const params: Record<string, EffectParamValue> = { ...props.effect.params, picture: `lib:${sprite.id}`, fps: sprite.fps };
+  delete params[key];
+  emit("update", params);
+}
+const libraryPicture = computed(() => {
+  const name = props.effect?.params.picture;
+  return typeof name === "string" && name.startsWith("lib:") ? spriteById(name.slice(4)) : undefined;
+});
+
 async function pickImageFromFiles(key: string, e: Event): Promise<void> {
   const select = e.target as HTMLSelectElement;
   const chosen = pictureFiles.value.find((f) => f.id === Number(select.value));
   select.value = "";
   if (!chosen) return;
   try {
-    setParam(key, await decodeImageForEffect(await api.fetchMediaFile(chosen)));
+    setImage(key, await decodeImageForEffect(await api.fetchMediaFile(chosen)));
   } catch {
     // Same as pickImage: a fetch that fails reaches the error overlay, not a blank effect.
   }
@@ -131,7 +154,7 @@ async function pickImage(key: string, e: Event): Promise<void> {
   input.value = "";
   if (!file) return;
   try {
-    setParam(key, await decodeImageForEffect(file));
+    setImage(key, await decodeImageForEffect(file));
   } catch {
     // A file picker is where the wrong file gets chosen; a throw here reaches the error overlay.
   }
@@ -873,7 +896,12 @@ function curveable(p: EffectParamSpec): boolean {
           been imported with the sequence.
         -->
         <template v-else-if="p.type === 'image'">
+          <span v-if="libraryPicture" class="library-picture">{{ libraryPicture.label }} (library)</span>
           <input type="file" accept="image/*" @change="pickImage(p.key, $event)" />
+          <select aria-label="A picture from the library" @change="pickFromLibrary(p.key, $event)">
+            <option value="">From the library…</option>
+            <option v-for="s in SPRITES" :key="s.id" :value="s.id">{{ s.label }}</option>
+          </select>
           <select v-if="pictureFiles.length" aria-label="A picture from Files" @change="pickImageFromFiles(p.key, $event)">
             <option value="">From Files…</option>
             <option v-for="f in pictureFiles" :key="f.id" :value="f.id">{{ f.name }}</option>
@@ -884,7 +912,7 @@ function curveable(p: EffectParamSpec): boolean {
             :image="imageParam(p.key)"
             :width="imageParam(p.key)?.width ?? 32"
             :height="imageParam(p.key)?.height ?? 16"
-            @update="setParam(p.key, $event)"
+            @update="setImage(p.key, $event)"
           />
         </template>
         <SketchEditor

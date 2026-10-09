@@ -428,6 +428,37 @@ describe("the mood style", () => {
 });
 
 
+describe("pictures from the lyrics", () => {
+  it("puts what a line names on the matrix while it is sung, and nothing for a line that names nothing", () => {
+    const song = syntheticSong(120);
+    const beatMs = 500;
+    const lyrics = [
+      { label: "Look at the reindeer go", startMs: 20_100, endMs: 22_400 },
+      { label: "Nothing much to say here", startMs: 24_000, endMs: 26_000 },
+      { label: "Grandpa drove the car home", startMs: 30_000, endMs: 31_900 },
+    ];
+    const plan = rulesDirector({ song, props, feel: "auto", seed: 7, style: "mood" });
+    const placements = choreograph(song, props, plan, { feel: feelSpec("auto", song), frameMs: 25, lyrics });
+    const matrix = props.find((p) => p.role === "matrix")!;
+    const pictures = placements.filter((p) => p.key === matrix.key && typeof p.effect.params.picture === "string");
+    expect(pictures.map((p) => [p.effect.params.picture, p.effect.params.movement])).toEqual([["lib:reindeer", "right"], ["lib:reindeer-car", "right"]]);
+    // From the beat nearest the line's start, and nothing else on the matrix meanwhile.
+    expect(Math.abs(pictures[0]!.effect.startMs - 20_000)).toBeLessThanOrEqual(beatMs / 2);
+    for (const pic of pictures) {
+      const meanwhile = placements.filter((p) => p.key === matrix.key && p !== pic && p.effect.startMs < pic.effect.endMs && p.effect.endMs > pic.effect.startMs && !p.effect.layerIndex);
+      expect(meanwhile).toEqual([]);
+    }
+
+    // Rendered, the matrix shows the sprite and its frames take turns.
+    const body = magicBody({ rows: [], timingTracks: [] }, placements, song, "replace", (() => { let n = 0; return () => `e${n++}`; })()).body;
+    const house = createHouseRenderer(layout.models, body, 25, undefined, layout.groups);
+    const at = (ms: number) => house.renderAt(ms)[house.models.findIndex((m) => `model:${m.id}` === matrix.key)]!;
+    const frameA = at(pictures[0]!.effect.startMs + 1000), frameB = at(pictures[0]!.effect.startMs + 1080);
+    expect(frameA.some((c) => c.r + c.g + c.b > 0)).toBe(true);
+    expect(frameA.map((c) => `${c.r},${c.g},${c.b}`).join()).not.toBe(frameB.map((c) => `${c.r},${c.g},${c.b}`).join());
+  });
+});
+
 describe("singing faces", () => {
   it("sing the lyric track all song on a face with a definition, the mouth on the phonemes", () => {
     const song = syntheticSong(120);

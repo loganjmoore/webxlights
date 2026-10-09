@@ -1023,6 +1023,36 @@ rather than adding "Lyrics 2" (`replaceTimingTrack`).
 nothing: the group carried the role and a group row has no face definition. Singing faces are
 now always carried by their own models.
 
+### Pictures from the lyrics (2026-10-09)
+
+Logan asked for the matrix to show what the song is singing about: a reindeer when it sings of
+reindeer, the sleigh, boots on the roof, a reindeer driving a car. A sung line that names
+something in the picture library now puts it on every matrix (2D, 200 nodes or more) while the
+line is sung: from the beat nearest the line's start to the beat after it ends, two beats at
+least and four bars at most, moving the way the thing moves. It takes the matrix from whatever
+the plan put there, and nothing but a whole-house hit plays over it. The lines are the lyric
+phrase track (Auto lyrics' "Lyrics", or a Papagayo voice's phrases); Magic now offers to hear the
+lyrics first whenever there is a matrix as well as a singing face.
+
+**The library** (`apps/web/src/lib/magic/sprites.ts`) is 24 sprites of original pixel art drawn
+as text, one character a pixel, two or three frames each: reindeer, sleigh, Santa, boots on the
+roof, a reindeer driving a car, snowman, bells, star, snowflake, tree, present, candle, heart,
+house, angel, moon, toy train, drum, gingerbread figure, ornament, wreath, a manger under a star,
+stocking and candy cane, with the lyric words that call each up. Pixel art rather than generated
+images: it reads at 32-64 pixels, its frames line up exactly, it costs nothing and needs no key.
+None is a licensed character; the reindeer is a plain brown one, and the trigger words leave out
+trademarked names. `docs/magic-sequence/lyric-pictures.png` is eight of them rendered on the test
+layout's 48x24 matrix through the app's renderer, six moments each.
+
+**Animated pictures.** The engine's Pictures effect plays `frames` at `fps` (by real time since
+the effect began) in place of its still `image`, and has two new movements: `bounce` (hops in
+place) and `fly` (across on a wave); xLights has neither, and the .xsq export already leaves a
+Pictures effect for the user to point at a file. A library picture is stored by name
+(`params.picture`, "lib:reindeer"), not as pixels, so a sequence carries dozens of them for a few
+bytes each; `toRenderableEffects` puts the frames in for the preview, the export and the fit
+score alike. The effect panel shows which one it is and offers the library beside a file, Files
+and drawing.
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)
