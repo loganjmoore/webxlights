@@ -54,7 +54,7 @@ const sequenceId = store.sequence?.id;
 const selectedSection = ref<number | null>(null);
 
 const feel = ref<Feel>("auto");
-const style = ref<Style>("show");
+const style = ref<Style>("mood");
 const paletteChoice = ref(-1); // -1: from the feel
 const excluded = ref<Set<Role>>(new Set());
 const createGroups = ref(true);
@@ -447,6 +447,7 @@ const strip = computed(() => {
         <section aria-labelledby="magic-style">
           <h2 id="magic-style">Style</h2>
           <div class="modes" role="radiogroup" aria-labelledby="magic-style">
+            <label title="One colour family all song, two colours at a time split across the house; the halves answer each other; loud parts go dark and sparkle; a white twinkle to close"><input v-model="style" type="radio" value="mood" /> One mood</label>
             <label title="One colour across the house, changing on the bar; white flashes on the backbeat; dark rests and breakdowns"><input v-model="style" type="radio" value="show" /> Whole-house show</label>
             <label title="Each kind of prop in its own colours and effects, the way most shared sequences are made"><input v-model="style" type="radio" value="classic" /> Prop by prop</label>
           </div>

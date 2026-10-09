@@ -177,9 +177,11 @@ const SUBMODEL_PROPS = new Set<Role>(["star", "singing_face"]);
 
 /**
  * Who carries each role: the user's role group if it covers the role, else each model. A
- * sub-model that is a prop of its own carries its own role; a part is left to its parent.
+ * sub-model that is a prop of its own carries its own role; a part is left to its parent. With
+ * split (the mood style, which colours the halves of the house apart), a group with members on
+ * both sides of the middle leaves the role to its members.
  */
-function unitsByRole(props: readonly PropInfo[]): Map<Role, Unit[]> {
+function unitsByRole(props: readonly PropInfo[], split = false): Map<Role, Unit[]> {
   const byKey = new Map(props.map((p) => [p.key, p]));
   const parentOf = (p: PropInfo) => byKey.get(`model:${p.key.slice("submodel:".length).split("/")[0]}`);
   const models = props.filter((p) => p.nodes > 0 && (p.key.startsWith("model:") || (p.key.startsWith("submodel:") && SUBMODEL_PROPS.has(p.role) && parentOf(p) !== undefined && parentOf(p)!.role !== p.role)));
@@ -193,8 +195,9 @@ function unitsByRole(props: readonly PropInfo[]): Map<Role, Unit[]> {
   const roles = new Set(models.map((m) => m.role));
   for (const role of roles) {
     if (role === "whole_house" || ROLE_EFFECTS[role].length === 0) continue;
+    const straddles = (g: PropInfo) => g.members!.some((k) => (byKey.get(k)?.x ?? 0.5) < 0.5) && g.members!.some((k) => (byKey.get(k)?.x ?? 0.5) >= 0.5);
     const own = groups
-      .filter((g) => g.role === role && g.members!.filter((k) => byKey.get(k)?.role === role).length >= 0.75 * g.members!.length)
+      .filter((g) => g.role === role && g.members!.filter((k) => byKey.get(k)?.role === role).length >= 0.75 * g.members!.length && !(split && straddles(g)))
       .sort((a, b) => b.members!.length - a.members!.length || a.key.localeCompare(b.key))[0];
     const covered = new Set(own?.members ?? []);
     const carriers = [...(own ? [own] : []), ...models.filter((m) => m.role === role && !covered.has(m.key))].sort((a, b) => a.x - b.x || a.key.localeCompare(b.key));
@@ -250,7 +253,7 @@ function beatAtOrAfter(beats: readonly number[], ms: number): number {
 export function choreograph(song: SongMap, props: readonly PropInfo[], plan: ShowPlan, options: ChoreographOptions): Placement[] {
   const seed = options.seed ?? plan.seed;
   const { feel, frameMs } = options;
-  const units = unitsByRole(props);
+  const units = unitsByRole(props, plan.style === "mood");
   const allUnits = [...units.values()].flat();
   if (allUnits.length === 0 || song.beats.length < 2) return [];
   const beatMs = 60000 / song.bpm;
@@ -277,8 +280,10 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
   const tierOf = (role: Role) => units.get(role)![0]!.prop.tier;
   const totalRows = allUnits.length;
 
-  // The show style plays the house as one instrument (plan.ts, Style).
-  const show = plan.style === "show";
+  // The show style plays the house as one instrument (plan.ts, Style). A mood is a show that
+  // differs where it says so.
+  const mood = plan.style === "mood";
+  const show = plan.style === "show" || mood;
   const avoid = new Set(plan.avoid ?? []);
   // Its focal point wears the contrast colour: the star, else the feature nearest the centre.
   const focal = new Set<Unit>(units.get("star") ?? []);
@@ -329,6 +334,19 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
     const contrastColour = (ms: number) => shade(hues.length > 1 ? hues[(slot(ms) + hues.length - 1) % hues.length]! : "#ffffff");
     // Accents flash white, or the contrast where the house is already white.
     const flashColour = (ms: number) => (isWhite(houseColour(ms)) ? contrastColour(ms) : "#ffffff");
+    // A mood wears two of its family at once, the house split down the middle, moving on through
+    // pairs that all hold the home colour (the reference video is half its home blue). The focal
+    // prop wears the other half's colour; a quiet section wears one colour everywhere.
+    const moodPairs = hues.length >= 3 ? [[0, 1], [2, 0], [0, 2], [1, 0]] : [[0, 1], [1, 0]];
+    const moodPair = (u: Unit, ms: number): [string, string] => {
+      const pair = moodPairs[slot(ms) % moodPairs.length]!.map((i) => hues[i] ?? "#ffffff");
+      const side = u.prop.x < 0.5 ? 0 : 1;
+      const own = quiet ? 0 : focal.has(u) ? 1 - side : side;
+      return [shade(pair[own]!), shade(pair[1 - own]!)];
+    };
+    // A mood's "alternate" passes the house between its halves: one half lit while the other
+    // rests, swapping with the colour. The heroes carry on through both.
+    const halves = mood && sp.motion === "alternate" && !quiet;
 
     if (dipAt(si)) {
       // A breakdown answers the music on one role: the house goes dark but for it and one
@@ -395,7 +413,8 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
     }
     // A whole-house texture sits under everything, so it only plays when the house is busy. In a
     // show's loud parts it washes the house in the bar's colour.
-    if (units.has("whole_house") && sp.intensity >= 0.6 && keyedRandom(seed, `house:${sp.look}`) < 0.5) lit.add("whole_house");
+    // A mood is two colours at a time, which one wash over the house would hide.
+    if (units.has("whole_house") && !mood && sp.intensity >= 0.6 && keyedRandom(seed, `house:${sp.look}`) < 0.5) lit.add("whole_house");
     // A dark flood under a lit whole-house group would show the group: floods hold an Off backdrop
     // instead (18% of flood time in the corpus is Off).
     if (lit.has("whole_house") && units.has("flood") && !lit.has("flood")) {
@@ -448,12 +467,12 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
               colorInputs: colorInputNames(inputs) as unknown as EffectParamValue,
             };
             const start = beatTime(from);
-            drafts.push({ unit, layer: 0, startMs: start, endMs: beatTime(to), name: "Shader", params, palette: show ? [houseColour(start), contrastColour(start)] : [...pair, accent] });
+            drafts.push({ unit, layer: 0, startMs: start, endMs: beatTime(to), name: "Shader", params, palette: mood ? moodPair(unit, start) : show ? [houseColour(start), contrastColour(start)] : [...pair, accent] });
             return;
           }
           if (kind === "picture") {
             const motif = motifs[lookNo % motifs.length]!;
-            const colours = show ? [houseColour(beatTime(from)), contrastColour(beatTime(from)), "#ffffff"] : [...pair, accent];
+            const colours = mood ? [...moodPair(unit, beatTime(from)), "#ffffff"] : show ? [houseColour(beatTime(from)), contrastColour(beatTime(from)), "#ffffff"] : [...pair, accent];
             const imageKey = `${motif}|${colours.join()}`;
             const image = images.get(imageKey) ?? images.set(imageKey, drawMotif(motif, colours)).get(imageKey)!;
             // Quiet: the picture grows in. Mid: it sways a bar at a time. Loud: it peeks up or
@@ -471,7 +490,7 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
           // A show's loud parts paint the frame of the house, the fills and the focal prop solid
           // in the bar's colour, the way a produced show floods its roofline and windows; the
           // features and heroes move inside that.
-          const solid = loud && (unit.prop.tier === "frame" || unit.prop.tier === "fill" || focal.has(unit)) && ROLE_EFFECTS[role].includes("On");
+          const solid = loud && !mood && (unit.prop.tier === "frame" || unit.prop.tier === "fill" || focal.has(unit)) && ROLE_EFFECTS[role].includes("On");
           const name = solid ? "On" : unit.prop.dims === 1 && TWO_D_ONLY.has(chosen) ? families.find((f) => !TWO_D_ONLY.has(f)) : chosen;
           if (!name) return;
           const punctual = PUNCTUAL.has(name);
@@ -481,7 +500,7 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
           // A show's loud blocks hold their colour, so only the roles carrying the section
           // re-trigger inside the bar; the white flashes mark the beat. Nothing in a show runs
           // across a change of colour.
-          if (loud && punctual) interval = Math.max(interval, sp.featured.includes(role) && unit.prop.tier !== "hero" ? 2 : song.beatsPerBar);
+          if (loud && punctual && !mood) interval = Math.max(interval, sp.featured.includes(role) && unit.prop.tier !== "hero" ? 2 : song.beatsPerBar);
           if (show) interval = Math.min(interval, period * song.beatsPerBar);
           interval = Math.max(step, Math.ceil(interval / step) * step);
           // Motion: a sweep across the role's props, one prop per beat.
@@ -496,7 +515,7 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
             const z = sp.motion === "right-to-left" ? zones - 1 - zone(unit.prop.x) : sp.motion === "centre-out" ? zone(Math.abs(unit.prop.x - 0.5) * 2) : zone(unit.prop.x);
             if (punctual) interval = Math.max(interval, zones * step);
             phase = z * step;
-          } else if (n > 1 && sp.motion !== "unison") {
+          } else if (n > 1 && sp.motion !== "unison" && !halves) {
             if (punctual) {
               const cycle = sp.motion === "alternate" ? 2 : Math.min(n, song.beatsPerBar);
               interval = Math.max(interval, cycle * step);
@@ -510,9 +529,10 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
             // rest of its slot dark, the way the corpus's one-beat effects do; that gap is what
             // makes the next trigger read as a beat. Heroes, lit all song, fill their slot, and so
             // does everything in a show's loud parts: the house holds the bar's colour as a block.
-            const end = Math.min(b + (punctual && unit.prop.tier !== "hero" && !loud ? Math.min(interval, step === 1 ? 2 : step) : interval), to);
+            const end = Math.min(b + (punctual && unit.prop.tier !== "hero" && (!loud || mood) ? Math.min(interval, step === 1 ? 2 : step) : interval), to);
             const startMs = beatTime(b), endMs = beatTime(end);
             if (endMs <= startMs) continue;
+            if (halves && unit.prop.tier !== "hero" && (unit.prop.x < 0.5 ? 0 : 1) !== slot(startMs) % 2) continue;
             const { params, layer } = effectParams(name, end - b, variation + (sp.motion === "right-to-left" ? 1 : 0), feel, options.title);
             // A solid block holds steady: the bar's change of colour and the flashes are the beat.
             if (solid) params.endIntensity = params.startIntensity ?? 100;
@@ -520,7 +540,7 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
             // A re-triggered effect swaps the pair on each trigger, so the beat shows as a
             // two-colour pattern; a texture holds it. A show wears the house's one colour, the
             // focal prop (and every other prop under "alternate") the contrast.
-            const colors = show
+            const colors = mood ? [moodPair(unit, startMs)[0]] : show
               ? [focal.has(unit) || (sp.motion === "alternate" && k % 2) ? contrastColour(startMs) : houseColour(startMs)]
               : [...new Set((punctual && variation % 2 ? [pair[1]!, pair[0]!] : pair).slice(0, size))];
             // A pulse that comes and goes dies away in the quieter sections, and breathes in as
@@ -534,9 +554,10 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
     }
 
     // 7. Heroes take a third layer in the loud sections: a texture at low mix over their base
-    // (the corpus's mega trees and matrices run 2 layers at the median, 6-7 at p90).
-    if (sp.intensity >= 0.75) {
-      for (const unit of [...lit].flatMap((r) => units.get(r)!).filter((u) => u.prop.tier === "hero" && u.prop.dims === 2)) {
+    // (the corpus's mega trees and matrices run 2 layers at the median, 6-7 at p90). A mood's
+    // loud parts sparkle white over the features as well.
+    if (sp.intensity >= 0.75 || (mood && loud)) {
+      for (const unit of [...lit].flatMap((r) => units.get(r)!).filter((u) => (u.prop.tier === "hero" && u.prop.dims === 2) || (mood && loud && u.prop.tier === "feature"))) {
         const name = ["Twinkle", "Shimmer"].find((n) => ROLE_EFFECTS[unit.prop.role].includes(n) && !avoid.has(n));
         if (!name) continue;
         for (let p = 0; p + 1 < phraseBeats.length; p++) {
@@ -577,12 +598,14 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
         if (!name) continue;
         own.forEach((t, i) => {
           const next = own[i + 1] ?? section.endMs;
-          // A show's flash is half a beat: a crack, then the colour again.
+          // A show's flash is half a beat: a crack, then the colour again. A mood's flashes are
+          // the other half's colour, which kept to the family and marked the beat better than
+          // white on the test songs.
           const endMs = Math.min(t + (show ? beatMs / 2 : beatMs), next, section.endMs);
           if (endMs - t < frameMs) return;
           const { params } = effectParams(name, 1, i, feel, options.title);
           // Accents all wear the accent colour; an On accent decays unless the section is loud.
-          drafts.push({ unit, layer: 1, startMs: t, endMs, name, params, palette: [show ? flashColour(t) : accent], ...(name === "On" && sp.intensity < 0.75 ? { fadeOutMs: (endMs - t) / 2 } : {}) });
+          drafts.push({ unit, layer: 1, startMs: t, endMs, name, params, palette: [mood ? moodPair(unit, t)[1] : show ? flashColour(t) : accent], ...(name === "On" && sp.intensity < 0.75 ? { fadeOutMs: (endMs - t) / 2 } : {}) });
         });
       }
     }
@@ -608,6 +631,24 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
       }
     }
   });
+
+  // A mood closes on the house twinkling a dim white and fading away, the reference video's last
+  // ten seconds: the last four bars at most, unless the song ends loud. Full white there lit the
+  // house brighter than the song's quiet ending and cost the fit score its loudness parts.
+  const tail = song.sections[song.sections.length - 1];
+  if (mood && tail && !loudness[song.sections.length - 1] && !avoid.has("Twinkle")) {
+    const from = song.downbeats.find((d) => d >= Math.max(tail.startMs, song.durationMs - 4 * song.beatsPerBar * beatMs) - 1) ?? tail.startMs;
+    for (let i = drafts.length - 1; i >= 0; i--) {
+      const d = drafts[i]!;
+      if (d.startMs >= from - 1) drafts.splice(i, 1);
+      else if (d.endMs > from) { d.endMs = from; delete d.fadeOutMs; }
+    }
+    const { params } = effectParams("Twinkle", (song.durationMs - from) / beatMs, 0, feel, options.title);
+    for (const unit of allUnits) {
+      if (!ROLE_EFFECTS[unit.prop.role].includes("Twinkle") || unit.prop.role === "whole_house" || unit.prop.role === "flood") continue;
+      drafts.push({ unit, layer: 0, startMs: from, endMs: song.durationMs, name: "Twinkle", params: { ...params }, palette: [dim("#ffffff", 0.3)], fadeInMs: song.beatsPerBar * beatMs });
+    }
+  }
 
   // A singing face with a face definition sings the lyric track all song, its mouth on the
   // phonemes and its eyes blinking, in place of its own effects and texture (the corpus's

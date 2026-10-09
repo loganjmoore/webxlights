@@ -181,7 +181,7 @@ class MagicPlanController extends Controller
             'props.groups' => ['nullable', 'array', 'max:40'],
             'props.groups.*' => ['string', 'max:100'],
             'feel' => ['required', Rule::in(['auto', 'traditional', 'joyful', 'peaceful', 'powerful', 'magical', 'rock'])],
-            'style' => ['nullable', Rule::in(['show', 'classic'])],
+            'style' => ['nullable', Rule::in(['show', 'mood', 'classic'])],
             'direction' => ['nullable', 'string', 'max:500'],
             // A chat edit: the user's ask and the plan it changes. The plan is context for the
             // model only; what comes back is validated like any plan.

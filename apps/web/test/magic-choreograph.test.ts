@@ -356,6 +356,78 @@ describe("the show style", () => {
   });
 });
 
+describe("the mood style", () => {
+  const moodRun = (song: SongMap, seed = 7) => {
+    const plan = rulesDirector({ song, props, feel: "magical", seed, style: "mood" });
+    return { plan, placements: choreograph(song, props, plan, { feel: feelSpec("magical", song), frameMs: 25, title: "Jingle Bells" }) };
+  };
+  const moods = TEMPOS.map((bpm) => ({ bpm, song: syntheticSong(bpm), ...moodRun(syntheticSong(bpm)) }));
+  const x = new Map(props.map((p) => [p.key, p.x]));
+  const showingAt = (placements: Placement[], t: number) => placements.filter((p) => !p.effect.layerIndex && p.effect.name !== "Pictures" && p.effect.startMs <= t && p.effect.endMs > t);
+
+  it("keeps one colour family all song and closes on a dim white twinkle", () => {
+    let closed = 0;
+    for (const { song, plan, placements } of moods) {
+      expect(Object.keys(plan.palettes)).toEqual(["p0"]);
+      expect(plan.sections.every((s) => s.palette === "p0")).toBe(true);
+      expect(plan.ending).toBe("fade");
+      // A family colour at any brightness: quiet sections glow at half.
+      const rgb = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+      const inFamily = (c: string) => [...feelSpec("magical", song).mood, "#ffffff"].some((f) => {
+        const [a, b] = [rgb(c), rgb(f)], k = Math.max(...a) / Math.max(...b);
+        return a.every((v, i) => Math.abs(v - b[i]! * k) <= 2);
+      });
+      for (const p of placements.filter((q) => !q.effect.layerIndex && q.effect.name !== "Twinkle")) for (const c of p.effect.palette ?? []) expect(inFamily(c), `${p.role} ${c}`).toBe(true);
+      const loud = showLoud(song, plan.sections.map((s) => s.intensity));
+      if (loud[loud.length - 1]) continue;
+      const near = showingAt(placements, song.durationMs - 300);
+      expect(near.length).toBeGreaterThan(3);
+      expect(near.every((p) => p.effect.name === "Twinkle" || p.effect.name === "Faces")).toBe(true);
+      closed++;
+    }
+    expect(closed).toBeGreaterThan(0);
+  });
+
+  it("wears two colours at once in the loud sections, split down the middle of the house", () => {
+    let split = 0;
+    for (const { song, plan, placements } of moods) {
+      // No carrier spans the middle: a group across it would paint both halves one colour.
+      for (const p of placements.filter((q) => q.key.startsWith("group:"))) {
+        const members = props.find((q) => q.key === p.key)!.members!.map((k) => x.get(k) ?? 0.5);
+        expect(members.every((v) => v < 0.5) || members.every((v) => v >= 0.5), p.key).toBe(true);
+      }
+      const loud = showLoud(song, plan.sections.map((s) => s.intensity));
+      song.sections.forEach((section, si) => {
+        if (!loud[si]) return;
+        for (const d of song.downbeats.filter((t) => t >= section.startMs && t < section.endMs - 1)) {
+          const showing = showingAt(placements, d + 60000 / song.bpm / 2).filter((p) => p.role !== "star" && p.effect.name !== "Twinkle" && p.effect.name !== "Faces");
+          const side = (left: boolean) => new Set(showing.filter((p) => (x.get(p.key)! < 0.5) === left && Math.abs(x.get(p.key)! - 0.5) > 0.05).flatMap((p) => p.effect.palette ?? []));
+          const [l, r] = [side(true), side(false)];
+          if (l.size === 1 && r.size === 1 && [...l][0] !== [...r][0]) split++;
+        }
+      });
+    }
+    expect(split).toBeGreaterThan(10);
+  });
+
+  it("passes the house between its halves where it alternates, the heroes carrying on through", () => {
+    let checked = 0;
+    for (const { song, plan, placements } of moods) {
+      song.sections.forEach((section, si) => {
+        if (plan.sections[si]!.motion !== "alternate" || plan.sections[si]!.intensity < SHOW_QUIET) return;
+        for (const d of song.downbeats.filter((t) => t >= section.startMs && t < section.endMs - 1)) {
+          const lit = showingAt(placements, d + 60000 / song.bpm / 2).filter((p) => !["mega_tree", "matrix", "singing_face"].includes(p.role));
+          const sides = new Set(lit.map((p) => x.get(p.key)! < 0.5));
+          expect(sides.size, `${section.label} at ${d}`).toBeLessThanOrEqual(1);
+          checked++;
+        }
+      });
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+});
+
+
 describe("singing faces", () => {
   it("sing the lyric track all song on a face with a definition, the mouth on the phonemes", () => {
     const song = syntheticSong(120);

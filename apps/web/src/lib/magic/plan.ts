@@ -10,9 +10,12 @@ export type Feel = "auto" | "traditional" | "joyful" | "peaceful" | "powerful" |
 /**
  * How the house moves. "show" plays it as one instrument, the way produced shows do: one colour
  * across the house that changes on the bar, white accents, dark rests and breakdowns, sweeps
- * across the whole front. "classic" sequences prop by prop the way the corpus's median song does.
+ * across the whole front. "mood" is a show in one colour family for the whole song, two of its
+ * colours at a time split across the house, the halves answering each other, loud parts that go
+ * dark and sparkle rather than flood, and a white twinkle to close. "classic" sequences prop by
+ * prop the way the corpus's median song does.
  */
-export type Style = "show" | "classic";
+export type Style = "show" | "mood" | "classic";
 
 export interface SectionPlan {
   /** Into SongMap.sections. */

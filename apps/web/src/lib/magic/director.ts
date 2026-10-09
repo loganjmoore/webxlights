@@ -83,11 +83,13 @@ export interface DirectorInput {
 }
 
 export function rulesDirector({ song, props, feel: feelName, seed, palette, style = "classic" }: DirectorInput): ShowPlan {
-  const show = style === "show";
+  // The mood style is a show too: everything below that a show does, it does, unless it says not.
+  const mood = style === "mood", show = style === "show" || mood;
   const feel = feelSpec(feelName, song);
   const roles = [...new Set(props.filter((p) => !p.key.startsWith("submodel:")).map((p) => p.role))].filter((r) => ROLE_EFFECTS[r].length > 0);
   const palettes: Record<string, string[]> = {};
-  const paletteList = palette?.length ? [palette, ...feel.palettes] : feel.palettes;
+  // A mood keeps one colour family all song.
+  const paletteList = palette?.length ? [palette, ...feel.palettes] : mood ? [feel.mood] : feel.palettes;
   paletteList.forEach((colors, i) => (palettes[`p${i}`] = colors));
 
   // Looks are per repeat group: the chorus looks like the chorus every time it comes round.
@@ -117,12 +119,13 @@ export function rulesDirector({ song, props, feel: feelName, seed, palette, styl
     const motionRoll = keyedRandom(seed, `motion:${look}`);
     // A show's loud parts move as one, changing colour together on the bar; elsewhere a sweep
     // crosses the whole front of the house.
+    // A mood's middle sections pass the house between its halves half the time ("alternate").
     const motion: Motion = show
-      ? loudness[index] ? "unison" : SWEEPS[Math.floor(motionRoll * SWEEPS.length)]!
+      ? loudness[index] ? "unison" : mood && motionRoll < 0.5 ? "alternate" : SWEEPS[Math.floor((mood ? motionRoll * 2 - 1 : motionRoll) * SWEEPS.length)]!
       : intensity < 0.3 ? "unison" : MOTIONS[Math.floor(motionRoll * MOTIONS.length)]!;
     const accents: Accents = intensity >= 0.7 ? (song.bpm < 110 || show ? "beats" : "downbeats") : intensity >= 0.45 ? "downbeats" : "none";
     return {
-      index, look, intensity, palette: `p${lookIndex % paletteList.length}`, featured, families, motion,
+      index, look, intensity, palette: mood ? "p0" : `p${lookIndex % paletteList.length}`, featured, families, motion,
       accents: accents !== "none" && ["rock", "powerful"].includes(feelName) && song.hits.length > 0 ? "hits" : accents,
       wholeHouseHit: false,
     };
@@ -136,9 +139,10 @@ export function rulesDirector({ song, props, feel: feelName, seed, palette, styl
   // its families rotated, so the second verse reads as a continuation rather than a stall.
   for (let i = 1; i < sections.length; i++) {
     const prev = sections[i - 1]!, cur = sections[i]!;
-    if (cur.look !== prev.look && cur.palette !== prev.palette) continue;
+    // A mood has the one palette, so only a repeated look counts.
+    if (cur.look !== prev.look && (mood || cur.palette !== prev.palette)) continue;
     if (cur.look === prev.look) cur.look = `${cur.look}${i}`;
-    cur.palette = `p${(Number(prev.palette.slice(1)) + 1) % paletteList.length}`;
+    if (!mood) cur.palette = `p${(Number(prev.palette.slice(1)) + 1) % paletteList.length}`;
     for (const role of roles) {
       const list = cur.families[role];
       if (list && list.length > 1) cur.families[role] = [...list.slice(1), list[0]!];
@@ -146,7 +150,8 @@ export function rulesDirector({ song, props, feel: feelName, seed, palette, styl
   }
 
   const last = song.sections[song.sections.length - 1];
-  return { seed, palettes, sections, ending: last && last.energy >= 0.6 ? "hit-then-dark" : "fade", style };
+  // A mood closes on a white twinkle that fades, whatever the song does.
+  return { seed, palettes, sections, ending: !mood && last && last.energy >= 0.6 ? "hit-then-dark" : "fade", style };
 }
 
 /**
