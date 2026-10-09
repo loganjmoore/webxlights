@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { analyzeSong } from "@webxlights/engine";
-import { audioHash, cachedSongMap, withCachedSongMap } from "../src/lib/magic/songMapClient";
+import { analyzeSongInWorker, audioHash, cachedSongMap, STALE_PAGE, withCachedSongMap } from "../src/lib/magic/songMapClient";
 
 // A real (tiny) map rather than a hand-built object, so the fixture can't drift from the type.
 const map = analyzeSong(new Float32Array(22050), 22050);
@@ -46,5 +46,31 @@ describe("song map cache on the sequence", () => {
   it("survives the JSON round trip the server puts it through", () => {
     const stored = JSON.parse(JSON.stringify(withCachedSongMap(null, "aaa", map)));
     expect(cachedSongMap(stored, "aaa")).toEqual(map);
+  });
+});
+
+describe("a worker that fails to load", () => {
+  // What a browser does with a module worker whose script won't load: an error event, no message.
+  class DeadWorker {
+    onmessage: ((e: MessageEvent) => void) | null = null;
+    onerror: ((e: ErrorEvent) => void) | null = null;
+    postMessage(): void {
+      setTimeout(() => this.onerror?.({ message: "" } as ErrorEvent), 0);
+    }
+    terminate(): void {}
+  }
+  const audio = { numberOfChannels: 1, length: 4, sampleRate: 22050, getChannelData: () => new Float32Array(4) } as unknown as AudioBuffer;
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("says to reload when a deploy has replaced this page's scripts", async () => {
+    vi.stubGlobal("Worker", DeadWorker);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
+    await expect(analyzeSongInWorker(audio)).rejects.toThrow(STALE_PAGE);
+  });
+
+  it("keeps the plain failure when the page is current", async () => {
+    vi.stubGlobal("Worker", DeadWorker);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 200 })));
+    await expect(analyzeSongInWorker(audio)).rejects.toThrow("Song analysis failed");
   });
 });

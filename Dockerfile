@@ -35,6 +35,8 @@ COPY --from=vendor /app ./
 COPY --from=web-build /repo/apps/web/dist ./public/app
 
 COPY apps/api/docker/nginx.conf /etc/nginx/http.d/default.conf
+# A config nginx can't read is an outage at start; fail the build instead.
+RUN nginx -t
 COPY apps/api/docker/supervisord.conf /etc/supervisord.conf
 COPY apps/api/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
