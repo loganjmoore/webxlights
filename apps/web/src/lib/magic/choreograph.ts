@@ -1,9 +1,11 @@
-import { EFFECT_SCHEMAS, NOTE_RANGE_VU_METER_TYPES, defaultParamsFor } from "@webxlights/engine";
-import type { RowElementType, SequenceEffect } from "../api";
+import { EFFECT_SCHEMAS, NOTE_RANGE_VU_METER_TYPES, defaultParamsFor, type PictureImage } from "@webxlights/engine";
+import { colorInputNames, defaultValueFor } from "@webxlights/formats";
+import type { EffectParamValue, RowElementType, SequenceEffect, ShaderRecord } from "../api";
 import type { PropInfo, Role, Tier } from "../propRoles";
 import { PARAMS, importEffectSettings } from "../xsqEffectSettings";
 import { keyedRandom, nativeEffectName, weightedOrder } from "./director";
 import type { FeelSpec } from "./feels";
+import { drawMotif, songMotifs } from "./motifs";
 import type { SectionPlan, ShowPlan } from "./plan";
 import { priors } from "./priors";
 import { ROLE_EFFECTS, TWO_D_ONLY } from "./roleEffects";
@@ -29,16 +31,22 @@ export interface ChoreographOptions {
   /** Overrides plan.seed: "Try another" re-rolls the choices, not the plan. */
   seed?: number;
   frameMs: number;
-  /** For Text on a matrix. */
+  /** For Text on a matrix, and which pictures it gets. */
   title?: string;
+  /** Library shaders it may place on the 2D heroes and the whole house: the built-ins. */
+  shaders?: readonly MagicShader[];
 }
 
+export type MagicShader = Pick<ShaderRecord, "id" | "name" | "source" | "inputs">;
+
 /** Effects that mark a beat: re-triggered at the beat grid, each filling to the next. */
-const PUNCTUAL = new Set(["On", "Shockwave", "Ripple", "Curtain", "SingleStrand", "Color Wash", "Strobe", "Fan", "Bars", "Morph", "Marquee", "Lightning", "Shape", "Circles", "Fill"]);
+export const PUNCTUAL = new Set(["On", "Shockwave", "Ripple", "Curtain", "SingleStrand", "Color Wash", "Strobe", "Fan", "Bars", "Morph", "Marquee", "Lightning", "Shape", "Circles", "Fill"]);
 const TIER_PRIORITY: Record<Tier, number> = { fill: 0, frame: 1, feature: 2, hero: 3 };
 /** The corpus: about 30-36% of a song's props are lit at any second; quietest 16 s ~24%, busiest ~52%. */
 const LIT_SHARE_QUIET = priors.structure.litShareQuietPhrase.p50;
 const LIT_SHARE_BUSY = priors.structure.litShareBusyPhrase.p50;
+/** Pictures carry their pixels in the sequence body, about 10 KB each, inside the autosave budget. */
+const MAX_PICTURES = 8;
 
 interface Unit { prop: PropInfo; elementType: Placement["elementType"]; elementId: number; subName?: string; order: number }
 interface Draft { unit: Unit; layer: number; startMs: number; endMs: number; name: string; params: SequenceEffect["params"]; palette: string[]; layerSettings?: SequenceEffect["layer"]; mix?: number; fadeInMs?: number; fadeOutMs?: number; hit?: boolean }
@@ -129,6 +137,31 @@ function effectParams(name: string, beats: number, variation: number, feel: Feel
 }
 
 /**
+ * A look's colour plan. The heroes and the fills lead in the palette's first colour, the frame of
+ * the house holds the second, the features alternate between the two by role so neighbours
+ * contrast, and the star takes the accent, the palette's last colour. The accent comes in with
+ * the music: a quiet look stays in its rich colours, a loud one pairs nearly everything with it.
+ * Every prop of a role wears the same pair for the whole look: colour changes with the look, not
+ * with every trigger.
+ */
+function colourPlan(palette: readonly string[], roles: readonly Role[], tierOf: (r: Role) => Tier, intensity: number): { pairs: Map<Role, [string, string]>; accent: string } {
+  const base = palette[0] ?? "#ffffff", second = palette[1] ?? base, accent = palette[palette.length - 1] ?? base;
+  const lift = intensity >= 0.75 ? accent : undefined, rich = intensity < 0.4;
+  const pairs = new Map<Role, [string, string]>();
+  let feature = 0;
+  for (const role of [...roles].sort()) {
+    const tier = tierOf(role);
+    pairs.set(role,
+      role === "star" ? [accent, base]
+      : tier === "hero" ? [base, rich ? second : accent]
+      : tier === "frame" ? [second, lift ?? base]
+      : tier === "feature" ? (feature++ % 2 ? [base, lift ?? second] : [second, rich ? base : accent])
+      : [base, second]);
+  }
+  return { pairs, accent };
+}
+
+/**
  * Sub-model roles that mean a separate prop rather than a part: the star on a mega tree, a face on
  * a singing tree. Part names read as roles too often to trust the rest: a snowflake's "Circle 1"
  * is not a wreath, and a spinner's "Burst 2" is not another spinner (a real layout's 430
@@ -188,7 +221,18 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
   const step = song.bpm >= 90 ? 1 : song.beatsPerBar;
   const beatTime = (b: number) => (b < song.beats.length ? song.beats[b]! : song.beats[song.beats.length - 1]! + (b - song.beats.length + 1) * beatMs);
   const drafts: Draft[] = [];
-  const litBefore = new Set<Unit>();
+  const litBySection: Set<Unit>[] = [];
+  const planOf = (si: number): SectionPlan => plan.sections.find((s) => s.index === si) ?? plan.sections[Math.min(si, plan.sections.length - 1)]!;
+  // Looks in the order they first play: a repeat of a look gets the same shader and picture.
+  const lookNumbers = new Map<string, number>();
+  for (const s of plan.sections) if (!lookNumbers.has(s.look)) lookNumbers.set(s.look, lookNumbers.size);
+  const usable = (options.shaders ?? []).filter((sh) => colorInputNames(sh.inputs ?? []).length > 0);
+  const named = (names: readonly string[]) => names.map((n) => usable.find((sh) => sh.name === n)).filter((sh): sh is MagicShader => !!sh);
+  const shaderLists = { calm: named(feel.shaders.calm), lively: named(feel.shaders.lively) };
+  for (const key of ["calm", "lively"] as const) if (!shaderLists[key].length) shaderLists[key] = usable;
+  const motifs = songMotifs(options.title, feel.motifs);
+  const images = new Map<string, PictureImage>();
+  let picturesLeft = MAX_PICTURES;
   // The order roles come in for a look, kept so a repeat of the look lights the same roles.
   const lookRoles = new Map<string, Role[]>();
   const litLooks = new Map<Role, number>();
@@ -197,8 +241,10 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
   const totalRows = allUnits.length;
 
   song.sections.forEach((section, si) => {
-    const sp: SectionPlan = plan.sections.find((s) => s.index === si) ?? plan.sections[Math.min(si, plan.sections.length - 1)]!;
+    const sp = planOf(si);
     const palette = plan.palettes[sp.palette] ?? Object.values(plan.palettes)[0] ?? ["#ffffff", "#ff0000"];
+    const { pairs, accent } = colourPlan(palette, [...units.keys()], tierOf, sp.intensity);
+    const lookNo = lookNumbers.get(sp.look) ?? 0;
     const firstBeat = beatAtOrAfter(song.beats, section.startMs);
     const endBeat = si === song.sections.length - 1 ? song.beats.length : beatAtOrAfter(song.beats, section.endMs);
     if (endBeat <= firstBeat) return;
@@ -258,6 +304,47 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
           if (pick < acc) { chosen = families[i]!; break; }
         }
         roleUnits.forEach((unit, k) => {
+          const [primary, partner] = pairs.get(role)!;
+          // Alternate motion alternates the pair along the role's props.
+          const pair = sp.motion === "alternate" && k % 2 ? [partner, primary] : [primary, partner];
+          // The 2D heroes and the whole house rotate their phrases through a library shader and,
+          // on a matrix, a picture of the song's motif, so every look shows each.
+          const beats = to - from;
+          const canShader = usable.length > 0 && unit.prop.dims === 2 && (role === "whole_house" || (unit.prop.tier === "hero" && role !== "singing_face"));
+          const canPicture = motifs.length > 0 && role === "matrix" && unit.prop.dims === 2 && unit.prop.nodes >= 200;
+          const kinds = role === "whole_house" ? ["shader"] : [...(canPicture ? ["picture"] : []), "family", ...(canShader ? ["shader"] : [])];
+          let kind = kinds[(p + lookNo) % kinds.length]!;
+          if ((kind === "shader" && !canShader) || (kind === "picture" && picturesLeft <= 0)) kind = "family";
+          if (kind === "shader") {
+            const list = sp.intensity < 0.5 ? shaderLists.calm : shaderLists.lively;
+            const shader = list[(lookNo * 3 + (role === "matrix" ? 1 : role === "whole_house" ? 2 : 0)) % list.length]!;
+            const inputs = shader.inputs ?? [];
+            // As EffectPropsPanel stores a picked shader: inputs and colour names ride as params.
+            const params: SequenceEffect["params"] = {
+              ...defaultParamsFor("Shader"), source: shader.source, speed: clampTo("Shader", "speed", (feel.speed * song.bpm) / 120), shaderId: shader.id,
+              inputs: Object.fromEntries(inputs.map((i) => [i.name, defaultValueFor(i)])) as unknown as EffectParamValue,
+              colorInputs: colorInputNames(inputs) as unknown as EffectParamValue,
+            };
+            drafts.push({ unit, layer: 0, startMs: beatTime(from), endMs: beatTime(to), name: "Shader", params, palette: [...pair, accent] });
+            return;
+          }
+          if (kind === "picture") {
+            const motif = motifs[lookNo % motifs.length]!;
+            const colours = [...pair, accent];
+            const imageKey = `${motif}|${colours.join()}`;
+            const image = images.get(imageKey) ?? images.set(imageKey, drawMotif(motif, colours)).get(imageKey)!;
+            // Quiet: the picture grows in. Mid: it sways a bar at a time. Loud: it peeks up or
+            // scrolls across, a pass every two bars.
+            const bars = Math.max(1, Math.round(beats / song.beatsPerBar));
+            const [movement, speed, fade] = sp.intensity < 0.4 ? ["zoom in", 1, 2] as const
+              : sp.intensity < 0.75 ? ["wiggle", bars, 1] as const
+              : [p % 2 ? "peekaboo" : lookNo % 2 ? "left" : "right", Math.max(1, Math.round(bars / 2)), p % 2 ? 1 : 0] as const;
+            const params = { ...defaultParamsFor("Pictures"), image, movement, speed, scaleMode: "fit" };
+            const fadeMs = fade * beatMs;
+            drafts.push({ unit, layer: 0, startMs: beatTime(from), endMs: beatTime(to), name: "Pictures", params, palette: [], ...(fadeMs ? { fadeInMs: fadeMs, fadeOutMs: fadeMs } : {}) });
+            picturesLeft--;
+            return;
+          }
           const name = unit.prop.dims === 1 && TWO_D_ONLY.has(chosen) ? families.find((f) => !TWO_D_ONLY.has(f)) : chosen;
           if (!name) return;
           const punctual = PUNCTUAL.has(name);
@@ -287,8 +374,13 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
             if (endMs <= startMs) continue;
             const { params, layer } = effectParams(name, end - b, variation + (sp.motion === "right-to-left" ? 1 : 0), feel, options.title);
             const size = Math.max(1, Math.min(2, priors.palette.sizeByEffect[nativeEffectName(name)] ?? 1));
-            const colors = Array.from({ length: Math.min(size, palette.length) }, (_, c) => palette[(variation + c + k) % palette.length]!);
-            drafts.push({ unit, layer: 0, startMs, endMs, name, params, palette: colors, ...(layer ? { layerSettings: layer } : {}) });
+            // A re-triggered effect swaps the pair on each trigger, so the beat shows as a
+            // two-colour pattern; a texture holds it.
+            const colors = [...new Set((punctual && variation % 2 ? [pair[1]!, pair[0]!] : pair).slice(0, size))];
+            // A pulse that comes and goes dies away in the quieter sections, and breathes in as
+            // well in the quietest; the loud ones cut.
+            const pulse = punctual && unit.prop.tier !== "hero" && sp.intensity < 0.5 ? { fadeOutMs: (endMs - startMs) / 2, ...(sp.intensity < 0.35 ? { fadeInMs: (endMs - startMs) / 3 } : {}) } : {};
+            drafts.push({ unit, layer: 0, startMs, endMs, name, params, palette: colors, ...(layer ? { layerSettings: layer } : {}), ...pulse });
             variation++;
           }
         });
@@ -304,7 +396,7 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
         for (let p = 0; p + 1 < phraseBeats.length; p++) {
           const [from, to] = [phraseBeats[p]!, phraseBeats[p + 1]!];
           const { params } = effectParams(name, to - from, p, feel, options.title);
-          drafts.push({ unit, layer: 2, startMs: beatTime(from), endMs: beatTime(to), name, params, palette: [palette[(p + 1) % palette.length]!], mix: 0.6 });
+          drafts.push({ unit, layer: 2, startMs: beatTime(from), endMs: beatTime(to), name, params, palette: [accent], mix: 0.6 });
         }
       }
     }
@@ -338,26 +430,33 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
           const endMs = Math.min(t + beatMs, next, section.endMs);
           if (endMs - t < frameMs) return;
           const { params } = effectParams(name, 1, i, feel, options.title);
-          drafts.push({ unit, layer: 1, startMs: t, endMs, name, params, palette: [palette[(i + 1) % palette.length]!] });
+          // Accents all wear the accent colour; an On accent decays unless the section is loud.
+          drafts.push({ unit, layer: 1, startMs: t, endMs, name, params, palette: [accent], ...(name === "On" && sp.intensity < 0.75 ? { fadeOutMs: (endMs - t) / 2 } : {}) });
         });
       }
     }
 
-    // Fades in where a prop comes in from dark, for textures; punctual effects already pulse.
-    for (const unit of [...lit].flatMap((r) => units.get(r)!)) {
-      const first = drafts.find((d) => d.unit === unit && d.layer === 0 && d.startMs >= section.startMs - 1);
-      if (first && !litBefore.has(unit) && !PUNCTUAL.has(first.name)) first.fadeInMs = Math.min(beatMs * step, (first.endMs - first.startMs) / 2);
-    }
-    litBefore.clear();
-    for (const role of lit) for (const unit of units.get(role)!) litBefore.add(unit);
+    litBySection[si] = new Set([...lit].flatMap((r) => units.get(r)!));
   });
 
-  // Section ends: textures fade out into the next section's look.
-  for (const section of song.sections) {
-    const lastByUnit = new Map<Unit, Draft>();
-    for (const d of drafts) if (d.layer === 0 && d.startMs >= section.startMs - 1 && d.startMs < section.endMs - 1) lastByUnit.set(d.unit, d);
-    for (const d of lastByUnit.values()) if (!PUNCTUAL.has(d.name)) d.fadeOutMs = Math.min(beatMs, (d.endMs - d.startMs) / 2);
-  }
+  // Fades only where a prop goes to or comes from dark: between two effects on one prop a fade
+  // would dip to black mid-song. Quiet entrances and exits take two beats, the rest one; a prop
+  // that comes in on a loud section, or goes out as the music jumps, cuts on the downbeat.
+  song.sections.forEach((section, si) => {
+    const sp = planOf(si);
+    const inside = drafts.filter((d) => d.layer === 0 && d.name !== "Off" && d.startMs >= section.startMs - 1 && d.startMs < section.endMs - 1);
+    const next = si + 1 < song.sections.length ? planOf(si + 1) : undefined;
+    for (const unit of litBySection[si] ?? []) {
+      const mine = inside.filter((d) => d.unit === unit);
+      const first = mine[0], last = mine[mine.length - 1];
+      if (first && !litBySection[si - 1]?.has(unit) && sp.intensity < 0.75 && !PUNCTUAL.has(first.name) && first.fadeInMs === undefined) {
+        first.fadeInMs = (sp.intensity < 0.4 ? 2 : 1) * beatMs * step;
+      }
+      if (last && next && !litBySection[si + 1]?.has(unit) && next.intensity <= sp.intensity + 0.15) {
+        last.fadeOutMs = Math.max(last.fadeOutMs ?? 0, (next.intensity < sp.intensity - 0.15 ? 2 : 1) * beatMs);
+      }
+    }
+  });
 
   // Whole-house hits: where the plan asks and where the song jumps on a downbeat, rationed to the
   // corpus's p75 of about 1.5 a minute. Every prop takes it, on the accent layer.
@@ -383,16 +482,20 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
       hits.push(lastBar);
     }
   }
-  const lastPalette = plan.palettes[plan.sections[plan.sections.length - 1]?.palette ?? ""] ?? ["#ffffff"];
   for (const t of hits) {
-    const length = t === hits[hits.length - 1] && plan.ending === "hit-then-dark" ? 2 * beatMs : beatMs;
+    const last = t === hits[hits.length - 1] && plan.ending === "hit-then-dark";
+    const length = last ? 2 * beatMs : beatMs;
+    // The whole house flashes the accent of the section it lands in, and the last hit dies away.
+    const si = Math.max(0, song.sections.findIndex((s) => t >= s.startMs - 1 && t < s.endMs - 1));
+    const sectionPalette = plan.palettes[planOf(si).palette] ?? ["#ffffff"];
+    const hitColour = sectionPalette[sectionPalette.length - 1] ?? "#ffffff";
     for (const unit of allUnits) {
       if (unit.prop.role === "whole_house") continue;
       for (const d of drafts) if (d.unit === unit && d.layer === 1 && d.endMs > t && d.startMs < t + length) d.endMs = d.startMs; // the hit replaces accents
       const allowed = ROLE_EFFECTS[unit.prop.role];
       const name = unit.prop.tier === "hero" && unit.prop.dims === 2 && allowed.includes("Shockwave") ? "Shockwave" : "On";
       const { params } = effectParams(name, 1, 0, feel, options.title);
-      drafts.push({ unit, layer: 1, startMs: t, endMs: Math.min(t + length, song.durationMs), name, params, palette: [lastPalette[0] ?? "#ffffff"], hit: true });
+      drafts.push({ unit, layer: 1, startMs: t, endMs: Math.min(t + length, song.durationMs), name, params, palette: [hitColour], hit: true, ...(last ? { fadeOutMs: 1.5 * beatMs } : {}) });
     }
   }
 
@@ -404,10 +507,11 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
     for (const d of drafts) if (d.layer === 0) lastByUnit.set(d.unit, d);
     for (const d of lastByUnit.values()) if (d.endMs >= song.durationMs - 4 * beatMs) d.endMs = song.durationMs;
   }
-  // Intro builds in.
-  for (const d of drafts) if (d.layer === 0 && d.startMs < (song.sections[0]?.endMs ?? 0) && d.startMs === drafts.find((x) => x.unit === d.unit && x.layer === 0)?.startMs && !d.fadeInMs) d.fadeInMs = Math.min(2 * beatMs, (d.endMs - d.startMs) / 2);
+  // A picture plays alone: no accents or texture over it, short of a whole-house hit.
+  const pictures = drafts.filter((d) => d.name === "Pictures");
+  const shown = drafts.filter((d) => d.layer === 0 || d.hit || !pictures.some((p) => p.unit === d.unit && p.startMs < d.endMs && d.startMs < p.endMs));
 
-  return finish(drafts, song, frameMs, seed, totalRows);
+  return finish(shown, song, frameMs, seed, totalRows);
 }
 
 /** Frame-snap, keep layers non-overlapping, and thin moments where too much of the house starts at once. */

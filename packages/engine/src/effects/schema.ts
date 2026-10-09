@@ -298,7 +298,7 @@ export const PICTURES_EFFECT_SCHEMA: EffectSchema = {
   params: [
     { key: "image", label: "Image", type: "image", default: "" },
     { key: "scaleMode", label: "Scale", type: "choice", options: ["fit", "stretch", "none"], default: "fit" },
-    { key: "movement", label: "Movement", type: "choice", options: ["none", "left", "right", "up", "down", "scaled"], default: "none" },
+    { key: "movement", label: "Movement", type: "choice", options: ["none", "left", "right", "up", "down", "scaled", "peekaboo", "wiggle", "zoom in"], default: "none" },
     { key: "speed", label: "Speed", type: "intSlider", min: 0, max: 50, default: 1, valueCurve: true },
     { key: "transparentBlack", label: "Black is Transparent", type: "checkbox", default: false },
     { key: "brightnessPct", label: "Brightness", type: "intSlider", min: 0, max: 100, default: 100, valueCurve: true },

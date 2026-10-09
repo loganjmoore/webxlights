@@ -75,6 +75,22 @@ describe("model node counts match SPEC formulas", () => {
 // None of the shape below was pinned before, which is how the screen coords came to mix two
 // unit systems - node-index units up the Y axis, ratio units across X - and went unnoticed
 // until someone looked at a rendered layout. Every node-count test above passed throughout.
+describe("Horizontal matrix", () => {
+  // MatrixModel::InitHMatrix: SetBufferSize(NumStrands, PixelsPerStrand) - strands high, pixels
+  // wide. A portrait buffer shown landscape drew every Text and picture on its side.
+  it("renders into a buffer as wide as a string and as tall as the string count, the way it shows", () => {
+    const geo = computeVerticalMatrixTopLeft({ strings: 24, nodesPerString: 48, horizontal: true });
+    expect([geo.width, geo.height]).toEqual([48, 24]);
+    for (const n of geo.nodes) {
+      expect([n.bufX, n.bufY]).toEqual([n.screenX, n.screenY]);
+      expect(n.bufX).toBeLessThan(48);
+      expect(n.bufY).toBeLessThan(24);
+    }
+    // The wiring is the vertical matrix's, read across: string s is row s.
+    expect(new Set(geo.nodes.filter((n) => n.string === 3).map((n) => n.bufY))).toEqual(new Set([3]));
+  });
+});
+
 describe("Tree screen shape", () => {
   // The widest span at a given height: "how wide is the tree there", for a cone whose nodes are
   // wrapped around it.

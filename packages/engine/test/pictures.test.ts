@@ -84,6 +84,30 @@ describe("Pictures effect (SPEC ch8)", () => {
     expect(large).toBeGreaterThan(small);
   });
 
+  it("zoom in grows the image from nothing over a pass", () => {
+    const at = (t: number) => litCount(render({ movement: "zoom in", scaleMode: "stretch", speed: 1 }, t));
+    expect(at(0)).toBe(0);
+    expect(at(0.5)).toBeGreaterThan(0);
+    expect(at(0.99)).toBeGreaterThan(at(0.5));
+  });
+
+  it("peekaboo rises from below, holds centred, and sinks again", () => {
+    const at = (t: number) => render({ movement: "peekaboo", scaleMode: "stretch", speed: 1 }, t);
+    expect(litCount(at(0))).toBe(0);
+    expect(litCount(at(0.5))).toBe(64);
+    // Half risen: only the image's top half shows, in the bottom of the buffer.
+    const half = at(0.125);
+    expect(half.getPixel(0, 0).a).toBeGreaterThan(0);
+    expect(half.getPixel(0, 7).a).toBe(0);
+  });
+
+  it("wiggle sways side to side and comes back", () => {
+    const at = (t: number) => render({ movement: "wiggle", scaleMode: "stretch", speed: 1 }, t);
+    expect(at(0.25).getPixel(0, 7).a).toBe(0); // swayed right: the left column is uncovered
+    expect(at(0.75).getPixel(7, 7).a).toBe(0); // swayed left
+    expect(litCount(at(0))).toBe(64);
+  });
+
   it("a fully transparent source pixel is skipped", () => {
     const withAlpha: PictureImage = { width: 1, height: 1, data: [255, 0, 0, 0] };
     const buf = new RenderBuffer(4, 4);

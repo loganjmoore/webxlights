@@ -7,7 +7,7 @@ import { confirm } from "../lib/confirm";
 import { propMap, ROLE_NAMES, type PropInfo, type Role } from "../lib/propRoles";
 import { feelFromSong, feelSpec, FEELS } from "../lib/magic/feels";
 import { rulesDirector } from "../lib/magic/director";
-import { choreograph } from "../lib/magic/choreograph";
+import { choreograph, type MagicShader } from "../lib/magic/choreograph";
 import { magicBody, sectionNames, type MagicMode } from "../lib/magic/apply";
 import { ROLE_EFFECTS } from "../lib/magic/roleEffects";
 import type { Feel, ShowPlan } from "../lib/magic/plan";
@@ -198,6 +198,17 @@ async function ensureGroups(): Promise<void> {
 const generationProps = shallowRef<PropInfo[] | null>(null);
 const generationGroups = shallowRef<ModelGroupRecord[] | null>(null);
 
+let builtinShaders: Promise<MagicShader[]> | null = null;
+/** The library's built-in shaders, for the heroes and the whole house. Without them it still runs, shaderless. */
+function loadBuiltinShaders(): Promise<MagicShader[]> {
+  builtinShaders ??= (async () => {
+    const first = await api.listShaders({ kind: "builtin" });
+    const rest = await Promise.all(Array.from({ length: first.last_page - 1 }, (_, i) => api.listShaders({ kind: "builtin", page: i + 2 })));
+    return [first, ...rest].flatMap((page) => page.data.map(({ id, name, source, inputs }) => ({ id, name, source, inputs })));
+  })().catch(() => ((builtinShaders = null), []));
+  return builtinShaders;
+}
+
 async function generate(again = false): Promise<void> {
   if (!song.value || !store.sequence || busy.value) return;
   if (mode.value === "replace" && hasEffects.value && !again) {
@@ -234,6 +245,7 @@ async function generate(again = false): Promise<void> {
       if (status.value?.available && !userKey) api.magicStatus().then((s) => (status.value = s), () => undefined);
     }
     lastPlan.value = plan;
+    const shaders = await loadBuiltinShaders();
     // A few arrangements of the plan, each rendered and scored against the song, and the best
     // one kept (docs/MAGIC-SEQUENCE.md 2.6). Try another scores just the next one. Scoring a big
     // house takes a while, so it stops early rather than keep anyone waiting.
@@ -246,7 +258,7 @@ async function generate(again = false): Promise<void> {
       await new Promise((r) => setTimeout(r, 0));
       const placements = choreograph(song.value, scope, plan, {
         feel: feelSpec(feel.value, song.value), seed: candidateSeed, frameMs: store.sequence.frame_ms,
-        title: store.sequence.metadata?.song || store.sequence.name,
+        title: store.sequence.metadata?.song || store.sequence.name, shaders,
       });
       const applied = magicBody(base, placements, song.value, mode.value, newEffectId);
       const fit = fitScore({

@@ -1,3 +1,4 @@
+import type { Motif } from "./motifs";
 import type { Feel } from "./plan";
 import type { SongMap } from "@webxlights/engine";
 
@@ -18,6 +19,10 @@ export interface FeelSpec {
   character: number;
   /** Candidate palettes, most typical first; sections take them in turn. */
   palettes: string[][];
+  /** Built-in library shaders by name, for the quiet sections and the loud ones. */
+  shaders: { calm: string[]; lively: string[] };
+  /** Pictures for the matrix when the title names none. */
+  motifs: Motif[];
 }
 
 export const FAVOUR = 3;
@@ -33,6 +38,8 @@ export const FEELS: Record<Exclude<Feel, "auto">, FeelSpec> = {
     intensityShift: -0.1,
     character: 0.6,
     palettes: [["#ff0000", "#00ff00", "#ffffff"], ["#ff0000", "#ffffff"], ["#00ff00", WARM_WHITE], ["#ffb000", WARM_WHITE], ["#ff0000", "#00ff00"]],
+    shaders: { calm: ["Warm White Sparkle", "Twinkle Field", "Snowfall", "Colour Wash"], lively: ["Candy Cane", "Peppermint Swirl", "Comet Chase", "Champagne Shimmer"] },
+    motifs: ["tree", "ornament", "candycane"],
   },
   joyful: {
     label: "Joyful",
@@ -42,6 +49,8 @@ export const FEELS: Record<Exclude<Feel, "auto">, FeelSpec> = {
     intensityShift: 0.05,
     character: 0.8,
     palettes: [["#ff0000", "#00ff00", "#0000ff", "#ffff00"], ["#ff00ff", "#00ffff", "#ffff00"], ["#ff0000", "#ffffff"], ["#00ff00", "#ffff00"], ["#ff8000", "#ffffff"]],
+    shaders: { calm: ["Mesh Gradient", "Twinkle Field", "Champagne Shimmer"], lively: ["Checker Slide", "Starburst", "Expanding Rings", "Marquee Chase", "Kaleidoscope"] },
+    motifs: ["gift", "star", "note"],
   },
   peaceful: {
     label: "Peaceful",
@@ -51,6 +60,8 @@ export const FEELS: Record<Exclude<Feel, "auto">, FeelSpec> = {
     intensityShift: -0.25,
     character: 0.5,
     palettes: [[WARM_WHITE, "#fbe0b4"], ["#0080ff", "#ffffff"], ["#8000ff", "#0033cc"], [WARM_WHITE, "#63c9fa"]],
+    shaders: { calm: ["Aurora Curtain", "Snowfall", "Cloud Drift", "Ocean Swell", "Iridescent Silk"], lively: ["Plankton Glow", "Mesh Gradient", "Caustics"] },
+    motifs: ["star", "snowflake"],
   },
   powerful: {
     label: "Powerful",
@@ -60,6 +71,8 @@ export const FEELS: Record<Exclude<Feel, "auto">, FeelSpec> = {
     intensityShift: 0.25,
     character: 1.1,
     palettes: [["#ff0000", "#ffffff"], ["#0000ff", "#ffffff"], ["#ff8000", "#ff0000"], ["#ffffff", "#c0c0c0"], ["#8000ff", "#ff00ff"]],
+    shaders: { calm: ["Godrays", "Smoke Plume", "Liquid Metal"], lively: ["Plasma Storm", "Spin Tunnel", "Radar Sweep", "Lightning", "Vu Bars"] },
+    motifs: ["star", "note"],
   },
   magical: {
     label: "Magical",
@@ -69,6 +82,8 @@ export const FEELS: Record<Exclude<Feel, "auto">, FeelSpec> = {
     intensityShift: 0,
     character: 1,
     palettes: [["#8000ff", "#00ffff", "#ffffff"], ["#0080ff", "#ff00ff"], ["#63c9fa", "#ffffff", "#c0c0c0"], ["#ffb000", "#8000ff"]],
+    shaders: { calm: ["Aurora Curtain", "Iridescent Silk", "Ink Bloom", "Plankton Glow"], lively: ["Kaleidoscope", "Voronoi Crystal", "Champagne Shimmer", "Metaballs", "Starburst"] },
+    motifs: ["snowflake", "star"],
   },
   rock: {
     label: "Rock/EDM",
@@ -78,6 +93,8 @@ export const FEELS: Record<Exclude<Feel, "auto">, FeelSpec> = {
     intensityShift: 0.3,
     character: 1.2,
     palettes: [["#ff0000", "#ffffff", "#0000ff"], ["#00ffff", "#ff00ff"], ["#ffff00", "#ff0000"], ["#00ff00", "#0000ff"], ["#ffffff", "#ff0000"]],
+    shaders: { calm: ["Smoke Plume", "Ember Rise", "Neuro Noise"], lively: ["Plasma Storm", "Lava Flow", "Spin Tunnel", "Lightning", "Vu Bars"] },
+    motifs: ["note", "star"],
   },
 };
 
