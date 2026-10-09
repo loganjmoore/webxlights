@@ -805,7 +805,8 @@ What was built, and where the code made a decision the spec didn't.
   the beat part. Finding sections on the browser's bars and snapping them to the pro downbeats
   was tried and scored lower on all three (87, 72, 71). So pro stays opt-in: it gives a truer
   Magic Beats timing track on a song whose tempo drifts, and is not a better generator by the
-  score. Screenshot: `docs/magic-sequence/pro-analysis.jpg`.
+  score. "Use browser analysis" switches back, and a song where Beat This! finds fewer than 8
+  beats keeps the browser's. Screenshot: `docs/magic-sequence/pro-analysis.jpg`.
 
 ## Out of scope by this build's own terms
 

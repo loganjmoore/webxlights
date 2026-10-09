@@ -63,7 +63,7 @@ export function beatThisLogMel(samples: Float32Array): { frames: number; data: F
   const n = samples.length;
   // numpy/torch "reflect": the edge sample is not repeated.
   const at = (i: number): number => {
-    if (n === 1) return samples[0]!;
+    if (n <= 1) return samples[0] ?? 0;
     let j = i;
     while (j < 0 || j >= n) j = j < 0 ? -j : 2 * (n - 1) - j;
     return samples[j]!;

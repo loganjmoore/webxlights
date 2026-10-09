@@ -13,7 +13,8 @@ async function modelBytes(): Promise<Uint8Array> {
   const hit = await cache?.match(MODEL_URL);
   if (hit) return new Uint8Array(await hit.arrayBuffer());
   const res = await fetch(MODEL_URL);
-  if (!res.ok) throw new Error(`couldn't download the beat model (${res.status})`);
+  // A missing file comes back as the app's index.html with a 200; never cache that as the model.
+  if (!res.ok || res.headers.get("content-type")?.includes("text/html")) throw new Error(`couldn't download the beat model (${res.status})`);
   await cache?.put(MODEL_URL, res.clone()).catch(() => undefined);
   return new Uint8Array(await res.arrayBuffer());
 }

@@ -191,17 +191,21 @@ export function proBeats(model: SongModel, beats: readonly number[], downbeats: 
   let b = [...beats];
   let d = [...downbeats];
   while (b.length > 16 && 60 / medianGap(b) > MAX_PRO_BPM) {
-    if (barLength(b, d) % 2 === 1) {
+    const bar = barLength(b, d);
+    if (bar % 2 === 1) {
       b = d.filter((t) => b.includes(t));
       d = [];
       continue;
     }
+    if (!bar) d = []; // downbeats that make no steady bar (every beat one, say) don't steer the halving
     const set = new Set(d);
     let k = Math.max(0, b.indexOf(d[0] ?? NaN)) % 2; // a pickup keeps the first downbeat's step
+    const before = b.length;
     b = b.filter((t) => {
       if (set.has(t)) k = 0;
       return k++ % 2 === 0;
     });
+    if (b.length === before) break;
   }
   if (b.length < 2) return { beats: b, downbeats: d };
   const head = medianGap(b.slice(0, 9));

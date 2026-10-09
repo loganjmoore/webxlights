@@ -59,6 +59,10 @@ describe("Beat This! front end", () => {
 });
 
 describe("Beat This! postprocessing", () => {
+  it("gives one silent frame for no audio at all", () => {
+    expect(beatThisLogMel(new Float32Array(0)).frames).toBe(1);
+  });
+
   it("turns the reference logits into exactly the reference beats and downbeats", () => {
     const { beats, downbeats } = beatThisPeaks(Float32Array.from(fixture.beatLogits), Float32Array.from(fixture.downbeatLogits));
     expect(beats.map((b) => Math.round(b * 1e4) / 1e4)).toEqual(fixture.beats);
@@ -128,6 +132,13 @@ describe("Beat This!'s beats as a lighting grid", () => {
     expect(out.beats[1]! - out.beats[0]!).toBeCloseTo(0.4);
     expect(downbeats.every((d) => out.beats.includes(d))).toBe(true);
     expect(out.downbeats).toEqual(downbeats);
+  });
+
+  it("halves a fast grid whose every beat is marked a downbeat, and stops", () => {
+    const beats = every(0.24, 0, 24);
+    const out = proBeats(span(0, 24), beats, beats);
+    expect(out.beats[1]! - out.beats[0]!).toBeCloseTo(0.48);
+    expect(out.downbeats).toEqual([]);
   });
 
   it("carries the grid to the ends of the audible song at the local tempo", () => {
