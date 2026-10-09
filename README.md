@@ -76,7 +76,7 @@ optional is off until you set it:
 | Variable | Turns on |
 |---|---|
 | `SHADER_API_KEY`, `SHADER_PROVIDER`, `SHADER_MODEL` | Server-funded shader generation. Leave unset and generation answers 503 while the rest of the shader library works. |
-| `MAGIC_MODEL`, `MAGIC_DAILY_LIMIT`, `MAGIC_MONTHLY_LIMIT` | Magic Sequence's AI director. It uses the shader assistant's provider and key. The model defaults to `claude-opus-5-5` on Anthropic, and the allowance to 10 plans a day and 20 a month per person (0 is uncapped). Your own key bypasses the allowance. |
+| `MAGIC_MODEL`, `MAGIC_DAILY_LIMIT`, `MAGIC_MONTHLY_LIMIT` | Magic Sequence's AI director. It uses the shader assistant's provider and key. The model defaults to `claude-opus-5-5` on Anthropic, and the allowance to 10 plans a day and 100 a month per person (0 is uncapped). Your own key bypasses the allowance. |
 | `LYRICS_API_KEY` | Automatic lyric timing (OpenAI `whisper-1`). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | "Continue with Google". Redirect URI is `<origin>/api/auth/google/callback`. |
 

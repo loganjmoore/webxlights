@@ -50,7 +50,7 @@ return [
         // Empty means claude-opus-5-5 on Anthropic, or the provider's own default otherwise.
         'model' => env('MAGIC_MODEL'),
         'daily_limit' => (int) env('MAGIC_DAILY_LIMIT', 10),
-        'monthly_limit' => (int) env('MAGIC_MONTHLY_LIMIT', 20),
+        'monthly_limit' => (int) env('MAGIC_MONTHLY_LIMIT', 100),
     ],
 
     /*
