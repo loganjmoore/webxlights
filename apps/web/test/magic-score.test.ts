@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { analyzeAudio, analyzeSong, type SongMap } from "@webxlights/engine";
+import { analyzeAudio, analyzeSong, defaultParamsFor, type SongMap } from "@webxlights/engine";
 import { propMap } from "../src/lib/propRoles";
 import { rulesDirector } from "../src/lib/magic/director";
 import { choreograph } from "../src/lib/magic/choreograph";
@@ -76,6 +76,20 @@ describe("the fit score", () => {
     console.log(describeScore("flat", bad));
     expect(bad.score).toBeLessThan(good.score - 20);
     expect(plan.sections.length).toBeGreaterThan(0);
+  });
+});
+
+describe("the beat part", () => {
+  it("counts a change of colour on the beat, not only a change of brightness", { timeout: 60_000 }, () => {
+    const song = syntheticSong(120);
+    const matrix = props.find((p) => p.role === "matrix")!;
+    // Red and green are equally bright: only their colour changes on each beat.
+    const onEachBeat = (colours: string[]) => song.beats.slice(0, -1).map((b, i) => ({
+      elementType: "model" as const, elementId: Number(matrix.key.slice(6)), key: matrix.key, role: matrix.role,
+      effect: { name: "On", startMs: b, endMs: song.beats[i + 1]!, params: defaultParamsFor("On"), palette: [colours[i % colours.length]!] },
+    }));
+    const score = (placements: ReturnType<typeof onEachBeat>) => fitScore({ song, models: layout.models, groups: layout.groups, body: magicBody({ rows: [], timingTracks: [] }, placements, song, "replace", () => "x").body, placements, frameMs: 25 });
+    expect(score(onEachBeat(["#ff0000", "#00ff00"])).raw.beatRatio).toBeGreaterThan(2 * score(onEachBeat(["#ff0000"])).raw.beatRatio);
   });
 });
 

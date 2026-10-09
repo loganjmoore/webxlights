@@ -33,8 +33,11 @@ const WEIGHTS = { loud: 0.3, beat: 0.3, lift: 0.2, style: 0.1, variety: 0.1 } as
 const STEP_MS = 250;
 const STRIDE = 8;
 
-/** Effects Magic Sequence never places, left out of the style comparison as analyze.mjs does. */
-const NEVER_PLACED = new Set(["Faces", "Pictures", "Video", "Shader", "State", "DMX", "Moving Head", "Sketch", "Kaleidoscope", "Warp", "Piano", "Guitar", "Liquid", "Off"]);
+/**
+ * Effects left out of the style comparison, as analyze.mjs does: ones Magic Sequence never places,
+ * and the asset effects (Pictures, Shader) it places by its own rule rather than the corpus mix.
+ */
+const NOT_COMPARED = new Set(["Faces", "Pictures", "Video", "Shader", "State", "DMX", "Moving Head", "Sketch", "Kaleidoscope", "Warp", "Piano", "Guitar", "Liquid", "Off"]);
 
 function corr(a: readonly number[], b: readonly number[]): number {
   const n = Math.min(a.length, b.length);
@@ -80,7 +83,7 @@ export function styleDivergence(placements: readonly Placement[]): number {
   for (const [role, mine] of Object.entries(seconds)) {
     const full = priors.roles[role]?.effectShareBySeconds;
     if (!full) continue;
-    const prior = Object.fromEntries(Object.entries(full).filter(([k]) => !NEVER_PLACED.has(k)));
+    const prior = Object.fromEntries(Object.entries(full).filter(([k]) => !NOT_COMPARED.has(k)));
     const top = Object.fromEntries(Object.entries(mine).filter(([k]) => k in prior));
     const total = Object.values(top).reduce((a, b) => a + b, 0);
     if (total <= 0) continue;
@@ -140,18 +143,30 @@ export function fitScore(input: ScoreInput): FitScore {
   const smooth = bright.map((_, i) => mean(bright.slice(Math.max(0, i - 2), i + 3)));
   const rLoud = corr(smooth, loud);
 
-  // Change just after a beat against the same gap in the middle of the beat.
+  // Change just after a beat against the same gap in the middle of the beat. Change in colour,
+  // not only brightness: red to green on the beat is a change anyone watching sees.
+  const shade = (colors: Array<RGBA[] | null>) => colors.map((nodes) => {
+    const out = [0, 0, 0];
+    if (!nodes || nodes.length === 0) return out;
+    let n = 0;
+    for (let i = 0; i < nodes.length; i += STRIDE) {
+      const c = nodes[i]!;
+      if (c.a > 0) { out[0] += c.r; out[1] += c.g; out[2] += c.b; }
+      n++;
+    }
+    return out.map((v) => v / n / 255);
+  });
   const probes = createHouseRenderer(models, body, frameMs, audio, groups, input.blendBetweenModels);
   const beatMs = 60000 / song.bpm;
-  const diff = (a: number[], b: number[]) => mean(a.map((v, i) => Math.abs(v - b[i]!)));
+  const diff = (a: number[][], b: number[][]) => mean(a.map((v, i) => (Math.abs(v[0]! - b[i]![0]!) + Math.abs(v[1]! - b[i]![1]!) + Math.abs(v[2]! - b[i]![2]!)) / 3));
   let on = 0, off = 0;
   for (let i = 0; i < song.beats.length; i += 2) {
     const b = song.beats[i]!;
     if (b < 40 || b + beatMs * 0.45 + 120 >= song.durationMs) continue;
-    const before = level(probes.renderAt(b - 40));
-    on += diff(before, level(probes.renderAt(b + 80)));
-    const mid = level(probes.renderAt(b + beatMs * 0.45));
-    off += diff(mid, level(probes.renderAt(b + beatMs * 0.45 + 120)));
+    const before = shade(probes.renderAt(b - 40));
+    on += diff(before, shade(probes.renderAt(b + 80)));
+    const mid = shade(probes.renderAt(b + beatMs * 0.45));
+    off += diff(mid, shade(probes.renderAt(b + beatMs * 0.45 + 120)));
   }
   const beatRatio = off > 0 ? on / off : on > 0 ? 3 : 1;
 

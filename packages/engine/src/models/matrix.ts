@@ -42,13 +42,15 @@ export function computeVerticalMatrixTopLeft(params: MatrixParams): ModelGeometr
   for (let s = 0; s < width; s++) {
     const topToBottom = s % 2 === 0; // serpentine zigzag wiring
     for (let n = 0; n < height; n++) {
-      const bufY = topToBottom ? height - 1 - n : n;
-      // A horizontal matrix is the same buffer read across instead of up: strings run left to
-      // right, so what was a column becomes a row. Transposing here rather than in a second
-      // function keeps one wiring rule for both.
-      const [screenX, screenY] = params.horizontal ? [bufY, s] : [s, bufY];
-      nodes.push({ bufX: s, bufY, screenX, screenY, string: s, indexInString: n });
+      const along = topToBottom ? height - 1 - n : n;
+      // A horizontal matrix is the same wiring read across instead of up: strings run left to
+      // right, so what was a column becomes a row - in the buffer as well as on screen, or every
+      // effect draws sideways. MatrixModel::InitHMatrix: SetBufferSize(NumStrands, PixelsPerStrand),
+      // strands high and pixels wide. Transposing here rather than in a second function keeps one
+      // wiring rule for both.
+      const [x, y] = params.horizontal ? [along, s] : [s, along];
+      nodes.push({ bufX: x, bufY: y, screenX: x, screenY: y, string: s, indexInString: n });
     }
   }
-  return { width, height, nodes };
+  return params.horizontal ? { width: height, height: width, nodes } : { width, height, nodes };
 }

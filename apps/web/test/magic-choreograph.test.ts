@@ -3,8 +3,9 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { propMap, type Role } from "../src/lib/propRoles";
 import { completePlan, rulesDirector } from "../src/lib/magic/director";
-import { choreograph, type Placement } from "../src/lib/magic/choreograph";
+import { choreograph, PUNCTUAL, type MagicShader, type Placement } from "../src/lib/magic/choreograph";
 import { feelSpec } from "../src/lib/magic/feels";
+import { songMotifs } from "../src/lib/magic/motifs";
 import { ROLE_EFFECTS, TWO_D_ONLY } from "../src/lib/magic/roleEffects";
 import { priors } from "../src/lib/magic/priors";
 import type { ModelGroupRecord, ModelRecord } from "../src/lib/api";
@@ -58,7 +59,9 @@ describe("the choreographer's output is a valid sequence", () => {
     const dims = new Map(props.map((p) => [p.key, p.dims]));
     for (const { placements } of runs) {
       for (const p of placements) {
-        expect(ROLE_EFFECTS[p.role], `${p.role}: ${p.effect.name}`).toContain(p.effect.name);
+        // Pictures are the matrix's own; shaders come only with a library (tested below).
+        if (p.effect.name === "Pictures") expect(p.role).toBe("matrix");
+        else expect(ROLE_EFFECTS[p.role], `${p.role}: ${p.effect.name}`).toContain(p.effect.name);
         if (dims.get(p.key) === 1) expect(TWO_D_ONLY.has(p.effect.name), `${p.key}: ${p.effect.name}`).toBe(false);
       }
     }
@@ -207,5 +210,110 @@ describe("the deferred spec details", () => {
       }
     }
     expect(found).toBe(true);
+  });
+});
+
+describe("a plan for colour, fades, shaders and pictures", () => {
+  const shaders = (JSON.parse(readFileSync(fileURLToPath(new URL("../../api/database/data/builtin-shaders.json", import.meta.url)), "utf-8")) as Omit<MagicShader, "id">[])
+    .map((s, i) => ({ id: i + 1, name: s.name, source: s.source, inputs: s.inputs }));
+  const withLibrary = TEMPOS.map((bpm) => {
+    const song = syntheticSong(bpm);
+    const plan = rulesDirector({ song, props, feel: "auto", seed: 7 });
+    return { bpm, song, plan, placements: choreograph(song, props, plan, { feel: feelSpec("auto", song), frameMs: 25, title: "Jingle Bells", shaders }) };
+  });
+  const sectionOf = (song: ReturnType<typeof syntheticSong>, p: Placement) => song.sections.findIndex((s) => p.effect.startMs >= s.startMs - 1 && p.effect.startMs < s.endMs - 1);
+
+  it("dresses every prop of a role alike for a section, in the section's palette", () => {
+    for (const { bpm, song, plan, placements } of withLibrary) {
+      for (const [si, section] of song.sections.entries()) {
+        const sp = plan.sections.find((s) => s.index === si)!;
+        const palette = plan.palettes[sp.palette]!;
+        const byRole = new Map<string, Set<string>>();
+        for (const p of placements) {
+          if (sectionOf(song, p) !== si || p.effect.name === "Pictures" || p.effect.name === "Off") continue;
+          for (const c of p.effect.palette ?? []) expect(palette, `${bpm} BPM ${section.label} ${p.role}`).toContain(c);
+          if (p.effect.layerIndex) continue;
+          (byRole.get(p.role) ?? byRole.set(p.role, new Set()).get(p.role)!).add(String((p.effect.palette ?? [])[0]));
+        }
+        // A role's lead colour is its pair: one colour held, or two swapped on the beat.
+        for (const [role, leads] of byRole) expect(leads.size, `${bpm} BPM section ${si} ${role}: ${[...leads]}`).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
+  it("gives every accent and every whole-house hit in a section one colour", () => {
+    for (const { song, placements } of withLibrary) {
+      for (const si of song.sections.keys()) {
+        const accents = placements.filter((p) => p.effect.layerIndex === 1 && sectionOf(song, p) === si);
+        expect(new Set(accents.map((p) => p.effect.palette?.[0])).size).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("fades only into and out of dark, never from one effect into another on a prop", () => {
+    for (const { bpm, placements } of withLibrary) {
+      const lanes = new Map<string, Placement[]>();
+      for (const p of placements) (lanes.get(`${p.key}|${p.effect.layerIndex ?? 0}`) ?? lanes.set(`${p.key}|${p.effect.layerIndex ?? 0}`, []).get(`${p.key}|${p.effect.layerIndex ?? 0}`)!).push(p);
+      for (const list of lanes.values()) {
+        list.sort((a, b) => a.effect.startMs - b.effect.startMs);
+        list.forEach((p, i) => {
+          const msg = `${bpm} BPM ${p.key} ${p.effect.name} at ${p.effect.startMs}`;
+          // Pictures dissolve in and out on purpose: the image is the event.
+          if (p.effect.name === "Pictures") return;
+          // A pulse breathes wherever it is; a texture fades only into and out of dark.
+          if (PUNCTUAL.has(p.effect.name)) return;
+          if (p.effect.transition?.outType) expect(list[i + 1]?.effect.startMs ?? Infinity, msg).toBeGreaterThan(p.effect.endMs);
+          if (p.effect.transition?.inType) expect(list[i - 1]?.effect.endMs ?? -Infinity, msg).toBeLessThan(p.effect.startMs);
+        });
+      }
+    }
+  });
+
+  it("puts library shaders on the 2D heroes in the plan's colours, with the inputs a picked shader carries", () => {
+    for (const { bpm, song, placements } of withLibrary) {
+      const placed = placements.filter((p) => p.effect.name === "Shader");
+      expect(placed.length, `${bpm} BPM`).toBeGreaterThan(0);
+      for (const p of placed) {
+        expect(["mega_tree", "matrix", "whole_house"]).toContain(p.role);
+        const shader = shaders.find((s) => s.id === p.effect.params.shaderId)!;
+        expect(p.effect.params.source).toBe(shader.source);
+        expect(p.effect.params.colorInputs).toEqual(shader.inputs.filter((i) => i.type === "color").map((i) => i.name));
+        expect(p.effect.palette!.length).toBeGreaterThanOrEqual(2);
+      }
+      // A repeated look plays the same shader on the same prop.
+      const looks = new Map<string, Set<unknown>>();
+      for (const p of placed) {
+        const look = withLibrary.find((r) => r.bpm === bpm)!.plan.sections.find((s) => s.index === sectionOf(song, p))!.look;
+        const key = `${look}|${p.key}|${p.effect.palette!.join()}`;
+        (looks.get(key) ?? looks.set(key, new Set()).get(key)!).add(p.effect.params.shaderId);
+      }
+      for (const ids of looks.values()) expect(ids.size).toBe(1);
+    }
+    expect(runs.flatMap((r) => r.placements).some((p) => p.effect.name === "Shader")).toBe(false);
+  });
+
+  it("draws pictures for the matrix and animates them", () => {
+    for (const { bpm, placements } of withLibrary) {
+      const pictures = placements.filter((p) => p.effect.name === "Pictures");
+      expect(pictures.length, `${bpm} BPM`).toBeGreaterThan(0);
+      expect(pictures.length).toBeLessThanOrEqual(8);
+      for (const p of pictures) {
+        const image = p.effect.params.image as { width: number; height: number; data: number[] };
+        expect(Math.max(image.width, image.height)).toBeLessThanOrEqual(64);
+        expect(image.data.length).toBe(image.width * image.height * 4);
+        expect(image.data.some((v, i) => i % 4 === 3 && v === 255)).toBe(true);
+        expect(["zoom in", "wiggle", "peekaboo", "left", "right"]).toContain(p.effect.params.movement);
+        // Nothing plays over a picture but a whole-house hit.
+        const over = placements.filter((o) => o.key === p.key && o.effect.layerIndex && o.effect.startMs < p.effect.endMs && p.effect.startMs < o.effect.endMs);
+        for (const o of over) expect(o.effect.endMs - o.effect.startMs, `${bpm} BPM ${o.effect.name}`).toBeLessThanOrEqual((2 * 60000) / bpm + 25);
+      }
+    }
+  });
+
+  it("picks the pictures from the title, then from the feel", () => {
+    expect(songMotifs("Jingle Bells", ["tree"])[0]).toBe("bell");
+    expect(songMotifs("O Holy Night", ["tree"])[0]).toBe("star");
+    expect(songMotifs("Awesome God", ["note"])[0]).toBe("cross");
+    expect(songMotifs("Untitled", ["tree", "ornament"])).toEqual(["tree", "ornament"]);
   });
 });

@@ -6,8 +6,11 @@ import type { SongMap } from "@webxlights/engine";
 // The corpus's own measurements (tools/sequence-corpus/analyze.mjs), applied to a generated
 // sequence: rows are the elements, starts within 26 ms are "together".
 
-/** Effects Magic Sequence never places; left out of the style comparison, as analyze.mjs does. */
-const NEVER_PLACED = new Set(["Faces", "Pictures", "Video", "Shader", "State", "DMX", "Moving Head", "Sketch", "Kaleidoscope", "Warp", "Piano", "Guitar", "Liquid", "Off"]);
+/**
+ * Effects left out of the style comparison, as analyze.mjs does: ones Magic Sequence never places,
+ * and the asset effects (Pictures, Shader) it places by its own rule rather than the corpus mix.
+ */
+const NOT_COMPARED = new Set(["Faces", "Pictures", "Video", "Shader", "State", "DMX", "Moving Head", "Sketch", "Kaleidoscope", "Warp", "Piano", "Guitar", "Liquid", "Off"]);
 
 export function jsd(p: Record<string, number>, q: Record<string, number>): number {
   const keys = new Set([...Object.keys(p), ...Object.keys(q)]);
@@ -67,7 +70,7 @@ export function metrics(song: SongMap, placements: readonly Placement[]) {
   for (const [role, dist] of Object.entries(seconds)) {
     const full = priors.roles[role]?.effectShareBySeconds;
     if (!full) continue;
-    const prior = Object.fromEntries(Object.entries(full).filter(([k]) => !NEVER_PLACED.has(k)));
+    const prior = Object.fromEntries(Object.entries(full).filter(([k]) => !NOT_COMPARED.has(k)));
     const top = Object.fromEntries(Object.entries(dist).filter(([k]) => k in prior));
     const d = jsd(top, prior);
     styleByRole[role] = Math.round(d * 1000) / 1000;

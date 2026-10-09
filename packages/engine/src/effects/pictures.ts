@@ -13,7 +13,7 @@ export interface PictureImage {
   data: ArrayLike<number>; // RGBA, row-major, top row first
 }
 
-export type PictureMovement = "none" | "left" | "right" | "up" | "down" | "scaled";
+export type PictureMovement = "none" | "left" | "right" | "up" | "down" | "scaled" | "peekaboo" | "wiggle" | "zoom in";
 
 export interface PicturesParams {
   image?: PictureImage;
@@ -34,8 +34,9 @@ export function renderPictures(buffer: RenderBuffer, _palette: RGBA[], params: P
   const pass = travel - Math.floor(travel);
   const brightness = Math.max(0, Math.min(1, params.brightnessPct / 100));
 
-  // "scaled" movement zooms the image in and out instead of translating it
-  const zoom = params.movement === "scaled" ? 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(2 * Math.PI * pass)) : 1;
+  // "scaled" zooms the image in and out instead of translating it; "zoom in" grows it from
+  // nothing to full size once a pass.
+  const zoom = params.movement === "scaled" ? 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(2 * Math.PI * pass)) : params.movement === "zoom in" ? pass : 1;
   const { drawW, drawH } = fitSize(params.scaleMode, image, W, H, zoom);
 
   let originX = (W - drawW) / 2;
@@ -52,6 +53,17 @@ export function renderPictures(buffer: RenderBuffer, _palette: RGBA[], params: P
       break;
     case "up":
       originY = -drawH + pass * (H + drawH);
+      break;
+    // xLights' peekaboo: up from below the bottom edge for the first quarter of a pass, held
+    // centred, and back down in the last quarter.
+    case "peekaboo": {
+      const out = pass < 0.25 ? 1 - pass * 4 : pass > 0.75 ? (pass - 0.75) * 4 : 0;
+      originY -= out * ((H + drawH) / 2);
+      break;
+    }
+    // Side to side about the centre, an eighth of the buffer each way, once a pass.
+    case "wiggle":
+      originX += Math.sin(2 * Math.PI * pass) * (W / 8);
       break;
     default:
       break;

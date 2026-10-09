@@ -676,7 +676,8 @@ What was built, and where the code made a decision the spec didn't.
 - **Singing faces** lead with VU Meter: Faces needs a lyric track the generator can't make.
 - **Style threshold.** `analyze.mjs` now records `style.roleEffectJsd`: per song, the
   seconds-weighted Jensen-Shannon divergence of its effect-by-role mix from the corpus's, over each
-  role's top effects minus those Magic Sequence never places. Corpus median 0.456 (IQR
+  role's top effects minus those Magic Sequence never places (and, later, Pictures and Shader,
+  which it places by its own rule). Corpus median 0.456 (IQR
   0.378-0.541). Generated, over 3 tempos x 5 seeds on the test layout: mean 0.386.
 - Built after phase 4 (see "Finishing" below): the hero texture layer, Off backdrops on floods and
   sub-model rows. The section strip's labels are editable; dragging its boundaries is the spec's
@@ -807,6 +808,57 @@ What was built, and where the code made a decision the spec didn't.
   Magic Beats timing track on a song whose tempo drifts, and is not a better generator by the
   score. "Use browser analysis" switches back, and a song where Beat This! finds fewer than 8
   beats keeps the browser's. Screenshot: `docs/magic-sequence/pro-analysis.jpg`.
+
+### A colour plan, fades, shaders and pictures
+
+Logan asked on 2026-10-08 for colours that look planned rather than random, fades used where they
+belong, the library's shaders where they fit, and generated, animated pictures on matrices.
+
+- **Colour plan.** Each placement used to take `palette[(trigger + colour + prop) % n]`, so every
+  re-trigger and every prop of a role changed colour. Now a look has a plan (`colourPlan` in
+  `choreograph.ts`): heroes and fills lead in the palette's first colour, the frame of the house
+  holds the second, features alternate between the two by role so neighbours contrast, and the
+  star takes the accent (the palette's last colour). Every prop of a role wears the same pair for
+  the look. A re-triggered effect swaps its pair on each trigger, so the beat shows as a two-colour
+  pattern; a texture holds it; "alternate" motion alternates the pair along the props. The accent
+  follows the music: a quiet look stays in its rich colours, a loud one pairs nearly everything
+  with the accent. Accents and whole-house hits wear the section's accent.
+- **Fades.** Textures fade only into and out of dark, never into the next effect on the same prop
+  (the old section-end fade-outs dipped to black mid-song). Quiet entrances and exits take two
+  beats, the rest one; a prop that comes in on a loud section, or leaves as the music jumps, cuts
+  on the downbeat. Pulses on props that come and go die away in sections under 0.5 intensity and
+  breathe in as well under 0.35; On accents decay unless the section is loud; the last hit of a
+  hit-then-dark ending fades out. On the synthetic songs, 3% of effects fade in and 6-22% fade
+  out (the corpus: 11% and 17%).
+- **Shaders.** The dialog loads the 50 built-ins (`kind=builtin`, three pages; without them it
+  runs shaderless). Each feel names calm and lively built-ins (Rainbow Sweep is left out: it has
+  no colour inputs, so it would ignore the plan). 2D heroes alternate phrases between their
+  families and a shader, a whole-house group plays one under a busy section, and a repeated look
+  plays the same shader on the same prop. Params are what EffectPropsPanel stores for a picked
+  shader: source, input defaults, colour input names, shader id; the palette is the role's pair
+  plus the accent. The corpus backs it: Shader lifts 3.6x on whole-house groups.
+- **Pictures.** `motifs.ts` draws eleven motifs (star, tree, snowflake, bell, heart, candy cane,
+  gift, note, cross, pumpkin, ornament) from shapes, 32 px, 3x3 supersampled, in the look's
+  colours. The title picks first (Jingle Bells is a bell, O Holy Night a star, Awesome God a
+  cross), then the feel's own. A matrix of at least 200 nodes rotates its phrases through picture,
+  family and shader. Quiet: the picture zooms in. Mid: it wiggles a bar at a time. Loud: it peeks
+  up or scrolls across, a pass every two bars. Nothing plays over a picture but a whole-house hit.
+  At most 8 a sequence: the pixels live in the body, about 10 KB each. The corpus backs it:
+  Pictures lifts 5.0x on matrices.
+- **Engine.** Pictures gains xLights' `peekaboo`, `wiggle` and `zoom in` movements, which the xsq
+  mapping already named. A horizontal matrix now renders into a buffer as wide as a string and as
+  tall as the string count (`MatrixModel::InitHMatrix`): it used to keep the vertical buffer and
+  turn only the screen positions, so every Text and picture on a Horiz Matrix drew on its side.
+- **Score.** The beat part counted brightness change only, so red to green on the beat scored
+  nothing. It now measures colour change. On the synthetic songs at 80, 120 and 150 BPM, the
+  fit is 90, 78 and 88 with pictures in, against 99, 77 and 86 for the old random colours on the
+  old brightness measure. The gap at 80 BPM is mostly pictures: their motion doesn't land on the
+  beat.
+- **Seen in the app.** Local API on a scratch SQLite copy, the test layout, Jingle Bells at 159
+  BPM: the dialog loaded the three shader pages, placed 625 effects including 16 shaders and 7
+  pictures, fit 87. Rendered from the app's own renderer: the bell scrolls across the matrix, the
+  star peeks up and sinks, and each section's props share its pair
+  (`docs/magic-sequence/pictures-shaders.jpg`, `docs/magic-sequence/colour-plan.jpg`).
 
 ## Out of scope by this build's own terms
 
