@@ -696,9 +696,9 @@ What was built, and where the code made a decision the spec didn't.
   shader generation or the other way round). `GET /v1/magic/status` tells the dialog whether to
   offer the director and how much of the allowance is left.
 - Defaults: `MAGIC_MODEL` unset means `claude-opus-5-5` on Anthropic (not `SHADER_MODEL`), effort
-  `medium`, adaptive thinking; `MAGIC_DAILY_LIMIT` 10 and `MAGIC_MONTHLY_LIMIT` 20 plans per
-  person. 20 rather than the shader assistant's 100 because a plan costs about 10-15 cents on
-  Opus 5.5, so the worst case is about $2.40 per active person a month; Try another reuses the
+  `medium`, adaptive thinking; `MAGIC_DAILY_LIMIT` 10 and `MAGIC_MONTHLY_LIMIT` 100 plans per
+  person (raised from 20 on 2026-10-09, matching the shader assistant). A plan costs about 10-15
+  cents on Opus 5.5, so the worst case is about $12-15 per active person a month; Try another reuses the
   plan and costs nothing.
 - Structured output is `output_config.format` with a strict JSON schema, added to the driver
   interface as `completeJson`. Records (palettes, families) travel as lists, because strict mode
