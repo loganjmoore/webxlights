@@ -817,23 +817,22 @@ analysis" above); everything in 6.3 waits for its own spec.
 
 ## Blocked
 
-The AI director's live run is blocked on the production API key. The other items here waited
-on Logan and are done:
+Nothing is blocked. The first two items waited on Logan and are done; the third is an open
+follow-up on one real layout:
 
 - **Sign-off on three songs** (phase 4's last check): signed off by Logan on 2026-10-08. Worth
   watching in real use: mid-chorus frames
   can read sparse (a SingleStrand chase lights a quarter of a prop, the corpus's median), and a
   strophic carol gets most of its verses labelled chorus.
-- **The AI director against a real provider: blocked on the production key.** Run live on
-  pixl.community on 2026-10-09 with Logan's go-ahead (his "Awesome God" sequence, Fill empty rows,
-  then undone). The request reaches Anthropic as built (claude-opus-5-5, the ShowPlan schema,
-  the refusal fallback) and comes back `401 authentication_error: invalid x-api-key`, twice, in
-  about a second. The fallback did its job: the rules director planned it, the dialog said so,
-  and the plan credit was refunded. The shader assistant shares the key, so it fails the same
-  way. Needs a valid key in `SHADER_API_KEY` on the Render web service (`ANTHROPIC_API_KEY` is the
-  fallback name); nothing in the code
-  changes. Found once the image sent Laravel's log to stderr (#175); before that the error stayed
-  in a file inside the container.
+- **The AI director against a real provider: verified 2026-10-09.** The first live runs (Logan's
+  "Awesome God" sequence, Fill empty rows) got `401 authentication_error: invalid x-api-key`: the
+  production key had been revoked. The fallback did its job each time (the rules director planned
+  it, the dialog said so, the plan credit was refunded), and the cause only showed once the image
+  sent Laravel's log to stderr (#175). With a new key in `SHADER_API_KEY`, the same press returned
+  `POST /api/v1/sequences/20/magic-plan 200` in about 9 seconds on claude-opus-5-5; the dialog
+  placed 1,147 effects from the AI plan (no fallback notice) and the monthly counter went from 20
+  to 19 free plans. The result was undone; the sequence is as Logan left it. Fit on this layout:
+  36 (loud 0.00, beat 0.53, lift 0.14), in line with the rules director here (see next item).
 - **Seen on the same real layout (120 models).** The fit there is low and swings with the seed:
   25, 29 and 53 across three rules-director runs. Its 33 Tree models classify backwards: the two
   6,400-node trees are named "Seed Tree" and "Tree", and the word "tree" makes them mini trees
