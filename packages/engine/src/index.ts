@@ -70,6 +70,7 @@ export * from "./effects/schema";
 export * from "./audio";
 export * from "./onsets";
 export * from "./songMap";
+export * from "./song/beatThis";
 export * from "./rng";
 export * from "./blend";
 export * from "./nodeMapping";

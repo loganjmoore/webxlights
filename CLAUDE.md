@@ -35,7 +35,10 @@ Do not change these without recording why in this file.
   response, so the engine can adopt `SharedArrayBuffer` without a header change. The Vite dev
   server sets them too.
 - **Content-Security-Policy forbids inline and third-party scripts.** Shaders are user content
-  that runs on the GPU; the page never evaluates a byte of it as JavaScript.
+  that runs on the GPU; the page never evaluates a byte of it as JavaScript. `script-src` carries
+  `'wasm-unsafe-eval'` (added 2026-10-08 for Magic Sequence's pro analysis: onnxruntime-web runs
+  the Beat This! model as WebAssembly). It permits compiling WebAssembly only, never `eval`, and
+  the WASM is the app's own build asset.
 - **Timeline grid is a custom virtualized canvas.** No DOM grid or timeline libraries.
 - **House preview is Three.js.**
 - **Migrations run at container start** (`apps/api/docker/entrypoint.sh`), not by hand and not

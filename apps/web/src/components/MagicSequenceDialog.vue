@@ -47,6 +47,7 @@ const song = shallowRef<SongMap | null>(null);
 const songHash = ref<string | null>(null);
 const analysis = ref("Reading the song…");
 const analysisFailed = ref(false);
+const proStatus = ref("");
 const selectedSection = ref<number | null>(null);
 
 const feel = ref<Feel>("auto");
@@ -115,6 +116,24 @@ async function saveSongMap(map: SongMap): Promise<void> {
     await store.saveSettings({ metadata: withCachedSongMap(store.sequence.metadata, songHash.value, map) });
   } catch {
     /* the next press analyses again */
+  }
+}
+
+/** Beats from Beat This! instead of the browser's tracker; the sections are found again on them. */
+async function useProAnalysis(): Promise<void> {
+  if (busy.value) return;
+  busy.value = true;
+  proStatus.value = "Loading the beat model…";
+  try {
+    const map = await analyzeSongInWorker(props.audio, (_fraction, step) => (proStatus.value = `${step}…`), true);
+    song.value = map;
+    selectedSection.value = null;
+    proStatus.value = "";
+    void saveSongMap(map);
+  } catch (err) {
+    proStatus.value = `Pro analysis failed${err instanceof Error ? ` (${err.message})` : ""}, so the browser's beats stay.`;
+  } finally {
+    busy.value = false;
   }
 }
 
@@ -264,8 +283,19 @@ const strip = computed(() => {
         <template v-else>
           <p class="note">
             <span class="num">{{ Math.round(song.bpm) }}</span> BPM · {{ song.beatsPerBar }}/4 · {{ song.sections.length }} sections
+            <span v-if="song.source === 'pro'"> · pro beats</span>
             <span v-if="song.confidence.beats < 0.5"> · the beat is hard to hear in this song, so check the Magic Beats track</span>
+            <span v-if="song.source === 'browser'"> ·
+              <button
+                type="button"
+                class="link"
+                :disabled="busy"
+                title="Tracks the beats with Beat This!, a neural network that runs in your browser. The first time downloads about 25 MB."
+                @click="useProAnalysis"
+              >Use pro analysis</button>
+            </span>
           </p>
+          <p v-if="proStatus" class="note" role="status">{{ proStatus }}</p>
           <div class="strip" role="group" aria-label="Sections">
             <button
               v-for="seg in strip"

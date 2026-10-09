@@ -106,8 +106,10 @@ song on a mid laptop.
 
 **Pro path (optional, better).** For users who want tighter beats and real section labels:
 
-- **Beat This!** (CPJKU, ISMIR 2024, code and weights MIT) as ONNX in a Worker, WebGPU with WASM
-  fallback. ~120 MB, cached in Cache Storage after first use. Replaces beats and downbeats only.
+- **Beat This!** (CPJKU, ISMIR 2024, code and weights MIT) as ONNX in a Worker, on
+  onnxruntime-web's WASM backend. About 25 MB (10.5 MB model, 14 MB runtime), the model kept in
+  Cache Storage after first use. Replaces beats and downbeats only; built, see "Pro analysis" in
+  the build log.
 - Server job (same pattern as `Jobs/AlignLyrics.php`) for section labels from a hosted model
   **only after its weights licence is confirmed** (allin1's Harmonix-derived weights and
   SongFormer's are both unconfirmed today). Until then the browser segmenter is the only one.
@@ -531,7 +533,7 @@ Starting values; tune against the fit score and Logan's eye.
 | Need | v1 | Where | Licence | Cost |
 |---|---|---|---|---|
 | Beats, bars, tempo | Port of LightsAutoSequencer analysis | Browser worker | GPL-3.0 | 0 |
-| Better beats (opt-in) | Beat This! ONNX | Browser worker, WebGPU/WASM | MIT | 0 (120 MB one-time download) |
+| Better beats (opt-in) | Beat This! ONNX (small0) | Browser worker, WASM | MIT | 0 (25 MB one-time download) |
 | Sections + labels | Own self-similarity segmenter + rules | Browser worker | ours | 0 |
 | Energy, hits, impacts | Own DSP on existing FFT | Browser worker | ours | 0 |
 | Creative plan | Claude Opus 5.5 (`MAGIC_MODEL` to change) via existing provider plumbing | API | API terms | ~10-15 cents per press on Opus 5.5 ($4/$20 per MTok; ~6k in, ~2k out plus thinking); ~5-8 cents on Sonnet 5.5; under 1 cent on Haiku 5.5 |
@@ -743,8 +745,9 @@ What was built, and where the code made a decision the spec didn't.
   sub-models; not committed) with the Jingle Bells recording: 630-663 effects, fit 70-74. The
   layout's own role groups (Roofline, Windows, Arches, Candy Canes, Mega Tree and Star) carry
   their roles. Screenshots: `docs/magic-sequence/`.
-- Not done: a Beat This! ONNX "pro" analysis, a separate render benchmark beyond the timings the
-  score test logs, the fit score for the AI director's candidate plans, and anything in phase 5.
+- Not done: a separate render benchmark beyond the timings the score test logs, the fit score for
+  the AI director's candidate plans, and anything in phase 5. (The Beat This! pro analysis came
+  later; see "Pro analysis" below.)
 
 ### Finishing: the details phases 2 and 3 deferred
 
@@ -767,12 +770,49 @@ What was built, and where the code made a decision the spec didn't.
   of the Bells 76, unchanged within a point. On the real layout with Jingle Bells: 640 effects
   (289 a minute), fit 76, 19 texture-layer effects on the heroes.
 
+### Pro analysis: Beat This!
+
+`MAGIC-SEQUENCE-GOAL.md` left Beat This! out of the goal; Logan asked for it to be built on
+2026-10-08.
+
+- **Model.** The official small0 checkpoint (2M parameters), exported to ONNX with a dynamic time
+  axis by `tools/beat-this/export_onnx.py`, committed at `apps/web/public/models/` with its MIT
+  notice beside it. ONNX Runtime matches PyTorch within 1e-3 on the logits at every length tried.
+- **Port.** The log-mel front end (torchaudio's settings: 22.05 kHz, 1024-point periodic Hann,
+  hop 441, 128 slaney mels from 30 Hz to 11 kHz, log1p(1000x)), the 30 s chunking with 6-frame
+  borders and keep-first overlap, and the "minimal" peak picker are TypeScript in
+  `packages/engine/src/song/beatThis.ts`. Against the Python pipeline on a synthetic signal: the
+  log-mel within 5e-5, the logits through onnxruntime-web within 8e-5, and the same 81 beats and
+  downbeats exactly. The DBN postprocessor is not ported (madmom's weights are non-commercial).
+- **Runtime.** onnxruntime-web 1.30 on WASM, threaded (the page is cross-origin isolated), loaded
+  by the analysis worker only when someone presses "Use pro analysis". WebGPU was not used: its
+  build of the runtime is 28 MB instead of 14, and WASM is already fast enough. The CSP gains
+  `'wasm-unsafe-eval'` for it (recorded in CLAUDE.md).
+- **Speed.** Jingle Bells (2:13) in the production image: 9.4 s with the model cached, about
+  0.7 s per 30 s chunk plus 5 s of model start and log-mel; about 15 s more the first time,
+  for the download. The browser analysis takes 0.6 s.
+- **Making it a lighting grid.** Above 200 BPM the tracked beat is a subdivision (Carol of the
+  Bells comes back as a 3/4 at 250): an even bar keeps every other beat, an odd bar makes its
+  downbeats the beats. Beat This! marks only the beats it is sure of (Jingle Bells' loose ending
+  has none after 110 s), so the grid is carried on at the local tempo to the ends of the audible
+  song, and the bar pattern past the tracker's last downbeat. Sections are then found on the pro
+  bars by the same segmenter.
+- **What it measured.** Onset alignment (strong onsets within 40 ms of a beat) improves on all
+  three test songs: 0.59 against 0.51, 0.23 against 0.18, 0.24 against 0.20. The fit score does
+  not move on average. Best of three seeds, pro against browser: Jingle Bells 75 against 89,
+  Silent Night 88 against 77, Carol of the Bells 79 against 76; the real layout with Jingle Bells
+  66 against 76. The differences come mostly from where the sections fall (loud and lift), not
+  the beat part. Finding sections on the browser's bars and snapping them to the pro downbeats
+  was tried and scored lower on all three (87, 72, 71). So pro stays opt-in: it gives a truer
+  Magic Beats timing track on a song whose tempo drifts, and is not a better generator by the
+  score. Screenshot: `docs/magic-sequence/pro-analysis.jpg`.
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)
 "is out of scope on purpose", and that "Beat This! ONNX, Demucs, Whisper and hosted section models
-are out of scope for this goal". So the pro analysis path of 2.1 (and its "Use pro analysis"
-toggle) and everything in 6.3 wait for their own specs.
+are out of scope for this goal". Beat This! was built anyway at Logan's request (see "Pro
+analysis" above); everything in 6.3 waits for its own spec.
 
 ## Blocked
 

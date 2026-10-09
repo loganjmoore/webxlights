@@ -7,12 +7,12 @@ import type { SongWorkerMessage } from "./songAnalysis.worker";
 // the result on the sequence so a song is analysed once rather than once per press.
 
 /**
- * Analyses a decoded track in a Worker.
+ * Analyses a decoded track in a Worker; `pro` takes the beats from Beat This! instead.
  *
  * The samples are copied before they are transferred: a mono track's channel data is the
  * AudioBuffer's own memory, and transferring that would empty the buffer the player is using.
  */
-export function analyzeSongInWorker(buffer: AudioBuffer, onProgress?: SongAnalysisProgress): Promise<SongMap> {
+export function analyzeSongInWorker(buffer: AudioBuffer, onProgress?: SongAnalysisProgress, pro = false): Promise<SongMap> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./songAnalysis.worker.ts", import.meta.url), { type: "module" });
     const settle = (finish: () => void): void => {
@@ -29,7 +29,7 @@ export function analyzeSongInWorker(buffer: AudioBuffer, onProgress?: SongAnalys
 
     const mono = toMono(buffer);
     const samples = buffer.numberOfChannels === 1 ? mono.slice() : mono;
-    worker.postMessage({ samples, sampleRate: buffer.sampleRate }, [samples.buffer]);
+    worker.postMessage({ samples, sampleRate: buffer.sampleRate, pro }, [samples.buffer]);
   });
 }
 
