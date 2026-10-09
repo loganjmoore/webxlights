@@ -15,22 +15,40 @@ import type { SongWorkerMessage } from "./songAnalysis.worker";
 export function analyzeSongInWorker(buffer: AudioBuffer, onProgress?: SongAnalysisProgress, pro = false): Promise<SongMap> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./songAnalysis.worker.ts", import.meta.url), { type: "module" });
-    const settle = (finish: () => void): void => {
+    const fail = async (message: string | undefined): Promise<void> => {
       worker.terminate();
-      finish();
+      reject(new Error((await pageIsStale()) ? STALE_PAGE : message || "Song analysis failed"));
     };
     worker.onmessage = (event: MessageEvent<SongWorkerMessage>) => {
       const message = event.data;
       if (message.type === "progress") onProgress?.(message.fraction, message.step);
-      else if (message.type === "done") settle(() => resolve(message.songMap));
-      else settle(() => reject(new Error(message.message)));
+      else if (message.type === "done") {
+        worker.terminate();
+        resolve(message.songMap);
+      } else void fail(message.message);
     };
-    worker.onerror = (event) => settle(() => reject(new Error(event.message || "Song analysis failed")));
+    // A worker that fails to load says nothing: no message, just the event.
+    worker.onerror = (event) => void fail(event.message);
 
     const mono = toMono(buffer);
     const samples = buffer.numberOfChannels === 1 ? mono.slice() : mono;
     worker.postMessage({ samples, sampleRate: buffer.sampleRate, pro }, [samples.buffer]);
   });
+}
+
+export const STALE_PAGE = "pixl was updated since this page was opened. Reload the page to analyse the song.";
+
+/**
+ * Whether the server has moved on to a newer build than this page. Each deploy replaces the
+ * hashed scripts, so a page opened before one asks for a worker (and the pro model's runtime)
+ * that is no longer there; its own script being gone too is the sign.
+ */
+async function pageIsStale(): Promise<boolean> {
+  try {
+    return (await fetch(import.meta.url, { method: "HEAD", cache: "no-store" })).status === 404;
+  } catch {
+    return false;
+  }
 }
 
 /** SHA-256 of the audio file's bytes, as hex: what says a cached SongMap is for this song. */
