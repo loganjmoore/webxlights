@@ -1003,6 +1003,26 @@ moments in both, show on the left and mood on the right: the intro, two bars of 
 pair on the next bar) and the last chorus. The AI director is told what a mood means and asked
 for one palette of three neighbouring colours. The video's own frames are not in the repo.
 
+### Lyrics from the song, with nothing pasted (2026-10-09)
+
+Logan asked for the lyric track and the singing to be automatic: the words taken from the song's
+audio, not pasted. Auto lyrics now takes an empty box. The server sends no prompt and asks
+Whisper for its segments as well as its words; the browser makes a line of each segment (or, with
+none, of each stretch of singing between pauses over 0.6 s, ten words at most) and aligns as
+before, so every word is "heard" and the dictionary's pronunciations are looked up for the heard
+words. A misheard word stays misheard; pasting is still the exact path.
+
+Magic does it on the press: when the layout has a singing face with a face definition and the
+song has no phoneme track, *Hear the lyrics in the song first* (on by default) lays down the
+Lyrics, Words and Phonemes tracks before planning, and the faces sing them. It costs one of the
+month's lyric listens (`LYRICS_MONTHLY_LIMIT`); without a key, past the allowance, or after five
+minutes it says so and generates without singing. A fresh timing replaces the Lyrics tracks
+rather than adding "Lyrics 2" (`replaceTimingTrack`).
+
+**Fixed.** Two singing faces in a group (Magic's own "Magic: Singing faces", made by default) sang
+nothing: the group carried the role and a group row has no face definition. Singing faces are
+now always carried by their own models.
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)

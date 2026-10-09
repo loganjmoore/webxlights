@@ -301,9 +301,12 @@ export interface SequenceRow {
 export interface LyricAlignmentRecord {
   id: number;
   status: "queued" | "running" | "done" | "failed";
-  lyrics: string;
+  /** Null when nothing was pasted: the words heard are the lyrics. */
+  lyrics: string | null;
   result: {
     words: { text: string; start: number; end: number }[];
+    /** The service's own phrases, which make the lines when nothing was pasted. */
+    segments?: { text: string; start: number; end: number }[];
     language: string | null;
     model: string;
     /** ARPAbet for each lyric word the dictionary knows, keyed by the normalised word. */
@@ -583,9 +586,9 @@ export const api = {
       headers: keyHeaders(credentials),
     }),
 
-  // Automatic lyric timing: paste the lyrics, poll until the server has listened to the song.
-  alignLyrics: (sequenceId: number, lyrics: string) =>
-    request<LyricAlignmentRecord>(`/v1/sequences/${sequenceId}/lyrics`, { method: "POST", body: JSON.stringify({ lyrics }) }),
+  // Automatic lyric timing: paste the lyrics (or not), poll until the server has listened to the song.
+  alignLyrics: (sequenceId: number, lyrics?: string) =>
+    request<LyricAlignmentRecord>(`/v1/sequences/${sequenceId}/lyrics`, { method: "POST", body: JSON.stringify({ lyrics: lyrics?.trim() || null }) }),
   latestLyricAlignment: (sequenceId: number) => request<LyricAlignmentRecord | null>(`/v1/sequences/${sequenceId}/lyrics`),
 
   // The shared sequence library.

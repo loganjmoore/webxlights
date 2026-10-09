@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignLyrics, lyricTimingTracks, normaliseWord, shapesForArpabet } from "../src/lib/lyricAlign";
+import { alignLyrics, lyricTimingTracks, normaliseWord, shapesForArpabet, lyricsFromTranscript, lyricTracksFor } from "../src/lib/lyricAlign";
 import { xtimingXml } from "../src/lib/xtimingExport";
 
 const heard = (text: string, start: number, end: number) => ({ text, start, end });
@@ -90,5 +90,26 @@ describe("xtiming export", () => {
     expect(xml).toContain('<timing name="Lyrics" SourceVersion="2024.20">');
     expect(xml).toContain('<Effect label="say &quot;hi&quot; &amp; &lt;go&gt;" starttime="0" endtime="1000" />');
     expect(xml.match(/<EffectLayer>/g)).toHaveLength(2);
+  });
+});
+
+describe("lyrics heard rather than pasted", () => {
+  const heard = [
+    { text: "Dashing", start: 1, end: 1.4 }, { text: "through", start: 1.5, end: 1.8 }, { text: "the", start: 1.8, end: 1.9 }, { text: "snow,", start: 2, end: 2.6 },
+    { text: "In", start: 4, end: 4.2 }, { text: "a", start: 4.2, end: 4.3 }, { text: "sleigh", start: 4.4, end: 5 },
+  ];
+
+  it("makes a line of each phrase the service heard, else of each stretch of singing", () => {
+    expect(lyricsFromTranscript(heard, [{ text: " Dashing through the snow, ", start: 1, end: 2.6 }, { text: "In a sleigh", start: 4, end: 5 }])).toBe("Dashing through the snow,\nIn a sleigh");
+    // No phrases: the 1.4 s pause starts a new line.
+    expect(lyricsFromTranscript(heard)).toBe("Dashing through the snow,\nIn a sleigh");
+  });
+
+  it("times every heard word where it was heard, with nothing pasted", () => {
+    const record = { id: 1, status: "done" as const, lyrics: null, error: null, created_at: null, result: { words: heard, language: "english", model: "whisper-1", pronunciations: { sleigh: ["S", "L", "EY1"] } } };
+    const made = lyricTracksFor("Lyrics", record, 10_000)!;
+    expect(made.alignment.heard).toBe(heard.length);
+    expect(made.alignment.phrases.map((p) => [p.label, p.startMs, p.endMs])).toEqual([["Dashing through the snow,", 1000, 2600], ["In a sleigh", 4000, 5000]]);
+    expect(made.tracks.map((t) => t.name)).toEqual(["Lyrics", "Lyrics — Words", "Lyrics — Phonemes"]);
   });
 });

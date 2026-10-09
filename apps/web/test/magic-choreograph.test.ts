@@ -482,6 +482,18 @@ describe("singing faces", () => {
     expect(on(mbp, 41, 46) && off(mbp, 31, 36)).toBe(true);
   });
 
+  it("sing each on its own when a group holds them all (Magic's own \"Singing faces\" group)", () => {
+    const song = syntheticSong(120);
+    const faceModel = layout.models.find((m) => m.name === "Singing Face")!;
+    const second = { ...faceModel, id: 900, name: "Singing Face 2" };
+    const models = [...layout.models, second];
+    const groups = [...layout.groups, { id: 901, name: "Magic: Singing faces", buffer_style: "Default", members: [{ id: faceModel.id, name: faceModel.name }, { id: 900, name: second.name }], params: null }];
+    const withGroup = propMap(models, groups);
+    const singing = { track: "Lyrics — Phonemes", faces: new Map([[`model:${faceModel.id}`, "Face"], ["model:900", "Face"]]) };
+    const placements = choreograph(song, withGroup, rulesDirector({ song, props: withGroup, feel: "auto", seed: 7 }), { feel: feelSpec("auto", song), frameMs: 25, singing });
+    expect(placements.filter((p) => p.effect.name === "Faces").map((p) => p.key).sort()).toEqual([`model:${faceModel.id}`, "model:900"].sort());
+  });
+
   it("keep their own effects without lyric timing", () => {
     const song = syntheticSong(120);
     const placements = choreograph(song, props, rulesDirector({ song, props, feel: "auto", seed: 7 }), { feel: feelSpec("auto", song), frameMs: 25 });

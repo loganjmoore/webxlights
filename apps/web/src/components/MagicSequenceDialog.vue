@@ -18,6 +18,7 @@ import { feedbackPayload, magicRecord, type MagicRecord } from "../lib/magic/fee
 import type { MagicStatus } from "../lib/magic/plan";
 import { loadKey, loadProvider } from "../lib/anthropicKey";
 import { bestCandidate, fitScore, type FitScore } from "../lib/magic/score";
+import { lyricTracksFor } from "../lib/lyricAlign";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 
 // Magic Sequence (docs/MAGIC-SEQUENCE.md 4): one press, an editable sequence across the user's
@@ -103,6 +104,40 @@ const singing = computed(() => {
   return track && faces.size ? { track, faces } : undefined;
 });
 const hasSingingFaces = computed(() => roleCounts.value.some((r) => r.role === "singing_face"));
+// No lyric timing yet: a press times it from the song first (Whisper on the server, the words
+// heard taken as the lyrics), so the faces sing without anyone pasting or importing anything.
+const hasLyricTiming = computed(() => store.body.timingTracks.some((t) => /Phonemes$/.test(t.name) && (t.labels ?? []).some((l) => l && l !== "rest")));
+const lyricsFirst = ref(true);
+const hasFaceDefinitions = computed(() => props.models.some((m) => (m.faces ?? []).some(faceHasNodes)));
+
+/** Listens to the song for its words and lays down the lyric tracks; says why if it can't. */
+async function timeLyricsFromSong(sequenceId: number): Promise<void> {
+  progress.value = "Listening to the song for the words…";
+  try {
+    await api.alignLyrics(sequenceId);
+    const started = Date.now();
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const record = await api.latestLyricAlignment(sequenceId);
+      if (record?.status === "failed") throw new Error(record.error ?? "the listen failed");
+      if (record?.status === "done") {
+        const made = lyricTracksFor("Lyrics", record, store.sequence?.duration_ms);
+        for (const track of made?.tracks ?? []) store.replaceTimingTrack(track);
+        return;
+      }
+      // ponytail: a fixed five-minute wait; a full-length song takes Whisper about a minute.
+      if (Date.now() - started > 300_000) throw new Error("it is taking too long; Auto lyrics shows when it finishes");
+    }
+  } catch (err) {
+    let why = err instanceof Error ? err.message : "the listen failed";
+    try {
+      why = (JSON.parse(why) as { message?: string }).message ?? why;
+    } catch {
+      // Not JSON; the text stands.
+    }
+    notice.value = `The faces won't sing this time: ${why}`;
+  }
+}
 
 onMounted(async () => {
   api.magicStatus().then((s) => (status.value = s), () => undefined);
@@ -276,6 +311,7 @@ async function generate(again = false, override?: ShowPlan): Promise<void> {
     const scope = generationProps.value ?? scopedProps.value;
     const palette = paletteChoice.value >= 0 ? hexPalettes.value[paletteChoice.value] : undefined;
     notice.value = "";
+    if (!again && !override && lyricsFirst.value && hasSingingFaces.value && hasFaceDefinitions.value && !hasLyricTiming.value && store.sequence.audio_filename) await timeLyricsFromSong(store.sequence.id);
     let plan = override ?? (again && lastPlan.value ? lastPlan.value : null) ?? rulesDirector({ song: song.value, props: scope, feel: feel.value, seed: seed.value, style: style.value, ...(palette ? { palette } : {}) });
     if (!again && !override && aiAvailable.value && useAi.value) {
       progress.value = "Asking the director…";
@@ -512,7 +548,8 @@ const strip = computed(() => {
           </div>
           <p v-if="hasSingingFaces" class="note">
             <template v-if="singing">Singing faces sing “{{ singing.track }}”.</template>
-            <template v-else>Singing faces sing the words once the song has lyric timing (Auto lyrics) and the face has a definition.</template>
+            <template v-else-if="!hasFaceDefinitions">Singing faces sing the words once the face has a definition (Faces in the layout editor).</template>
+            <label v-else><input v-model="lyricsFirst" type="checkbox" /> Hear the lyrics in the song first, so the singing faces sing them</label>
           </p>
           <ul v-if="fixingRoles" class="roles">
             <li v-for="model in models" :key="model.id">

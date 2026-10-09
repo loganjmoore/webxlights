@@ -9,8 +9,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Automatic lyric timing: paste the lyrics, the server listens to the song, the browser polls
- * for the result and turns it into phrase, word and phoneme tracks.
+ * Automatic lyric timing: paste the lyrics (or don't, and the words heard are the lyrics), the
+ * server listens to the song, the browser polls for the result and turns it into phrase, word
+ * and phoneme tracks.
  *
  * Funded the same way as the shader assistant - a monthly allowance per person, counted from
  * the credit ledger so a failed listen gives the slot back.
@@ -20,7 +21,7 @@ class LyricAlignmentController extends Controller
     public function store(Request $request, Sequence $sequence)
     {
         $sequence->project->authorize($request->user(), 'editor');
-        $data = $request->validate(['lyrics' => ['required', 'string', 'min:2', 'max:20000']]);
+        $data = $request->validate(['lyrics' => ['nullable', 'string', 'min:2', 'max:20000']]);
         $user = $request->user();
 
         if (! $sequence->audio_path || ! Storage::disk('audio')->exists($sequence->audio_path)) {
@@ -42,7 +43,7 @@ class LyricAlignmentController extends Controller
             'sequence_id' => $sequence->id,
             'user_id' => $user->id,
             'status' => 'queued',
-            'lyrics' => $data['lyrics'],
+            'lyrics' => $data['lyrics'] ?? null,
         ]);
         // Counted before the listen, refunded by the job if it fails.
         $user->moveCredits(0, 'lyric_alignment', ['lyric_alignment' => $alignment->id, 'sequence' => $sequence->id]);

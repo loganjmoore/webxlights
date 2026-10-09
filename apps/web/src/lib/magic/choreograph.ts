@@ -196,7 +196,9 @@ function unitsByRole(props: readonly PropInfo[], split = false): Map<Role, Unit[
   for (const role of roles) {
     if (role === "whole_house" || ROLE_EFFECTS[role].length === 0) continue;
     const straddles = (g: PropInfo) => g.members!.some((k) => (byKey.get(k)?.x ?? 0.5) < 0.5) && g.members!.some((k) => (byKey.get(k)?.x ?? 0.5) >= 0.5);
-    const own = groups
+    // Singing faces each sing their own face definition, which a group row has none of: two
+    // faces in Magic's own "Singing faces" group used to sing nothing.
+    const own = role === "singing_face" ? undefined : groups
       .filter((g) => g.role === role && g.members!.filter((k) => byKey.get(k)?.role === role).length >= 0.75 * g.members!.length && !(split && straddles(g)))
       .sort((a, b) => b.members!.length - a.members!.length || a.key.localeCompare(b.key))[0];
     const covered = new Set(own?.members ?? []);

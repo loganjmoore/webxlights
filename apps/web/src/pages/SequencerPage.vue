@@ -11,7 +11,7 @@ import { parseMidi, parsePapagayo, type ParsedMidi } from "@webxlights/formats";
 import { ALL_TRACKS, describeMidiImport, midiTrackChoices, timingTrackFromMidi } from "../lib/midiTiming";
 import { describePapagayoImport, tracksFromPapagayo } from "../lib/papagayoTiming";
 import { breakdownPhrases, breakdownWords, cellsOf, phonemesTrackName, wordsTrackName } from "../lib/lyricBreakdown";
-import { alignLyrics, lyricTimingTracks } from "../lib/lyricAlign";
+import { lyricTracksFor } from "../lib/lyricAlign";
 import { downloadXtiming } from "../lib/xtimingExport";
 import { effectIcon } from "../lib/effectIcons";
 import { filterRanked, isDefaultStrandName } from "../lib/listFilter";
@@ -272,10 +272,10 @@ const lyricsMessage = ref("");
 let lyricsPoll: ReturnType<typeof setTimeout> | undefined;
 
 function applyLyricAlignment(record: LyricAlignmentRecord): void {
-  if (!record.result) return;
-  const alignment = alignLyrics(record.lyrics, record.result.words, store.sequence?.duration_ms);
-  const tracks = lyricTimingTracks(LYRICS_TRACK, alignment, record.result.pronunciations);
-  for (const track of tracks) replaceTrackNamed(track.name, track);
+  const made = lyricTracksFor(LYRICS_TRACK, record, store.sequence?.duration_ms);
+  if (!made || !record.result) return;
+  const { alignment, tracks } = made;
+  for (const track of tracks) store.replaceTimingTrack(track);
   const total = alignment.words.length;
   const known = alignment.words.filter((w) => record.result!.pronunciations[w.key]).length;
   lyricsMessage.value =
@@ -306,10 +306,6 @@ async function pollLyrics(): Promise<void> {
 }
 
 async function timeLyrics(): Promise<void> {
-  if (!lyricsText.value.trim()) {
-    lyricsMessage.value = "Paste the lyrics first, one line per phrase.";
-    return;
-  }
   lyricsBusy.value = true;
   lyricsMessage.value = "Sending the song off to be listened to…";
   try {
@@ -2934,13 +2930,14 @@ watch(sequenceId, async (id) => {
       <h3 class="timing-heading">Auto lyrics</h3>
       <p class="timing-note">
         Paste the lyrics, one line per phrase, and the song is listened to for where each word is
-        sung. You get three tracks — Lyrics, Words and Phonemes — the phonemes from the CMU
-        Pronouncing Dictionary. It gets most of the way there; play it through and nudge what is off.
+        sung. Leave it empty and the words are taken from the song itself (a misheard word then
+        stays misheard). You get three tracks — Lyrics, Words and Phonemes — the phonemes from the
+        CMU Pronouncing Dictionary. It gets most of the way there; play it through and nudge what is off.
       </p>
       <textarea v-model="lyricsText" class="lyrics-box" rows="6" placeholder="Jingle bells, jingle bells&#10;Jingle all the way…" :disabled="lyricsBusy"></textarea>
       <div class="timing-row">
         <button type="button" :disabled="lyricsBusy || !store.sequence?.audio_filename" :title="store.sequence?.audio_filename ? 'Listen to the song and time these lyrics' : 'Upload the song first'" @click="timeLyrics">
-          {{ lyricsBusy ? "Listening…" : "Time the lyrics" }}
+          {{ lyricsBusy ? "Listening…" : lyricsText.trim() ? "Time the lyrics" : "Hear and time the lyrics" }}
         </button>
         <button type="button" title="Save the lyric tracks as an xLights .xtiming file" @click="downloadLyricsXtiming">Download .xtiming</button>
       </div>
