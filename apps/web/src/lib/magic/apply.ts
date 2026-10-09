@@ -68,7 +68,9 @@ export function magicBody(current: SequenceBody, placements: readonly Placement[
   const tracks: TimingTrack[] = [
     { name: "Magic Beats", marks: song.beats.map(Math.round), fixed: true },
     { name: "Magic Bars", marks: song.downbeats.map(Math.round), fixed: true },
-    { name: "Magic Sections", marks: song.sections.map((s) => Math.round(s.startMs)), labels: names, fixed: true },
+    // A closing mark at the end of the song: a label runs to the next mark, so the last section
+    // needs one to have a cell at all.
+    { name: "Magic Sections", marks: [...song.sections.map((s) => Math.round(s.startMs)), Math.round(song.durationMs)], labels: [...names, ""], fixed: true },
   ];
   body.timingTracks = [...body.timingTracks.filter((t) => !(MAGIC_TRACKS as readonly string[]).includes(t.name)), ...tracks];
   if (mode === "replace" || !body.songBoundaries?.length) {

@@ -63,7 +63,7 @@ export async function audioHash(bytes: ArrayBuffer): Promise<string> {
  */
 export function cachedSongMap(metadata: SequenceMetadata | null | undefined, hash: string): SongMap | null {
   const cached = metadata?.songMap;
-  return cached && cached.hash === hash && cached.map?.version === 1 ? cached.map : null;
+  return cached && cached.hash === hash && cached.map?.version === 2 ? cached.map : null;
 }
 
 /** The sequence's metadata with the SongMap stored on it, everything else as it was. */

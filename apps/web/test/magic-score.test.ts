@@ -9,14 +9,15 @@ import { feelSpec } from "../src/lib/magic/feels";
 import { magicBody } from "../src/lib/magic/apply";
 import { bestCandidate, fitScore, SCORE_FLOORS, type FitScore } from "../src/lib/magic/score";
 import type { ModelGroupRecord, ModelRecord } from "../src/lib/api";
+import type { Style } from "../src/lib/magic/plan";
 import { syntheticSong } from "./fixtures/syntheticSong";
 
 const layout = JSON.parse(readFileSync(fileURLToPath(new URL("./fixtures/magic-layout.json", import.meta.url)), "utf-8")) as { models: ModelRecord[]; groups: ModelGroupRecord[] };
 const props = propMap(layout.models, layout.groups);
 const SONGS = new URL("../../../tools/sequence-corpus/.songs/", import.meta.url);
 
-function generateAndScore(song: SongMap, seed: number, audio?: ReturnType<typeof analyzeAudio>): FitScore {
-  const plan = rulesDirector({ song, props, feel: "auto", seed });
+function generateAndScore(song: SongMap, seed: number, audio?: ReturnType<typeof analyzeAudio>, style: Style = "classic"): FitScore {
+  const plan = rulesDirector({ song, props, feel: "auto", seed, style });
   const placements = choreograph(song, props, plan, { feel: feelSpec("auto", song), frameMs: 25 });
   let n = 0;
   const body = magicBody({ rows: [], timingTracks: [] }, placements, song, "replace", () => `e${n++}`).body;
@@ -55,10 +56,12 @@ describe("the fit score", () => {
   // Each score renders the whole house a few hundred times: about a second here, slower on CI.
   it("scores a generated sequence on a synthetic song above 60, every part above its floor", { timeout: 60_000 }, () => {
     for (const bpm of [80, 120, 150]) {
-      const started = performance.now();
-      const s = generateAndScore(syntheticSong(bpm), 7);
-      console.log(`${describeScore(`synthetic ${bpm} BPM`, s)} in ${(performance.now() - started).toFixed(0)} ms`);
-      expectGood(s);
+      for (const style of ["classic", "show"] as const) {
+        const started = performance.now();
+        const s = generateAndScore(syntheticSong(bpm), 7, undefined, style);
+        console.log(`${describeScore(`synthetic ${bpm} BPM ${style}`, s)} in ${(performance.now() - started).toFixed(0)} ms`);
+        expectGood(s);
+      }
     }
   });
 
@@ -96,15 +99,16 @@ describe("the beat part", () => {
 const songs = ["jingle-bells", "silent-night", "carol-of-the-bells"].map((id) => ({ id, wav: new URL(`${id}.wav`, SONGS) }));
 describe.skipIf(!songs.every((s) => existsSync(s.wav)))("the fit score on the public-domain test songs (tools/sequence-corpus/test-songs.md)", () => {
   for (const { id, wav } of songs) {
-    it(`${id} scores at least 60 with every part above its floor`, { timeout: 120_000 }, () => {
+    it(`${id} scores at least 60 with every part above its floor, in either style`, { timeout: 240_000 }, () => {
       const { samples, sampleRate } = readWav(wav);
       const song = analyzeSong(samples, sampleRate);
       const audio = analyzeAudio(samples, sampleRate, 25);
-      const scores = [1, 2, 3].map((seed) => generateAndScore(song, seed, audio));
-      const best = bestCandidate(scores, (s) => s);
-      console.log(`${id}: ${song.bpm} BPM, ${song.sections.map((s) => `${s.label}/${s.group}/${s.energy.toFixed(2)}`).join(" ")}`);
-      scores.forEach((s, i) => console.log(describeScore(`${id} seed ${i + 1}`, s)));
-      expectGood(best);
+      console.log(`${id}: ${song.bpm} BPM, ${song.sections.map((s) => `${s.label}/${s.group}/${s.energy.toFixed(2)}`).join(" ")}, ${song.rests.length} rests`);
+      for (const style of ["classic", "show"] as const) {
+        const scores = [1, 2, 3].map((seed) => generateAndScore(song, seed, audio, style));
+        scores.forEach((s, i) => console.log(describeScore(`${id} ${style} seed ${i + 1}`, s)));
+        expectGood(bestCandidate(scores, (s) => s));
+      }
     });
   }
 });

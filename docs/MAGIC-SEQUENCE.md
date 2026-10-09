@@ -65,7 +65,7 @@ interface SongMap {
   energy: Float32Array;          // per beat, 0..1, song-relative
   hits: { ms: number; strength: number; band: "kick" | "snare" | "hat" | "full" }[];
   impacts: number[];             // ms: sudden energy jumps (>1.8x within 1 s) and drops
-  vocals?: { startMs: number; endMs: number }[]; // when someone is singing, if known
+  rests: { startMs: number; endMs: number }[];   // where the music stops for half a beat or more (version 2)
   confidence: { beats: number; sections: number };
   source: "browser" | "pro";
 }
@@ -179,6 +179,8 @@ interface ShowPlan {
     wholeHouseHit: boolean;                // one unison hit at the section's first downbeat
   }[];
   ending: "fade" | "hit-then-dark" | "hold";
+  style?: "show" | "classic";              // how the house moves (11, "The show style"); absent is classic
+  avoid?: EffectName[];                    // effects a chat edit took out everywhere ("less strobe")
 }
 ```
 
@@ -451,7 +453,10 @@ Follows `DESIGN.md`: dark chrome, the accent only for the current/primary thing.
   4. *Props*: role chips with counts (tap to exclude), "Fix roles…" for corrections, "Create
      groups for roles without one" toggle.
   5. *Mode*: Fill empty rows / Replace everything / New layers on top.
-  6. **Generate** (primary). Then: fit score, "Try another" (new seed, same plan), "Undo".
+  6. *Style*: Whole-house show (default) or Prop by prop (11, "The show style").
+  7. **Generate** (primary). Then: fit score, "Try another" (new seed, same plan), "Undo", and a
+     *Change it* box for chat edits.
+  8. When the last press has since been edited: *Share what you changed* (11, "Phase 5").
 - Progress is honest: "Finding beats… Finding sections… Asking the director… Placing 1,842 effects".
 - Works with the AI director off; the toggle shows only when a provider is configured or the user
   has their own key (same rules as the shader assistant).
@@ -592,7 +597,7 @@ credit ledger, with its own caps: `MAGIC_DAILY_LIMIT`, `MAGIC_MONTHLY_LIMIT`, ro
 | 2. Rules generator | Choreographer, rules director, feels, dialog, apply, timing tracks, regions | Button works end to end with no network; fit score ≥ 60 on the test songs |
 | 3. AI director | Endpoint, schema, validation, caps, fallback | Same flow with the toggle on; invalid plans degrade gracefully |
 | 4. Score and tune | Headless fit score, candidate selection, tuning pass | Generated stats inside corpus spread; Logan signs off on 3 songs |
-| 5. Later | Vocals, chat edits, learned picker | Separate specs |
+| 5. Later | Vocals, chat edits, learned picker | Built 2026-10-09 (11, "Phase 5"); the picker learns once shared edits arrive |
 
 ---
 
@@ -860,12 +865,109 @@ belong, the library's shaders where they fit, and generated, animated pictures o
   star peeks up and sinks, and each section's props share its pair
   (`docs/magic-sequence/pictures-shaders.jpg`, `docs/magic-sequence/colour-plan.jpg`).
 
+### The show style (2026-10-09)
+
+Logan asked for sequences as polished as a produced show, with a 2024 full-show video (Tom
+BetGeorge's Magical Light Shows) as the reference. About 150 frames were pulled from it, 10 s
+apart for the shape and 0.2 s apart inside bars, and compared with this generator. It plays the
+house as one instrument where Magic sequenced prop by prop, and the corpus's median song (section
+3) is closer to Magic than to it. So the difference is a second style, not a retune: `plan.style`,
+"show" by default in the dialog, "classic" (everything above) for anyone who wants the corpus's
+look. What the video does, and what "show" does about it:
+
+| In the video | In the show style |
+|---|---|
+| One colour across the whole house, the next every bar (red, blue, white, green at 11:26-11:56) | Every lit prop wears the section palette's colour for the bar; quiet sections hold a colour per phrase, the rest per two bars. Nothing runs across a change of colour |
+| The centre snowflake always contrasts (white on blue, blue on red, red on white) | The focal prop (the star, else the feature nearest the centre) wears the colour before |
+| Roofline and windows flooded solid in the loud parts | Loud sections paint frame, fill and focal props with a steady On; features and heroes move inside it |
+| White pops on the backbeat over the colour | White flashes (the contrast if the house is white) on beats 2 and 4, on the last beat above 130 BPM, half a beat long, over the frame and the focal prop |
+| Black on the rests; a dark beat before the drop | `SongMap.rests` (below) and the beat before a rising whole-house hit cut every effect but the hits and singing faces |
+| Breakdowns: three snowflakes flash on the notes, each a new colour, path lights answering, the rest dark (10:38) | A section in the song's quieter half that both neighbours outshine plays call and response on one feature role and one answering role, On on its hits, a new colour each |
+| Carol's verse: outlines only, dim, the lit windows sweeping left to right (1:06) | Quiet sections light only the frame tier at half brightness, no shaders or pictures; sweeps cross the house by position (a zone per beat of the bar), not along one role |
+| The whole house changes together in the chorus | Loud sections move in unison, and their bar lines are exempt from the 40%-start thinning |
+
+"Loud" is relative: at least 0.7 intensity and of a kind (repeat group) with a section in the
+song's louder half, ties broken by energy and choruses first. A feel that lifts every section to
+1.0 (Rock on Jingle Bells) still leaves verses that hold back, and a chorus plays alike each time.
+
+**Rests.** `analyzeSong` now finds where the music stops: half-beats 12 dB under the quieter
+quartile of the four bars around them, measured 25 ms inside the half-beat (a frame is 46 ms and
+the next downbeat's attack leaked into it). The median was the first reference and read the gaps
+between drum hits as rests. On the test songs it is conservative: Jingle Bells 4 rests, Silent
+Night 2, Carol of the Bells none. `SongMap.version` is 2; a cached version 1 map is analysed again.
+
+**Measured** (best of three seeds, the 32-model test layout, real audio for the songs):
+
+| | Synthetic 80 / 120 / 150 BPM | Jingle Bells | Silent Night | Carol of the Bells |
+|---|---|---|---|---|
+| classic | 90 / 78 / 88 | 87 | 80 | 81 |
+| show | 97 / 97 / 97 | 94 | 82 | 95 |
+
+The beat part is 1.00 for every show run: steady blocks that change on the bar, with white
+flashes on the backbeat, change after the beat and almost never in the middle of one. Blocks that
+faded to 30% across the bar (On's long-effect default) scored 0.45-0.56 at 120-150 BPM. The cost
+is density: a colour a bar is an effect per lit row per bar, about 600-860 a minute on the test
+layout against the corpus's p75 of 405. The test allows twice the p75; a real layout's role groups
+carry it in fewer rows (1,491 effects for Jingle Bells on the sample show, fit 98 in the app).
+Renders from the app's own renderer, three bars of a chorus then a backbeat then a verse:
+`docs/magic-sequence/show-style.jpg` and, at the same moments, `classic-style.jpg`.
+
+The AI director is told the style and what it means, and asked for three or four strong colours
+that read one after another. Lasers, searchlights, fireworks and flame effects in the video are
+hardware this app does not drive.
+
+### Phase 5: vocals, chat edits, shared edits and a learned picker (2026-10-09)
+
+**Vocals.** Singing faces sing. When the song has lyric timing (Auto lyrics, which already times
+the words with Whisper on the server, or a Papagayo import) and a singing face has a face
+definition, each such face gets one Faces effect for the whole song on the phoneme track, eyes
+on Automatic, in place of its VU Meter, texture and show-style darkness (a face cut off before a
+drop stops mid-word). Tested by rendering: the mouth's AI nodes light while the track says AI,
+the MBP nodes after. A singing-face sub-model (the face on a singing tree) sings with its
+parent's definition: sub-model rows used to render without their model, because a definition's
+node ranges count the parent's lights, so a Faces or State effect on one drew nothing. They now
+get the parent's face and state definitions renumbered into their own nodes (`subModelSource`,
+in the preview and the export alike). The dialog says which track the faces will sing, or that
+they will once the song has lyric timing. Demucs was not needed: the words come from the lyric
+aligner, not from a vocal stem.
+
+**Chat edits.** After a press, *Change it* takes plain language. "less strobe", "no twinkle",
+"without lightning" and "make the second chorus bigger", "the verses calmer" are applied by
+`edits.ts` with no model and no cost: an effect leaves every role and layer (`plan.avoid`, honoured
+for families, the hero texture, accents and hits), and a section's intensity moves a quarter.
+Anything else goes to the AI director with the current plan (`POST .../magic-plan` with `edit` and
+`plan`; same caps, refusal screen and validation as a plan), which is told to change only what
+the edit asks; its answer is filled from the current plan, not the rules plan. Either way the same
+seed is placed again under the same single undo. Seen in the app: "less shockwave" took the
+sample show from 1,491 effects with Shockwave to 1,499 without, fit 98.
+
+**Shared edits.** Each press keeps a record on the sequence (`metadata.magic`: per row, the role,
+tier and seconds of each effect placed; not for New layers on top, whose rows mix in the user's
+own effects). When the user has changed the sequence since, the dialog offers *Share what you
+changed*: per kind of prop, the seconds placed and the seconds there now, with the song's section
+labels, energies and lengths. No audio, names, row identities or layout; the server rejects
+anything but roles, tiers, plain effect names and counts. `POST /v1/sequences/{id}/magic-feedback`
+(editor access, `throttle:10,1`) keeps one row per person per sequence in `magic_feedback`;
+`php artisan magic:export-feedback` writes the payloads, without who shared them, as JSON lines.
+
+**Learned picker.** `tools/sequence-corpus/train-picker.mjs` turns the export into
+`apps/web/src/lib/magic/picker.json`: per role and effect, seconds wanted over seconds given,
+smoothed towards 1, clamped to 0.05-4, kept once five songs have spoken. The rules director
+multiplies it into its effect weights (squared, like the rest, so 0.05 is what it takes to unseat
+SingleStrand's 43% on arches). It ships empty, and does nothing until shared edits come in. It is
+one multiplier per role and effect; the spec's gradient-boosted picker over section label, energy
+and tempo waits for enough data, and the payload already carries those.
+
+**Also fixed.** The Magic Sections timing track had no closing mark, so the last section's label
+never made a cell; it ends at the song's end now.
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)
 "is out of scope on purpose", and that "Beat This! ONNX, Demucs, Whisper and hosted section models
 are out of scope for this goal". Beat This! was built anyway at Logan's request (see "Pro
-analysis" above); everything in 6.3 waits for its own spec.
+analysis" above), and so was phase 5 on 2026-10-09 (see "Phase 5"). Demucs and hosted section
+models are still not used.
 
 ## Blocked
 

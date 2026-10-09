@@ -19,7 +19,7 @@ import {
 } from "@webxlights/engine";
 import type { ControllerRecord, ModelGroupRecord, ModelRecord, SequenceBody, SequenceRecord } from "./api";
 import { groupRenderSpecs } from "./groupRendering";
-import { toRenderableEffects } from "./renderableEffects";
+import { subModelSource, toRenderableEffects } from "./renderableEffects";
 
 const SEED = 12345;
 
@@ -112,7 +112,9 @@ export function createHouseRenderer(
           body.rows
             .filter((r) => r.elementType === elementType && r.elementId === model.id && r.subName === spec.name)
             .flatMap((r) => r.effects),
-          { timingTracks: body.timingTracks },
+          // A sub-model renders the parent's state and face definitions in its own numbering; a
+          // strand, like the preview, gets the timing tracks alone.
+          { timingTracks: body.timingTracks, ...(elementType === "submodel" ? { model: subModelSource(model, sub.parentIndices) } : {}) },
         );
         if (rowEffects.length === 0) return null;
         return {

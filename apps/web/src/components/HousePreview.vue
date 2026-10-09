@@ -10,6 +10,7 @@ import {
   nodeWorldOffset,
   planGroupRendering,
   scatterGroupColors,
+  computeSubModel,
   createRowPlayer,
   transformedHalfExtents,
   type AudioSeries,
@@ -21,7 +22,7 @@ import {
 import type { ModelGroupRecord, ModelRecord, SequenceBody } from "../lib/api";
 import { groupRenderSpecs } from "../lib/groupRendering";
 import { composeModel, type RenderRow } from "../lib/composeModel";
-import { toRenderableEffects } from "../lib/renderableEffects";
+import { subModelSource, toRenderableEffects } from "../lib/renderableEffects";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createScene, disposeScene, resizeScene, type SceneSetup } from "../lib/sceneSetup";
 import { displayY, transformForModel } from "../lib/modelTransform";
@@ -195,13 +196,15 @@ function rebuildComposeCache(): void {
         toRenderableEffects(at("strand", entry.model.id, spec.name), { timingTracks: tracks }),
       ]),
     ),
-    // A sub-model row gets the timing tracks but not the parent's state definitions: a state's
-    // node ranges are numbered against the model they were defined on, so applying them to a
-    // sub-model's own numbering would light the wrong nodes.
-    subModels: (entry.model.sub_models ?? []).map((spec) => ({
-      spec,
-      effects: toRenderableEffects(at("submodel", entry.model.id, spec.name), { timingTracks: tracks }),
-    })),
+    // A sub-model row gets the parent's state and face definitions renumbered into its own
+    // nodes (subModelSource): they are drawn on the parent, so their ranges count its lights.
+    subModels: (entry.model.sub_models ?? []).map((spec) => {
+      const sub = computeSubModel(entry.geometry, spec);
+      return {
+        spec,
+        effects: toRenderableEffects(at("submodel", entry.model.id, spec.name), { timingTracks: tracks, model: sub ? subModelSource(entry.model, sub.parentIndices) : null }),
+      };
+    }),
   }));
 
   groupJobs = planGroupRendering(

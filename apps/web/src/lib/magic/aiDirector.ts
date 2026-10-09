@@ -2,7 +2,7 @@ import type { SongMap } from "@webxlights/engine";
 import { api, ApiError } from "../api";
 import type { PropInfo, Role, Tier } from "../propRoles";
 import { completePlan } from "./director";
-import type { Feel, MagicPlanRequest, ShowPlan } from "./plan";
+import type { Feel, MagicPlanRequest, ShowPlan, Style } from "./plan";
 import { ROLE_EFFECTS } from "./roleEffects";
 
 // The AI director's side of a press (docs/MAGIC-SEQUENCE.md 2.3): a compact brief out, a
@@ -10,6 +10,7 @@ import { ROLE_EFFECTS } from "./roleEffects";
 // rules plan with a one-line notice; the button never depends on the network.
 
 export interface BriefOptions {
+  style?: Style;
   direction?: string;
   title?: string;
   artist?: string;
@@ -47,6 +48,7 @@ export function planRequest(song: SongMap, props: readonly PropInfo[], feel: Fee
       groups: props.filter((p) => p.key.startsWith("group:")).map((p) => p.name.slice(0, 100)).slice(0, 40),
     },
     feel,
+    ...(options.style ? { style: options.style } : {}),
     ...(direction ? { direction: direction.slice(0, 500) } : {}),
   };
 }
@@ -73,6 +75,27 @@ export async function directPlan(
     // anything else is ours, and the built-in director has it covered.
     const said = err instanceof ApiError && (err.status === 429 || err.status === 422) ? `${serverMessage(err.message)} ` : "";
     return { plan: rules, notice: `${said}The built-in director planned this one.` };
+  }
+}
+
+/**
+ * A chat edit by the AI director: the ask and the current plan out, a changed plan back, every
+ * gap filled from the current plan so a partial answer changes only what it names. A failure
+ * leaves the plan as it was and says why.
+ */
+export async function editPlan(
+  sequenceId: number,
+  request: MagicPlanRequest,
+  current: ShowPlan,
+  edit: string,
+  credentials?: { key?: string | null; provider?: string | null; model?: string | null },
+): Promise<{ plan: ShowPlan | null; notice?: string }> {
+  try {
+    const response = await api.magicPlan(sequenceId, { ...request, edit: edit.trim().slice(0, 300), plan: current }, credentials);
+    return { plan: completePlan(response.plan, current, request.props.roles.map((r) => r.role)) };
+  } catch (err) {
+    const said = err instanceof ApiError && (err.status === 429 || err.status === 422) ? `${serverMessage(err.message)} ` : "";
+    return { plan: null, notice: `${said}The AI director couldn't make that change.`.trim() };
   }
 }
 

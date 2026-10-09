@@ -7,7 +7,7 @@
 // per-beat energy curve, band-limited hits, impacts, confidence figures and section ranking.
 // The feature extraction, tempo fit, grid and section code live in ./song/.
 
-import type { SongAnalysisProgress, SongHit, SongMap, SongSection } from "./songMap";
+import type { SongAnalysisProgress, SongHit, SongMap, SongRest, SongSection } from "./songMap";
 import { detrend, FPS, frameTime, pickPeaks, resampleMono, sdThreshold, spectralFeatures, type Onset, type SongFeatures, type SongModel } from "./song/features";
 import { buildGrid, gridFit, gridFromBeats, proBeats, rmsDb } from "./song/grid";
 import { detectBoundaries, groupSections, labelSections, spansFromBoundaries } from "./song/sections";
@@ -122,6 +122,31 @@ function findImpacts(feat: SongFeatures, beatSec: number): number[] {
   const chosen: number[] = [];
   for (const c of candidates) if (chosen.every((f) => Math.abs(f - c.f) >= 2 * FPS)) chosen.push(c.f);
   return chosen.sort((a, b) => a - b).map((f) => ms(frameTime(f)));
+}
+
+/**
+ * Where the music stops for a moment: half-beats at least 12 dB under the quieter quartile of the
+ * four bars around them, merged into runs. The song's lead-in and tail don't count. A light show
+ * goes dark on a rest; the band cutting out is as much a cue as a hit.
+ */
+function findRests(feat: SongFeatures, beats: readonly number[], T: number, beatsPerBar: number, songStart: number, songEnd: number): SongRest[] {
+  const halves = beats.flatMap((b, i) => [b, (b + (beats[i + 1] ?? b + T)) / 2]);
+  // Measured inside the half-beat: a frame is 46 ms wide, and the next downbeat's attack would
+  // leak into the last one.
+  const level = halves.map((t, i) => rmsDb(feat, t + 0.025, (halves[i + 1] ?? t + T / 2) - 0.025));
+  const rests: SongRest[] = [];
+  for (let i = 0; i < halves.length; i++) {
+    const t = halves[i]!, end = halves[i + 1] ?? t + T / 2;
+    if (t < songStart + T || end > songEnd - T) continue;
+    // Against the quieter quartile, not the median: the gaps between drum hits are quiet too,
+    // and only a drop well under the groove's own floor is the band stopping.
+    const around = level.slice(Math.max(0, i - 4 * beatsPerBar), i + 4 * beatsPerBar + 1).sort((a, b) => a - b);
+    if (level[i]! > percentile(around, 0.25) - 12) continue;
+    const last = rests[rests.length - 1];
+    if (last && Math.abs(last.endMs - ms(t)) < 1) last.endMs = ms(end);
+    else rests.push({ startMs: ms(t), endMs: ms(end) });
+  }
+  return rests;
 }
 
 function tempoOnsets(feat: SongFeatures, active: Uint8Array) {
@@ -245,7 +270,7 @@ export function analyzeSong(samples: Float32Array, sampleRate: number, onProgres
       : 0;
 
   const map: SongMap = {
-    version: 1,
+    version: 2,
     durationMs,
     bpm,
     beats: beatsMs,
@@ -255,6 +280,7 @@ export function analyzeSong(samples: Float32Array, sampleRate: number, onProgres
     energy,
     hits: findHits(feat, onsets.envelope, onsets.kickEnvelope, active),
     impacts: findImpacts(feat, T),
+    rests: findRests(feat, grid.beats, T, grid.beatsPerBar, model.songStart, model.songEnd),
     confidence: { beats: Math.round(beatConfidence * 1000) / 1000, sections: Math.round((detection?.confidence ?? 0) * 1000) / 1000 },
     source: pro ? "pro" : "browser",
   };

@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef } from "vue";
-import type { AudioSeries, SongMap, SectionLabel, StoredSwatch } from "@webxlights/engine";
+import { faceHasNodes, type AudioSeries, type SongMap, type SectionLabel, type StoredSwatch } from "@webxlights/engine";
 import ModalPanel from "./ModalPanel.vue";
 import { api, type ModelGroupRecord, type ModelRecord } from "../lib/api";
 import { confirm } from "../lib/confirm";
 import { propMap, ROLE_NAMES, type PropInfo, type Role } from "../lib/propRoles";
 import { feelFromSong, feelSpec, FEELS } from "../lib/magic/feels";
 import { rulesDirector } from "../lib/magic/director";
-import { choreograph, type MagicShader } from "../lib/magic/choreograph";
+import { choreograph, type MagicShader, type Placement } from "../lib/magic/choreograph";
 import { magicBody, sectionNames, type MagicMode } from "../lib/magic/apply";
 import { ROLE_EFFECTS } from "../lib/magic/roleEffects";
-import type { Feel, ShowPlan } from "../lib/magic/plan";
+import type { Feel, ShowPlan, Style } from "../lib/magic/plan";
 import { analyzeSongInWorker, audioHash, cachedSongMap, withCachedSongMap } from "../lib/magic/songMapClient";
-import { directPlan, planRequest } from "../lib/magic/aiDirector";
+import { directPlan, editPlan, planRequest } from "../lib/magic/aiDirector";
+import { ruleEdit } from "../lib/magic/edits";
+import { feedbackPayload, magicRecord, type MagicRecord } from "../lib/magic/feedback";
 import type { MagicStatus } from "../lib/magic/plan";
 import { loadKey, loadProvider } from "../lib/anthropicKey";
 import { bestCandidate, fitScore, type FitScore } from "../lib/magic/score";
@@ -52,6 +54,7 @@ const sequenceId = store.sequence?.id;
 const selectedSection = ref<number | null>(null);
 
 const feel = ref<Feel>("auto");
+const style = ref<Style>("show");
 const paletteChoice = ref(-1); // -1: from the feel
 const excluded = ref<Set<Role>>(new Set());
 const createGroups = ref(true);
@@ -87,6 +90,19 @@ const feelPalette = computed(() => FEELS[feel.value === "auto" ? resolvedFeel.va
 const hasEffects = computed(() => store.body.rows.some((r) => r.effects.length > 0));
 const canUndo = computed(() => appliedAtDepth.value !== null && store.undoDepth === appliedAtDepth.value);
 const names = computed(() => (song.value ? sectionNames(song.value) : []));
+// Singing faces sing when the song has lyric timing (Auto lyrics or a Papagayo import) and the
+// face has a definition: the phoneme track drives the mouth.
+const singing = computed(() => {
+  const tracks = store.body.timingTracks.filter((t) => /Phonemes$/.test(t.name) && (t.labels ?? []).some((l) => l && l !== "rest"));
+  const track = (tracks.find((t) => t.name === "Lyrics — Phonemes") ?? tracks[0])?.name;
+  const faces = new Map<string, string>();
+  for (const m of props.models) {
+    const face = (m.faces ?? []).find(faceHasNodes);
+    if (face) faces.set(`model:${m.id}`, face.name);
+  }
+  return track && faces.size ? { track, faces } : undefined;
+});
+const hasSingingFaces = computed(() => roleCounts.value.some((r) => r.role === "singing_face"));
 
 onMounted(async () => {
   api.magicStatus().then((s) => (status.value = s), () => undefined);
@@ -150,6 +166,37 @@ async function reanalyse(pro: boolean): Promise<void> {
   }
 }
 
+/**
+ * What this press placed, kept on the sequence so its user can later share what they changed.
+ * "New layers on top" puts Magic's effects on rows that already had the user's own, which would
+ * muddy the comparison, so it keeps nothing; Undo forgets it.
+ */
+async function saveMagicRecord(record: MagicRecord | null): Promise<void> {
+  if (!store.sequence || store.sequence.id !== sequenceId) return;
+  try {
+    await store.saveSettings({ metadata: { ...store.sequence.metadata, magic: record } });
+  } catch {
+    /* the next press keeps one again */
+  }
+}
+
+// Shared on purpose, never in the background: what the user changed since the last press.
+const shareState = ref<"" | "sending" | "shared" | "failed">("");
+const shareable = computed(() => {
+  const record = store.sequence?.metadata?.magic;
+  return record && !busy.value ? feedbackPayload(record, store.body) : null;
+});
+async function shareChanges(): Promise<void> {
+  if (!shareable.value || !store.sequence) return;
+  shareState.value = "sending";
+  try {
+    await api.magicFeedback(store.sequence.id, shareable.value);
+    shareState.value = "shared";
+  } catch {
+    shareState.value = "failed";
+  }
+}
+
 function relabel(index: number, label: SectionLabel): void {
   if (!song.value) return;
   const sections = song.value.sections.map((s, i) => (i === index ? { ...s, label } : s));
@@ -209,7 +256,8 @@ function loadBuiltinShaders(): Promise<MagicShader[]> {
   return builtinShaders;
 }
 
-async function generate(again = false): Promise<void> {
+/** Generates; `again` re-arranges in place of the last press, `override` with an edited plan. */
+async function generate(again = false, override?: ShowPlan): Promise<void> {
   if (!song.value || !store.sequence || busy.value) return;
   if (mode.value === "replace" && hasEffects.value && !again) {
     const ok = await confirm({ title: "Replace everything?", message: "Every effect in this sequence is replaced. One Undo brings them back.", confirmLabel: "Replace", danger: true });
@@ -228,14 +276,14 @@ async function generate(again = false): Promise<void> {
     const scope = generationProps.value ?? scopedProps.value;
     const palette = paletteChoice.value >= 0 ? hexPalettes.value[paletteChoice.value] : undefined;
     notice.value = "";
-    let plan = again && lastPlan.value ? lastPlan.value : rulesDirector({ song: song.value, props: scope, feel: feel.value, seed: seed.value, ...(palette ? { palette } : {}) });
-    if (!again && aiAvailable.value && useAi.value) {
+    let plan = override ?? (again && lastPlan.value ? lastPlan.value : null) ?? rulesDirector({ song: song.value, props: scope, feel: feel.value, seed: seed.value, style: style.value, ...(palette ? { palette } : {}) });
+    if (!again && !override && aiAvailable.value && useAi.value) {
       progress.value = "Asking the director…";
       const meta = store.sequence.metadata;
       const stored = loadProvider();
       const directed = await directPlan(
         store.sequence.id,
-        planRequest(song.value, scope, feel.value, { direction: direction.value, title: meta?.song || store.sequence.name, ...(meta?.artist ? { artist: meta.artist } : {}) }),
+        planRequest(song.value, scope, feel.value, { style: style.value, direction: direction.value, title: meta?.song || store.sequence.name, ...(meta?.artist ? { artist: meta.artist } : {}) }),
         plan,
         userKey ? { key: userKey, provider: stored.provider, model: stored.model } : undefined,
       );
@@ -252,20 +300,20 @@ async function generate(again = false): Promise<void> {
     const base = store.body;
     const seeds = again ? [seed.value] : [seed.value, (seed.value + 1) >>> 0, (seed.value + 2) >>> 0];
     const started = performance.now();
-    const candidates: { seed: number; applied: ReturnType<typeof magicBody>; fit: FitScore }[] = [];
+    const candidates: { seed: number; applied: ReturnType<typeof magicBody>; fit: FitScore; placements: Placement[] }[] = [];
     for (const [i, candidateSeed] of seeds.entries()) {
       progress.value = seeds.length > 1 ? `Scoring arrangement ${i + 1} of ${seeds.length}…` : "Scoring the arrangement…";
       await new Promise((r) => setTimeout(r, 0));
       const placements = choreograph(song.value, scope, plan, {
         feel: feelSpec(feel.value, song.value), seed: candidateSeed, frameMs: store.sequence.frame_ms,
-        title: store.sequence.metadata?.song || store.sequence.name, shaders,
+        title: store.sequence.metadata?.song || store.sequence.name, shaders, ...(singing.value ? { singing: singing.value } : {}),
       });
       const applied = magicBody(base, placements, song.value, mode.value, newEffectId);
       const fit = fitScore({
         song: song.value, models: props.models, groups: generationGroups.value ?? props.groups, body: applied.body, placements,
         frameMs: store.sequence.frame_ms, ...(props.audioSeries ? { audio: props.audioSeries } : {}), blendBetweenModels: store.sequence.blend_between_models === true,
       });
-      candidates.push({ seed: candidateSeed, applied, fit });
+      candidates.push({ seed: candidateSeed, applied, fit, placements });
       if (performance.now() - started > 6000) break;
     }
     const best = bestCandidate(candidates, (c) => c.fit);
@@ -273,11 +321,52 @@ async function generate(again = false): Promise<void> {
     progress.value = `Placing ${best.applied.added.toLocaleString()} effects…`;
     store.replaceBody(best.applied.body);
     appliedAtDepth.value = store.undoDepth;
+    void saveMagicRecord(mode.value === "new-layers" ? null : magicRecord(song.value, best.placements, scope, style.value, feel.value));
+    shareState.value = "";
     result.value = { added: best.applied.added, skippedRows: best.applied.skippedRows, fit: best.fit, candidates: candidates.length };
     progress.value = "";
   } finally {
     busy.value = false;
   }
+}
+
+// Chat edits (docs/MAGIC-SEQUENCE.md 6.3): "less strobe" and "make the second chorus bigger" are
+// done here for free; anything else asks the AI director to change the plan. Either way the same
+// arrangement is placed again with the one thing changed, under the same single undo.
+const change = ref("");
+const changeNote = ref("");
+async function applyChange(): Promise<void> {
+  const ask = change.value.trim();
+  if (!song.value || !lastPlan.value || !store.sequence || busy.value || !canUndo.value || !ask) return;
+  changeNote.value = "";
+  let edited = ruleEdit(lastPlan.value, song.value, ask);
+  if (!edited && aiAvailable.value) {
+    busy.value = true;
+    progress.value = "Asking the director…";
+    const meta = store.sequence.metadata;
+    const stored = loadProvider();
+    try {
+      const answer = await editPlan(
+        store.sequence.id,
+        planRequest(song.value, generationProps.value ?? scopedProps.value, feel.value, { style: style.value, title: meta?.song || store.sequence.name, ...(meta?.artist ? { artist: meta.artist } : {}) }),
+        lastPlan.value,
+        ask,
+        userKey ? { key: userKey, provider: stored.provider, model: stored.model } : undefined,
+      );
+      edited = answer.plan;
+      if (answer.notice) changeNote.value = answer.notice;
+    } finally {
+      busy.value = false;
+      progress.value = "";
+    }
+    if (status.value?.available && !userKey) api.magicStatus().then((s) => (status.value = s), () => undefined);
+  }
+  if (!edited) {
+    changeNote.value ||= "Without the AI director, Change knows “less” or “no” and an effect, and “make the chorus bigger” or “calmer”.";
+    return;
+  }
+  change.value = "";
+  await generate(true, edited);
 }
 
 function tryAnother(): void {
@@ -290,6 +379,7 @@ function undo(): void {
   store.undo();
   appliedAtDepth.value = null;
   result.value = null;
+  void saveMagicRecord(null);
 }
 
 const strip = computed(() => {
@@ -354,6 +444,14 @@ const strip = computed(() => {
           </select>
         </section>
 
+        <section aria-labelledby="magic-style">
+          <h2 id="magic-style">Style</h2>
+          <div class="modes" role="radiogroup" aria-labelledby="magic-style">
+            <label title="One colour across the house, changing on the bar; white flashes on the backbeat; dark rests and breakdowns"><input v-model="style" type="radio" value="show" /> Whole-house show</label>
+            <label title="Each kind of prop in its own colours and effects, the way most shared sequences are made"><input v-model="style" type="radio" value="classic" /> Prop by prop</label>
+          </div>
+        </section>
+
         <section v-if="aiAvailable" class="wide" aria-labelledby="magic-director">
           <h2 id="magic-director">Director</h2>
           <label class="row"><input v-model="useAi" type="checkbox" /> Ask the AI director for the plan</label>
@@ -411,6 +509,10 @@ const strip = computed(() => {
             <label><input v-model="createGroups" type="checkbox" /> Create groups for roles without one</label>
             <button type="button" class="link" :aria-expanded="fixingRoles" @click="fixingRoles = !fixingRoles">Fix roles…</button>
           </div>
+          <p v-if="hasSingingFaces" class="note">
+            <template v-if="singing">Singing faces sing “{{ singing.track }}”.</template>
+            <template v-else>Singing faces sing the words once the song has lyric timing (Auto lyrics) and the face has a definition.</template>
+          </p>
           <ul v-if="fixingRoles" class="roles">
             <li v-for="model in models" :key="model.id">
               <span>{{ model.name }}</span>
@@ -454,6 +556,27 @@ const strip = computed(() => {
           </div>
         </div>
       </footer>
+
+      <form v-if="result" class="change" @submit.prevent="applyChange">
+        <input
+          v-model="change"
+          type="text"
+          maxlength="300"
+          placeholder="Change it: “less strobe”, “make the second chorus bigger”"
+          aria-label="Change the sequence"
+          :disabled="busy || !canUndo"
+        />
+        <button type="submit" :disabled="busy || !canUndo || !change.trim()">Change</button>
+      </form>
+      <p v-if="changeNote" class="note" role="status">{{ changeNote }}</p>
+
+      <p v-if="shareState === 'shared'" class="note" role="status">Shared. Thank you: Magic learns from what people keep.</p>
+      <p v-else-if="shareable" class="note share">
+        You have changed the last Magic Sequence since it was placed.
+        <button type="button" class="link" :disabled="shareState === 'sending'" @click="shareChanges">Share what you changed</button>
+        to help it learn which effects people keep. It sends the kinds of prop, the effect names and how long each plays, and the song's sections; no audio, names or layout.
+        <template v-if="shareState === 'failed'"> That didn't go through; try again later.</template>
+      </p>
 
     </div>
   </ModalPanel>
@@ -659,6 +782,21 @@ button.link {
 }
 .cols .wide {
   grid-column: 1 / -1;
+}
+.change {
+  display: flex;
+  gap: 0.5rem;
+}
+.change input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 0.5rem;
+  font: inherit;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-control);
+  color: var(--text);
 }
 footer {
   display: flex;

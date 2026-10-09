@@ -185,6 +185,18 @@ describe("hits and impacts", () => {
     expect(kicks.length).toBeGreaterThan(0);
     expect(kicks.every((h) => h.ms >= 11000 && h.ms <= 24500)).toBe(true);
   });
+
+  it("finds where the band stops, and no rest in a steady groove", { timeout: 60_000 }, () => {
+    const chords = [triad(57, true), triad(53)];
+    const audio = render(22050, 120, [{ bars: 12, chords, pad: 0.05, groove: "full", drums: 3 }]);
+    expect(analyzeSong(audio, 22050).rests).toEqual([]);
+    // Bar 6 (12 s at 120 BPM) stops for two beats.
+    audio.fill(0, 12 * 22050, 13 * 22050);
+    const rests = analyzeSong(audio, 22050).rests;
+    expect(rests.length).toBe(1);
+    expect(Math.abs(rests[0]!.startMs - 12000)).toBeLessThanOrEqual(260);
+    expect(Math.abs(rests[0]!.endMs - 13000)).toBeLessThanOrEqual(260);
+  });
 });
 
 describe("edges", () => {

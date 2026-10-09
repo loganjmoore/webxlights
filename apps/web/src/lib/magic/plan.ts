@@ -7,6 +7,12 @@ export type Motion = "left-to-right" | "right-to-left" | "centre-out" | "alterna
 export type Accents = "none" | "downbeats" | "beats" | "hits";
 export type Ending = "fade" | "hit-then-dark" | "hold";
 export type Feel = "auto" | "traditional" | "joyful" | "peaceful" | "powerful" | "magical" | "rock";
+/**
+ * How the house moves. "show" plays it as one instrument, the way produced shows do: one colour
+ * across the house that changes on the bar, white accents, dark rests and breakdowns, sweeps
+ * across the whole front. "classic" sequences prop by prop the way the corpus's median song does.
+ */
+export type Style = "show" | "classic";
 
 export interface SectionPlan {
   /** Into SongMap.sections. */
@@ -33,6 +39,10 @@ export interface ShowPlan {
   palettes: Record<string, string[]>;
   sections: SectionPlan[];
   ending: Ending;
+  /** Absent is "classic". */
+  style?: Style;
+  /** Effects the user asked not to see anywhere ("less strobe"), on any role or layer. */
+  avoid?: string[];
 }
 
 /** What the AI director is sent: summaries only, never audio or the layout itself. */
@@ -46,7 +56,11 @@ export interface MagicPlanRequest {
   };
   props: { roles: { role: Role; count: number; tier: Tier }[]; groups: string[] };
   feel: Feel;
+  style?: Style;
   direction?: string;
+  /** A chat edit: the user's ask, and the plan it changes. */
+  edit?: string;
+  plan?: ShowPlan;
 }
 
 /** A validated, possibly partial plan: whatever the server dropped, the rules director fills. */

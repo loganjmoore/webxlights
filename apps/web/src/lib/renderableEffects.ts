@@ -1,4 +1,4 @@
-import { labelsFromTrack, toRenderPalette, type EffectData, type FaceSpec, type StateEntry, type TimingLabel } from "@webxlights/engine";
+import { labelsFromTrack, parseNodeRanges, toRenderPalette, type EffectData, type FaceSpec, type StateEntry, type TimingLabel } from "@webxlights/engine";
 import type { ModelRecord, SequenceEffect, TimingTrack } from "./api";
 
 // Turning this app's stored effects into what the engine renders.
@@ -41,6 +41,32 @@ function faceFor(model: EffectSourceData["model"], definitionName: unknown): Fac
   if (definitions.length === 0) return undefined;
   const wanted = typeof definitionName === "string" ? definitionName.trim() : "";
   return wanted ? definitions.find((d) => d.name === wanted) : definitions.length === 1 ? definitions[0] : undefined;
+}
+
+/**
+ * A model's state and face definitions renumbered for one of its sub-models.
+ *
+ * Definitions are drawn on the parent, so their node ranges count the parent's lights; a sub-model
+ * row renders in its own numbering, where the same numbers are other lights. Each range is mapped
+ * through the sub-model (`parentIndices`, from computeSubModel) and nodes outside it are dropped,
+ * so a face drawn on a singing tree sings on the tree's "Face" sub-model too.
+ */
+export function subModelSource(model: Pick<ModelRecord, "states" | "faces">, parentIndices: readonly number[]): Pick<ModelRecord, "states" | "faces"> {
+  const own = new Map(parentIndices.map((parent, i) => [parent, i]));
+  const renumber = (ranges: string | undefined): string => {
+    const nodes = parseNodeRanges(ranges).flatMap((n) => (own.has(n) ? [own.get(n)! + 1] : []));
+    return nodes.join(",");
+  };
+  const optional = <K extends string>(spec: Partial<Record<K, string>>, keys: readonly K[]) =>
+    Object.fromEntries(keys.filter((k) => spec[k] !== undefined).map((k) => [k, renumber(spec[k])]));
+  return {
+    states: (model.states ?? []).map((s) => ({ ...s, entries: s.entries.map((e) => ({ ...e, nodes: renumber(e.nodes) })) })),
+    faces: (model.faces ?? []).map((f) => ({
+      ...f,
+      mouths: f.mouths.map((m) => ({ ...m, nodes: renumber(m.nodes) })),
+      ...optional(f, ["eyesOpen", "eyesClosed", "eyesOpen2", "eyesClosed2", "eyesOpen3", "eyesClosed3", "outline", "outline2"] as const),
+    })),
+  };
 }
 
 /**

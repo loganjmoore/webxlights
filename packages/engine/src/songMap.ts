@@ -26,8 +26,14 @@ export interface SongHit {
   band: "kick" | "snare" | "hat" | "full";
 }
 
+export interface SongRest {
+  startMs: number;
+  endMs: number;
+}
+
 export interface SongMap {
-  version: 1;
+  /** 2 added `rests`; a cached map of another version is analysed again. */
+  version: 2;
   durationMs: number;
   bpm: number;
   /** ms, ascending. */
@@ -42,6 +48,8 @@ export interface SongMap {
   hits: SongHit[];
   /** ms: sudden energy jumps and drops. */
   impacts: number[];
+  /** Where the music stops for half a beat or more, on the half-beat grid. */
+  rests: SongRest[];
   /** 0..1 each. How far to trust the beat grid and the section boundaries. */
   confidence: { beats: number; sections: number };
   source: "browser" | "pro";
