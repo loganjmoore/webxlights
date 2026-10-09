@@ -295,7 +295,7 @@ const strip = computed(() => {
         <p v-if="!song" class="note" role="status" :class="{ error: analysisFailed }">{{ analysis }}</p>
         <template v-else>
           <p class="note">
-            <span class="num">{{ Math.round(song.bpm) }}</span> BPM · {{ song.beatsPerBar }}/4 · {{ song.sections.length }} sections
+            <span class="num">{{ Math.round(song.bpm) }}</span> BPM · {{ song.beatsPerBar }}/4 · {{ song.sections.length }} section{{ song.sections.length === 1 ? "" : "s" }}
             <span v-if="song.source === 'pro'"> · pro beats ·
               <button type="button" class="link" :disabled="busy" title="Back to the beats this browser finds itself" @click="reanalyse(false)">Use browser analysis</button>
             </span>
@@ -428,7 +428,7 @@ const strip = computed(() => {
         <span class="note" role="status" aria-live="polite">
           <template v-if="progress">{{ progress }}</template>
           <template v-else-if="result">
-            Placed <span class="num">{{ result.added.toLocaleString() }}</span> effects<template v-if="result.skippedRows">, leaving {{ result.skippedRows }} rows that already had effects</template>.
+            Placed <span class="num">{{ result.added.toLocaleString() }}</span> effect{{ result.added === 1 ? "" : "s" }}<template v-if="result.skippedRows">, leaving {{ result.skippedRows }} row{{ result.skippedRows === 1 ? "" : "s" }} that already had effects</template>.
             {{ notice }}
           </template>
         </span>

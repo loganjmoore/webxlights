@@ -817,13 +817,27 @@ analysis" above); everything in 6.3 waits for its own spec.
 
 ## Blocked
 
-Nothing. Two items waited on Logan:
+The AI director's live run is blocked on the production API key. The other items here waited
+on Logan and are done:
 
 - **Sign-off on three songs** (phase 4's last check): signed off by Logan on 2026-10-08. Worth
   watching in real use: mid-chorus frames
   can read sparse (a SingleStrand chase lights a quarter of a prop, the corpus's median), and a
   strophic carol gets most of its verses labelled chorus.
-- **The AI director against a real provider**: there is no model key on the machine this was
-  built on, so before production it ran only against a faked provider and the real SDK with a
-  mocked transport. Logan is checking it on pixl.community, where the key is set; a failure there
-  falls back to the rules director with a one-line notice.
+- **The AI director against a real provider: blocked on the production key.** Run live on
+  pixl.community on 2026-10-09 with Logan's go-ahead (his "Awesome God" sequence, Fill empty rows,
+  then undone). The request reaches Anthropic as built (claude-opus-5-5, the ShowPlan schema,
+  the refusal fallback) and comes back `401 authentication_error: invalid x-api-key`, twice, in
+  about a second. The fallback did its job: the rules director planned it, the dialog said so,
+  and the plan credit was refunded. The shader assistant shares the key, so it fails the same
+  way. Needs a valid key in `SHADER_API_KEY` on the Render web service (`ANTHROPIC_API_KEY` is the
+  fallback name); nothing in the code
+  changes. Found once the image sent Laravel's log to stderr (#175); before that the error stayed
+  in a file inside the container.
+- **Seen on the same real layout (120 models).** The fit there is low and swings with the seed:
+  25, 29 and 53 across three rules-director runs. Its 33 Tree models classify backwards: the two
+  6,400-node trees are named "Seed Tree" and "Tree", and the word "tree" makes them mini trees
+  (features); the 29 100-200 node trees have bare names (MTL1, PTR2, ...), so DisplayAs makes
+  them mega trees (heroes, lit all song). A size-aware rule for Tree models is the likely fix; a
+  synthetic layout with 29 tree heroes still scored 96-97, so it is not proven to be the whole
+  story and waits for a test against this layout's own data.
