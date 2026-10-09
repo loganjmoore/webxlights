@@ -38,11 +38,15 @@ class AlignLyrics
                 $sequence->audio_filename ?: basename($sequence->audio_path),
                 $alignment->lyrics,
             );
-            $lyricWords = preg_split('/\s+/', $alignment->lyrics, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            // Nothing pasted: the words heard are the lyrics.
+            $lyricWords = $alignment->lyrics !== null
+                ? (preg_split('/\s+/', $alignment->lyrics, -1, PREG_SPLIT_NO_EMPTY) ?: [])
+                : array_column($heard['words'], 'text');
             $alignment->update([
                 'status' => 'done',
                 'result' => [
                     'words' => $heard['words'],
+                    'segments' => $heard['segments'],
                     'language' => $heard['language'],
                     'model' => $heard['model'],
                     'pronunciations' => $aligner->pronunciations($lyricWords),

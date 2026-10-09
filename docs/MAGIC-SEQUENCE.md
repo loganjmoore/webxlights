@@ -1003,6 +1003,56 @@ moments in both, show on the left and mood on the right: the intro, two bars of 
 pair on the next bar) and the last chorus. The AI director is told what a mood means and asked
 for one palette of three neighbouring colours. The video's own frames are not in the repo.
 
+### Lyrics from the song, with nothing pasted (2026-10-09)
+
+Logan asked for the lyric track and the singing to be automatic: the words taken from the song's
+audio, not pasted. Auto lyrics now takes an empty box. The server sends no prompt and asks
+Whisper for its segments as well as its words; the browser makes a line of each segment (or, with
+none, of each stretch of singing between pauses over 0.6 s, ten words at most) and aligns as
+before, so every word is "heard" and the dictionary's pronunciations are looked up for the heard
+words. A misheard word stays misheard; pasting is still the exact path.
+
+Magic does it on the press: when the layout has a singing face with a face definition and the
+song has no phoneme track, *Hear the lyrics in the song first* (on by default) lays down the
+Lyrics, Words and Phonemes tracks before planning, and the faces sing them. It costs one of the
+month's lyric listens (`LYRICS_MONTHLY_LIMIT`); without a key, past the allowance, or after five
+minutes it says so and generates without singing. A fresh timing replaces the Lyrics tracks
+rather than adding "Lyrics 2" (`replaceTimingTrack`).
+
+**Fixed.** Two singing faces in a group (Magic's own "Magic: Singing faces", made by default) sang
+nothing: the group carried the role and a group row has no face definition. Singing faces are
+now always carried by their own models.
+
+### Pictures from the lyrics (2026-10-09)
+
+Logan asked for the matrix to show what the song is singing about: a reindeer when it sings of
+reindeer, the sleigh, boots on the roof, a reindeer driving a car. A sung line that names
+something in the picture library now puts it on every matrix (2D, 200 nodes or more) while the
+line is sung: from the beat nearest the line's start to the beat after it ends, two beats at
+least and four bars at most, moving the way the thing moves. It takes the matrix from whatever
+the plan put there, and nothing but a whole-house hit plays over it. The lines are the lyric
+phrase track (Auto lyrics' "Lyrics", or a Papagayo voice's phrases); Magic now offers to hear the
+lyrics first whenever there is a matrix as well as a singing face.
+
+**The library** (`apps/web/src/lib/magic/sprites.ts`) is 24 sprites of original pixel art drawn
+as text, one character a pixel, two or three frames each: reindeer, sleigh, Santa, boots on the
+roof, a reindeer driving a car, snowman, bells, star, snowflake, tree, present, candle, heart,
+house, angel, moon, toy train, drum, gingerbread figure, ornament, wreath, a manger under a star,
+stocking and candy cane, with the lyric words that call each up. Pixel art rather than generated
+images: it reads at 32-64 pixels, its frames line up exactly, it costs nothing and needs no key.
+None is a licensed character; the reindeer is a plain brown one, and the trigger words leave out
+trademarked names. `docs/magic-sequence/lyric-pictures.png` is eight of them rendered on the test
+layout's 48x24 matrix through the app's renderer, six moments each.
+
+**Animated pictures.** The engine's Pictures effect plays `frames` at `fps` (by real time since
+the effect began) in place of its still `image`, and has two new movements: `bounce` (hops in
+place) and `fly` (across on a wave); xLights has neither, and the .xsq export already leaves a
+Pictures effect for the user to point at a file. A library picture is stored by name
+(`params.picture`, "lib:reindeer"), not as pixels, so a sequence carries dozens of them for a few
+bytes each; `toRenderableEffects` puts the frames in for the preview, the export and the fit
+score alike. The effect panel shows which one it is and offers the library beside a file, Files
+and drawing.
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)

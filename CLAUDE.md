@@ -56,8 +56,9 @@ Do not change these without recording why in this file.
 - Effect and model names follow xLights vocabulary so a desktop user recognises them.
 - Every project resource goes through `Project::authorize()` with owner, editor and viewer
   levels. A project you are not a member of is a 403; a shader you cannot see is a 404.
-- Uploads are audio only, allow-listed by extension, capped at 50MB, stored outside the web
-  root and served with `nosniff` after the project check.
+- Uploads are audio and pictures, allow-listed by extension (`Media::AUDIO_EXTENSIONS`,
+  `IMAGE_EXTENSIONS`), capped at 50MB, stored outside the web root and served with `nosniff`
+  after the project check.
 - Add a test when fixing a bug. CI runs `npm run lint`, `npm run typecheck`, `npm run test`,
   `php artisan test` and a full Docker image build on every pull request.
 

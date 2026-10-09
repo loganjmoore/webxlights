@@ -67,6 +67,39 @@ class LyricAlignmentTest extends TestCase
         $this->assertDatabaseHas('credit_transactions', ['user_id' => $user->id, 'reason' => 'lyric_alignment']);
     }
 
+    public function test_with_nothing_pasted_the_words_heard_are_the_lyrics(): void
+    {
+        config(['services.lyrics.key' => 'test-key', 'services.lyrics.base_url' => 'https://stt.example/v1']);
+        Http::fake([
+            'stt.example/v1/audio/transcriptions' => Http::response([
+                'language' => 'english',
+                'words' => [
+                    ['word' => 'Dashing', 'start' => 1.0, 'end' => 1.4],
+                    ['word' => 'through', 'start' => 1.5, 'end' => 1.8],
+                    ['word' => 'snow', 'start' => 2.0, 'end' => 2.6],
+                ],
+                'segments' => [['text' => ' Dashing through snow ', 'start' => 1.0, 'end' => 2.6], ['text' => ' ', 'start' => 3.0, 'end' => 3.1]],
+            ]),
+        ]);
+        $user = User::factory()->create();
+        $sequence = $this->sequenceWithAudio($user);
+
+        $this->actingAs($user)->postJson("/api/v1/sequences/{$sequence->id}/lyrics", [])->assertStatus(202)->assertJsonPath('lyrics', null);
+
+        // The heard words are looked up in the dictionary, and the service's phrases come back
+        // for the browser to make lines of (the blank one left out).
+        $this->actingAs($user)->getJson("/api/v1/sequences/{$sequence->id}/lyrics")->assertOk()
+            ->assertJsonPath('status', 'done')
+            ->assertJsonPath('result.segments', [['text' => 'Dashing through snow', 'start' => 1, 'end' => 2.6]])
+            ->assertJsonPath('result.pronunciations.snow', ['S', 'N', 'OW1']);
+        Http::assertSent(function ($request) {
+            $names = collect($request->data())->pluck('name');
+
+            // No hint without lyrics, and both word and segment timestamps.
+            return ! $names->contains('prompt') && $names->filter(fn ($n) => $n === 'timestamp_granularities[]')->count() === 2;
+        });
+    }
+
     public function test_without_audio_there_is_nothing_to_listen_to(): void
     {
         config(['services.lyrics.key' => 'test-key']);

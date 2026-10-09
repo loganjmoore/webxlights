@@ -421,6 +421,17 @@ export const useSequencerStore = defineStore("sequencer", () => {
   }
 
   /**
+   * Puts a track in place of the one with its name, or adds it: a fresh lyric timing replaces
+   * the last one rather than piling up "Lyrics 2", "Lyrics 3".
+   */
+  function replaceTimingTrack(track: TimingTrack): void {
+    pushUndoSnapshot();
+    const i = body.value.timingTracks.findIndex((t) => t.name === track.name);
+    if (i >= 0) body.value.timingTracks[i] = { ...track };
+    else body.value.timingTracks.push({ ...track });
+  }
+
+  /**
    * Renames a track, keeping names unique.
    *
    * Uniqueness matters more here than it looks: the label-driven effects (State, Piano, Guitar,
@@ -556,6 +567,7 @@ export const useSequencerStore = defineStore("sequencer", () => {
     ensureDefaultTimingTrack,
     generateTimingMarks,
     addTimingTrack,
+    replaceTimingTrack,
     renameTimingTrack,
     deleteTimingTrack,
     setTimingTrackFixed,

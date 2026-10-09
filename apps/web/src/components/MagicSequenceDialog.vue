@@ -18,6 +18,8 @@ import { feedbackPayload, magicRecord, type MagicRecord } from "../lib/magic/fee
 import type { MagicStatus } from "../lib/magic/plan";
 import { loadKey, loadProvider } from "../lib/anthropicKey";
 import { bestCandidate, fitScore, type FitScore } from "../lib/magic/score";
+import { lyricTracksFor } from "../lib/lyricAlign";
+import { cellsOf } from "../lib/lyricBreakdown";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 
 // Magic Sequence (docs/MAGIC-SEQUENCE.md 4): one press, an editable sequence across the user's
@@ -103,6 +105,52 @@ const singing = computed(() => {
   return track && faces.size ? { track, faces } : undefined;
 });
 const hasSingingFaces = computed(() => roleCounts.value.some((r) => r.role === "singing_face"));
+// No lyric timing yet: a press times it from the song first (Whisper on the server, the words
+// heard taken as the lyrics), so the faces sing without anyone pasting or importing anything.
+const hasLyricTiming = computed(() => store.body.timingTracks.some((t) => /Phonemes$/.test(t.name) && (t.labels ?? []).some((l) => l && l !== "rest")));
+const lyricsFirst = ref(true);
+// The sung lines, for pictures from the lyrics: Auto lyrics' "Lyrics" track, or a Papagayo
+// voice's "<voice> — Phrases", found from the phoneme track beside it.
+const lyricLines = computed(() => {
+  const tracks = store.body.timingTracks;
+  const phonemes = tracks.find((t) => t.name === "Lyrics — Phonemes") ?? tracks.find((t) => /— Phonemes$/.test(t.name));
+  const base = phonemes?.name.replace(/ — Phonemes$/, "");
+  const phrases = base ? tracks.find((t) => t.name === base || t.name === `${base} — Phrases`) : undefined;
+  const lines = phrases ? cellsOf(phrases).filter((c) => c.label.trim()) : [];
+  return lines.length ? lines : undefined;
+});
+const hasFaceDefinitions = computed(() => props.models.some((m) => (m.faces ?? []).some(faceHasNodes)));
+// Lyric timing is worth a listen when a face can sing it or a matrix can picture it.
+const wantsLyrics = computed(() => (hasSingingFaces.value && hasFaceDefinitions.value) || roleCounts.value.some((r) => r.role === "matrix"));
+
+/** Listens to the song for its words and lays down the lyric tracks; says why if it can't. */
+async function timeLyricsFromSong(sequenceId: number): Promise<void> {
+  progress.value = "Listening to the song for the words…";
+  try {
+    await api.alignLyrics(sequenceId);
+    const started = Date.now();
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const record = await api.latestLyricAlignment(sequenceId);
+      if (record?.status === "failed") throw new Error(record.error ?? "the listen failed");
+      if (record?.status === "done") {
+        const made = lyricTracksFor("Lyrics", record, store.sequence?.duration_ms);
+        for (const track of made?.tracks ?? []) store.replaceTimingTrack(track);
+        return;
+      }
+      // ponytail: a fixed five-minute wait; a full-length song takes Whisper about a minute.
+      if (Date.now() - started > 300_000) throw new Error("it is taking too long; Auto lyrics shows when it finishes");
+    }
+  } catch (err) {
+    let why = err instanceof Error ? err.message : "the listen failed";
+    try {
+      why = (JSON.parse(why) as { message?: string }).message ?? why;
+    } catch {
+      // Not JSON; the text stands.
+    }
+    notice.value = `No lyrics this time (the faces won't sing, the matrix won't picture them): ${why}`;
+  }
+}
 
 onMounted(async () => {
   api.magicStatus().then((s) => (status.value = s), () => undefined);
@@ -276,6 +324,7 @@ async function generate(again = false, override?: ShowPlan): Promise<void> {
     const scope = generationProps.value ?? scopedProps.value;
     const palette = paletteChoice.value >= 0 ? hexPalettes.value[paletteChoice.value] : undefined;
     notice.value = "";
+    if (!again && !override && lyricsFirst.value && wantsLyrics.value && !hasLyricTiming.value && store.sequence.audio_filename) await timeLyricsFromSong(store.sequence.id);
     let plan = override ?? (again && lastPlan.value ? lastPlan.value : null) ?? rulesDirector({ song: song.value, props: scope, feel: feel.value, seed: seed.value, style: style.value, ...(palette ? { palette } : {}) });
     if (!again && !override && aiAvailable.value && useAi.value) {
       progress.value = "Asking the director…";
@@ -307,6 +356,7 @@ async function generate(again = false, override?: ShowPlan): Promise<void> {
       const placements = choreograph(song.value, scope, plan, {
         feel: feelSpec(feel.value, song.value), seed: candidateSeed, frameMs: store.sequence.frame_ms,
         title: store.sequence.metadata?.song || store.sequence.name, shaders, ...(singing.value ? { singing: singing.value } : {}),
+        ...(lyricLines.value ? { lyrics: lyricLines.value } : {}),
       });
       const applied = magicBody(base, placements, song.value, mode.value, newEffectId);
       const fit = fitScore({
@@ -510,10 +560,15 @@ const strip = computed(() => {
             <label><input v-model="createGroups" type="checkbox" /> Create groups for roles without one</label>
             <button type="button" class="link" :aria-expanded="fixingRoles" @click="fixingRoles = !fixingRoles">Fix roles…</button>
           </div>
-          <p v-if="hasSingingFaces" class="note">
-            <template v-if="singing">Singing faces sing “{{ singing.track }}”.</template>
-            <template v-else>Singing faces sing the words once the song has lyric timing (Auto lyrics) and the face has a definition.</template>
+          <p v-if="wantsLyrics && !hasLyricTiming" class="note">
+            <label><input v-model="lyricsFirst" type="checkbox" /> Hear the lyrics in the song first, so the faces sing them and the matrix pictures what they name</label>
           </p>
+          <p v-else-if="hasLyricTiming && (hasSingingFaces || lyricLines)" class="note">
+            <template v-if="singing">Singing faces sing “{{ singing.track }}”.</template>
+            <template v-else-if="hasSingingFaces">Singing faces sing the words once the face has a definition (Faces in the layout editor).</template>
+            <template v-if="lyricLines"> The matrix pictures what the lyrics name.</template>
+          </p>
+          <p v-else-if="hasSingingFaces" class="note">Singing faces sing the words once the face has a definition (Faces in the layout editor).</p>
           <ul v-if="fixingRoles" class="roles">
             <li v-for="model in models" :key="model.id">
               <span>{{ model.name }}</span>

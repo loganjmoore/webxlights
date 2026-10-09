@@ -8,7 +8,7 @@
 // mouth shapes come from the CMU Pronouncing Dictionary when it knows the word, and from its
 // letters (lyricBreakdown.ts) when it does not. The same three tracks a Papagayo import makes.
 
-import type { TimingTrack } from "./api";
+import type { LyricAlignmentRecord, TimingTrack } from "./api";
 import { cellsForPhonemes, phonemesForWord, phonemesTrackName, trackFromCells, wordsTrackName, type Cell } from "./lyricBreakdown";
 
 export interface HeardWord {
@@ -157,6 +157,31 @@ export function alignLyrics(lyrics: string, heard: HeardWord[], durationMs?: num
     return { label, startMs: own[0]?.startMs ?? 0, endMs: own[own.length - 1]?.endMs ?? 0 };
   });
   return { phrases, words, heard: heardCount };
+}
+
+/**
+ * With nothing pasted, the heard words are the lyrics: a line per phrase the service heard, or,
+ * without its phrases, a new line wherever the singing pauses (or every ten words).
+ */
+export function lyricsFromTranscript(words: HeardWord[], segments: HeardWord[] = []): string {
+  const fromSegments = segments.map((s) => s.text.trim()).filter(Boolean);
+  if (fromSegments.length) return fromSegments.join("\n");
+  const lines: string[][] = [];
+  let last = -Infinity;
+  for (const w of words) {
+    if (!lines.length || w.start - last > 0.6 || lines[lines.length - 1]!.length >= 10) lines.push([]);
+    lines[lines.length - 1]!.push(w.text);
+    last = w.end;
+  }
+  return lines.map((l) => l.join(" ")).join("\n");
+}
+
+/** The phrase, word and phoneme tracks for a finished timing, pasted lyrics or not. */
+export function lyricTracksFor(name: string, record: LyricAlignmentRecord, durationMs?: number): { alignment: Alignment; tracks: TimingTrack[] } | null {
+  if (!record.result) return null;
+  const lyrics = record.lyrics ?? lyricsFromTranscript(record.result.words, record.result.segments);
+  const alignment = alignLyrics(lyrics, record.result.words, durationMs);
+  return { alignment, tracks: lyricTimingTracks(name, alignment, record.result.pronunciations) };
 }
 
 /**

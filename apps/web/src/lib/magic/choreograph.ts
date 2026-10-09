@@ -6,6 +6,7 @@ import { PARAMS, importEffectSettings } from "../xsqEffectSettings";
 import { keyedRandom, nativeEffectName, SHOW_LOUD, SHOW_QUIET, showLoud, weightedOrder } from "./director";
 import type { FeelSpec } from "./feels";
 import { drawMotif, songMotifs } from "./motifs";
+import { spriteFor } from "./sprites";
 import type { SectionPlan, ShowPlan } from "./plan";
 import { priors } from "./priors";
 import { ROLE_EFFECTS, TWO_D_ONLY } from "./roleEffects";
@@ -41,6 +42,8 @@ export interface ChoreographOptions {
    * on them, sing the words all song.
    */
   singing?: { track: string; faces: ReadonlyMap<string, string> };
+  /** The sung lines, timed (the lyric phrase track): a line that names a sprite shows it. */
+  lyrics?: readonly { label: string; startMs: number; endMs: number }[];
 }
 
 export type MagicShader = Pick<ShaderRecord, "id" | "name" | "source" | "inputs">;
@@ -53,6 +56,8 @@ const LIT_SHARE_QUIET = priors.structure.litShareQuietPhrase.p50;
 const LIT_SHARE_BUSY = priors.structure.litShareBusyPhrase.p50;
 /** Pictures carry their pixels in the sequence body, about 10 KB each, inside the autosave budget. */
 const MAX_PICTURES = 8;
+/** Library pictures are named, not stored, so the lyrics can call up many more of them. */
+const MAX_LYRIC_PICTURES = 32;
 
 interface Unit { prop: PropInfo; elementType: Placement["elementType"]; elementId: number; subName?: string; order: number }
 interface Draft { unit: Unit; layer: number; startMs: number; endMs: number; name: string; params: SequenceEffect["params"]; palette: string[]; layerSettings?: SequenceEffect["layer"]; mix?: number; fadeInMs?: number; fadeOutMs?: number; hit?: boolean }
@@ -196,7 +201,9 @@ function unitsByRole(props: readonly PropInfo[], split = false): Map<Role, Unit[
   for (const role of roles) {
     if (role === "whole_house" || ROLE_EFFECTS[role].length === 0) continue;
     const straddles = (g: PropInfo) => g.members!.some((k) => (byKey.get(k)?.x ?? 0.5) < 0.5) && g.members!.some((k) => (byKey.get(k)?.x ?? 0.5) >= 0.5);
-    const own = groups
+    // Singing faces each sing their own face definition, which a group row has none of: two
+    // faces in Magic's own "Singing faces" group used to sing nothing.
+    const own = role === "singing_face" ? undefined : groups
       .filter((g) => g.role === role && g.members!.filter((k) => byKey.get(k)?.role === role).length >= 0.75 * g.members!.length && !(split && straddles(g)))
       .sort((a, b) => b.members!.length - a.members!.length || a.key.localeCompare(b.key))[0];
     const covered = new Set(own?.members ?? []);
@@ -647,6 +654,34 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
     for (const unit of allUnits) {
       if (!ROLE_EFFECTS[unit.prop.role].includes("Twinkle") || unit.prop.role === "whole_house" || unit.prop.role === "flood") continue;
       drafts.push({ unit, layer: 0, startMs: from, endMs: song.durationMs, name: "Twinkle", params: { ...params }, palette: [dim("#ffffff", 0.3)], fadeInMs: song.beatsPerBar * beatMs });
+    }
+  }
+
+  // Pictures from the lyrics: a line that names something the library draws (a reindeer, a
+  // sleigh, boots on the roof) puts it on the matrix while the line is sung, moving the way it
+  // moves, and takes the matrix from whatever was planned there. From the beat nearest the
+  // line's start to the beat after it ends, two beats at least and four bars at most.
+  const screens = (units.get("matrix") ?? []).filter((u) => u.prop.dims === 2 && u.prop.nodes >= 200);
+  if (screens.length && options.lyrics?.length && !avoid.has("Pictures")) {
+    let shown = 0, lastEnd = 0;
+    for (const line of options.lyrics) {
+      const sprite = spriteFor(line.label);
+      if (!sprite || shown >= MAX_LYRIC_PICTURES) continue;
+      const from = Math.max(lastEnd, beatTime(beatAtOrAfter(song.beats, line.startMs - beatMs / 2)));
+      const to = Math.min(Math.max(beatTime(beatAtOrAfter(song.beats, line.endMs)), from + 2 * beatMs), from + 4 * song.beatsPerBar * beatMs, song.durationMs);
+      if (to - from < beatMs) continue;
+      // A bounce hops on every other beat and a sway takes a bar; the rest go across once.
+      const beats = (to - from) / beatMs;
+      const speed = sprite.movement === "bounce" ? Math.max(1, Math.round(beats / 2)) : sprite.movement === "wiggle" ? Math.max(1, Math.round(beats / song.beatsPerBar)) : 1;
+      const params = { ...defaultParamsFor("Pictures"), picture: `lib:${sprite.id}`, movement: sprite.movement, speed, fps: sprite.fps, scaleMode: "fit" };
+      for (const unit of screens) {
+        const kept = carve(drafts.filter((d) => d.unit === unit), from, to);
+        const others = drafts.filter((d) => d.unit !== unit);
+        drafts.length = 0;
+        drafts.push(...others, ...kept, { unit, layer: 0, startMs: from, endMs: to, name: "Pictures", params, palette: [] });
+      }
+      shown++;
+      lastEnd = to;
     }
   }
 

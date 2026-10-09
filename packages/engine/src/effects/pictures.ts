@@ -13,10 +13,15 @@ export interface PictureImage {
   data: ArrayLike<number>; // RGBA, row-major, top row first
 }
 
-export type PictureMovement = "none" | "left" | "right" | "up" | "down" | "scaled" | "peekaboo" | "wiggle" | "zoom in";
+// "bounce" hops in place and "fly" crosses left to right on a gentle wave: the web's own, for
+// animated pictures that walk, drive and fly (xLights has neither).
+export type PictureMovement = "none" | "left" | "right" | "up" | "down" | "scaled" | "peekaboo" | "wiggle" | "zoom in" | "bounce" | "fly";
 
 export interface PicturesParams {
   image?: PictureImage;
+  /** An animation: shown in turn at fps, in place of image. */
+  frames?: readonly PictureImage[];
+  fps?: number;
   movement: PictureMovement;
   speed: number; // 0-50
   scaleMode: "none" | "stretch" | "fit";
@@ -26,7 +31,7 @@ export interface PicturesParams {
 
 // SPEC ch8 "Pictures": draw an image into the buffer, optionally scaled and scrolling.
 export function renderPictures(buffer: RenderBuffer, _palette: RGBA[], params: PicturesParams, ctx: FrameContext): void {
-  const image = params.image;
+  const image = frameAt(params, ctx);
   const { width: W, height: H } = buffer;
   if (!image || image.width <= 0 || image.height <= 0 || W === 0 || H === 0) return;
 
@@ -65,6 +70,15 @@ export function renderPictures(buffer: RenderBuffer, _palette: RGBA[], params: P
     case "wiggle":
       originX += Math.sin(2 * Math.PI * pass) * (W / 8);
       break;
+    // Up a sixth of the buffer and down again, twice a pass.
+    case "bounce":
+      originY += Math.abs(Math.sin(2 * Math.PI * pass)) * (H / 6);
+      break;
+    // Across like "right", rising and falling an eighth of the buffer twice on the way.
+    case "fly":
+      originX = -drawW + pass * (W + drawW);
+      originY += Math.sin(4 * Math.PI * pass) * (H / 8);
+      break;
     default:
       break;
   }
@@ -92,4 +106,12 @@ function fitSize(
     return { drawW: image.width * factor, drawH: image.height * factor };
   }
   return { drawW: image.width * zoom, drawH: image.height * zoom };
+}
+
+/** The animation frame showing now, by real time since the effect began; else the still. */
+function frameAt(params: PicturesParams, ctx: FrameContext): PictureImage | undefined {
+  const frames = params.frames;
+  if (!frames?.length) return params.image;
+  const elapsedMs = ctx.clock ? ctx.clock.atMs - ctx.clock.startMs : ctx.frameIndexInEffect * 50;
+  return frames[Math.floor((Math.max(0, elapsedMs) / 1000) * Math.max(0.1, params.fps ?? 8)) % frames.length];
 }
