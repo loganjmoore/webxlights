@@ -987,10 +987,12 @@ follow-up on one real layout:
   placed 1,147 effects from the AI plan (no fallback notice) and the monthly counter went from 20
   to 19 free plans. The result was undone; the sequence is as Logan left it. Fit on this layout:
   36 (loud 0.00, beat 0.53, lift 0.14), in line with the rules director here (see next item).
-- **Seen on the same real layout (120 models).** The fit there is low and swings with the seed:
-  25, 29 and 53 across three rules-director runs. Its 33 Tree models classify backwards: the two
-  6,400-node trees are named "Seed Tree" and "Tree", and the word "tree" makes them mini trees
-  (features); the 29 100-200 node trees have bare names (MTL1, PTR2, ...), so DisplayAs makes
-  them mega trees (heroes, lit all song). A size-aware rule for Tree models is the likely fix; a
-  synthetic layout with 29 tree heroes still scored 96-97, so it is not proven to be the whole
-  story and waits for a test against this layout's own data.
+- **Seen on the same real layout (120 models).** The fit there was low and swung with the seed:
+  25, 29 and 53 across three rules-director runs. Its 33 Tree models classified backwards: the two
+  6,400-node trees are named "Seed Tree" and "Tree", and the word "tree" made them mini trees
+  (features); the 29 100-200 node trees have bare names (MTL1, PTR2, ...), so DisplayAs made
+  them mega trees (heroes, lit all song). Fixed 2026-10-09 in `propMap`, leaving the corpus's name
+  rules alone: a Tree model whose name doesn't say mini or mega is a mega tree when it has at
+  least 400 nodes and half the largest tree's, and a mini tree otherwise (tested on a layout
+  built to match). The fit on that layout itself has not been measured again: its data lives on
+  pixl.community, not here.
