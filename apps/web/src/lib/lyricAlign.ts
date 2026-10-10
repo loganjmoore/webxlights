@@ -182,8 +182,9 @@ export function lyricsFromTranscript(words: HeardWord[], segments: HeardWord[] =
  * faces mouth nonsense. Six different words and six words a minute at least.
  */
 export function heardSinging(words: readonly HeardWord[], durationMs: number, text?: string | null): boolean {
-  // The written-down words when a text model listened: they are the lyrics then.
-  const said = text ? text.split(/\s+/) : words.map((w) => w.text);
+  // The written-down words when a text model listened: they are the lyrics then, and an empty
+  // page means it heard no singing (whisper's filler on an instrumental doesn't count).
+  const said = text != null ? text.split(/\s+/) : words.map((w) => w.text);
   const distinct = new Set(said.map(normaliseWord).filter(Boolean)).size;
   return distinct >= 6 && said.length / Math.max(durationMs / 60_000, 0.5) >= 6;
 }

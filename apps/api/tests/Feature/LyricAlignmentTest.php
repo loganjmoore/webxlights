@@ -145,6 +145,22 @@ class LyricAlignmentTest extends TestCase
             ->assertJsonPath('status', 'done')->assertJsonPath('result.text', null)->assertJsonPath('result.model', 'whisper-1');
     }
 
+    public function test_a_text_model_that_heard_nothing_says_so_rather_than_trusting_whisper(): void
+    {
+        config(['services.lyrics.key' => 'test-key', 'services.lyrics.base_url' => 'https://stt.example/v1', 'services.lyrics.text_model' => 'gpt-transcribe']);
+        Http::fake(fn ($request) => collect($request->data())->firstWhere('name', 'model')['contents'] === 'gpt-transcribe'
+            ? Http::response(['text' => ''])
+            : Http::response(['language' => 'english', 'words' => [['word' => 'Music', 'start' => 1.0, 'end' => 1.5]], 'segments' => []]));
+        $user = User::factory()->create();
+        $sequence = $this->sequenceWithAudio($user);
+
+        $this->actingAs($user)->postJson("/api/v1/sequences/{$sequence->id}/lyrics", [])->assertStatus(202);
+
+        // An empty page, not "no text model": the browser reads it as no singing.
+        $this->actingAs($user)->getJson("/api/v1/sequences/{$sequence->id}/lyrics")->assertOk()
+            ->assertJsonPath('result.text', '')->assertJsonPath('result.model', 'gpt-transcribe + whisper-1');
+    }
+
     public function test_without_audio_there_is_nothing_to_listen_to(): void
     {
         config(['services.lyrics.key' => 'test-key']);

@@ -133,5 +133,9 @@ describe("lyrics a text model wrote down", () => {
     expect(made.alignment.words.find((w) => w.label === "sleigh")!.startMs).toBe(2400);
     expect(heardSinging(words, 60_000, "Over the hills the sleigh goes by. Over the hills the sleigh goes by.")).toBe(true);
     expect(heardSinging(words, 120_000, "Music.")).toBe(false);
+    // The text model heard nothing: whisper's own words don't count then, however many.
+    const filler = Array.from({ length: 60 }, (_, i) => ({ text: ["la", "da", "oh", "hey", "yeah", "mm", "na"][i % 7]!, start: i, end: i + 0.5 }));
+    expect(heardSinging(filler, 60_000)).toBe(true);
+    expect(heardSinging(filler, 60_000, "")).toBe(false);
   });
 });
