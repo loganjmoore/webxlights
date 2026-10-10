@@ -190,7 +190,8 @@ function onDropEffect(row: GridRow, name: string, startMs: number): void {
 // an effect. The grid and waveform are mounted inside the same kind of shared horizontal
 // scroller SequencerPage uses, so scrollLeft means the same thing here as there.
 
-const pxPerMs = ref(0.01);
+// ?zoom= opens the bench zoomed in, to read lane labels and effect names.
+const pxPerMs = ref(Number(new URLSearchParams(location.search).get("zoom")) || 0.01);
 // The 3D preview renders every rAF; under software GL that floors any frame-time measurement
 // at tens of milliseconds. The interaction benches pause it so they measure the grid, not it.
 const previewPaused = ref(false);
@@ -328,6 +329,7 @@ async function runDragBench(moves = 120): Promise<void> {
         @move="onMove"
         @place="onPlace"
         @drop-effect="onDropEffect"
+        @seek="(ms: number) => (playheadMs = ms)"
       />
     </div>
   </div>
