@@ -3,7 +3,7 @@ import { colorInputNames, defaultValueFor } from "@webxlights/formats";
 import type { EffectParamValue, RowElementType, SequenceEffect, ShaderRecord } from "../api";
 import type { PropInfo, Role, Tier } from "../propRoles";
 import { PARAMS, importEffectSettings } from "../xsqEffectSettings";
-import { keyedRandom, nativeEffectName, SHOW_LOUD, SHOW_QUIET, showLoud, weightedOrder } from "./director";
+import { keyedRandom, nativeEffectName, SHOW_QUIET, showLoud, weightedOrder } from "./director";
 import type { FeelSpec } from "./feels";
 import { drawMotif, songMotifs } from "./motifs";
 import { spriteById, spriteFor, type Sprite } from "./sprites";
@@ -53,9 +53,15 @@ export type MagicShader = Pick<ShaderRecord, "id" | "name" | "source" | "inputs"
 /** Effects that mark a beat: re-triggered at the beat grid, each filling to the next. */
 export const PUNCTUAL = new Set(["On", "Shockwave", "Ripple", "Curtain", "SingleStrand", "Color Wash", "Strobe", "Fan", "Bars", "Morph", "Marquee", "Lightning", "Shape", "Circles", "Fill"]);
 const TIER_PRIORITY: Record<Tier, number> = { fill: 0, frame: 1, feature: 2, hero: 3 };
-/** The corpus: about 30-36% of a song's props are lit at any second; quietest 16 s ~24%, busiest ~52%. */
-const LIT_SHARE_QUIET = priors.structure.litShareQuietPhrase.p50;
-const LIT_SHARE_BUSY = priors.structure.litShareBusyPhrase.p50;
+/**
+ * How much of the house a section lights. The corpus lights 30-36% of a song's props at any
+ * second (quietest 16 s ~24%, busiest ~52%); Logan asked (2026-10-10) for most of the display lit
+ * most of the time but not all of it all of the time. So the quietest section lights 60% of the
+ * rows and the busiest 90%, and the music's rise and fall shows as brightness (glow, below)
+ * rather than as props going dark. Rests, breakdowns and the beat before a drop still go dark.
+ */
+const LIT_SHARE_MIN = 0.6;
+const LIT_SHARE_MAX = 0.9;
 /** Pictures carry their pixels in the sequence body, about 10 KB each, inside the autosave budget. */
 const MAX_PICTURES = 8;
 /** Library pictures are named, not stored, so the lyrics can call up many more of them. */
@@ -132,6 +138,11 @@ function effectParams(name: string, beats: number, variation: number, feel: Feel
     params.movement = "left";
   }
   if (name === "On" && beats > 2) params.endIntensity = 30;
+  // Full rather than sparse (Logan, 2026-10-10: most of the display lit most of the time): a chase
+  // covers at least 40% of its prop, where the corpus's median chase is a tenth, and a twinkle
+  // lights a quarter of the lights rather than 3%.
+  if (name === "SingleStrand") params.chaseSizePct = Math.max(Number(params.chaseSizePct) || 0, 40);
+  if (name === "Twinkle") params.countPct = Math.max(Number(params.countPct) || 0, 25);
   // Re-trigger the same family, vary the direction (the corpus repeats an effect 73-94% of the
   // time and almost never as an identical copy).
   const flip = variation % 2 === 1;
@@ -288,6 +299,10 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
   const countedLooks = new Set<string>();
   const tierOf = (role: Role) => units.get(role)![0]!.prop.tier;
   const totalRows = allUnits.length;
+  // A section's share of the house counts lights' props, not rows: a group of four arches is four.
+  const propsOf = (u: Unit) => u.prop.members?.length ?? 1;
+  const totalProps = allUnits.filter((u) => u.prop.role !== "whole_house").reduce((n, u) => n + propsOf(u), 0);
+  const roleProps = (r: Role) => units.get(r)!.reduce((n, u) => n + propsOf(u), 0);
 
   // The show style plays the house as one instrument (plan.ts, Style). A mood is a show that
   // differs where it says so.
@@ -338,7 +353,10 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
       while (bar + 1 < barStarts.length && barStarts[bar + 1]! <= ms + 1) bar++;
       return Math.floor(bar / period) + lookNo;
     };
-    const shade = (c: string) => (quiet ? dim(c, 0.5) : c);
+    // Quiet sections glow at half brightness and the middle ones at 80%: with most of the house lit
+    // all song, brightness is what tells a verse from a chorus.
+    const glow = sp.intensity < SHOW_QUIET ? 0.5 : sp.intensity < 0.6 ? 0.8 : 1;
+    const shade = (c: string) => (glow < 1 ? dim(c, glow) : c);
     const houseColour = (ms: number) => shade(hues[slot(ms) % hues.length]!);
     const contrastColour = (ms: number) => shade(hues.length > 1 ? hues[(slot(ms) + hues.length - 1) % hues.length]! : "#ffffff");
     // Accents flash white, or the contrast where the house is already white.
@@ -404,33 +422,25 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
     // From under the corpus's quietest-phrase median to its busiest: a lit role covers its whole
     // section here, where the corpus's flicker on and off inside one, so the same share of rows
     // gives more light.
-    const target = (loud
-      ? LIT_SHARE_BUSY + ((1 - LIT_SHARE_BUSY) * (sp.intensity - SHOW_LOUD)) / (1 - SHOW_LOUD)
-      : LIT_SHARE_QUIET * 0.6 + (LIT_SHARE_BUSY - LIT_SHARE_QUIET * 0.6) * sp.intensity) * totalRows;
-    const outlinesOnly = quiet && roles.some((r) => tierOf(r) === "frame");
-    const lit = new Set<Role>(roles.filter((r) => (outlinesOnly ? tierOf(r) === "frame" : (tierOf(r) === "hero" && sp.intensity >= 0.2) || sp.featured.includes(r))));
-    let litRows = [...lit].reduce((n, r) => n + units.get(r)!.length, 0);
+    const target = (LIT_SHARE_MIN + (LIT_SHARE_MAX - LIT_SHARE_MIN) * sp.intensity) * totalProps;
+    const lit = new Set<Role>(roles.filter((r) => (tierOf(r) === "hero" && sp.intensity >= 0.2) || sp.featured.includes(r)));
+    let litRows = [...lit].reduce((n, r) => n + roleProps(r), 0);
     for (const role of order) {
-      if (litRows >= target || outlinesOnly) break;
+      if (litRows >= target) break;
       if (lit.has(role)) continue;
+      // Not all of it: a role that would take the section well past its share waits for a section
+      // that wants it, and a smaller one may fit instead.
+      if (litRows > 0 && litRows + roleProps(role) > target * 1.05) continue;
       lit.add(role);
-      litRows += units.get(role)!.length;
+      litRows += roleProps(role);
     }
     if (!countedLooks.has(sp.look)) {
       countedLooks.add(sp.look);
       for (const role of lit) litLooks.set(role, (litLooks.get(role) ?? 0) + 1);
     }
-    // A whole-house texture sits under everything, so it only plays when the house is busy. In a
-    // show's loud parts it washes the house in the bar's colour.
-    // A mood is two colours at a time, which one wash over the house would hide.
-    if (units.has("whole_house") && !mood && sp.intensity >= 0.6 && keyedRandom(seed, `house:${sp.look}`) < 0.5) lit.add("whole_house");
-    // A dark flood under a lit whole-house group would show the group: floods hold an Off backdrop
-    // instead (18% of flood time in the corpus is Off).
-    if (lit.has("whole_house") && units.has("flood") && !lit.has("flood")) {
-      for (const unit of units.get("flood")!) {
-        drafts.push({ unit, layer: 0, startMs: section.startMs, endMs: section.endMs, name: "Off", params: { ...defaultParamsFor("Off") }, palette: [] });
-      }
-    }
+    // No whole-house wash: it lit every prop at once, and with the props lit on their own the house
+    // is full without it (Logan, 2026-10-10: most of it, not all of it, most of the time). The
+    // whole-house group still takes the hits.
 
     // 2-4. Per phrase (4 bars), one family per role, re-triggered on the grid, coordinated.
     const phraseBeats: number[] = [firstBeat];
@@ -476,7 +486,7 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
               colorInputs: colorInputNames(inputs) as unknown as EffectParamValue,
             };
             const start = beatTime(from);
-            drafts.push({ unit, layer: 0, startMs: start, endMs: beatTime(to), name: "Shader", params, palette: mood ? moodPair(unit, start) : show ? [houseColour(start), contrastColour(start)] : [...pair, accent] });
+            drafts.push({ unit, layer: 0, startMs: start, endMs: beatTime(to), name: "Shader", params, palette: mood ? moodPair(unit, start) : show ? [houseColour(start), contrastColour(start)] : [...pair, accent].map(shade) });
             return;
           }
           if (kind === "picture") {
@@ -532,6 +542,12 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
             } else phase = Math.min(position, song.beatsPerBar - 1) * step;
           }
           let variation = 0;
+          // A prop whose turn in a sweep comes later in the phrase holds its colour dimly until
+          // then rather than sitting dark (a slow song's sweep takes a bar a prop).
+          if (phase > 0 && !solid && ROLE_EFFECTS[role].includes("On") && !avoid.has("On")) {
+            const lead = show ? (mood ? moodPair(unit, beatTime(from))[0] : houseColour(beatTime(from))) : shade(pair[0]!);
+            drafts.push({ unit, layer: 0, startMs: beatTime(from), endMs: beatTime(Math.min(from + phase, to)), name: "On", params: { ...defaultParamsFor("On"), startIntensity: 100, endIntensity: 100 }, palette: [dim(lead, 0.35)] });
+          }
           for (let b = from + phase; b < to; b += interval) {
             // A punctual effect on a prop that comes and goes lasts at most two beats (a bar on the
             // slow songs' bar grid) and leaves the
@@ -551,11 +567,19 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
             // focal prop (and every other prop under "alternate") the contrast.
             const colors = mood ? [moodPair(unit, startMs)[0]] : show
               ? [focal.has(unit) || (sp.motion === "alternate" && k % 2) ? contrastColour(startMs) : houseColour(startMs)]
-              : [...new Set((punctual && variation % 2 ? [pair[1]!, pair[0]!] : pair).slice(0, size))];
+              : [...new Set((punctual && variation % 2 ? [pair[1]!, pair[0]!] : pair).slice(0, size))].map(shade);
             // A pulse that comes and goes dies away in the quieter sections, and breathes in as
             // well in the quietest; the loud ones cut.
-            const pulse = punctual && unit.prop.tier !== "hero" && sp.intensity < 0.5 ? { fadeOutMs: (endMs - startMs) / 2, ...(sp.intensity < 0.35 ? { fadeInMs: (endMs - startMs) / 3 } : {}) } : {};
+            // The rest of the slot holds the colour dimly rather than going dark (Logan, 2026-10-10:
+            // most of the display lit most of the time), so the beat reads as bright against dim.
+            const holdTo = Math.min(beatTime(Math.min(b + interval, to)), section.endMs);
+            const hold = holdTo - endMs >= beatMs / 2 && ROLE_EFFECTS[role].includes("On") && !avoid.has("On");
+            const pulse = punctual && unit.prop.tier !== "hero" && sp.intensity < 0.5 ? { ...(hold ? {} : { fadeOutMs: (endMs - startMs) / 2 }), ...(sp.intensity < 0.35 ? { fadeInMs: (endMs - startMs) / 3 } : {}) } : {};
             drafts.push({ unit, layer: 0, startMs, endMs, name, params, palette: colors, ...(layer ? { layerSettings: layer } : {}), ...pulse });
+            if (hold) {
+              const still = { ...defaultParamsFor("On"), startIntensity: 100, endIntensity: 100 };
+              drafts.push({ unit, layer: 0, startMs: endMs, endMs: holdTo, name: "On", params: still, palette: [dim(colors[0] ?? "#ffffff", 0.35)] });
+            }
             variation++;
           }
         });
@@ -821,7 +845,9 @@ function finish(drafts: Draft[], song: SongMap, frameMs: number, seed: number, t
 
   // The corpus's big hit: 40% of the rows in use (at least 4) starting within a frame of each
   // other. Only planned hits may do that; anywhere else the lowest-priority re-triggers merge into
-  // the effect before them (the same effect held across the beat) until the moment is below it.
+  // the effect before them on their row (held across the beat, whatever it is) until the moment
+  // is below it. A start with nothing before it to hold stays: dropping it left the prop dark for
+  // its whole slot, a phrase on a slow song, and most of the display is meant to be lit.
   const rowsInUse = new Set(live.map((d) => d.unit.prop.key)).size || totalRows;
   const cap = Math.max(4, Math.ceil(0.4 * rowsInUse)) - 1;
   const buckets = new Map<number, Draft[]>();
@@ -832,11 +858,11 @@ function finish(drafts: Draft[], song: SongMap, frameMs: number, seed: number, t
     const rows = new Map<string, Draft[]>();
     for (const d of list) (rows.get(d.unit.prop.key) ?? rows.set(d.unit.prop.key, []).get(d.unit.prop.key)!).push(d);
     if (rows.size <= cap) continue;
-    const victims = [...rows.keys()].sort((a, b) => TIER_PRIORITY[rows.get(a)![0]!.unit.prop.tier] - TIER_PRIORITY[rows.get(b)![0]!.unit.prop.tier] || keyedRandom(seed, `thin:${ms}:${a}`) - keyedRandom(seed, `thin:${ms}:${b}`));
+    const before = (d: Draft) => live.find((x) => !removed.has(x) && lane(x) === lane(d) && x.endMs === d.startMs);
+    const victims = [...rows.keys()].filter((key) => rows.get(key)!.every((d) => before(d))).sort((a, b) => TIER_PRIORITY[rows.get(a)![0]!.unit.prop.tier] - TIER_PRIORITY[rows.get(b)![0]!.unit.prop.tier] || keyedRandom(seed, `thin:${ms}:${a}`) - keyedRandom(seed, `thin:${ms}:${b}`));
     for (const key of victims.slice(0, rows.size - cap)) {
       for (const d of rows.get(key)!) {
-        const prev = live.find((x) => !removed.has(x) && lane(x) === lane(d) && x.endMs === d.startMs && x.name === d.name);
-        if (prev) prev.endMs = d.endMs;
+        before(d)!.endMs = d.endMs;
         removed.add(d);
       }
     }

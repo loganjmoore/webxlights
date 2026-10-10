@@ -15,6 +15,9 @@ return [
         'key' => env('LYRICS_API_KEY', env('OPENAI_API_KEY')),
         'base_url' => env('LYRICS_BASE_URL', 'https://api.openai.com/v1'),
         'model' => env('LYRICS_MODEL', 'whisper-1'),
+        // With nothing pasted, this model writes the words down first (whisper-1 then times
+        // them): it hears singing better and has no word times. Empty: whisper-1 alone.
+        'text_model' => env('LYRICS_TEXT_MODEL', 'gpt-transcribe'),
         // Server-funded listens per person per month; 0 means uncapped.
         'monthly_limit' => (int) env('LYRICS_MONTHLY_LIMIT', 20),
     ],
