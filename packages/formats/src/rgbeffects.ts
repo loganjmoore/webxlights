@@ -198,51 +198,70 @@ function parseStates(model: Record<string, unknown>): ParsedStateDefinition[] {
 // can't be fetched. What does come across is the definition itself: its name, its placement and
 // which mouth positions it had, so the editor shows the rows waiting for their pictures rather
 // than losing that a singing face existed at all.
-const FACE_PART_KEYS = [
-  "Eyes-Open",
-  "Eyes-Closed",
-  "Eyes-Open2",
-  "Eyes-Closed2",
-  "Eyes-Open3",
-  "Eyes-Closed3",
-  "Outline",
-  "Outline2",
-];
+//
+// The keys are xLights' own (src-core/effects/FacesEffect.cpp): "Mouth-AI", a second layer of the
+// same mouth as "Mouth-AI2", "Eyes-Open", "FaceOutline", each colour as "<key>-Color" and used
+// only when CustomColors is "1", and a matrix face's pictures as "Mouth-AI-EyesOpen" and
+// "-EyesClosed". This read "mouth-AI" and "Outline" once, from a hand-written sample, and every
+// real singing face came across with its eyes and no mouth.
+const FACE_PART_KEYS: Record<string, string[]> = {
+  "Eyes-Open": ["Eyes-Open"],
+  "Eyes-Closed": ["Eyes-Closed"],
+  "Eyes-Open2": ["Eyes-Open2"],
+  "Eyes-Closed2": ["Eyes-Closed2"],
+  "Eyes-Open3": ["Eyes-Open3"],
+  "Eyes-Closed3": ["Eyes-Closed3"],
+  Outline: ["FaceOutline", "Outline"],
+  Outline2: ["FaceOutline2", "Outline2"],
+};
 
-function parseFaces(model: Record<string, unknown>): ParsedFaceDefinition[] {
+/** A model's face definitions, from its <faceInfo> elements as the XML parser left them. */
+export function parseFaces(model: Record<string, unknown>): ParsedFaceDefinition[] {
   const raw = asArray<Record<string, string>>(model.faceInfo as never);
   const out: ParsedFaceDefinition[] = [];
   for (const info of raw) {
     if (!info || typeof info !== "object") continue;
-    const isMatrix = `${info.Type ?? info.type ?? ""}`.toLowerCase().includes("matrix");
+    // Keys matched however they are cased, as every label is.
+    const byKey = new Map(Object.entries(info).map(([k, v]) => [k.toLowerCase(), v]));
+    const get = (key: string) => {
+      const value = byKey.get(key.toLowerCase());
+      return value === undefined || `${value}` === "" ? undefined : `${value}`;
+    };
+    const isMatrix = (get("Type") ?? "").toLowerCase().includes("matrix");
+    const customColors = get("CustomColors") === "1";
 
-    const mouths: ParsedFaceDefinition["mouths"] = [];
-    const imageNames: string[] = [];
+    const mouths = new Map<string, ParsedFaceDefinition["mouths"][number]>();
+    const imageNames = new Set<string>();
     for (const [key, value] of Object.entries(info)) {
-      const match = /^mouth-(.+?)(-Color)?$/.exec(key);
+      const match = /^mouth-(.+?)(-color)?$/i.exec(key);
       if (!match || match[2] || value === undefined || `${value}` === "") continue;
       if (isMatrix) {
-        imageNames.push(match[1]!);
+        imageNames.add(match[1]!.replace(/-eyes(open|closed)$/i, ""));
         continue;
       }
-      const color = info[`mouth-${match[1]}-Color`];
-      mouths.push({ name: match[1]!, nodes: `${value}`, ...(color ? { color: `${color}` } : {}) });
+      // "Mouth-AI2" is a second layer of AI's mouth, lit with it.
+      const layered = /^(.+)2$/.exec(match[1]!);
+      const name = layered && get(`Mouth-${layered[1]}`) !== undefined ? layered[1]! : match[1]!;
+      const color = customColors && name === match[1] ? get(`Mouth-${name}-Color`) : undefined;
+      const known = mouths.get(name.toLowerCase());
+      if (known) known.nodes = `${known.nodes},${value}`;
+      else mouths.set(name.toLowerCase(), { name, nodes: `${value}`, ...(color ? { color } : {}) });
     }
 
     const parts: Record<string, string> = {};
     if (!isMatrix) {
-      for (const key of FACE_PART_KEYS) {
-        const value = info[key];
-        if (value !== undefined && `${value}` !== "") parts[key] = `${value}`;
+      for (const [part, keys] of Object.entries(FACE_PART_KEYS)) {
+        const value = keys.map(get).find((v) => v !== undefined);
+        if (value !== undefined) parts[part] = value;
       }
     }
 
-    if (mouths.length === 0 && imageNames.length === 0 && Object.keys(parts).length === 0) continue;
+    if (mouths.size === 0 && imageNames.size === 0 && Object.keys(parts).length === 0) continue;
     out.push({
-      name: info.Name ?? info.name ?? "",
+      name: get("Name") ?? "",
       kind: isMatrix ? "matrix" : "nodes",
-      mouths,
-      imageNames,
+      mouths: [...mouths.values()],
+      imageNames: [...imageNames],
       parts,
     });
   }

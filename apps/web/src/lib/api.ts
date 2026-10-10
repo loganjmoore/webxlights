@@ -6,6 +6,7 @@ import type { BlendMode, ColorAdjust, FaceSpec, LayerSettings, PictureImage, Sta
 import type { IsfInput } from "@webxlights/formats";
 import type { MagicPlanRequest, MagicPlanResponse, MagicStatus } from "./magic/plan";
 import type { MagicFeedback, MagicRecord } from "./magic/feedback";
+import { withImportedFaces } from "./importedFaces";
 
 export class ApiError extends Error {
   status: number;
@@ -498,7 +499,8 @@ export const api = {
   listProjects: () => request<Project[]>("/v1/projects"),
   createProject: (name: string) => request<Project>("/v1/projects", { method: "POST", body: JSON.stringify({ name }) }),
   listLayouts: (projectId: number) => request<Layout[]>(`/v1/projects/${projectId}/layouts`),
-  listModels: (layoutId: number) => request<ModelRecord[]>(`/v1/layouts/${layoutId}/models`),
+  // Faces imported before the importer read xLights' own keys are mended as they load (importedFaces.ts).
+  listModels: async (layoutId: number) => (await request<ModelRecord[]>(`/v1/layouts/${layoutId}/models`)).map(withImportedFaces),
   bulkUpsertModels: (layoutId: number, models: ModelUpsertPayload[]) =>
     request<ModelRecord[]>(`/v1/layouts/${layoutId}/models/bulk`, { method: "POST", body: JSON.stringify({ models }) }),
   updateModel: (layoutId: number, modelId: number, patch: Partial<ModelUpsertPayload>) =>

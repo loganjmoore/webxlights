@@ -165,21 +165,39 @@ describe("Faces", () => {
 <xrgb>
   <models>
     <model name="Singing Face" DisplayAs="Custom" parm1="10" parm2="4" CustomModel="1,2;3,4">
-      <faceInfo Name="Face1" Type="NodeRange" mouth-AI="1-5" mouth-rest="6" mouth-MBP-Color="#00FF00" mouth-MBP="7-8" Eyes-Open="9" Eyes-Closed="10" Outline="11-20" />
-      <faceInfo Name="Matrix Face" Type="Matrix" mouth-AI="C:/faces/ai.png" mouth-rest="C:/faces/rest.png" />
+      <faceInfo Name="Face1" Type="NodeRange" CustomColors="1" Mouth-AI="1-5" Mouth-AI2="30-32" Mouth-rest="6" Mouth-MBP-Color="#00FF00" Mouth-MBP="7-8" Eyes-Open="9" Eyes-Closed="10" FaceOutline="11-20" FaceOutline-Color="#FFFFFF" />
+      <faceInfo Name="Plain Colours" Type="NodeRange" CustomColors="0" Mouth-O="1-3" Mouth-O-Color="#FF0000" />
+      <faceInfo Name="Matrix Face" Type="Matrix" Mouth-AI-EyesOpen="C:/faces/ai.png" Mouth-AI-EyesClosed="C:/faces/ai-shut.png" Mouth-rest-EyesOpen="C:/faces/rest.png" />
     </model>
     <model name="Arch" DisplayAs="Arches" parm1="1" parm2="20" />
   </models>
 </xrgb>`;
 
-  it("reads the mouths, the eyes and the outline of a node-range face", () => {
+  // The keys as xLights writes them (src-core/effects/FacesEffect.cpp): "Mouth-AI", a second layer
+  // "Mouth-AI2", "FaceOutline", and colours only when CustomColors is "1". The sample here once
+  // said "mouth-AI" and "Outline", and real singing faces imported with eyes and no mouth.
+  it("reads the mouths, the eyes and the outline of a node-range face, keyed as xLights writes them", () => {
     const face = parseRgbEffectsXml(xml).models.find((m) => m.name === "Singing Face")!.faces[0]!;
     expect(face.name).toBe("Face1");
     expect(face.kind).toBe("nodes");
-    expect(face.mouths.find((m) => m.name === "AI")!.nodes).toBe("1-5");
+    // The second layer lights with the first.
+    expect(face.mouths.find((m) => m.name === "AI")!.nodes).toBe("1-5,30-32");
+    expect(face.mouths.some((m) => m.name === "AI2")).toBe(false);
     expect(face.mouths.find((m) => m.name === "MBP")).toEqual({ name: "MBP", nodes: "7-8", color: "#00FF00" });
     expect(face.parts["Eyes-Open"]).toBe("9");
     expect(face.parts.Outline).toBe("11-20");
+  });
+
+  it("keeps a mouth's colour only when the definition forces custom colours", () => {
+    const face = parseRgbEffectsXml(xml).models.find((m) => m.name === "Singing Face")!.faces.find((f) => f.name === "Plain Colours")!;
+    expect(face.mouths).toEqual([{ name: "O", nodes: "1-3" }]);
+  });
+
+  it("still reads the older lower-case keys", () => {
+    const old = `<xrgb><models><model name="F" DisplayAs="Custom" CustomModel="1"><faceInfo Name="F" Type="NodeRange" mouth-AI="1-5" Outline="6" /></model></models></xrgb>`;
+    const face = parseRgbEffectsXml(old).models[0]!.faces[0]!;
+    expect(face.mouths).toEqual([{ name: "AI", nodes: "1-5" }]);
+    expect(face.parts.Outline).toBe("6");
   });
 
   it("brings a Matrix face across as a shell, without reading its image paths as node ranges", () => {

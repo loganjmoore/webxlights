@@ -1226,6 +1226,16 @@ on the tree's own row, which renders over the group's. The dialog times the lyri
 prop has a face, and names who will sing. A tree with a face sub-model keeps singing on the
 sub-model instead. Without a phrase track the face sings all song.
 
+They still didn't move their mouths on Logan's layout: the eyes lit, the mouth and outline never
+did. The importer read face definitions with the keys of a hand-written sample ("mouth-AI",
+"Outline"), and xLights writes "Mouth-AI", "Mouth-AI2" for a second layer, "FaceOutline", and
+colours only under CustomColors="1" (`src-core/effects/FacesEffect.cpp`). Every imported face
+kept its eyes, which matched by luck, and lost its mouths and outline. The parser now reads
+xLights' keys, any case, and the older ones. Layouts already imported are mended as their models
+load (`importedFaces.ts`): a node-range face with no mouth gets its mouths and outline back from
+the model's own `<faceInfo>`, which is still in its raw attributes. A face with a mouth is left
+alone, so nothing drawn in the editor is touched.
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)
