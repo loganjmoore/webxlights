@@ -14,6 +14,8 @@ export type GridGesture =
   | "add-mark"
   /** A press on a mark itself - nothing on press; right-click deletes. */
   | "none"
+  /** A press on a timing lane's cell: jump the playhead there, nothing is dragged. */
+  | "seek"
   /** Pick the alignment reference out of the block (shift on an effect's body). */
   | "pick-reference"
   /** Shift on an effect's edge: drag inwards to set a fade. */
@@ -28,7 +30,7 @@ export type GridGesture =
   | "band";
 
 export interface GestureHit {
-  kind: "effect" | "mark" | "ruler-empty" | "row-empty" | "row-label" | "none";
+  kind: "effect" | "mark" | "lane" | "ruler-empty" | "row-empty" | "row-label" | "none";
   /** Set when the press landed on an effect's left or right edge. */
   edge?: "left" | "right" | null;
 }
@@ -40,6 +42,10 @@ export interface GestureModifiers {
 export function gestureFor(hit: GestureHit, modifiers: GestureModifiers): GridGesture {
   if (hit.kind === "ruler-empty") return "add-mark";
   if (hit.kind === "mark") return "none";
+  // A lane is a pinned display of a track's labels, not a place to draw anything, so a press there
+  // means "take me to that word". It must not fall through to the selection box below, which would
+  // start one under the ruler.
+  if (hit.kind === "lane") return "seek";
   // A row label is the layer menu's target, and right-click is how you reach it - a left press
   // there should do nothing rather than start a selection box behind the labels.
   if (hit.kind === "row-label") return "none";
@@ -61,4 +67,4 @@ export function gestureFor(hit: GestureHit, modifiers: GestureModifiers): GridGe
 }
 
 /** Every gesture this grid has, so a test can prove each one is still reachable. */
-export const GRID_GESTURES: GridGesture[] = ["add-mark", "none", "pick-reference", "fade", "resize", "move", "place", "band"];
+export const GRID_GESTURES: GridGesture[] = ["add-mark", "none", "seek", "pick-reference", "fade", "resize", "move", "place", "band"];
