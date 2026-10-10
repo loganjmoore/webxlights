@@ -317,6 +317,8 @@ export interface LyricAlignmentRecord {
     words: { text: string; start: number; end: number }[];
     /** The service's own phrases, which make the lines when nothing was pasted. */
     segments?: { text: string; start: number; end: number }[];
+    /** With nothing pasted: the words a text model wrote down, which are the lyrics then. */
+    text?: string | null;
     language: string | null;
     model: string;
     /** ARPAbet for each lyric word the dictionary knows, keyed by the normalised word. */

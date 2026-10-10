@@ -181,15 +181,33 @@ export function lyricsFromTranscript(words: HeardWord[], segments: HeardWord[] =
  * with a handful of filler words repeated across the song; laying those down would have the
  * faces mouth nonsense. Six different words and six words a minute at least.
  */
-export function heardSinging(words: readonly HeardWord[], durationMs: number): boolean {
-  const distinct = new Set(words.map((w) => normaliseWord(w.text)).filter(Boolean)).size;
-  return distinct >= 6 && words.length / Math.max(durationMs / 60_000, 0.5) >= 6;
+export function heardSinging(words: readonly HeardWord[], durationMs: number, text?: string | null): boolean {
+  // The written-down words when a text model listened: they are the lyrics then.
+  const said = text ? text.split(/\s+/) : words.map((w) => w.text);
+  const distinct = new Set(said.map(normaliseWord).filter(Boolean)).size;
+  return distinct >= 6 && said.length / Math.max(durationMs / 60_000, 0.5) >= 6;
+}
+
+/**
+ * Lines from a written-down transcript, which arrives as running text: a line per sentence or
+ * clause, and none longer than ten words.
+ */
+export function linesFromText(text: string): string {
+  return text
+    .split(/(?<=[.!?;:])\s+|\n+/)
+    .flatMap((line) => {
+      const words = line.trim().split(/\s+/).filter(Boolean);
+      const out: string[] = [];
+      for (let i = 0; i < words.length; i += 10) out.push(words.slice(i, i + 10).join(" "));
+      return out;
+    })
+    .join("\n");
 }
 
 /** The phrase, word and phoneme tracks for a finished timing, pasted lyrics or not. */
 export function lyricTracksFor(name: string, record: LyricAlignmentRecord, durationMs?: number): { alignment: Alignment; tracks: TimingTrack[] } | null {
   if (!record.result) return null;
-  const lyrics = record.lyrics ?? lyricsFromTranscript(record.result.words, record.result.segments);
+  const lyrics = record.lyrics ?? (record.result.text ? linesFromText(record.result.text) : lyricsFromTranscript(record.result.words, record.result.segments));
   const alignment = alignLyrics(lyrics, record.result.words, durationMs);
   return { alignment, tracks: lyricTimingTracks(name, alignment, record.result.pronunciations) };
 }

@@ -137,7 +137,7 @@ async function timeLyricsFromSong(sequenceId: number): Promise<void> {
       const record = await api.latestLyricAlignment(sequenceId);
       if (record?.status === "failed") throw new Error(record.error ?? "the listen failed");
       if (record?.status === "done") {
-        if (record.result && !heardSinging(record.result.words, store.sequence?.duration_ms ?? 0)) throw new Error("no singing was heard in this song");
+        if (record.result && !heardSinging(record.result.words, store.sequence?.duration_ms ?? 0, record.result.text)) throw new Error("no singing was heard in this song");
         const made = lyricTracksFor("Lyrics", record, store.sequence?.duration_ms);
         for (const track of made?.tracks ?? []) store.replaceTimingTrack(track);
         return;

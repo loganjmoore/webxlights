@@ -22,10 +22,13 @@ class LyricAligner
     public const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 
     /**
-     * Without lyrics there is no hint, and the segments (the service's own phrases) are what the
-     * browser breaks the heard words into lines by.
+     * Without lyrics, two listens when LYRICS_TEXT_MODEL is set: a newer transcription model
+     * writes down the words (it hears singing better than whisper-1 but gives no word times), and
+     * whisper-1, hinted with them, gives the times. The browser lines the first up with the
+     * second, as it does pasted lyrics. Without a text model, or if that listen fails, whisper-1's
+     * own words and segments (its phrases, which become the lines) are all there is.
      *
-     * @return array{words: list<array{text: string, start: float, end: float}>, segments: list<array{text: string, start: float, end: float}>, language: ?string, model: string}
+     * @return array{words: list<array{text: string, start: float, end: float}>, segments: list<array{text: string, start: float, end: float}>, text: ?string, language: ?string, model: string}
      */
     public function transcribe(string $audioPath, string $filename, ?string $lyrics): array
     {
@@ -38,6 +41,12 @@ class LyricAligner
             throw new RuntimeException('The audio is larger than 25MB. Export a smaller MP3 (128kbps is plenty) and upload that.');
         }
         $model = config('services.lyrics.model') ?: 'whisper-1';
+        $text = null;
+        if (($lyrics === null || trim($lyrics) === '') && ($textModel = config('services.lyrics.text_model'))) {
+            $heard = $this->post($key, $audioPath, $filename, [['name' => 'model', 'contents' => $textModel], ['name' => 'response_format', 'contents' => 'json']]);
+            $text = $heard->successful() ? trim((string) $heard->json('text')) : null;
+            $lyrics = $text ?: null;
+        }
         // Multipart parts rather than a keyed array: the granularity field repeats.
         $fields = [
             ['name' => 'model', 'contents' => $model],
@@ -50,11 +59,7 @@ class LyricAligner
             // couple of hundred tokens, so the first lines carry the most useful signal.
             $fields[] = ['name' => 'prompt', 'contents' => mb_substr(preg_replace('/\s+/', ' ', $lyrics) ?? '', 0, 800)];
         }
-        $response = Http::timeout(600)
-            ->withToken($key)
-            ->acceptJson()
-            ->attach('file', file_get_contents($audioPath), $filename)
-            ->post(rtrim(config('services.lyrics.base_url'), '/').'/audio/transcriptions', $fields);
+        $response = $this->post($key, $audioPath, $filename, $fields);
         if (! $response->successful()) {
             $why = $response->json('error.message') ?: "HTTP {$response->status()}";
             throw new RuntimeException("The transcription service refused the audio: {$why}");
@@ -74,7 +79,16 @@ class LyricAligner
             $segments[] = ['text' => trim((string) $s['text']), 'start' => (float) $s['start'], 'end' => (float) $s['end']];
         }
 
-        return ['words' => $words, 'segments' => $segments, 'language' => $response->json('language'), 'model' => $model];
+        return ['words' => $words, 'segments' => $segments, 'text' => $text ?: null, 'language' => $response->json('language'), 'model' => $text ? config('services.lyrics.text_model')." + {$model}" : $model];
+    }
+
+    private function post(string $key, string $audioPath, string $filename, array $fields): \Illuminate\Http\Client\Response
+    {
+        return Http::timeout(600)
+            ->withToken($key)
+            ->acceptJson()
+            ->attach('file', file_get_contents($audioPath), $filename)
+            ->post(rtrim(config('services.lyrics.base_url'), '/').'/audio/transcriptions', $fields);
     }
 
     /**

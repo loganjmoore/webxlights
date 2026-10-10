@@ -69,7 +69,7 @@ class LyricAlignmentTest extends TestCase
 
     public function test_with_nothing_pasted_the_words_heard_are_the_lyrics(): void
     {
-        config(['services.lyrics.key' => 'test-key', 'services.lyrics.base_url' => 'https://stt.example/v1']);
+        config(['services.lyrics.key' => 'test-key', 'services.lyrics.base_url' => 'https://stt.example/v1', 'services.lyrics.text_model' => null]);
         Http::fake([
             'stt.example/v1/audio/transcriptions' => Http::response([
                 'language' => 'english',
@@ -98,6 +98,51 @@ class LyricAlignmentTest extends TestCase
             // No hint without lyrics, and both word and segment timestamps.
             return ! $names->contains('prompt') && $names->filter(fn ($n) => $n === 'timestamp_granularities[]')->count() === 2;
         });
+    }
+
+    public function test_with_nothing_pasted_a_text_model_writes_the_words_and_whisper_times_them(): void
+    {
+        config(['services.lyrics.key' => 'test-key', 'services.lyrics.base_url' => 'https://stt.example/v1', 'services.lyrics.text_model' => 'gpt-transcribe']);
+        $models = [];
+        Http::fake(function ($request) use (&$models) {
+            $model = collect($request->data())->firstWhere('name', 'model')['contents'];
+            $models[] = $model;
+
+            return $model === 'gpt-transcribe'
+                ? Http::response(['text' => 'Over the hills the little sleigh goes by.'])
+                : Http::response(['language' => 'english', 'words' => [['word' => 'Over', 'start' => 1.0, 'end' => 1.3], ['word' => 'the', 'start' => 1.3, 'end' => 1.4], ['word' => 'hill', 'start' => 1.4, 'end' => 1.9]], 'segments' => []]);
+        });
+        $user = User::factory()->create();
+        $sequence = $this->sequenceWithAudio($user);
+
+        $this->actingAs($user)->postJson("/api/v1/sequences/{$sequence->id}/lyrics", [])->assertStatus(202);
+
+        $this->assertSame(['gpt-transcribe', 'whisper-1'], $models);
+        // Whisper was hinted with the written-down words, which come back as the lyrics, looked
+        // up in the dictionary word by word.
+        Http::assertSent(fn ($request) => collect($request->data())->firstWhere('name', 'model')['contents'] === 'whisper-1'
+            && collect($request->data())->firstWhere('name', 'prompt')['contents'] === 'Over the hills the little sleigh goes by.');
+        $this->actingAs($user)->getJson("/api/v1/sequences/{$sequence->id}/lyrics")->assertOk()
+            ->assertJsonPath('result.text', 'Over the hills the little sleigh goes by.')
+            ->assertJsonPath('result.model', 'gpt-transcribe + whisper-1')
+            ->assertJsonPath('result.pronunciations.sleigh', ['S', 'L', 'EY1']);
+    }
+
+    public function test_when_the_text_model_fails_whisper_listens_alone(): void
+    {
+        config(['services.lyrics.key' => 'test-key', 'services.lyrics.base_url' => 'https://stt.example/v1', 'services.lyrics.text_model' => 'gpt-transcribe']);
+        Http::fake(function ($request) {
+            return collect($request->data())->firstWhere('name', 'model')['contents'] === 'gpt-transcribe'
+                ? Http::response(['error' => ['message' => 'overloaded']], 503)
+                : Http::response(['language' => 'english', 'words' => [['word' => 'Snow', 'start' => 1.0, 'end' => 1.5]], 'segments' => []]);
+        });
+        $user = User::factory()->create();
+        $sequence = $this->sequenceWithAudio($user);
+
+        $this->actingAs($user)->postJson("/api/v1/sequences/{$sequence->id}/lyrics", [])->assertStatus(202);
+
+        $this->actingAs($user)->getJson("/api/v1/sequences/{$sequence->id}/lyrics")->assertOk()
+            ->assertJsonPath('status', 'done')->assertJsonPath('result.text', null)->assertJsonPath('result.model', 'whisper-1');
     }
 
     public function test_without_audio_there_is_nothing_to_listen_to(): void

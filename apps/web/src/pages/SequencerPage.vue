@@ -272,7 +272,7 @@ const lyricsMessage = ref("");
 let lyricsPoll: ReturnType<typeof setTimeout> | undefined;
 
 function applyLyricAlignment(record: LyricAlignmentRecord): void {
-  if (record.lyrics === null && record.result && !heardSinging(record.result.words, store.sequence?.duration_ms ?? 0)) {
+  if (record.lyrics === null && record.result && !heardSinging(record.result.words, store.sequence?.duration_ms ?? 0, record.result.text)) {
     lyricsMessage.value = "No singing was heard in this song, so there are no lyrics to time. If it has words, paste them and try again.";
     return;
   }

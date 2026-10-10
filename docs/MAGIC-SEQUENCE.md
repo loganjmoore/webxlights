@@ -1129,6 +1129,25 @@ size: more lit props and the holds are more effects, up to twice the corpus's p7
 classic and two and a half times in show, so a mood sequence of a 2-4 minute song is now
 300-750KB of JSON against the 500KB autosave target (it was already near it).
 
+### Better lyrics: two listens (2026-10-10)
+
+Logan asked for better lyrics from the song than whisper-1 gives. Claude takes no audio, and of
+OpenAI's transcription models only whisper-1 returns word times: a real call to `gpt-transcribe`
+with `verbose_json` was refused ("Use 'json' or 'text' instead"), and `gpt-4o-transcribe` has the
+same limit. The newer models are the better listeners by OpenAI's account (no independent
+measurement on singing was found; Jam-ALT puts whisper at about 36% word error on lyrics), and the
+aligner already treats pasted lyrics as the truth and whisper's words as the clock. So with
+nothing pasted there are now two listens: `LYRICS_TEXT_MODEL` (`gpt-transcribe` by default)
+writes the words down, whisper-1 is hinted with them and gives the times, and the browser lines
+the first up with the second as it does pasted lyrics, a line per sentence or clause of at most
+ten words. If the first listen fails, whisper-1 listens alone as before. About 4 cents a
+four-minute song for both.
+
+Not measured yet: how much better the words are on a sung recording. The three test songs are all
+instrumental (on Silent Night whisper-1 returned 34 filler words, gpt-transcribe none,
+gpt-4o-transcribe five), so a vocal recording is needed to score it. Vocal isolation before
+listening (Demucs) was left out: Jam-ALT found it made whisper worse on most languages.
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)

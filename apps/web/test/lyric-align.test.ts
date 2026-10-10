@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignLyrics, lyricTimingTracks, normaliseWord, shapesForArpabet, lyricsFromTranscript, lyricTracksFor } from "../src/lib/lyricAlign";
+import { alignLyrics, heardSinging, linesFromText, lyricTimingTracks, normaliseWord, shapesForArpabet, lyricsFromTranscript, lyricTracksFor } from "../src/lib/lyricAlign";
 import { xtimingXml } from "../src/lib/xtimingExport";
 
 const heard = (text: string, start: number, end: number) => ({ text, start, end });
@@ -111,5 +111,27 @@ describe("lyrics heard rather than pasted", () => {
     expect(made.alignment.heard).toBe(heard.length);
     expect(made.alignment.phrases.map((p) => [p.label, p.startMs, p.endMs])).toEqual([["Dashing through the snow,", 1000, 2600], ["In a sleigh", 4000, 5000]]);
     expect(made.tracks.map((t) => t.name)).toEqual(["Lyrics", "Lyrics — Words", "Lyrics — Phonemes"]);
+  });
+});
+
+describe("lyrics a text model wrote down", () => {
+  it("makes a line of each sentence, none longer than ten words", () => {
+    expect(linesFromText("Over the hills the little sleigh goes by. The lanterns swing and the bells are ringing all along the lane tonight, oh")).toBe(
+      "Over the hills the little sleigh goes by.\nThe lanterns swing and the bells are ringing all along\nthe lane tonight, oh",
+    );
+  });
+
+  it("are the lyrics, timed by whisper's clock", () => {
+    const words = [
+      { text: "Over", start: 1, end: 1.3 }, { text: "the", start: 1.3, end: 1.4 }, { text: "hill", start: 1.4, end: 1.9 },
+      { text: "sleigh", start: 2.4, end: 2.9 }, { text: "goes", start: 3, end: 3.3 }, { text: "by", start: 3.3, end: 3.8 },
+    ];
+    const record = { id: 1, status: "done" as const, lyrics: null, error: null, created_at: null, result: { words, text: "Over the hills the sleigh goes by.", language: "english", model: "gpt-transcribe + whisper-1", pronunciations: {} } };
+    const made = lyricTracksFor("Lyrics", record, 10_000)!;
+    // The text's words, not whisper's ("hills", not "hill"), each heard one on whisper's time.
+    expect(made.alignment.words.map((w) => w.label)).toEqual(["Over", "the", "hills", "the", "sleigh", "goes", "by."]);
+    expect(made.alignment.words.find((w) => w.label === "sleigh")!.startMs).toBe(2400);
+    expect(heardSinging(words, 60_000, "Over the hills the sleigh goes by. Over the hills the sleigh goes by.")).toBe(true);
+    expect(heardSinging(words, 120_000, "Music.")).toBe(false);
   });
 });
