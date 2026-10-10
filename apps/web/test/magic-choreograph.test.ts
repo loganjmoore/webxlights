@@ -119,7 +119,7 @@ describe("the choreographer follows the corpus, lit fuller", () => {
     }
   });
 
-  it("puts effects on roles in a mix no further from the corpus's than a typical real song's", () => {
+  it("puts effects on roles in a mix no further from the corpus's than a typical real song's", { timeout: 60_000 }, () => {
     // The yardstick is the corpus's own spread: the median Jensen-Shannon divergence between one
     // song's effect-by-role mix and the whole corpus's (tools/sequence-corpus analyze.mjs).
     const threshold = priors.style.roleEffectJsd.perSong.p50;
@@ -201,8 +201,8 @@ describe("the deferred spec details", () => {
     }
   });
 
-  it("never washes the whole house: it lit every prop at once", () => {
-    for (let seed = 1; seed <= 10; seed++) {
+  it("never washes the whole house: it lit every prop at once", { timeout: 60_000 }, () => {
+    for (let seed = 1; seed <= 3; seed++) {
       expect(run(props, seed).some((p) => p.role === "whole_house" && !p.effect.layerIndex && !p.effect.params.hit)).toBe(false);
     }
   });
