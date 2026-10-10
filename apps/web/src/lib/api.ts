@@ -297,6 +297,16 @@ export interface SequenceRow {
   effects: SequenceEffect[];
 }
 
+/** A picture drawn for a lyric: shared by everyone who asks for the same subject. */
+export interface MagicPictureRecord {
+  id: number | null;
+  subject: string;
+  /** refused: names something owned, or not a picture; limit: this month's new drawings are used. */
+  status: "queued" | "running" | "done" | "failed" | "refused" | "limit";
+  error: string | null;
+  url: string | null;
+}
+
 /** One automatic lyric timing: what the server heard in the song, once it has listened. */
 export interface LyricAlignmentRecord {
   id: number;
@@ -585,6 +595,16 @@ export const api = {
       body: JSON.stringify(payload),
       headers: keyHeaders(credentials),
     }),
+
+  // Pictures an image model draws for what the lyrics name: ask, poll, fetch the drawing.
+  magicPictures: (subjects: string[]) =>
+    request<{ pictures: MagicPictureRecord[]; monthly_limit: number; used_this_month: number }>("/v1/magic/pictures", { method: "POST", body: JSON.stringify({ subjects }) }),
+  magicPictureStatus: (ids: number[]) => request<{ pictures: MagicPictureRecord[] }>(`/v1/magic/pictures?ids=${ids.join(",")}`),
+  async fetchMagicPicture(url: string): Promise<Blob> {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    return res.blob();
+  },
 
   // Automatic lyric timing: paste the lyrics (or not), poll until the server has listened to the song.
   alignLyrics: (sequenceId: number, lyrics?: string) =>

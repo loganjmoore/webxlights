@@ -1053,6 +1053,43 @@ bytes each; `toRenderableEffects` puts the frames in for the preview, the export
 score alike. The effect panel shows which one it is and offers the library beside a file, Files
 and drawing.
 
+### Generated pictures (2026-10-09)
+
+Logan wanted real image generation for what the library has no drawing of, and added an OpenAI
+key (`OPENAI_API_KEY` on the web service). Claude's API takes no audio and draws no images, so the
+same key serves the lyric listening (whisper-1) and the drawing (gpt-image-2).
+
+**The director picks.** When the song has lyric timing, the AI director is sent the sung lines by
+index and the sprite ids, and its plan gains `pictures`: up to 12 lines, each with a subject in at
+most eight plain words ("boots on a snowy roof") and the id of a sprite that shows it, or "".
+The server keeps only real lines, once each, library ids the browser sent, and subjects the
+picture maker will draw. Without the AI director the lyrics' own words pick from the library as
+before.
+
+**The server draws** (`PictureMaker`, `MagicPictureController`, `DrawMagicPictures`). A subject is
+cleaned (lower case, plain words, 80 characters at most) and refused if it names an owned
+character, brand or real person ("Rudolph", "Frosty", "coca-cola" and about fifty more) or reads as
+anything but a picture (the direction screen). The prompt asks for one bold flat cartoon subject
+on pure black, no text, an original design. Measured on the first real call: 11.8 s, 196 output
+image tokens. That call also showed the model gives "a reindeer" a glowing red nose unprompted,
+the protected look of a famous one, so a reindeer or deer is now asked for with a plain dark
+brown nose and a snowman with a carrot nose and scarf and no pipe (`docs/magic-sequence/drawn-picture.png`,
+the second call, full size and shrunk to 48x48). Drawings run side by side after the response,
+like the lyric listening, and the browser polls. Each is kept on the web disk under its subject's
+key for everyone: asking again for something already drawn is free, and only a new drawing counts
+against `MAGIC_PICTURES_MONTHLY_LIMIT` (40 a month by default), refunded when it fails.
+
+**The browser keeps it in the effect.** The drawing is shrunk to 64 pixels and reduced to 63
+colours with near-black as off, and packed into one string param (`pictureData`, "pd1|w|h|palette|indices",
+about 6KB) that `toRenderableEffects` opens for the preview, the export and the fit score alike, so
+a sequence never has to fetch a picture to render. A drawing travels like a sprite that travels
+when its subject names one (a reindeer runs, a sleigh flies) and bounces otherwise.
+
+**No singing, no lyrics.** The first real listen on production was the Jingle Bells test
+recording, a band with no voice: Whisper still answered, with 18 filler words over 2:11. A listen
+with nothing pasted now needs six different words and six words a minute before its tracks are
+laid down; otherwise Auto lyrics and Magic say no singing was heard.
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)

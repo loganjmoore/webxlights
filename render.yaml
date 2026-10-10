@@ -66,7 +66,11 @@ services:
       # are not counted against it.
       - key: SHADER_MONTHLY_LIMIT
         value: "100"
-      # Automatic lyric timing (OpenAI whisper-1 word timestamps). Set the key in the dashboard.
+      # Automatic lyric timing (OpenAI whisper-1 word timestamps) and Magic Sequence's drawn
+      # pictures (gpt-image-2) both read OPENAI_API_KEY; LYRICS_API_KEY / PICTURES_API_KEY override
+      # it per feature. Set keys in the dashboard.
+      - key: OPENAI_API_KEY
+        sync: false
       - key: LYRICS_API_KEY
         sync: false
       - key: LYRICS_MONTHLY_LIMIT

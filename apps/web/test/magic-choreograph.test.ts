@@ -14,6 +14,7 @@ import { magicBody } from "../src/lib/magic/apply";
 import { createHouseRenderer } from "../src/lib/fseqExport";
 import { syntheticSong } from "./fixtures/syntheticSong";
 import { metrics } from "./fixtures/magicMetrics";
+import { encodePictureData } from "../src/lib/pictureData";
 
 const layout = JSON.parse(readFileSync(fileURLToPath(new URL("./fixtures/magic-layout.json", import.meta.url)), "utf-8")) as { models: ModelRecord[]; groups: ModelGroupRecord[] };
 const props = propMap(layout.models, layout.groups);
@@ -456,6 +457,43 @@ describe("pictures from the lyrics", () => {
     const frameA = at(pictures[0]!.effect.startMs + 1000), frameB = at(pictures[0]!.effect.startMs + 1080);
     expect(frameA.some((c) => c.r + c.g + c.b > 0)).toBe(true);
     expect(frameA.map((c) => `${c.r},${c.g},${c.b}`).join()).not.toBe(frameB.map((c) => `${c.r},${c.g},${c.b}`).join());
+  });
+});
+
+describe("pictures the director picks", () => {
+  it("shows its library drawing, or the one an image model drew, and skips a subject nobody drew", () => {
+    const song = syntheticSong(120);
+    const lyrics = [
+      { label: "Over the hill the sleigh goes by", startMs: 20_000, endMs: 22_000 },
+      { label: "A fox is watching from the snow", startMs: 26_000, endMs: 28_000 },
+      { label: "The lanterns swing along the lane", startMs: 32_000, endMs: 34_000 },
+    ];
+    // A red square, packed the way a drawing comes back from the server.
+    const red = encodePictureData(4, 4, Array.from({ length: 64 }, (_, i) => [255, 0, 0, 255][i % 4]!));
+    const rules = rulesDirector({ song, props, feel: "auto", seed: 7, style: "mood" });
+    const plan = { ...rules, pictures: [
+      { line: 0, subject: "a sleigh over a hill", library: "sleigh" },
+      { line: 1, subject: "a fox in the snow", library: "" },
+      { line: 2, subject: "lanterns on a lane", library: "" },
+    ] };
+    const placements = choreograph(song, props, plan, { feel: feelSpec("auto", song), frameMs: 25, lyrics, drawn: new Map([["a fox in the snow", red]]) });
+    const matrix = props.find((p) => p.role === "matrix")!;
+    const pictures = placements.filter((p) => p.key === matrix.key && (p.effect.params.picture || p.effect.params.pictureData));
+    expect(pictures.map((p) => p.effect.params.picture ?? "drawn")).toEqual(["lib:sleigh", "drawn"]);
+    // A fox moves like nothing in the library, so it bounces.
+    expect(pictures[1]!.effect.params.movement).toBe("bounce");
+
+    const body = magicBody({ rows: [], timingTracks: [] }, placements, song, "replace", (() => { let n = 0; return () => `e${n++}`; })()).body;
+    const house = createHouseRenderer(layout.models, body, 25, undefined, layout.groups);
+    const lit = house.renderAt(pictures[1]!.effect.startMs + 600)[house.models.findIndex((m) => `model:${m.id}` === matrix.key)]!.filter((c) => c.r > 200 && c.g < 40 && c.b < 40);
+    expect(lit.length).toBeGreaterThan(20);
+  });
+
+  it("keeps the director's pictures, minus a library id the browser doesn't have", () => {
+    const song = syntheticSong(120);
+    const rules = rulesDirector({ song, props, feel: "auto", seed: 7 });
+    const plan = completePlan({ pictures: [{ line: 0, subject: "a sleigh", library: "sleigh" }, { line: 1, subject: "a lighthouse", library: "lighthouse" }] }, rules, ["matrix"]);
+    expect(plan.pictures).toEqual([{ line: 0, subject: "a sleigh", library: "sleigh" }, { line: 1, subject: "a lighthouse", library: "" }]);
   });
 });
 

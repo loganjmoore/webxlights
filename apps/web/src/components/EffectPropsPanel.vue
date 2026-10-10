@@ -120,6 +120,7 @@ function setImage(key: string, image: PictureImage): void {
   if (!props.effect) return;
   const params = { ...props.effect.params, [key]: image };
   delete params.picture;
+  delete params.pictureData;
   emit("update", params);
 }
 function pickFromLibrary(key: string, e: Event): void {
@@ -129,6 +130,7 @@ function pickFromLibrary(key: string, e: Event): void {
   if (!props.effect || !sprite) return;
   const params: Record<string, EffectParamValue> = { ...props.effect.params, picture: `lib:${sprite.id}`, fps: sprite.fps };
   delete params[key];
+  delete params.pictureData;
   emit("update", params);
 }
 const libraryPicture = computed(() => {
@@ -897,6 +899,7 @@ function curveable(p: EffectParamSpec): boolean {
         -->
         <template v-else-if="p.type === 'image'">
           <span v-if="libraryPicture" class="library-picture">{{ libraryPicture.label }} (library)</span>
+          <span v-else-if="typeof effect.params.pictureData === 'string'" class="library-picture">Drawn for the lyrics</span>
           <input type="file" accept="image/*" @change="pickImage(p.key, $event)" />
           <select aria-label="A picture from the library" @change="pickFromLibrary(p.key, $event)">
             <option value="">From the library…</option>

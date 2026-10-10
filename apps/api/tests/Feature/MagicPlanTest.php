@@ -175,6 +175,29 @@ class MagicPlanTest extends TestCase
         $this->assertCount(1, $fake->calls);
     }
 
+    public function test_the_sung_lines_go_to_the_model_by_index_and_its_pictures_come_back_checked(): void
+    {
+        $fake = $this->fakeDriver($this->wire(['pictures' => [
+            ['line' => 1, 'subject' => 'a fox in the snow', 'library' => ''],
+            ['line' => 0, 'subject' => 'a sleigh over the hills', 'library' => 'sleigh'],
+            ['line' => 5, 'subject' => 'a line that is not there', 'library' => ''],
+        ]]));
+        $user = User::factory()->create();
+
+        $response = $this->plan($user, $this->sequenceFor($user), $this->payload([
+            'lyrics' => ['Over the hills the sleigh goes by', 'A fox is watching in the snow'],
+            'pictureLibrary' => ['sleigh', 'reindeer'],
+        ]))->assertOk();
+
+        $brief = json_decode($fake->calls[0]['user'], true);
+        $this->assertSame([['index' => 0, 'text' => 'Over the hills the sleigh goes by'], ['index' => 1, 'text' => 'A fox is watching in the snow']], $brief['lyrics']);
+        $this->assertSame(['sleigh', 'reindeer'], $brief['pictureLibrary']);
+        $response->assertJsonPath('plan.pictures', [
+            ['line' => 1, 'subject' => 'a fox in the snow', 'library' => ''],
+            ['line' => 0, 'subject' => 'a sleigh over the hills', 'library' => 'sleigh'],
+        ]);
+    }
+
     public function test_the_model_is_given_the_brief_the_whitelist_for_these_roles_and_a_strict_schema(): void
     {
         $fake = $this->fakeDriver($this->wire());
@@ -631,7 +654,7 @@ class MagicPlanTest extends TestCase
 
     public function test_the_status_reports_availability_model_and_allowance(): void
     {
-        config(['services.shader.key' => 'sk-ant-server', 'services.magic.daily_limit' => 5, 'services.magic.monthly_limit' => 40]);
+        config(['services.shader.key' => 'sk-ant-server', 'services.magic.daily_limit' => 5, 'services.magic.monthly_limit' => 40, 'services.pictures.key' => null, 'services.pictures.monthly_limit' => 40]);
         $this->fakeDriver($this->wire());
         $user = User::factory()->create();
         $sequence = $this->sequenceFor($user);
@@ -648,6 +671,7 @@ class MagicPlanTest extends TestCase
                 'used_today' => 2,
                 'monthly_limit' => 40,
                 'used_this_month' => 2,
+                'pictures' => ['available' => false, 'monthly_limit' => 40],
             ]);
     }
 

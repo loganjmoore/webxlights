@@ -12,6 +12,7 @@ use App\Http\Controllers\ProjectMemberController;
 use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\LyricAlignmentController;
 use App\Http\Controllers\MagicFeedbackController;
+use App\Http\Controllers\MagicPictureController;
 use App\Http\Controllers\MagicPlanController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\SequenceController;
@@ -63,6 +64,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('sequences/{sequence}/magic-plan', [MagicPlanController::class, 'plan'])->middleware('throttle:10,1');
         Route::post('sequences/{sequence}/magic-feedback', [MagicFeedbackController::class, 'store'])->middleware('throttle:10,1');
         Route::get('magic/status', [MagicPlanController::class, 'status']);
+        // Pictures an image model draws for what the lyrics name: new drawings are paid and
+        // capped, ones already drawn are shared and free. The image itself is shared content.
+        Route::post('magic/pictures', [MagicPictureController::class, 'store'])->middleware('throttle:10,1');
+        Route::get('magic/pictures', [MagicPictureController::class, 'index']);
+        Route::get('magic/pictures/{picture}/image', [MagicPictureController::class, 'image']);
 
         Route::apiResource('projects', ProjectController::class)->only(['index', 'store', 'show']);
         Route::get('projects/{project}/layouts', [LayoutController::class, 'index']);

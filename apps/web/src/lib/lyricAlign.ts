@@ -176,6 +176,16 @@ export function lyricsFromTranscript(words: HeardWord[], segments: HeardWord[] =
   return lines.map((l) => l.join(" ")).join("\n");
 }
 
+/**
+ * Whether a listen with nothing pasted heard singing. On an instrumental, Whisper still answers,
+ * with a handful of filler words repeated across the song; laying those down would have the
+ * faces mouth nonsense. Six different words and six words a minute at least.
+ */
+export function heardSinging(words: readonly HeardWord[], durationMs: number): boolean {
+  const distinct = new Set(words.map((w) => normaliseWord(w.text)).filter(Boolean)).size;
+  return distinct >= 6 && words.length / Math.max(durationMs / 60_000, 0.5) >= 6;
+}
+
 /** The phrase, word and phoneme tracks for a finished timing, pasted lyrics or not. */
 export function lyricTracksFor(name: string, record: LyricAlignmentRecord, durationMs?: number): { alignment: Alignment; tracks: TimingTrack[] } | null {
   if (!record.result) return null;

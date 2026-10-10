@@ -73,7 +73,11 @@ class PlanValidator
      * @param  int  $sectionCount  how many sections the song has
      * @return array{plan: array, dropped: string[]}
      */
-    public function validate(array $plan, array $allowed, int $sectionCount): array
+    /**
+     * @param  int  $lineCount  how many sung lines the request had (0: no pictures)
+     * @param  string[]  $library  the ids of the browser's ready drawings
+     */
+    public function validate(array $plan, array $allowed, int $sectionCount, int $lineCount = 0, array $library = []): array
     {
         $dropped = [];
         $out = [];
@@ -104,7 +108,47 @@ class PlanValidator
             $dropped[] = 'ending: not one of '.implode('|', self::ENDINGS);
         }
 
+        if ($lineCount > 0) {
+            $out['pictures'] = $this->pictures($plan['pictures'] ?? null, $lineCount, $library, $dropped);
+        }
+
         return ['plan' => $out, 'dropped' => $dropped];
+    }
+
+    private const MAX_PICTURES = 12;
+
+    /**
+     * The lyric pictures: a real line, once each, a subject the picture maker will draw (named
+     * characters and brands are refused there), and a library id the browser actually has.
+     */
+    private function pictures(mixed $pictures, int $lineCount, array $library, array &$dropped): array
+    {
+        $out = [];
+        $lines = [];
+        foreach (is_array($pictures) ? $pictures : [] as $i => $picture) {
+            $line = is_array($picture) ? ($picture['line'] ?? null) : null;
+            if (! is_int($line) || $line < 0 || $line >= $lineCount || isset($lines[$line])) {
+                $dropped[] = "pictures[{$i}]: not a line, or a line twice";
+
+                continue;
+            }
+            $subject = is_string($picture['subject'] ?? null) ? PictureMaker::subject($picture['subject']) : null;
+            if ($subject === null) {
+                $dropped[] = "pictures[{$i}]: subject refused";
+
+                continue;
+            }
+            $id = is_string($picture['library'] ?? null) && in_array($picture['library'], $library, true) ? $picture['library'] : '';
+            if (count($out) >= self::MAX_PICTURES) {
+                $dropped[] = 'pictures: more than '.self::MAX_PICTURES;
+
+                break;
+            }
+            $lines[$line] = true;
+            $out[] = ['line' => $line, 'subject' => $subject, 'library' => $id];
+        }
+
+        return $out;
     }
 
     private function palettes(mixed $palettes, array &$dropped): array

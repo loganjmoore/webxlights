@@ -19,6 +19,18 @@ return [
         'monthly_limit' => (int) env('LYRICS_MONTHLY_LIMIT', 20),
     ],
 
+    // Pictures for the matrix drawn by an image model, for what a lyric names that the sprite
+    // library has no drawing of (docs/MAGIC-SEQUENCE.md, "Generated pictures"). OpenAI's key, as
+    // for the lyric listening. A drawing is kept for everyone who asks for the same thing, so only
+    // new drawings count against the allowance. 0 means uncapped.
+    'pictures' => [
+        'key' => env('PICTURES_API_KEY', env('OPENAI_API_KEY')),
+        'base_url' => env('PICTURES_BASE_URL', 'https://api.openai.com/v1'),
+        'model' => env('PICTURES_MODEL', 'gpt-image-2'),
+        'quality' => env('PICTURES_QUALITY', 'low'),
+        'monthly_limit' => (int) env('MAGIC_PICTURES_MONTHLY_LIMIT', 40),
+    ],
+
     'shader' => [
         'provider' => env('SHADER_PROVIDER', 'anthropic'),
         // One key for whichever provider is selected. SHADER_API_KEY is the name to use;

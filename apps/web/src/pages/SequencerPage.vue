@@ -11,7 +11,7 @@ import { parseMidi, parsePapagayo, type ParsedMidi } from "@webxlights/formats";
 import { ALL_TRACKS, describeMidiImport, midiTrackChoices, timingTrackFromMidi } from "../lib/midiTiming";
 import { describePapagayoImport, tracksFromPapagayo } from "../lib/papagayoTiming";
 import { breakdownPhrases, breakdownWords, cellsOf, phonemesTrackName, wordsTrackName } from "../lib/lyricBreakdown";
-import { lyricTracksFor } from "../lib/lyricAlign";
+import { heardSinging, lyricTracksFor } from "../lib/lyricAlign";
 import { downloadXtiming } from "../lib/xtimingExport";
 import { effectIcon } from "../lib/effectIcons";
 import { filterRanked, isDefaultStrandName } from "../lib/listFilter";
@@ -272,6 +272,10 @@ const lyricsMessage = ref("");
 let lyricsPoll: ReturnType<typeof setTimeout> | undefined;
 
 function applyLyricAlignment(record: LyricAlignmentRecord): void {
+  if (record.lyrics === null && record.result && !heardSinging(record.result.words, store.sequence?.duration_ms ?? 0)) {
+    lyricsMessage.value = "No singing was heard in this song, so there are no lyrics to time. If it has words, paste them and try again.";
+    return;
+  }
   const made = lyricTracksFor(LYRICS_TRACK, record, store.sequence?.duration_ms);
   if (!made || !record.result) return;
   const { alignment, tracks } = made;
