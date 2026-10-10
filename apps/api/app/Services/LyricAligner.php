@@ -44,6 +44,8 @@ class LyricAligner
         $text = null;
         if (($lyrics === null || trim($lyrics) === '') && ($textModel = config('services.lyrics.text_model'))) {
             $heard = $this->post($key, $audioPath, $filename, [['name' => 'model', 'contents' => $textModel], ['name' => 'response_format', 'contents' => 'json']]);
+            // Null when that listen failed (whisper-1 then listens alone); "" when it heard no
+            // singing, which an instrumental gives: whisper-1 still answers there, with filler.
             $text = $heard->successful() ? trim((string) $heard->json('text')) : null;
             $lyrics = $text ?: null;
         }
@@ -79,7 +81,7 @@ class LyricAligner
             $segments[] = ['text' => trim((string) $s['text']), 'start' => (float) $s['start'], 'end' => (float) $s['end']];
         }
 
-        return ['words' => $words, 'segments' => $segments, 'text' => $text ?: null, 'language' => $response->json('language'), 'model' => $text ? config('services.lyrics.text_model')." + {$model}" : $model];
+        return ['words' => $words, 'segments' => $segments, 'text' => $text, 'language' => $response->json('language'), 'model' => $text !== null ? config('services.lyrics.text_model')." + {$model}" : $model];
     }
 
     private function post(string $key, string $audioPath, string $filename, array $fields): \Illuminate\Http\Client\Response
