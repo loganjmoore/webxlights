@@ -41,7 +41,7 @@ export interface ChoreographOptions {
   /**
    * When the song has lyric timing: its phoneme track, and the models that have a face
    * definition ("model:12" -> definition name). Their singing faces, and singing-face sub-models
-   * on them, sing the words all song.
+   * on them, sing the words all song; any other prop with one (a singing tree) sings each line.
    */
   singing?: { track: string; faces: ReadonlyMap<string, string> };
   /** The sung lines, timed (the lyric phrase track): a line that names a sprite shows it. */
@@ -807,6 +807,37 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
       drafts.push({ unit, layer: 0, startMs: 0, endMs: song.durationMs, name: "Faces", params, palette: [] });
     }
   }
+
+  // Any other prop with a face definition is a singing tree (a mega or mini tree with a face drawn
+  // on its lights; its name rarely says so, so its role is a tree). It sings each sung line: a dim
+  // wash of the section's colour hides its part in the show, and its face sings over that, from
+  // the beat before the line to the beat after it. Between lines it plays its part, which runs on
+  // underneath, so a shader doesn't restart. When a role group carries the tree, the face goes on
+  // the tree's own row, which renders over the group's.
+  const facesByKey = options.singing?.faces ?? new Map<string, string>();
+  const sungLines = (options.lyrics ?? []).filter((l) => l.label.trim() && l.endMs > l.startMs).sort((a, b) => a.startMs - b.startMs);
+  const spans: [number, number][] = [];
+  for (const line of sungLines) {
+    const from = beatTime(Math.max(0, beatAtOrAfter(song.beats, line.startMs) - 1));
+    const to = Math.min(song.durationMs, beatTime(beatAtOrAfter(song.beats, line.endMs)));
+    const last = spans[spans.length - 1];
+    // Lines a bar or less apart are one breath: the face doesn't blink out between them.
+    if (last && from - last[1] <= song.beatsPerBar * beatMs) last[1] = Math.max(last[1], to);
+    else if (to > from) spans.push([from, to]);
+  }
+  if (!sungLines.length) spans.push([0, song.durationMs]);
+  [...facesByKey].forEach(([key, faceDefinition], i) => {
+    const prop = props.find((p) => p.key === key);
+    const id = Number(key.split(":")[1]);
+    if (!prop || prop.role === "singing_face" || singers.some((u) => u.elementType === "submodel" && u.elementId === id)) return;
+    const unit = allUnits.find((u) => u.prop.key === key) ?? { prop, elementType: "model" as const, elementId: id, order: allUnits.length + i };
+    for (const [from, to] of spans) {
+      const si = Math.max(0, song.sections.findIndex((sec) => from >= sec.startMs - 1 && from < sec.endMs - 1));
+      const lead = (plan.palettes[planOf(si).palette] ?? ["#ffffff"])[0]!;
+      drafts.push({ unit, layer: 2, startMs: from, endMs: to, name: "On", params: { ...defaultParamsFor("On"), startIntensity: 100, endIntensity: 100 }, palette: [dim(lead, 0.2)] });
+      drafts.push({ unit, layer: 3, startMs: from, endMs: to, name: "Faces", params: { ...defaultParamsFor("Faces"), faceDefinition, useTimingTrack: true, timingTrack: options.singing!.track, eyes: "Automatic" }, palette: ["#ffffff", "#ffffff", lead] });
+    }
+  });
 
   // Whole-house hits: where the plan asks and where the song jumps on a downbeat, rationed to the
   // corpus's p75 of about 1.5 a minute. Every prop takes it, on the accent layer.
