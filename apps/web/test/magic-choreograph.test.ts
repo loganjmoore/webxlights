@@ -72,16 +72,20 @@ describe("the choreographer's output is a valid sequence", () => {
   });
 });
 
-describe("the choreographer follows the corpus", () => {
-  it("lights at least 1.5x as much of the house in the loudest section as in the quietest", () => {
+describe("the choreographer follows the corpus, lit fuller", () => {
+  // Logan, 2026-10-10: most of the display lit most of the time, not all of it all of the time.
+  // The corpus lights 24-52% of the props; every section here lights at least half, the loudest
+  // more than the quietest, and the rise shows in brightness as well.
+  it("lights most of the house in every section, the loudest more than the quietest", () => {
     for (const { bpm, song, placements } of runs) {
       const lit = metrics(song, placements).litShare;
+      for (const [i, share] of lit.entries()) expect(share, `${bpm} BPM section ${i}`).toBeGreaterThanOrEqual(0.5);
       const byEnergy = song.sections.map((s, i) => ({ e: s.energy, lit: lit[i]! })).sort((a, b) => a.e - b.e);
-      expect(byEnergy[byEnergy.length - 1]!.lit / byEnergy[0]!.lit, `${bpm} BPM`).toBeGreaterThanOrEqual(1.5);
+      expect(byEnergy[byEnergy.length - 1]!.lit / byEnergy[0]!.lit, `${bpm} BPM`).toBeGreaterThanOrEqual(1.2);
     }
   });
 
-  it("keeps the heroes lit most of the song and every other role near its corpus coverage", () => {
+  it("keeps the heroes lit most of the song and every other role at least as lit as the corpus", () => {
     for (const { bpm, song, placements } of runs) {
       const { coverageByRole } = metrics(song, placements);
       const others: number[] = [];
@@ -90,15 +94,12 @@ describe("the choreographer follows the corpus", () => {
         else {
           const prior = priors.roles[role]!.coverage;
           expect(coverage, `${bpm} BPM ${role}`).toBeGreaterThanOrEqual(prior.p10!);
-          expect(coverage, `${bpm} BPM ${role}`).toBeLessThanOrEqual(prior.p90!);
           others.push(coverage / prior.p50);
         }
       }
-      // A lit role here covers its whole section, where the corpus's flicker on and off inside
-      // one: the house as a whole sits within a factor of 2.5 of the corpus's medians.
+      // Fuller than the corpus's median song, prop for prop.
       const mean = others.reduce((a, b) => a + b, 0) / others.length;
-      expect(mean, `${bpm} BPM`).toBeGreaterThan(0.5);
-      expect(mean, `${bpm} BPM`).toBeLessThan(2.5);
+      expect(mean, `${bpm} BPM`).toBeGreaterThan(1.2);
     }
   });
 
@@ -128,11 +129,13 @@ describe("the choreographer follows the corpus", () => {
     expect(mean).toBeLessThan(threshold);
   });
 
-  it("keeps the effect rate inside the corpus's interquartile range", () => {
+  it("keeps the effect rate within twice the corpus's p75", () => {
+    // More of the house lit, and a dim hold between a punctual effect's beats, is more effects
+    // than the corpus's median song places; twice its p75 is the ceiling.
     for (const { bpm, song, placements } of runs) {
       const { effectsPerMinute } = metrics(song, placements);
       expect(effectsPerMinute, `${bpm} BPM`).toBeGreaterThanOrEqual(priors.corpus.effectsPerMinute.p25);
-      expect(effectsPerMinute, `${bpm} BPM`).toBeLessThanOrEqual(priors.corpus.effectsPerMinute.p75);
+      expect(effectsPerMinute, `${bpm} BPM`).toBeLessThanOrEqual(2 * priors.corpus.effectsPerMinute.p75);
     }
   });
 });
@@ -198,22 +201,10 @@ describe("the deferred spec details", () => {
     }
   });
 
-  it("holds the floods on an Off backdrop while a whole-house background plays", () => {
-    let found = false;
-    for (let seed = 1; seed <= 30 && !found; seed++) {
-      const placements = run(props, seed);
-      for (const s of song.sections) {
-        const inside = (p: Placement) => p.effect.startMs >= s.startMs && p.effect.startMs < s.endMs;
-        const house = placements.some((p) => p.role === "whole_house" && !p.effect.layerIndex && inside(p));
-        const floods = placements.filter((p) => p.role === "flood" && !p.effect.layerIndex && inside(p));
-        if (!house) {
-          expect(floods.some((p) => p.effect.name === "Off"), `seed ${seed}`).toBe(false);
-          continue;
-        }
-        if (floods.length && floods.every((p) => p.effect.name === "Off")) found = true;
-      }
+  it("never washes the whole house: it lit every prop at once", () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      expect(run(props, seed).some((p) => p.role === "whole_house" && !p.effect.layerIndex && !p.effect.params.hit)).toBe(false);
     }
-    expect(found).toBe(true);
   });
 });
 
@@ -267,15 +258,15 @@ describe("the show style", () => {
     }
   });
 
-  it("lights only the outlines in quiet sections, dimmed, with no showpieces", () => {
+  it("lights most of the house in quiet sections, dimmed, with no showpieces", () => {
     for (const { bpm, song, plan, placements } of shows) {
       song.sections.forEach((section, si) => {
         // The bridge between two choruses is a breakdown, tested below.
         if (plan.sections[si]!.intensity >= SHOW_QUIET || section.label === "bridge") return;
         const base = placements.filter((p) => !p.effect.layerIndex && inSection(section)(p));
-        expect(base.length, `${bpm} BPM section ${si}`).toBeGreaterThan(0);
+        expect(new Set(base.map((p) => p.key)).size, `${bpm} BPM section ${si}`).toBeGreaterThanOrEqual(0.5 * new Set(placements.map((p) => p.key)).size);
         for (const p of base) {
-          expect(["outline", "window", "icicle"], `${bpm} BPM section ${si}: ${p.role}`).toContain(p.role);
+          expect(["Shader", "Pictures"], `${bpm} BPM section ${si}: ${p.role}`).not.toContain(p.effect.name);
           for (const c of p.effect.palette ?? []) expect(Math.max(...[1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)))).toBeLessThanOrEqual(128);
         }
       });
@@ -338,12 +329,13 @@ describe("the show style", () => {
 
   it("scores the same kinds of thing the corpus measures, a colour change a bar at most dearer", () => {
     for (const { bpm, song, placements } of shows) {
-      // A colour a bar is an effect per lit row per bar: up to twice the corpus's p75 on this
-      // 32-row layout, where the user's role groups would carry it in fewer rows.
-      expect(metrics(song, placements).effectsPerMinute, `${bpm} BPM`).toBeLessThanOrEqual(2 * priors.corpus.effectsPerMinute.p75);
+      // A colour a bar is an effect per lit row per bar, and most of the house is lit: up to two
+      // and a half times the corpus's p75 on this 32-row layout, where the user's role groups
+      // would carry it in fewer rows.
+      expect(metrics(song, placements).effectsPerMinute, `${bpm} BPM`).toBeLessThanOrEqual(2.5 * priors.corpus.effectsPerMinute.p75);
       const lit = metrics(song, placements).litShare;
       const byEnergy = song.sections.map((s, i) => ({ e: s.energy, lit: lit[i]! })).sort((a, b) => a.e - b.e);
-      expect(byEnergy[byEnergy.length - 1]!.lit / byEnergy[0]!.lit, `${bpm} BPM`).toBeGreaterThanOrEqual(3);
+      expect(byEnergy[byEnergy.length - 1]!.lit, `${bpm} BPM`).toBeGreaterThanOrEqual(byEnergy[0]!.lit);
     }
   });
 
@@ -581,19 +573,25 @@ describe("a plan for colour, fades, shaders and pictures", () => {
   const sectionOf = (song: ReturnType<typeof syntheticSong>, p: Placement) => song.sections.findIndex((s) => p.effect.startMs >= s.startMs - 1 && p.effect.startMs < s.endMs - 1);
 
   it("dresses every prop of a role alike for a section, in the section's palette", () => {
+    // Its colours at any brightness: a quiet section glows dimmer, and a hold between beats dimmer still.
+    const rgb = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    const full = (c: string) => { const v = rgb(c), k = 255 / Math.max(...v, 1); return v.map((x) => Math.round(x * k)); };
+    const near = (a: number[], b: number[]) => a.every((x, i) => Math.abs(x - b[i]!) <= 12);
     for (const { bpm, song, plan, placements } of withLibrary) {
       for (const [si, section] of song.sections.entries()) {
         const sp = plan.sections.find((s) => s.index === si)!;
         const palette = plan.palettes[sp.palette]!;
-        const byRole = new Map<string, Set<string>>();
+        const byRole = new Map<string, number[][]>();
         for (const p of placements) {
           if (sectionOf(song, p) !== si || p.effect.name === "Pictures" || p.effect.name === "Off") continue;
-          for (const c of p.effect.palette ?? []) expect(palette, `${bpm} BPM ${section.label} ${p.role}`).toContain(c);
+          for (const c of p.effect.palette ?? []) expect(palette.some((q) => near(full(c), full(q))), `${bpm} BPM ${section.label} ${p.role} ${c}`).toBe(true);
           if (p.effect.layerIndex) continue;
-          (byRole.get(p.role) ?? byRole.set(p.role, new Set()).get(p.role)!).add(String((p.effect.palette ?? [])[0]));
+          const leads = byRole.get(p.role) ?? byRole.set(p.role, []).get(p.role)!;
+          const lead = full(String((p.effect.palette ?? [])[0]));
+          if (!leads.some((l) => near(l, lead))) leads.push(lead);
         }
         // A role's lead colour is its pair: one colour held, or two swapped on the beat.
-        for (const [role, leads] of byRole) expect(leads.size, `${bpm} BPM section ${si} ${role}: ${[...leads]}`).toBeLessThanOrEqual(2);
+        for (const [role, leads] of byRole) expect(leads.length, `${bpm} BPM section ${si} ${role}: ${leads.join(" ")}`).toBeLessThanOrEqual(2);
       }
     }
   });

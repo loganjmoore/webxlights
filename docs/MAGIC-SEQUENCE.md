@@ -1090,6 +1090,45 @@ recording, a band with no voice: Whisper still answered, with 18 filler words ov
 with nothing pasted now needs six different words and six words a minute before its tracks are
 laid down; otherwise Auto lyrics and Magic say no singing was heard.
 
+### Most of the house lit (2026-10-10)
+
+Logan asked for every sequence to lean towards each prop being on, with colour and effects: most
+of the display lit most of the time, but not all of it all of the time. The corpus lights 24-52%
+of a house's props at any moment, and each style followed it. Measured by rendering every quarter
+second (a prop counts as lit when a tenth of its lights show), on the 32-model test layout:
+
+| Mean lit (fully lit) | Jingle Bells | Silent Night | Carol of the Bells | Synthetic 120 |
+|---|---|---|---|---|
+| classic, before | 25% (4%) | 33% (1%) | 33% (8%) | 25% (1%) |
+| classic, after | 61% (0%) | 61% (1%) | 65% (2%) | 67% (1%) |
+| show, before | 46% (9%) | 60% (31%) | 42% (35%) | 53% (46%) |
+| show, after | 57% (0%) | 64% (1%) | 59% (2%) | 61% (1%) |
+| mood, before | 56% (7%) | 63% (1%) | 28% (1%) | 46% (11%) |
+| mood, after | 75% (0%) | 74% (1%) | 62% (1%) | 67% (1%) |
+
+What changed, each measured on its own:
+- A section lights 60% of the house's props at its quietest and 90% at its busiest, counted in
+  props rather than rows (a group of four arches is four), and a role that would take a section
+  well past its share waits for one that wants it, so even the loudest leave some resting.
+- Brightness carries the music instead of darkness: quiet sections glow at half brightness and
+  the middle ones at 80%, in every style. The show style's quiet sections light most of the house
+  dimly rather than the outlines alone.
+- A punctual effect still pulses on its beat, but the rest of its slot holds the colour at 35%
+  rather than going dark, and a prop waiting its turn in a sweep holds it too. Filling the slot
+  with the effect itself instead cost the beat part of the fit score a third.
+- Fuller effects: a chase covers at least 40% of its prop (the corpus's median is a tenth) and a
+  twinkle a quarter of the lights (the default is 3%).
+- The pile-up rule (no more than 40% of rows starting at once) now only merges a re-trigger into
+  the effect before it on its row; a start with nothing before it stays. Dropping those left props
+  dark for a whole slot, a phrase on a slow song, which was most of what classic lost on Silent Night.
+- No whole-house wash. It lit every prop at once, and was most of the show style's fully lit time.
+
+Rests, breakdowns and the beat before a drop still go dark. Fit scores stay above every floor
+(best of three: Jingle Bells, Silent Night, Carol of the Bells in all three styles). The cost is
+size: more lit props and the holds are more effects, up to twice the corpus's p75 a minute in
+classic and two and a half times in show, so a mood sequence of a 2-4 minute song is now
+300-750KB of JSON against the 500KB autosave target (it was already near it).
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)
