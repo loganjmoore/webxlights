@@ -22,6 +22,12 @@ float ribbon(vec2 w, float t, float k) {
   // A wide soft falloff, not a line: a thin ribbon would be a flicker on a low-resolution prop.
   return 1.0 / (1.0 + 2.2 * s * s);
 }
+// The palette's own brightness: every highlight scales with it, so a palette dimmed for a quiet
+// section dims the whole picture rather than leaving white sheen at full strength.
+float paletteLevel() {
+  vec3 m = max(colorA.rgb, max(colorB.rgb, colorC.rgb));
+  return max(m.r, max(m.g, m.b));
+}
 void main() {
   vec2 uv = isf_FragNormCoord;
   bool isLine = RENDERSIZE.y < 2.0;
@@ -46,6 +52,6 @@ void main() {
   // layering that gives the light depth without adding detail a prop could not show.
   float fine = ribbon(w * 2.1 + vec2(3.7, 1.9), t, 1.0);
   float lum = (0.56 + 0.36 * max(ga, max(gb, gc))) * (0.85 + 0.25 * fine);
-  vec3 col = hue * lum + (0.5 + 0.5 * hue) * 0.22 * meet;
+  vec3 col = hue * lum + (0.5 * paletteLevel() + 0.5 * hue) * 0.22 * meet;
   gl_FragColor = vec4(min(col, 1.0), 1.0);
 }

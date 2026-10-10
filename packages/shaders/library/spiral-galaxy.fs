@@ -36,6 +36,12 @@ float fbm(vec2 p) {
 float luma(vec3 c) {
   return dot(c, vec3(0.299, 0.587, 0.114));
 }
+// The palette's own brightness: every highlight scales with it, so a palette dimmed for a quiet
+// section dims the whole picture rather than leaving white sheen at full strength.
+float paletteLevel() {
+  vec3 m = max(colorA.rgb, max(colorB.rgb, colorC.rgb));
+  return max(m.r, max(m.g, m.b));
+}
 void main() {
   vec2 uv = isf_FragNormCoord;
   bool isLine = RENDERSIZE.y < 2.0;
@@ -72,7 +78,7 @@ void main() {
   float lightest = luma(core);
   if (luma(colorB.rgb) > lightest) { core = colorB.rgb; lightest = luma(core); }
   if (luma(colorC.rgb) > lightest) { core = colorC.rgb; }
-  core = mix(core, vec3(1.0), 0.45);
+  core = mix(core, vec3(paletteLevel()), 0.45);
   col += core * (1.3 * exp(-r * r * 38.0) + 0.38 * exp(-r * 4.5));
   // Stars sit on the pixel grid, not in the galaxy: a star that crept across the bulbs would
   // jump from one to the next. One in eight cells of six pixels has one, held a pixel clear of
@@ -86,7 +92,7 @@ void main() {
     vec2 d = local - at;
     float rate = 0.2 + 0.1 * floor(hash21(cell + 5.3) * 5.0);
     float tw = 0.35 + 0.65 * (0.5 + 0.5 * sin(t * rate + hash21(cell + 2.9) * 6.2831853));
-    col += mix(vec3(1.0), colorC.rgb, 0.3) * exp(-dot(d, d) * 1.3) * tw;
+    col += mix(vec3(paletteLevel()), colorC.rgb, 0.3) * exp(-dot(d, d) * 1.3) * tw;
   }
   gl_FragColor = vec4(min(col, 1.0), 1.0);
 }

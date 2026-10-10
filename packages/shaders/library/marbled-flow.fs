@@ -34,6 +34,12 @@ float fbm(vec2 p) {
   }
   return sum / 0.875;
 }
+// The palette's own brightness: every highlight scales with it, so a palette dimmed for a quiet
+// section dims the whole picture rather than leaving white sheen at full strength.
+float paletteLevel() {
+  vec3 m = max(colorA.rgb, max(colorB.rgb, colorC.rgb));
+  return max(m.r, max(m.g, m.b));
+}
 void main() {
   vec2 uv = isf_FragNormCoord;
   bool isLine = RENDERSIZE.y < 2.0;
@@ -56,13 +62,14 @@ void main() {
   vec3 col = (colorA.rgb * wt.x + colorB.rgb * wt.y + colorC.rgb * wt.z) / (wt.x + wt.y + wt.z);
   // Where two colours meet the mix can sag toward grey or brown: lift it back toward the
   // palette's own brightness. Marbling is lit from inside, never dim.
+  float pl = paletteLevel();
   float m = max(col.r, max(col.g, col.b));
-  col *= mix(1.0, 0.76 / max(m, 0.2), 0.85);
+  col *= mix(1.0, 0.76 * pl / max(m, 0.2 * pl + 0.0001), 0.85);
   // A slow sheen across the folds gives the liquid depth, and the lightest streaks on its
   // crests keep the whole bed luminous.
   float sheen = 0.5 + 0.5 * sin(w.y * 2.3 + w.x * 1.1 + t * 0.2);
   // Soft pale veins where the folds crowd together.
   float vein = pow(0.5 + 0.5 * cos(ph * 1.5 + 0.9), 5.0);
-  col = col * (0.72 + 0.28 * sheen) + 0.1 * sheen * sheen + 0.12 * vein;
+  col = col * (0.72 + 0.28 * sheen) + pl * (0.1 * sheen * sheen + 0.12 * vein);
   gl_FragColor = vec4(min(col, 1.0), 1.0);
 }
