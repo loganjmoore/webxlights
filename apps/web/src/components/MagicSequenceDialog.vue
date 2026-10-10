@@ -123,8 +123,14 @@ const lyricLines = computed(() => {
   return lines.length ? lines : undefined;
 });
 const hasFaceDefinitions = computed(() => props.models.some((m) => (m.faces ?? []).some(faceHasNodes)));
+// Who will sing: every prop with a face definition, singing faces and singing trees alike (a
+// singing tree's name rarely says so, so its role is a tree).
+const singerNames = computed(() => {
+  const names = props.models.filter((m) => (m.faces ?? []).some(faceHasNodes) && scopedProps.value.some((p) => p.key === `model:${m.id}`)).map((m) => m.name);
+  return names.length > 4 ? `${names.slice(0, 4).join(", ")} and ${names.length - 4} more` : names.join(", ");
+});
 // Lyric timing is worth a listen when a face can sing it or a matrix can picture it.
-const wantsLyrics = computed(() => (hasSingingFaces.value && hasFaceDefinitions.value) || roleCounts.value.some((r) => r.role === "matrix"));
+const wantsLyrics = computed(() => hasFaceDefinitions.value || roleCounts.value.some((r) => r.role === "matrix"));
 
 /** Listens to the song for its words and lays down the lyric tracks; says why if it can't. */
 async function timeLyricsFromSong(sequenceId: number): Promise<void> {
@@ -592,8 +598,8 @@ const strip = computed(() => {
           <p v-if="wantsLyrics && !hasLyricTiming" class="note">
             <label><input v-model="lyricsFirst" type="checkbox" /> Hear the lyrics in the song first, so the faces sing them and the matrix pictures what they name</label>
           </p>
-          <p v-else-if="hasLyricTiming && (hasSingingFaces || lyricLines)" class="note">
-            <template v-if="singing">Singing faces sing “{{ singing.track }}”.</template>
+          <p v-else-if="hasLyricTiming && (hasSingingFaces || singerNames || lyricLines)" class="note">
+            <template v-if="singing && singerNames">{{ singerNames }} sing “{{ singing.track }}”.</template>
             <template v-else-if="hasSingingFaces">Singing faces sing the words once the face has a definition (Faces in the layout editor).</template>
             <template v-if="lyricLines"> The matrix pictures what the lyrics name.</template>
           </p>

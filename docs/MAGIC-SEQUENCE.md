@@ -1211,6 +1211,21 @@ Every part clears its floor. What the show gives up is mostly the style part (0.
 the props, moves its mix away from the median sequence, which is what was asked. Classic's small
 beat dips come from the smooth shaders, which move between the beats as much as on them.
 
+### Singing trees (2026-10-10)
+
+Logan's singing trees weren't singing. Only a prop whose role was singing_face sang, and a
+singing tree is a tree with a face definition whose name rarely says so (MTL1, Tree 3), so it
+was read as a mega or mini tree and played the show. When a role group carried it, Magic never
+placed an effect on the tree's own row at all, and without a singing_face prop the dialog didn't
+time the lyrics. Now every prop with a face definition sings: a singing face all song, as before,
+and anything else on each sung line, from the beat at or before it to the beat after it (lines a
+bar or less apart are one breath). There, a dim wash of the section's colour (layer 2) hides the
+tree's part, which runs on underneath so a shader doesn't restart, and the face sings over it
+(layer 3, mouth and eyes white, outline in the section's colour). In a role group the face goes
+on the tree's own row, which renders over the group's. The dialog times the lyrics whenever any
+prop has a face, and names who will sing. A tree with a face sub-model keeps singing on the
+sub-model instead. Without a phrase track the face sings all song.
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)

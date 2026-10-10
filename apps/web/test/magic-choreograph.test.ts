@@ -647,6 +647,45 @@ describe("singing faces", () => {
     expect(placements.filter((p) => p.effect.name === "Faces").map((p) => p.key).sort()).toEqual([`model:${faceModel.id}`, "model:900"].sort());
   });
 
+  it("sing on singing trees: any tree with a face definition sings each line, over a dim wash, on its own row", () => {
+    const song = syntheticSong(120);
+    // Two mini trees the "Mini Trees" group carries, and the mega tree, each with a face drawn on
+    // its lights; none of their names says "sing".
+    const face: FaceSpec = { name: "Tree Face", mouths: [{ name: "AI", nodes: "1-5" }, { name: "MBP", nodes: "6-10" }], eyesOpen: "20-22" };
+    const trees = layout.models.filter((m) => ["Mini Tree 1", "Mini Tree 2", "Mega Tree"].includes(m.name));
+    const models = layout.models.map((m) => (trees.includes(m) ? { ...m, faces: [face] } : m));
+    const singing = { track: "Lyrics — Phonemes", faces: new Map(trees.map((m) => [`model:${m.id}`, "Tree Face"])) };
+    const lyrics = [{ label: "dashing through the snow", startMs: 10100, endMs: 13900 }, { label: "o'er the fields we go", startMs: 30100, endMs: 32900 }];
+    // The show style, where the "Mini Trees" group carries its members (a mood splits it).
+    const plan = rulesDirector({ song, props, feel: "magical", seed: 7, style: "show" });
+    const placements = choreograph(song, props, plan, { feel: feelSpec("magical", song), frameMs: 25, singing, lyrics });
+
+    for (const tree of trees) {
+      const key = `model:${tree.id}`;
+      const sung = placements.filter((p) => p.key === key && p.effect.name === "Faces");
+      // From the beat at or before each line to the beat after it, on top, and nowhere else.
+      expect(sung.map((p) => [p.effect.startMs, p.effect.endMs, p.effect.layerIndex, p.effect.params.faceDefinition]), tree.name).toEqual([[10000, 14000, 3, "Tree Face"], [30000, 33000, 3, "Tree Face"]]);
+      const wash = placements.filter((p) => p.key === key && p.effect.layerIndex === 2);
+      expect(wash.map((p) => [p.effect.name, p.effect.startMs, p.effect.endMs]), tree.name).toEqual([["On", 10000, 14000], ["On", 30000, 33000]]);
+    }
+    // The mini trees' group still carries their role between the lines.
+    expect(placements.some((p) => p.key === "group:102" && p.effect.startMs >= 14000)).toBe(true);
+
+    // Rendered: on the line the mouth sings white over the dim wash, the group's effect hidden.
+    const track = { name: "Lyrics — Phonemes", marks: [10200, 10700, 11200], labels: ["AI", "MBP", ""] };
+    const body = magicBody({ rows: [], timingTracks: [track] }, placements, song, "replace", (() => { let n = 0; return () => `e${n++}`; })()).body;
+    const house = createHouseRenderer(models, body, 25, undefined, layout.groups);
+    const mini = trees.find((m) => m.name === "Mini Tree 1")!;
+    const at = (ms: number) => house.renderAt(ms)[house.models.findIndex((m) => m.id === mini.id)]!;
+    const level = (c: RGBA) => (c.a ? c.r + c.g + c.b : 0);
+    const ai = at(10400);
+    expect(ai.slice(0, 5).every((c) => level(c) > 600)).toBe(true);
+    expect(ai.slice(5, 10).every((c) => level(c) > 0 && level(c) <= 160)).toBe(true);
+    expect(ai.slice(40).every((c) => level(c) <= 160)).toBe(true);
+    const mbp = at(10900);
+    expect(mbp.slice(5, 10).every((c) => level(c) > 600) && mbp.slice(0, 5).every((c) => level(c) <= 160)).toBe(true);
+  });
+
   it("keep their own effects without lyric timing", () => {
     const song = syntheticSong(120);
     const placements = choreograph(song, props, rulesDirector({ song, props, feel: "auto", seed: 7 }), { feel: feelSpec("auto", song), frameMs: 25 });
