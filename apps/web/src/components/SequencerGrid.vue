@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import type { RowElementType, SequenceBody, SequenceEffect } from "../lib/api";
 import { DEFAULT_UI_COLORS, type UiColors } from "../lib/uiColors";
 import { fadeDurationAt } from "../lib/effectFade";
 import { boxFromDrag, idsInBox, isDrag, selectionAfterClick } from "../lib/blockSelect";
 import { acceptedMoves, previewMoves, type DraggedEffect, type GhostPlacement } from "../lib/dragPreview";
 import { gestureFor } from "../lib/gridGesture";
+import { cellAt, firstCellEndingAfter, timingLanes, type LaneLayer, type TimingLane } from "../lib/timingLanes";
 import { dragOutSpan, freeGapAt, type Placement } from "../lib/effectPlacement";
 import { isPlaceholder, type PickerAnchor } from "../lib/effectPicker";
 
@@ -113,7 +114,25 @@ const DEFAULT_ROW_HEIGHT = 28;
 // same number or clicking a row selects the one above it.
 const rowHeight = computed(() => Math.max(8, Math.round(props.rowHeight ?? DEFAULT_ROW_HEIGHT)));
 const ROW_LABEL_WIDTH = 140;
-const HEADER_HEIGHT = 24; // pinned timing-track ruler, drawn every frame regardless of scrollTop
+// The pinned header, drawn every frame regardless of scrollTop: the "Marks" ruler, then one lane for
+// each labelled timing track (lib/timingLanes.ts). It grows with the lanes, so the row maths below
+// all reads headerHeight: a row hit-tested against a stale 24px would select the one above it.
+const RULER_HEIGHT = 24;
+const LANE_HEIGHT = 18;
+// The narrowest a cell can be and still get its words. Below this a label is a smear of ellipses.
+const LANE_LABEL_MIN_PX = 10;
+// Phrases read a little larger than the words and phonemes under them, and each layer has its own
+// tint, so the three read as one track's layers rather than three unrelated strips.
+const LANE_FONT: Record<LaneLayer, string> = { phrases: "11px system-ui", words: "10px system-ui", phonemes: "10px system-ui" };
+const LANE_TINT: Record<LaneLayer, string> = {
+  phrases: "rgba(255, 255, 255, 0.09)",
+  words: "rgba(143, 184, 232, 0.16)",
+  phonemes: "rgba(190, 160, 235, 0.16)",
+};
+// The cell being sung right now, in the app's warm accent (--accent in style.css): accent means
+// "current", and the playhead's line alone is easy to lose among a few thousand phoneme cells.
+const LANE_NOW = "#e8c468";
+const LANE_NOW_FILL = "rgba(232, 196, 104, 0.3)";
 // The canvas is as tall as the space the page gives this component, and only the rows inside it
 // are drawn (M9 perf budget: 100 rows / 5k effects). 420 is what it was fixed at, and what it
 // stays at anywhere that mounts the grid without a height.
@@ -121,6 +140,12 @@ const viewportHeight = ref(420);
 let vScrollResize: ResizeObserver | null = null;
 const EDGE_PX = 6;
 const SNAP_PX = 6;
+
+// The labelled timing tracks as pinned lanes. Plain data in a shallow ref, rebuilt with the draw
+// index: draw() and hitTest() read it, and reading the deep-reactive body there is the cost the
+// index exists to avoid. A ref rather than a bare variable because the header height follows it.
+const lanes = shallowRef<TimingLane[]>(timingLanes(props.body.timingTracks));
+const headerHeight = computed(() => RULER_HEIGHT + lanes.value.length * LANE_HEIGHT);
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const scrollRef = ref<HTMLDivElement | null>(null);
@@ -259,6 +284,7 @@ function rebuildDrawIndex(): void {
     );
   }
   drawMarks = props.body.timingTracks.flatMap((t) => [...t.marks]);
+  lanes.value = timingLanes(props.body.timingTracks);
 }
 
 function drawEffectsForRow(row: GridRow): DrawEffect[] {
@@ -341,7 +367,8 @@ function draw(): void {
   ctx.fillRect(0, 0, rect.width, rect.height);
 
   const height = rowHeight.value;
-  const rowsAreaHeight = rect.height - HEADER_HEIGHT;
+  const header = headerHeight.value;
+  const rowsAreaHeight = rect.height - header;
   const firstRow = Math.max(0, Math.floor(scrollTop.value / height));
   const lastRow = Math.min(props.rows.length, Math.ceil((scrollTop.value + rowsAreaHeight) / height));
 
@@ -352,7 +379,7 @@ function draw(): void {
 
   for (let i = firstRow; i < lastRow; i++) {
     const row = props.rows[i]!;
-    const y = HEADER_HEIGHT + i * height - scrollTop.value;
+    const y = header + i * height - scrollTop.value;
     ctx.fillStyle = i % 2 === 0 ? ui().rowHeading : ui().rowHeadingSelected;
     ctx.fillRect(0, y, rect.width, height);
 
@@ -392,7 +419,7 @@ function draw(): void {
   // The label gutter, painted over whatever scrolled under it - pinned, the way the ruler is.
   for (let i = firstRow; i < lastRow; i++) {
     const row = props.rows[i]!;
-    const y = HEADER_HEIGHT + i * height - scrollTop.value;
+    const y = header + i * height - scrollTop.value;
     ctx.fillStyle = i % 2 === 0 ? ui().rowHeading : ui().rowHeadingSelected;
     ctx.fillRect(0, y, ROW_LABEL_WIDTH, height);
 
@@ -408,12 +435,12 @@ function draw(): void {
     ctx.fillText(row.name, labelX, y + height / 2 + 4, ROW_LABEL_WIDTH - labelX - 4);
   }
 
-  // pinned timing-track ruler - always drawn at y=0..HEADER_HEIGHT regardless of scrollTop
+  // pinned timing-track ruler - always drawn at y=0..RULER_HEIGHT regardless of scrollTop
   ctx.fillStyle = ui().timingTrackHeader;
-  ctx.fillRect(0, 0, rect.width, HEADER_HEIGHT);
+  ctx.fillRect(0, 0, rect.width, RULER_HEIGHT);
   ctx.fillStyle = "#777";
   ctx.font = "10px system-ui";
-  ctx.fillText("Marks", 8, HEADER_HEIGHT / 2 + 3);
+  ctx.fillText("Marks", 8, RULER_HEIGHT / 2 + 3);
   // Every track's marks are drawn, but the ones in force get the full-strength line and the
   // flag: an effect snapping to a mark that looks the same as one it ignores is the kind of
   // thing you would blame on the snapping being broken.
@@ -426,7 +453,7 @@ function draw(): void {
     ctx.strokeStyle = ui().timingMark;
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, HEADER_HEIGHT);
+    ctx.lineTo(x, RULER_HEIGHT);
     ctx.stroke();
     if (active) {
       ctx.fillStyle = ui().timingMark;
@@ -439,10 +466,14 @@ function draw(): void {
     }
     ctx.globalAlpha = 1;
   }
+  drawLanes(ctx, rect.width, view);
+  // A divider under the ruler and under every lane, the last of which is where the rows begin.
   ctx.strokeStyle = ui().gridlines;
   ctx.beginPath();
-  ctx.moveTo(0, HEADER_HEIGHT);
-  ctx.lineTo(rect.width, HEADER_HEIGHT);
+  for (let y = RULER_HEIGHT; y <= header; y += LANE_HEIGHT) {
+    ctx.moveTo(0, y);
+    ctx.lineTo(rect.width, y);
+  }
   ctx.stroke();
 
   // row label divider
@@ -471,8 +502,8 @@ function draw(): void {
           ? [dropGhost]
           : [];
   for (const ghost of ghosts) {
-    const gy = HEADER_HEIGHT + ghost.rowIndex * height - scrollTop.value;
-    if (gy + height < HEADER_HEIGHT || gy > rect.height) continue;
+    const gy = header + ghost.rowIndex * height - scrollTop.value;
+    if (gy + height < header || gy > rect.height) continue;
     const gx1 = msToX(ghost.startMs) - view;
     const gx2 = msToX(ghost.endMs) - view;
     // "Only the ghost outlines that would collide with an existing effect turn red" - so the
@@ -501,17 +532,84 @@ function draw(): void {
 }
 
 /**
+ * `label` cut to fit `maxWidth` with an ellipsis, or "" when not even one letter would.
+ *
+ * Measured rather than handed to fillText's maxWidth, which squeezes the glyphs to fit instead of
+ * cutting them: a long lyric phrase in a narrow cell would come out as an unreadable sliver.
+ */
+function fitLabel(ctx: CanvasRenderingContext2D, label: string, maxWidth: number): string {
+  if (ctx.measureText(label).width <= maxWidth) return label;
+  let lo = 0;
+  let hi = label.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (ctx.measureText(`${label.slice(0, mid)}…`).width <= maxWidth) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo > 0 ? `${label.slice(0, lo)}…` : "";
+}
+
+/**
+ * The lanes under the ruler: each labelled timing track's cells, with the one being sung lit.
+ *
+ * Painted over the full width and then the title gutter over the left of it, so a cell scrolled
+ * under the gutter disappears beneath it the way an effect does. A label is kept in view while its
+ * cell is, so a phrase that began off the left edge still says what it is.
+ */
+function drawLanes(ctx: CanvasRenderingContext2D, width: number, view: number): void {
+  const playMs = props.playheadMs;
+  const pxPerMs = props.pxPerMs;
+  lanes.value.forEach((lane, laneIndex) => {
+    const y = RULER_HEIGHT + laneIndex * LANE_HEIGHT;
+    ctx.fillStyle = ui().timingTrackHeader;
+    ctx.fillRect(0, y, width, LANE_HEIGHT);
+    ctx.font = LANE_FONT[lane.layer];
+    const textY = y + LANE_HEIGHT / 2 + 3.5;
+
+    // Phoneme tracks run to thousands of cells, so start where the view does instead of at the first.
+    for (let i = firstCellEndingAfter(lane.cells, view / pxPerMs); i < lane.cells.length; i++) {
+      const cell = lane.cells[i]!;
+      const x1 = msToX(cell.startMs) - view;
+      if (x1 > width) break;
+      const x2 = msToX(cell.endMs) - view;
+      const now = playMs >= cell.startMs && playMs < cell.endMs;
+      ctx.fillStyle = now ? LANE_NOW_FILL : LANE_TINT[lane.layer];
+      ctx.fillRect(x1, y + 1, Math.max(1, x2 - x1 - 1), LANE_HEIGHT - 2);
+      if (now) {
+        ctx.strokeStyle = LANE_NOW;
+        ctx.strokeRect(x1 + 0.5, y + 1.5, Math.max(1, x2 - x1 - 2), LANE_HEIGHT - 3);
+      }
+
+      const textX = Math.max(x1, ROW_LABEL_WIDTH) + 3;
+      const room = Math.min(x2, width) - Math.max(x1, ROW_LABEL_WIDTH);
+      if (room < LANE_LABEL_MIN_PX) continue;
+      const text = fitLabel(ctx, cell.label, room - 6);
+      if (!text) continue;
+      ctx.fillStyle = now ? "#fff" : ui().rowHeadingText;
+      ctx.fillText(text, textX, textY);
+    }
+
+    ctx.fillStyle = ui().timingTrackHeader;
+    ctx.fillRect(0, y, ROW_LABEL_WIDTH, LANE_HEIGHT);
+    ctx.fillStyle = ui().rowHeadingText;
+    ctx.font = "10px system-ui";
+    const titleX = 8 + lane.depth * 12;
+    ctx.fillText(fitLabel(ctx, lane.title, ROW_LABEL_WIDTH - titleX - 4), titleX, textY);
+  });
+}
+
+/**
  * Where a row is on screen, under the pointer's x. The row rather than the pointer's y: a drag
  * that drifted into the row above would otherwise open the picker over the span it is about.
  */
 function anchorFor(clientX: number, rowIndex: number): PickerAnchor {
-  const top = (canvasRef.value?.getBoundingClientRect().top ?? 0) + HEADER_HEIGHT + rowIndex * rowHeight.value - scrollTop.value;
+  const top = (canvasRef.value?.getBoundingClientRect().top ?? 0) + headerHeight.value + rowIndex * rowHeight.value - scrollTop.value;
   return { x: clientX, top, bottom: top + rowHeight.value };
 }
 
 /** The row index a y coordinate falls on, whether or not a row is actually there. */
 function rowIndexAt(y: number): number {
-  return Math.floor((y - HEADER_HEIGHT + scrollTop.value) / rowHeight.value);
+  return Math.floor((y - headerHeight.value + scrollTop.value) / rowHeight.value);
 }
 
 const MINIMUM_EFFECT_MS = 50;
@@ -595,6 +693,9 @@ function drawTransitionMarks(
 type HitResult =
   | { kind: "effect"; row: GridRow; effect: SequenceEffect; edge: "left" | "right" | null }
   | { kind: "mark"; trackIndex: number; ms: number }
+  // A press inside a timing lane, away from its marks. `ms` is the start of the cell under the
+  // pointer (what a double-click edits or plays), or the raw time when the pointer is in a gap.
+  | { kind: "lane"; trackIndex: number; ms: number }
   | { kind: "ruler-empty"; trackIndex: number; ms: number }
   | { kind: "row-empty"; row: GridRow }
   | { kind: "row-label"; row: GridRow }
@@ -603,12 +704,31 @@ type HitResult =
 function hitTest(x: number, y: number): HitResult {
   // x is absolute timeline space; the gutter is pinned to the viewport, so its test is local.
   if (x - scrollLeft.value < ROW_LABEL_WIDTH) {
-    if (y < HEADER_HEIGHT) return { kind: "none" };
+    if (y < headerHeight.value) return { kind: "none" };
     const row = props.rows[rowIndexAt(y)];
     return row ? { kind: "row-label", row } : { kind: "none" };
   }
 
-  if (y < HEADER_HEIGHT) {
+  if (y >= RULER_HEIGHT && y < headerHeight.value) {
+    const lane = lanes.value[Math.floor((y - RULER_HEIGHT) / LANE_HEIGHT)];
+    if (!lane) return { kind: "none" };
+    // A lane's own marks first, and the nearest of them: phoneme cells can be narrower than the
+    // grab distance, where the first mark within reach is not the one the pointer is on.
+    let near: number | undefined;
+    let nearDist = EDGE_PX;
+    for (const mark of lane.marks) {
+      const dist = Math.abs(msToX(mark) - x);
+      if (dist < nearDist) {
+        near = mark;
+        nearDist = dist;
+      }
+    }
+    if (near !== undefined) return { kind: "mark", trackIndex: lane.trackIndex, ms: near };
+    const ms = xToMs(x);
+    return { kind: "lane", trackIndex: lane.trackIndex, ms: cellAt(lane.cells, ms)?.startMs ?? ms };
+  }
+
+  if (y < RULER_HEIGHT) {
     const ms = xToMs(x);
     for (const mark of allMarks()) {
       // The mark's own track, not track 0: with more than one track, deleting a mark that lives on
@@ -649,8 +769,9 @@ function onDoubleClick(e: MouseEvent): void {
   const hit = hitTest(x, y);
   // xLights' Effects Grid > Double Click Mode: a double-click on a timing mark either plays that
   // mark's interval or opens its label for editing. Which of the two is the page's business - the
-  // grid only says that it happened, and on which mark.
-  if (hit.kind === "mark") {
+  // grid only says that it happened, and on which mark. A lane cell reports the mark it starts on,
+  // so a word in a lyric track can be edited or played without aiming at its edge.
+  if (hit.kind === "mark" || hit.kind === "lane") {
     emit("markDoubleClick", hit.trackIndex, hit.ms);
     return;
   }
@@ -679,6 +800,10 @@ function onContextMenu(e: MouseEvent): void {
     emit("contextmenu", { kind: "mark", trackIndex: hit.trackIndex, ms: hit.ms, x: e.clientX, y: e.clientY });
   } else if (hit.kind === "ruler-empty") {
     emit("contextmenu", { kind: "ruler-empty", trackIndex: hit.trackIndex, ms: hit.ms, x: e.clientX, y: e.clientY });
+  } else if (hit.kind === "lane") {
+    // The pointer's own time, not the cell's start: the menu offers to add a mark here, and one at
+    // the start of the cell it is already in would be a mark that exists.
+    emit("contextmenu", { kind: "ruler-empty", trackIndex: hit.trackIndex, ms: xToMs(x), x: e.clientX, y: e.clientY });
   } else if (hit.kind === "row-label") {
     emit("contextmenu", { kind: "row-label", row: hit.row, x: e.clientX, y: e.clientY });
   }
@@ -701,6 +826,10 @@ function onPointerDown(e: PointerEvent): void {
 
   if (gesture === "add-mark" && hit.kind === "ruler-empty") {
     emit("addMark", hit.trackIndex, hit.ms);
+    return;
+  }
+  if (gesture === "seek" && hit.kind === "lane") {
+    emit("seek", hit.ms);
     return;
   }
   if (gesture === "none") return; // a mark: right-click deletes, nothing happens on press
@@ -760,7 +889,7 @@ function onPointerDown(e: PointerEvent): void {
 function updateHoverCursor(x: number, y: number): void {
   const hit = hitTest(x, y);
   if (hit.kind === "effect") hoverCursor.value = hit.edge ? "col-resize" : "grab";
-  else if (hit.kind === "mark") hoverCursor.value = "pointer";
+  else if (hit.kind === "mark" || hit.kind === "lane") hoverCursor.value = "pointer";
   else hoverCursor.value = "crosshair";
 }
 
@@ -1002,9 +1131,9 @@ watch(
 
 <template>
   <div ref="scrollRef" class="grid-scroll-viewport" @scroll="onScroll">
-    <!-- + HEADER_HEIGHT: the pinned ruler covers the top of the canvas, so without it the scroll
-         range ends 24px early and the last row never comes fully into view. -->
-    <div class="grid-spacer" :style="{ height: `${rows.length * rowHeight + HEADER_HEIGHT}px`, width: `${totalWidth}px` }">
+    <!-- + headerHeight: the pinned ruler and lanes cover the top of the canvas, so without it the
+         scroll range ends that early and the last row never comes fully into view. -->
+    <div class="grid-spacer" :style="{ height: `${rows.length * rowHeight + headerHeight}px`, width: `${totalWidth}px` }">
       <canvas
         ref="canvasRef"
         class="grid-canvas"

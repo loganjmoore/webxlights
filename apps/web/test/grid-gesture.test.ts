@@ -29,6 +29,13 @@ describe("what a press on the grid means", () => {
     expect(gestureFor({ kind: "ruler-empty" }, shift)).toBe("add-mark");
   });
 
+  it("seeks on a timing lane, with or without shift", () => {
+    // A lane is not a row: dragging out a selection box from under the ruler would be invisible
+    // and would clear the effect selection, where a word in a lyric track means "go there".
+    expect(gestureFor({ kind: "lane" }, plain)).toBe("seek");
+    expect(gestureFor({ kind: "lane" }, shift)).toBe("seek");
+  });
+
   it("draws out an effect on an empty row, and a selection box with shift or below the rows", () => {
     // Armed or not: what gets placed is the page's business, the gesture is the same drag.
     expect(gestureFor({ kind: "row-empty" }, plain)).toBe("place");
@@ -44,6 +51,7 @@ describe("every gesture the grid has", () => {
     const hits: { hit: GestureHit; modifiers: typeof plain }[] = [
       { hit: { kind: "ruler-empty" }, modifiers: plain },
       { hit: { kind: "mark" }, modifiers: plain },
+      { hit: { kind: "lane" }, modifiers: plain },
       { hit: { kind: "effect", edge: null }, modifiers: shift },
       { hit: { kind: "effect", edge: "left" }, modifiers: shift },
       { hit: { kind: "effect", edge: "left" }, modifiers: plain },
@@ -58,7 +66,7 @@ describe("every gesture the grid has", () => {
   });
 
   it("is one of the declared set, whatever it is handed", () => {
-    for (const kind of ["effect", "mark", "ruler-empty", "row-empty", "none"] as const) {
+    for (const kind of ["effect", "mark", "lane", "ruler-empty", "row-empty", "none"] as const) {
       for (const edge of [null, "left", "right"] as const) {
         for (const modifiers of [plain, shift]) {
           expect(GRID_GESTURES).toContain(gestureFor({ kind, edge }, modifiers));

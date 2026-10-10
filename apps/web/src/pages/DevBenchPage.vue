@@ -17,6 +17,7 @@ import Waveform from "../components/Waveform.vue";
 import { EFFECT_SCHEMAS, defaultParamsFor } from "@webxlights/engine";
 import type { PeakBucket } from "../lib/audio";
 import type { ModelRecord, SequenceBody, SequenceEffect } from "../lib/api";
+import { breakdownPhrases, breakdownWords, trackFromCells } from "../lib/lyricBreakdown";
 
 // Taken from the registry rather than hardcoded: schema keys are display names
 // ("Color Wash", not "ColorWash") and a miss renders nothing at all.
@@ -48,8 +49,25 @@ function makeModels(n: number): ModelRecord[] {
   }));
 }
 
+const LYRIC_LINES = ["twinkle twinkle little star", "how I wonder what you are", "up above the world so high", "like a diamond in the sky"];
+
+/**
+ * A lyric broken down the way the app does it, so the grid's timing lanes have a phrase, word and
+ * phoneme track to show: a line every four seconds, then its words, then the words' mouth shapes.
+ */
+function makeLyricTracks(): SequenceBody["timingTracks"] {
+  const lines = Array.from({ length: Math.floor(DURATION_MS / 4000) }, (_, i) => ({
+    startMs: i * 4000,
+    endMs: i * 4000 + 3500,
+    label: LYRIC_LINES[i % LYRIC_LINES.length]!,
+  }));
+  const phrases = trackFromCells("Lyrics", lines);
+  const words = breakdownPhrases(phrases);
+  return [phrases, words, breakdownWords(words, phrases.name)];
+}
+
 function makeBody(rows: number, perRow: number): SequenceBody {
-  const out: SequenceBody = { timingTracks: [{ name: "Beats", marks: [] }], rows: [] };
+  const out: SequenceBody = { timingTracks: [{ name: "Beats", marks: [] }, ...makeLyricTracks()], rows: [] };
   for (let ms = 0; ms < DURATION_MS; ms += 2000) out.timingTracks[0]!.marks.push(ms);
   for (let r = 0; r < rows; r++) {
     const effects: SequenceEffect[] = [];
