@@ -224,7 +224,8 @@ describe("the show style", () => {
       for (const p of placements) {
         expect(p.effect.startMs).toBeGreaterThanOrEqual(0);
         expect(p.effect.endMs).toBeLessThanOrEqual(song.durationMs);
-        if (p.effect.name !== "Pictures") expect(ROLE_EFFECTS[p.role], `${p.role}: ${p.effect.name}`).toContain(p.effect.name);
+        // Pictures, and the whole house's sweeps, are placed by their own rules, not the role's mix.
+        if (p.effect.name !== "Pictures" && !(p.role === "whole_house" && p.effect.name === "Morph")) expect(ROLE_EFFECTS[p.role], `${p.role}: ${p.effect.name}`).toContain(p.effect.name);
         if (dims.get(p.key) === 1) expect(TWO_D_ONLY.has(p.effect.name)).toBe(false);
         (lanes.get(`${p.key}|${p.effect.layerIndex ?? 0}`) ?? lanes.set(`${p.key}|${p.effect.layerIndex ?? 0}`, []).get(`${p.key}|${p.effect.layerIndex ?? 0}`)!).push(p);
       }
@@ -303,14 +304,19 @@ describe("the show style", () => {
     expect(placements.filter((p) => p.effect.startMs < drop && p.effect.endMs > drop - beatMs)).toEqual([]);
   });
 
-  it("paints the frame of the house solid in the loud sections", () => {
+  it("floods the fills solid in the loud sections, and the frame of the house on alternate phrases", () => {
     for (const { bpm, song, plan, placements } of shows) {
       const loud = showLoud(song, plan.sections.map((s) => s.intensity));
       song.sections.forEach((section, si) => {
         if (!loud[si]) return;
-        const frame = placements.filter((p) => !p.effect.layerIndex && ["outline", "window", "icicle", "flood"].includes(p.role) && inSection(section)(p));
-        expect(frame.length, `${bpm} BPM section ${si}`).toBeGreaterThan(0);
-        for (const p of frame) expect(p.effect.name, `${bpm} BPM section ${si} ${p.role}`).toBe("On");
+        const msg = `${bpm} BPM section ${si}`;
+        const fills = placements.filter((p) => !p.effect.layerIndex && p.role === "flood" && inSection(section)(p));
+        expect(fills.length, msg).toBeGreaterThan(0);
+        for (const p of fills) expect(p.effect.name, `${msg} ${p.role}`).toBe("On");
+        // The roofline floods on some phrases and runs its own effect on the others.
+        const frame = placements.filter((p) => !p.effect.layerIndex && p.role === "outline" && inSection(section)(p));
+        expect(frame.some((p) => p.effect.name === "On"), msg).toBe(true);
+        expect(frame.some((p) => p.effect.name !== "On"), msg).toBe(true);
       });
     }
   });
@@ -384,8 +390,9 @@ describe("the mood style", () => {
   it("wears two colours at once in the loud sections, split down the middle of the house", () => {
     let split = 0;
     for (const { song, plan, placements } of moods) {
-      // No carrier spans the middle: a group across it would paint both halves one colour.
-      for (const p of placements.filter((q) => q.key.startsWith("group:"))) {
+      // No carrier spans the middle: a group across it would paint both halves one colour. The
+      // whole house's sweeps paint each half its own colour, so they are the exception.
+      for (const p of placements.filter((q) => q.key.startsWith("group:") && q.role !== "whole_house")) {
         const members = props.find((q) => q.key === p.key)!.members!.map((k) => x.get(k) ?? 0.5);
         expect(members.every((v) => v < 0.5) || members.every((v) => v >= 0.5), p.key).toBe(true);
       }
@@ -405,9 +412,12 @@ describe("the mood style", () => {
 
   it("passes the house between its halves where it alternates, the heroes carrying on through", () => {
     let checked = 0;
-    for (const { song, plan, placements } of moods) {
+    // A few seeds, so some verse comes up "alternate" (on seed 7 only the bridge does).
+    const runsBySeed = [7, 1, 2, 3, 4, 5].flatMap((seed) => TEMPOS.map((bpm) => ({ song: syntheticSong(bpm), ...moodRun(syntheticSong(bpm), seed) })));
+    for (const { song, plan, placements } of runsBySeed) {
       song.sections.forEach((section, si) => {
-        if (plan.sections[si]!.motion !== "alternate" || plan.sections[si]!.intensity < SHOW_QUIET) return;
+        // The bridge between two choruses is a breakdown, which answers on one role instead.
+        if (plan.sections[si]!.motion !== "alternate" || plan.sections[si]!.intensity < SHOW_QUIET || section.label === "bridge") return;
         for (const d of song.downbeats.filter((t) => t >= section.startMs && t < section.endMs - 1)) {
           const lit = showingAt(placements, d + 60000 / song.bpm / 2).filter((p) => !["mega_tree", "matrix", "singing_face"].includes(p.role));
           const sides = new Set(lit.map((p) => x.get(p.key)! < 0.5));
@@ -420,6 +430,88 @@ describe("the mood style", () => {
   });
 });
 
+describe("a conducted show (Logan, 2026-10-10: an orchestra, whole-house sweeps, rich shaders)", () => {
+  const shaders = (JSON.parse(readFileSync(fileURLToPath(new URL("../../api/database/data/builtin-shaders.json", import.meta.url)), "utf-8")) as Omit<MagicShader, "id">[])
+    .map((s, i) => ({ id: i + 1, name: s.name, source: s.source, inputs: s.inputs }));
+  const conducted = (["show", "mood"] as const).flatMap((style) => TEMPOS.map((bpm) => {
+    const song = syntheticSong(bpm);
+    const plan = rulesDirector({ song, props, feel: "magical", seed: 7, style });
+    return { style, bpm, song, plan, placements: choreograph(song, props, plan, { feel: feelSpec("magical", song), frameMs: 25, title: "Jingle Bells", shaders }) };
+  }));
+  const house = props.find((p) => p.role === "whole_house")!;
+  const heroes = ["mega_tree", "matrix", "singing_face"];
+  const inSection = (s: SongMap["sections"][number]) => (p: Placement) => p.effect.startMs >= s.startMs - 1 && p.effect.startMs < s.endMs - 1;
+
+  it("sweeps the next colour across the whole house into each section, and every other bar of a loud one", () => {
+    for (const { style, bpm, song, plan, placements } of conducted) {
+      const msg = `${style} ${bpm} BPM`;
+      const sweeps = placements.filter((p) => p.key === house.key && p.effect.name === "Morph");
+      const loud = showLoud(song, plan.sections.map((s) => s.intensity));
+      const loudBars = song.sections.reduce((n, s, i) => n + (loud[i] ? Math.floor((s.endMs - s.startMs) / (4 * 60000 / bpm) / 2) : 0), 0);
+      // Into every section but the first, the breakdown and the drop's dark beat, and the loud bars.
+      expect(sweeps.length, msg).toBeGreaterThanOrEqual(song.sections.length - 3 + loudBars / 2);
+      const length = ((bpm >= 130 ? 2 : 1) * 60000) / bpm;
+      for (const sweep of sweeps) {
+        const t = sweep.effect.endMs;
+        expect(song.downbeats.some((d) => Math.abs(d - t) <= 25), `${msg} sweep at ${t}`).toBe(true);
+        expect(sweep.effect.layerIndex).toBe(1);
+        // Just before it lands, every prop it has passed is dark, so the sweep shows; the heroes
+        // play on through it.
+        const fromRight = sweep.effect.params.swapStartEnd === true;
+        const passed = new Set(props.filter((p) => house.members!.includes(p.key) && p.tier !== "hero" && (fromRight ? p.x > 0.15 : p.x < 0.85)).map((p) => p.key));
+        const at = t - 0.1 * length;
+        const lit = placements.filter((p) => passed.has(p.key) && p.effect.startMs <= at && p.effect.endMs > at);
+        expect(lit.map((p) => `${p.key} ${p.effect.name}`), `${msg} sweep at ${t}`).toEqual([]);
+      }
+    }
+  });
+
+  it("lies the quiet and middle sections on one shader across the whole house, the heroes playing it too", () => {
+    for (const { style, bpm, song, plan, placements } of conducted) {
+      const loud = showLoud(song, plan.sections.map((s) => s.intensity));
+      let beds = 0;
+      song.sections.forEach((section, si) => {
+        const sp = plan.sections[si]!;
+        // Not the loud sections (the props' own), the breakdown, a mood's halves, or its closing twinkle.
+        if (loud[si] || section.label === "bridge" || (style === "mood" && ((sp.motion === "alternate" && sp.intensity >= SHOW_QUIET) || si === song.sections.length - 1))) return;
+        const msg = `${style} ${bpm} BPM ${section.label} ${si}`;
+        // To the section's end, or to the dark beat before a drop.
+        const bed = placements.find((p) => p.key === house.key && p.effect.name === "Shader" && p.effect.startMs <= section.startMs + 25 && p.effect.endMs >= section.endMs - 60000 / bpm - 25);
+        expect(bed, msg).toBeDefined();
+        beds++;
+        for (const p of placements.filter((q) => heroes.includes(q.role) && q.effect.name === "Shader" && inSection(section)(q))) expect(p.effect.params.shaderId, msg).toBe(bed!.effect.params.shaderId);
+        // Over it only the heroes and the roles carrying the beat; everything else shows the bed.
+        const over = placements.filter((p) => !p.effect.layerIndex && p.key !== house.key && !heroes.includes(p.role) && inSection(section)(p));
+        for (const p of over) expect(sp.featured, `${msg} ${p.role}`).toContain(p.role);
+      });
+      expect(beds, `${style} ${bpm} BPM`).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps random flashers out, and rings rare and off the beat accents and hits", () => {
+    for (const { style, bpm, song, placements } of conducted) {
+      const closing = song.durationMs - 4 * 4 * (60000 / bpm) - 1;
+      // The mood's dim closing twinkle is the one deliberate exception.
+      const flashers = placements.filter((p) => ["Twinkle", "Strobe", "Lightning", "Fireworks", "Meteors", "Life", "Snow Storm", "Shimmer"].includes(p.effect.name) && !(style === "mood" && p.effect.name === "Twinkle" && p.effect.startMs >= closing));
+      expect(flashers.map((p) => `${p.role} ${p.effect.name}`), `${style} ${bpm} BPM`).toEqual([]);
+      const rings = placements.filter((p) => ["Shockwave", "Ripple", "Circles"].includes(p.effect.name));
+      expect(rings.filter((p) => p.effect.layerIndex), `${style} ${bpm} BPM`).toEqual([]);
+      expect(rings.length / placements.length, `${style} ${bpm} BPM`).toBeLessThan(0.05);
+    }
+  });
+
+  it("plays the user's starred shader first, even one that brings its own colours", () => {
+    const song = syntheticSong(120);
+    const plan = rulesDirector({ song, props, feel: "magical", seed: 7, style: "mood" });
+    const starred = { id: 999, name: "Black Cherry Cosmos", source: "void main() { gl_FragColor = vec4(0.5, 0.0, 0.2, 1.0); }", inputs: [] };
+    const placed = choreograph(song, props, plan, { feel: feelSpec("magical", song), frameMs: 25, shaders: [...shaders, starred], favourites: new Set([999]) })
+      .filter((p) => p.effect.name === "Shader")
+      .sort((a, b) => a.effect.startMs - b.effect.startMs);
+    expect(placed[0]!.effect.params.shaderId).toBe(999);
+    // Without the star, a shader with no colour inputs would ignore the plan's colours, so it is left out.
+    expect(choreograph(song, props, plan, { feel: feelSpec("magical", song), frameMs: 25, shaders: [...shaders, starred] }).some((p) => p.effect.params.shaderId === 999)).toBe(false);
+  });
+});
 
 describe("pictures from the lyrics", () => {
   it("puts what a line names on the matrix while it is sung, and nothing for a line that names nothing", () => {

@@ -50,7 +50,10 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     ...(import.meta.env.DEV
-      ? [{ path: "/dev/bench", component: () => import("../pages/DevBenchPage.vue") }]
+      ? [
+          { path: "/dev/bench", component: () => import("../pages/DevBenchPage.vue") },
+          { path: "/dev/magic", component: () => import("../pages/DevMagicPage.vue") },
+        ]
       : []),
   ],
 });

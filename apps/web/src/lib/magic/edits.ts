@@ -14,7 +14,8 @@ const ORDINALS: Record<string, number> = { first: 1, second: 2, third: 3, fourth
 
 /** The effects a phrase names: "strobes", "colour wash", "twinkle". */
 export function effectsIn(phrase: string): string[] {
-  const text = ` ${phrase.toLowerCase().replace(/colour/g, "color")} `;
+  // The whole house's sweeps are Morphs; nobody watching calls them that.
+  const text = ` ${phrase.toLowerCase().replace(/colour/g, "color").replace(/\bsweep/g, "morph")} `;
   return Object.keys(EFFECT_SCHEMAS).filter((name) => {
     if (NOT_NAMES.has(name)) return false;
     const word = name.toLowerCase().replace(/[^a-z0-9]+/g, "[ -]?");

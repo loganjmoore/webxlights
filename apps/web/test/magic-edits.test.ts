@@ -48,13 +48,19 @@ describe("a plain-language change to the plan", () => {
 
   it("takes an effect out of every role and every layer", () => {
     const before = place(plan);
-    for (const name of ["Twinkle", "Shockwave"]) {
+    // The whole house's sweeps, and the effect the show leans on most.
+    const counts = new Map<string, number>();
+    for (const p of before) if (effectsIn(p.effect.name).length) counts.set(p.effect.name, (counts.get(p.effect.name) ?? 0) + 1);
+    const common = [...counts].filter(([n]) => n !== "Morph").sort((a, b) => b[1] - a[1])[0]![0];
+    for (const name of ["Morph", common]) {
       expect(before.some((p) => p.effect.name === name), name).toBe(true);
       const edited = ruleEdit(plan, song, `less ${name.toLowerCase()}`)!;
       expect(edited.avoid).toContain(name);
       for (const s of edited.sections) for (const list of Object.values(s.families)) expect(list).not.toContain(name);
       expect(place(edited).filter((p) => p.effect.name === name)).toEqual([]);
     }
+    // "Fewer sweeps" means the sweeps.
+    expect(ruleEdit(plan, song, "fewer sweeps")!.avoid).toEqual(["Morph"]);
     // Asks add up.
     expect(ruleEdit(ruleEdit(plan, song, "no twinkle")!, song, "without strobes")!.avoid).toEqual(["Twinkle", "Strobe"]);
   });
