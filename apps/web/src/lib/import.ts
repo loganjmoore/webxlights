@@ -10,6 +10,7 @@ import {
 } from "@webxlights/engine";
 import { api, type GroupUpsertPayload, type ModelUpsertPayload, type ViewObjectUpsertPayload } from "./api";
 import { NODE_SPACING } from "./worldUnits";
+import { faceSpecFromParsed } from "./importedFaces";
 
 // The canvases' local-unit-to-world factor (LayoutCanvas/LayoutCanvas3D's NODE_SPACING).
 // Placement needs it to turn xLights' world-unit endpoint vectors into our local-unit scales.
@@ -85,24 +86,8 @@ export async function importRgbEffects(layoutId: number, xmlText: string): Promi
     sub_models: m.subModels,
     // State definitions arrive the same way and for the same reason.
     states: m.states,
-    // Face definitions arrive the same way. The parser has already dropped Matrix ones, which
-    // hold image paths rather than node ranges.
-    faces: m.faces.map((f) => ({
-      name: f.name,
-      kind: f.kind,
-      mouths: f.mouths,
-      // A matrix face arrives as a shell: the mouth positions it had, with no pictures, because
-      // the file names paths on the machine that made the show.
-      ...(f.kind === "matrix" ? { images: f.imageNames.map((name) => ({ name })), placement: "Centered" as const } : {}),
-      eyesOpen: f.parts["Eyes-Open"],
-      eyesClosed: f.parts["Eyes-Closed"],
-      eyesOpen2: f.parts["Eyes-Open2"],
-      eyesClosed2: f.parts["Eyes-Closed2"],
-      eyesOpen3: f.parts["Eyes-Open3"],
-      eyesClosed3: f.parts["Eyes-Closed3"],
-      outline: f.parts.Outline,
-      outline2: f.parts.Outline2,
-    })),
+    // Face definitions arrive the same way.
+    faces: m.faces.map(faceSpecFromParsed),
     string_type: m.attrs.StringType ?? null,
     start_channel: m.attrs.StartChannel ?? null,
     order: i,
