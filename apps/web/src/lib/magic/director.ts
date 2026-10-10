@@ -5,6 +5,7 @@ import type { Accents, Feel, MagicPlanResponse, Motion, SectionPlan, ShowPlan, S
 import { priors } from "./priors";
 import picker from "./picker.json";
 import { ROLE_EFFECTS } from "./roleEffects";
+import { spriteById } from "./sprites";
 import type { SongMap } from "@webxlights/engine";
 
 // The rules director: song + props + feel -> a ShowPlan (docs/MAGIC-SEQUENCE.md 2.3). Always
@@ -190,5 +191,9 @@ export function completePlan(ai: MagicPlanResponse["plan"], rules: ShowPlan, rol
     };
   });
   const ending = ai.ending && ["fade", "hit-then-dark", "hold"].includes(ai.ending) ? ai.ending : rules.ending;
-  return { seed: rules.seed, palettes, sections, ending, ...(rules.style ? { style: rules.style } : {}), ...(rules.avoid ? { avoid: rules.avoid } : {}) };
+  // The server checked the lines and subjects; a library id the browser doesn't have is dropped.
+  const pictures = Array.isArray(ai.pictures)
+    ? ai.pictures.filter((p) => Number.isInteger(p?.line) && typeof p.subject === "string" && p.subject).map((p) => ({ line: p.line, subject: p.subject, library: spriteById(p.library ?? "") ? p.library : "" }))
+    : rules.pictures;
+  return { seed: rules.seed, palettes, sections, ending, ...(rules.style ? { style: rules.style } : {}), ...(rules.avoid ? { avoid: rules.avoid } : {}), ...(pictures ? { pictures } : {}) };
 }

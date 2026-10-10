@@ -30,6 +30,7 @@ class MagicDirector
     - palettes: 2 to 4 named colour sets of 2 to 6 "#rrggbb" colours. Effects use one or two colours of a palette at a time, so put the dominant colours first.
     - sections: one entry for every song section, by its index. look is a short id such as "A": sections that should look alike share an id, which is how repeated choruses stay consistent, and "" means a look of its own. intensity is 0 to 1, how much of the house is lit and how fast it moves. palette is the name of one of your palettes. featured lists the roles that carry the section; every other prop stays quiet, so fewer is more dramatic. families lists, per role, the effects that role may use, best first, chosen only from allowedEffects for that role. motion is how the action travels across the house. accents is what the sequencer punctuates with: none, downbeats, beats, or the song's detected hits. wholeHouseHit puts one flash on every prop at the start of the section; keep it for the biggest moments.
     - ending: fade, hit-then-dark, or hold.
+    - pictures: only when the brief has lyrics (the song's sung lines, by index); otherwise an empty list. Pick up to 12 lines whose words name something a simple cartoon can show on a small LED screen: an animal, a vehicle, a person, an object, a place. For each: line is that line's index; subject is what to draw, in at most eight plain words, concrete and generic ("a reindeer pulling a sleigh", "boots on a snowy roof"), never a named or trademarked character, a brand or a real person; library is the id from pictureLibrary of a ready drawing that shows the same thing, or "" when none does. Skip lines that name nothing drawable, and prefer the line where a thing is first named over its repeats.
 
     What you are for: reading the song title, artist and the user's direction. Know that a carol about bells wants icy blue and white and a driving pulse, that a lullaby wants warm white and almost nothing moving, that "make the tree the star of the chorus" means the mega_tree is featured in the choruses. Decide the palette and mood, which roles carry which section, and how the show builds and releases.
     What you are not for: beats, bar positions, timestamps, effect parameters or anything per frame. The sequencer owns all of that, so never invent it.
@@ -92,7 +93,7 @@ class MagicDirector
         $allowed = array_intersect_key(RoleEffects::table(), array_flip($roles));
 
         $result = $driver->completeJson(self::SYSTEM, $this->brief($request, $allowed), $this->schema(array_keys($allowed)), $model, $userKey, $baseUrl);
-        $checked = $this->validator->validate(PlanValidator::fromWire($result['data']), $allowed, count($request['song']['sections']));
+        $checked = $this->validator->validate(PlanValidator::fromWire($result['data']), $allowed, count($request['song']['sections']), count($request['lyrics'] ?? []), $request['pictureLibrary'] ?? []);
 
         return $checked + ['usage' => ['provider' => $provider, 'model' => $model] + $result['usage'], 'model' => $model];
     }
@@ -117,6 +118,8 @@ class MagicDirector
             ], fn ($v) => $v !== null),
             'props' => ['roles' => $request['props']['roles'], 'groups' => $request['props']['groups'] ?? []],
             'allowedEffects' => $allowed,
+            'lyrics' => isset($request['lyrics']) ? array_map(fn ($text, $i) => ['index' => $i, 'text' => $text], array_values($request['lyrics']), array_keys(array_values($request['lyrics']))) : null,
+            'pictureLibrary' => $request['pictureLibrary'] ?? null,
         ], fn ($v) => $v !== null), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
@@ -153,6 +156,7 @@ class MagicDirector
                 'wholeHouseHit' => ['type' => 'boolean'],
             ])],
             'ending' => ['type' => 'string', 'enum' => PlanValidator::ENDINGS],
+            'pictures' => ['type' => 'array', 'items' => $object(['line' => ['type' => 'integer'], 'subject' => $string, 'library' => $string])],
         ]);
     }
 }

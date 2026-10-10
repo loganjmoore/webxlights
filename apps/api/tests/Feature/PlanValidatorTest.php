@@ -240,4 +240,30 @@ class PlanValidatorTest extends TestCase
         $this->assertSame([], $plan['palettes']);
         $this->assertSame([], $plan['sections'][0]['families']);
     }
+
+    public function test_pictures_name_a_real_line_once_a_drawable_subject_and_only_a_library_id_the_browser_has(): void
+    {
+        $plan = $this->plan(['pictures' => [
+            ['line' => 0, 'subject' => 'A reindeer pulling a sleigh!', 'library' => 'reindeer'],
+            ['line' => 0, 'subject' => 'a second picture for the same line', 'library' => ''],
+            ['line' => 9, 'subject' => 'a line that does not exist', 'library' => ''],
+            ['line' => 1, 'subject' => 'Rudolph on the roof', 'library' => ''],
+            ['line' => 2, 'subject' => 'boots on a snowy roof', 'library' => 'not-in-the-library'],
+        ]]);
+
+        ['plan' => $out, 'dropped' => $dropped] = (new PlanValidator)->validate($plan, self::ALLOWED, 2, 3, ['reindeer', 'sleigh']);
+
+        $this->assertSame([
+            ['line' => 0, 'subject' => 'a reindeer pulling a sleigh', 'library' => 'reindeer'],
+            ['line' => 2, 'subject' => 'boots on a snowy roof', 'library' => ''],
+        ], $out['pictures']);
+        $this->assertCount(3, array_filter($dropped, fn ($d) => str_starts_with($d, 'pictures')));
+    }
+
+    public function test_without_lyrics_a_plan_has_no_pictures(): void
+    {
+        $out = (new PlanValidator)->validate($this->plan(['pictures' => [['line' => 0, 'subject' => 'a star', 'library' => '']]]), self::ALLOWED, 2)['plan'];
+
+        $this->assertArrayNotHasKey('pictures', $out);
+    }
 }

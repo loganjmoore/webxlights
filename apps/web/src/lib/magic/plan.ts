@@ -36,6 +36,16 @@ export interface SectionPlan {
   wholeHouseHit: boolean;
 }
 
+/** A sung line the director wants pictured: a library drawing, else one an image model draws. */
+export interface LyricPicture {
+  /** Into the sung lines the request carried. */
+  line: number;
+  /** What to draw, plain and generic: "boots on a snowy roof". */
+  subject: string;
+  /** A sprite id (sprites.ts), or "" when none shows it. */
+  library: string;
+}
+
 export interface ShowPlan {
   seed: number;
   /** name -> 2..6 hex colours; effects use one or two of them. */
@@ -46,6 +56,8 @@ export interface ShowPlan {
   style?: Style;
   /** Effects the user asked not to see anywhere ("less strobe"), on any role or layer. */
   avoid?: string[];
+  /** From the AI director when it was given the lyrics; without it the lyrics' own words pick. */
+  pictures?: LyricPicture[];
 }
 
 /** What the AI director is sent: summaries only, never audio or the layout itself. */
@@ -64,6 +76,9 @@ export interface MagicPlanRequest {
   /** A chat edit: the user's ask, and the plan it changes. */
   edit?: string;
   plan?: ShowPlan;
+  /** The sung lines, for the pictures, and the sprite ids the plan may name. */
+  lyrics?: string[];
+  pictureLibrary?: string[];
 }
 
 /** A validated, possibly partial plan: whatever the server dropped, the rules director fills. */
@@ -83,4 +98,6 @@ export interface MagicStatus {
   used_today: number;
   monthly_limit: number;
   used_this_month: number;
+  /** Drawn pictures for what the lyrics name: whether the server can draw, and its allowance. */
+  pictures?: { available: boolean; monthly_limit: number };
 }

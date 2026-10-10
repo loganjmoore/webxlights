@@ -1,6 +1,7 @@
 import { labelsFromTrack, parseNodeRanges, toRenderPalette, type EffectData, type FaceSpec, type StateEntry, type TimingLabel } from "@webxlights/engine";
 import type { EffectParamValue, ModelRecord, SequenceEffect, TimingTrack } from "./api";
 import { spriteFrames } from "./magic/sprites";
+import { decodePictureData } from "./pictureData";
 
 // Turning this app's stored effects into what the engine renders.
 //
@@ -85,9 +86,11 @@ export function toRenderableEffects(effects: SequenceEffect[], source: EffectSou
     const states = entriesFor(source.model, effect.params.stateDefinition);
     const face = faceFor(source.model, effect.params.faceDefinition);
     const data: EffectData | undefined = timing || states || face ? { timing, states, face } : undefined;
-    // A library picture is named, not stored: its frames are the sprite's (magic/sprites.ts).
+    // A library picture is named, not stored: its frames are the sprite's (magic/sprites.ts). A
+    // drawn one is kept compact in the effect (pictureData.ts) and opened here.
     const sprite = effect.name === "Pictures" && typeof effect.params.picture === "string" && effect.params.picture.startsWith("lib:") ? spriteFrames(effect.params.picture.slice(4)) : undefined;
-    const params = sprite ? { ...effect.params, frames: sprite as unknown as EffectParamValue } : effect.params;
+    const drawn = effect.name === "Pictures" && typeof effect.params.pictureData === "string" ? decodePictureData(effect.params.pictureData) : undefined;
+    const params = sprite ? { ...effect.params, frames: sprite as unknown as EffectParamValue } : drawn ? { ...effect.params, image: drawn } : effect.params;
     return { ...effect, params, palette: toRenderPalette(effect.palette), ...(data ? { data } : {}) };
   });
 }

@@ -18,7 +18,8 @@ import { feedbackPayload, magicRecord, type MagicRecord } from "../lib/magic/fee
 import type { MagicStatus } from "../lib/magic/plan";
 import { loadKey, loadProvider } from "../lib/anthropicKey";
 import { bestCandidate, fitScore, type FitScore } from "../lib/magic/score";
-import { lyricTracksFor } from "../lib/lyricAlign";
+import { heardSinging, lyricTracksFor } from "../lib/lyricAlign";
+import { drawPictures } from "../lib/magic/drawnPictures";
 import { cellsOf } from "../lib/lyricBreakdown";
 import { newEffectId, useSequencerStore } from "../stores/sequencer";
 
@@ -77,6 +78,8 @@ const result = ref<{ added: number; skippedRows: number; fit: FitScore; candidat
 // Undo and Try another touch the undo stack only when the top entry is still ours.
 const appliedAtDepth = ref<number | null>(null);
 const lastPlan = shallowRef<ShowPlan | null>(null);
+// Pictures drawn for the lyrics this session, by subject: Try another and chat edits reuse them.
+const drawn = shallowRef(new Map<string, string>());
 const seed = ref(Math.floor(Math.random() * 2 ** 31));
 
 const allProps = computed(() => propMap(props.models, props.groups));
@@ -134,6 +137,7 @@ async function timeLyricsFromSong(sequenceId: number): Promise<void> {
       const record = await api.latestLyricAlignment(sequenceId);
       if (record?.status === "failed") throw new Error(record.error ?? "the listen failed");
       if (record?.status === "done") {
+        if (record.result && !heardSinging(record.result.words, store.sequence?.duration_ms ?? 0)) throw new Error("no singing was heard in this song");
         const made = lyricTracksFor("Lyrics", record, store.sequence?.duration_ms);
         for (const track of made?.tracks ?? []) store.replaceTimingTrack(track);
         return;
@@ -332,7 +336,10 @@ async function generate(again = false, override?: ShowPlan): Promise<void> {
       const stored = loadProvider();
       const directed = await directPlan(
         store.sequence.id,
-        planRequest(song.value, scope, feel.value, { style: style.value, direction: direction.value, title: meta?.song || store.sequence.name, ...(meta?.artist ? { artist: meta.artist } : {}) }),
+        planRequest(song.value, scope, feel.value, {
+          style: style.value, direction: direction.value, title: meta?.song || store.sequence.name, ...(meta?.artist ? { artist: meta.artist } : {}),
+          ...(lyricLines.value ? { lyrics: lyricLines.value.map((l) => l.label) } : {}),
+        }),
         plan,
         userKey ? { key: userKey, provider: stored.provider, model: stored.model } : undefined,
       );
@@ -342,6 +349,15 @@ async function generate(again = false, override?: ShowPlan): Promise<void> {
       if (status.value?.available && !userKey) api.magicStatus().then((s) => (status.value = s), () => undefined);
     }
     lastPlan.value = plan;
+    // What the director wants pictured that the sprite library doesn't draw: an image model draws
+    // it (or the server hands back a drawing someone already had made).
+    const toDraw = (plan.pictures ?? []).filter((p) => !p.library && !drawn.value.has(p.subject)).map((p) => p.subject);
+    if (toDraw.length && status.value?.pictures?.available) {
+      progress.value = `Drawing ${toDraw.length === 1 ? "a picture" : `${Math.min(toDraw.length, 8)} pictures`} for the lyrics…`;
+      const made = await drawPictures(toDraw);
+      drawn.value = new Map([...drawn.value, ...made.pictures]);
+      if (made.problems.length) notice.value = `${notice.value} Some lyric pictures weren't drawn: ${made.problems[0]}`.trim();
+    }
     const shaders = await loadBuiltinShaders();
     // A few arrangements of the plan, each rendered and scored against the song, and the best
     // one kept (docs/MAGIC-SEQUENCE.md 2.6). Try another scores just the next one. Scoring a big
@@ -356,7 +372,7 @@ async function generate(again = false, override?: ShowPlan): Promise<void> {
       const placements = choreograph(song.value, scope, plan, {
         feel: feelSpec(feel.value, song.value), seed: candidateSeed, frameMs: store.sequence.frame_ms,
         title: store.sequence.metadata?.song || store.sequence.name, shaders, ...(singing.value ? { singing: singing.value } : {}),
-        ...(lyricLines.value ? { lyrics: lyricLines.value } : {}),
+        ...(lyricLines.value ? { lyrics: lyricLines.value } : {}), drawn: drawn.value,
       });
       const applied = magicBody(base, placements, song.value, mode.value, newEffectId);
       const fit = fitScore({

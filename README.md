@@ -76,6 +76,7 @@ optional is off until you set it:
 | Variable | Turns on |
 |---|---|
 | `SHADER_API_KEY`, `SHADER_PROVIDER`, `SHADER_MODEL` | Server-funded shader generation. Leave unset and generation answers 503 while the rest of the shader library works. |
+| `OPENAI_API_KEY`, `PICTURES_MODEL`, `PICTURES_QUALITY`, `MAGIC_PICTURES_MONTHLY_LIMIT` | Magic Sequence's drawn pictures: what the lyrics name that the sprite library has no drawing of, drawn by an image model (`gpt-image-2`, `low` quality by default) and kept for everyone who asks for the same thing. 40 new drawings a month per person by default (0 is uncapped); ones already drawn are free. The same key times lyrics unless `LYRICS_API_KEY` is set. |
 | `MAGIC_MODEL`, `MAGIC_DAILY_LIMIT`, `MAGIC_MONTHLY_LIMIT` | Magic Sequence's AI director. It uses the shader assistant's provider and key. The model defaults to `claude-opus-5-5` on Anthropic, and the allowance to 10 plans a day and 100 a month per person (0 is uncapped). Your own key bypasses the allowance. |
 | `LYRICS_API_KEY` | Automatic lyric timing (OpenAI `whisper-1`). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | "Continue with Google". Redirect URI is `<origin>/api/auth/google/callback`. |

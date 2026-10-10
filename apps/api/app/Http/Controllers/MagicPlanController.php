@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Sequence;
 use App\Services\Magic\MagicDirector;
+use App\Services\Magic\PictureMaker;
 use App\Services\Magic\RoleEffects;
 use App\Services\Shader\RequestScreen;
 use Illuminate\Http\Request;
@@ -116,11 +117,12 @@ class MagicPlanController extends Controller
     }
 
     /** What the UI needs to decide whether to offer the AI director, and how much is left. */
-    public function status(Request $request, MagicDirector $director)
+    public function status(Request $request, MagicDirector $director, PictureMaker $pictures)
     {
         $user = $request->user();
         $daily = (int) config('services.magic.daily_limit');
         $monthly = (int) config('services.magic.monthly_limit');
+        $pictureLimit = (int) config('services.pictures.monthly_limit');
 
         return response()->json([
             'available' => $director->serverConfigured(),
@@ -131,6 +133,11 @@ class MagicPlanController extends Controller
             'used_today' => $daily > 0 ? $this->usedSince($user, now('UTC')->startOfDay()) : 0,
             'monthly_limit' => $monthly,
             'used_this_month' => $monthly > 0 ? $this->usedSince($user, now('UTC')->startOfMonth()) : 0,
+            // Drawn pictures for what the lyrics name (MagicPictureController).
+            'pictures' => [
+                'available' => $pictures->configured(),
+                'monthly_limit' => $pictureLimit,
+            ],
         ]);
     }
 
@@ -194,6 +201,12 @@ class MagicPlanController extends Controller
             'plan.style' => ['nullable', 'string', 'max:20'],
             'plan.avoid' => ['nullable', 'array', 'max:40'],
             'plan.avoid.*' => ['string', 'max:40'],
+            // The sung lines, for the pictures the plan may ask for, and the ids of the drawings
+            // the browser's sprite library has (the only library ids a plan may name).
+            'lyrics' => ['nullable', 'array', 'max:200'],
+            'lyrics.*' => ['string', 'max:200'],
+            'pictureLibrary' => ['nullable', 'array', 'max:64'],
+            'pictureLibrary.*' => ['string', 'regex:/^[a-z0-9-]{1,40}$/'],
         ];
     }
 }

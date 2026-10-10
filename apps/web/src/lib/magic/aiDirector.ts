@@ -4,6 +4,7 @@ import type { PropInfo, Role, Tier } from "../propRoles";
 import { completePlan } from "./director";
 import type { Feel, MagicPlanRequest, ShowPlan, Style } from "./plan";
 import { ROLE_EFFECTS } from "./roleEffects";
+import { SPRITES } from "./sprites";
 
 // The AI director's side of a press (docs/MAGIC-SEQUENCE.md 2.3): a compact brief out, a
 // validated plan back, every gap filled by the rules director. Any failure falls back to the
@@ -14,6 +15,8 @@ export interface BriefOptions {
   direction?: string;
   title?: string;
   artist?: string;
+  /** The sung lines, when the song has lyric timing: the director picks the ones to picture. */
+  lyrics?: readonly string[];
 }
 
 /** What the director is told: summaries of the song and the house, never audio or the layout. */
@@ -50,6 +53,7 @@ export function planRequest(song: SongMap, props: readonly PropInfo[], feel: Fee
     feel,
     ...(options.style ? { style: options.style } : {}),
     ...(direction ? { direction: direction.slice(0, 500) } : {}),
+    ...(options.lyrics?.length ? { lyrics: options.lyrics.slice(0, 200).map((l) => l.slice(0, 200)), pictureLibrary: SPRITES.map((s) => s.id) } : {}),
   };
 }
 

@@ -6,7 +6,7 @@ import { PARAMS, importEffectSettings } from "../xsqEffectSettings";
 import { keyedRandom, nativeEffectName, SHOW_LOUD, SHOW_QUIET, showLoud, weightedOrder } from "./director";
 import type { FeelSpec } from "./feels";
 import { drawMotif, songMotifs } from "./motifs";
-import { spriteFor } from "./sprites";
+import { spriteById, spriteFor, type Sprite } from "./sprites";
 import type { SectionPlan, ShowPlan } from "./plan";
 import { priors } from "./priors";
 import { ROLE_EFFECTS, TWO_D_ONLY } from "./roleEffects";
@@ -44,6 +44,8 @@ export interface ChoreographOptions {
   singing?: { track: string; faces: ReadonlyMap<string, string> };
   /** The sung lines, timed (the lyric phrase track): a line that names a sprite shows it. */
   lyrics?: readonly { label: string; startMs: number; endMs: number }[];
+  /** Pictures an image model drew for plan.pictures' subjects: subject -> pictureData string. */
+  drawn?: ReadonlyMap<string, string>;
 }
 
 export type MagicShader = Pick<ShaderRecord, "id" | "name" | "source" | "inputs">;
@@ -662,18 +664,36 @@ export function choreograph(song: SongMap, props: readonly PropInfo[], plan: Sho
   // moves, and takes the matrix from whatever was planned there. From the beat nearest the
   // line's start to the beat after it ends, two beats at least and four bars at most.
   const screens = (units.get("matrix") ?? []).filter((u) => u.prop.dims === 2 && u.prop.nodes >= 200);
-  if (screens.length && options.lyrics?.length && !avoid.has("Pictures")) {
-    let shown = 0, lastEnd = 0;
-    for (const line of options.lyrics) {
+  // Which lines, and what: the AI director's choice when it read the lyrics (a library drawing,
+  // else one an image model drew for it), otherwise whatever each line's own words name.
+  const lyricPictures: { line: { startMs: number; endMs: number }; sprite?: Sprite; drawn?: string; subject?: string }[] = plan.pictures
+    ? plan.pictures.flatMap((p) => {
+      const line = options.lyrics?.[p.line];
+      const sprite = p.library ? spriteById(p.library) : undefined;
+      const drawn = sprite ? undefined : options.drawn?.get(p.subject);
+      return line && (sprite || drawn) ? [{ line, ...(sprite ? { sprite } : {}), ...(drawn ? { drawn, subject: p.subject } : {}) }] : [];
+    }).sort((a, b) => a.line.startMs - b.line.startMs)
+    : (options.lyrics ?? []).flatMap((line) => {
       const sprite = spriteFor(line.label);
-      if (!sprite || shown >= MAX_LYRIC_PICTURES) continue;
+      return sprite ? [{ line, sprite }] : [];
+    });
+  if (screens.length && lyricPictures.length && !avoid.has("Pictures")) {
+    let shown = 0, lastEnd = 0;
+    for (const { line, sprite, drawn, subject } of lyricPictures) {
+      if (shown >= MAX_LYRIC_PICTURES) break;
       const from = Math.max(lastEnd, beatTime(beatAtOrAfter(song.beats, line.startMs - beatMs / 2)));
       const to = Math.min(Math.max(beatTime(beatAtOrAfter(song.beats, line.endMs)), from + 2 * beatMs), from + 4 * song.beatsPerBar * beatMs, song.durationMs);
       if (to - from < beatMs) continue;
-      // A bounce hops on every other beat and a sway takes a bar; the rest go across once.
+      // A drawing travels like a sprite that travels when its subject names one (a reindeer runs,
+      // a sleigh flies); "a fox in the snow" naming the snowflake says nothing, so it bounces. A
+      // bounce hops on every other beat and a sway takes a bar; the rest go across once.
+      const borrowed = spriteFor(subject ?? "")?.movement;
+      const movement = sprite?.movement ?? (borrowed === "right" || borrowed === "left" || borrowed === "fly" ? borrowed : "bounce");
       const beats = (to - from) / beatMs;
-      const speed = sprite.movement === "bounce" ? Math.max(1, Math.round(beats / 2)) : sprite.movement === "wiggle" ? Math.max(1, Math.round(beats / song.beatsPerBar)) : 1;
-      const params = { ...defaultParamsFor("Pictures"), picture: `lib:${sprite.id}`, movement: sprite.movement, speed, fps: sprite.fps, scaleMode: "fit" };
+      const speed = movement === "bounce" ? Math.max(1, Math.round(beats / 2)) : movement === "wiggle" ? Math.max(1, Math.round(beats / song.beatsPerBar)) : 1;
+      const params = sprite
+        ? { ...defaultParamsFor("Pictures"), picture: `lib:${sprite.id}`, movement, speed, fps: sprite.fps, scaleMode: "fit" }
+        : { ...defaultParamsFor("Pictures"), pictureData: drawn!, movement, speed, scaleMode: "fit" };
       for (const unit of screens) {
         const kept = carve(drafts.filter((d) => d.unit === unit), from, to);
         const others = drafts.filter((d) => d.unit !== unit);
