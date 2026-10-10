@@ -1148,6 +1148,69 @@ instrumental (on Silent Night whisper-1 returned 34 filler words, gpt-transcribe
 gpt-4o-transcribe five), so a vocal recording is needed to score it. Vocal isolation before
 listening (Demucs) was left out: Jam-ALT found it made whisper worse on most languages.
 
+### A conducted show (2026-10-10)
+
+Logan asked for more of the high-fidelity shaders (his example was a community shader, Black
+Cherry Cosmos), more whole-house sweeps and fewer circle shockwaves, and no random flashing
+across random props: every group of props an orchestra section, conducted to the feel of the
+music. The show and mood styles (the dialog's two show styles) now play the house that way;
+classic changes only where noted.
+
+| Before | Now |
+|---|---|
+| A role came in by a weighted draw each look | The roles come in as the music builds, the frame of the house first, then the fills, then the features, biggest ensembles first. The roles carrying the beat are the biggest feature ensembles taking turns look by look. A loud section lights every role: the full orchestra |
+| Quiet and middle sections lit 60-80% of the props on their own | They lie on a **shader bed**: one library shader across the whole-house group, the house as one picture. The mega tree and matrix play the same shader, the roles carrying the beat pulse over it with nothing held between the beats, and every other prop shows the bed. It glows at half the section's brightness: a bed lights every light at once, and at full strength a verse outshone its chorus (show at 120 BPM went to loud 0.00, lift 0.00) |
+| A colour changed on every prop at once on the bar | A **sweep**: in the beat before each section lands (two beats at 130 BPM and up), and every other bar of a loud section, the next colour wipes across the whole-house group (Morph, a bright edge leading it, the new colour filling in behind). Each prop lets go of its colour as the edge reaches it so the wipe shows, and comes back in the new colour on the downbeat, so every start stays on the grid. The heroes play through it. Not into a breakdown, a rest, the dark beat before a drop or the mood's closing twinkle. "Fewer sweeps" in Change takes them out (`avoid: ["Morph"]`) |
+| Heroes alternated families and shaders, middle sections only | A show's heroes play shaders all song, calm ones in the quieter sections and lively ones in the loud; the matrix still alternates with its pictures, and lyric pictures still take it |
+| Shockwave accents on the 2D heroes every downbeat, Shockwave in whole-house hits | No hero accents in a show (the beat is the house's to mark); hits and accents are On everywhere, every style. Shockwave, Ripple and Circles weigh a sixteenth in the families (a quarter, squared) |
+| Twinkle and Shimmer overlays on loud heroes and a mood's features; Strobe and Lightning in some families | A show leaves out everything that flashes at random or at its own rate: Twinkle, Strobe, Lightning, Shimmer, Fireworks, Meteors, Life, Snow Storm (`RANDOM_FLASH`). The mood's dim closing twinkle stays, on purpose |
+| The roofline flooded solid through every loud section | It floods on alternate phrases and runs its own effect in the bar's colour on the others |
+
+**Shaders.** Four richer built-ins (Nebula Drift, Spiral Galaxy, Marbled Flow, Prism Veil:
+domain-warped fbm, a turning galaxy, marbling, a prism veil; 51-92 lines against the library's
+24-51). Each feel's lists now lead with the deep, moving ones and drop the flat ones (checkers,
+marquees, rings, VU bars, lightning). Every highlight in the four scales with the palette's own
+brightness, so a palette dimmed for a quiet bed dims the picture: Marbled Flow first renormalised
+every pixel to a fixed brightness and added white sheen, which kept a "dim" intro the brightest
+section in the song. **Starred shaders lead**: the dialog loads the user's favourites alongside
+the built-ins and plays them first, even one with no colour inputs (it brings its own colours).
+Starring a shader in the library is how to ask Magic for it. Black Cherry Cosmos itself is not in
+the repo and production's library can't be read from here, so it was not checked by name.
+`tools/shader-check/metrics.mjs` flags Nebula Drift and Prism Veil on `driftDelta` (26-31%
+against 15%): its windows at 0, 600 and 36,000 s land on different parts of a 62.8 s loop; the
+36,000 s window matches the first. Not part of CI.
+
+**The whole-house group.** The beds and sweeps need one, and its effects render under every
+prop's own (`applyGroupBase`), which is why a prop has to step aside to show them. The dialog's
+"Create groups" now also makes "Magic: Whole house" when the layout has none, and `propMap`
+reads a group of 80% or more of the lit props, of more than one kind, as the whole house even when
+one kind is most of it (an "All" group on a yard of arches used to read as arches).
+
+**Seeing it.** The tests run in Node, where a shader renders transparent, so `/dev/magic`
+(dev only, no API needed) runs a Magic Sequence on the test layout and draws house frames with
+the real WebGL shaders, with the fit score and each section's mean brightness:
+`/dev/magic?style=mood&feel=magical&bpm=120&seed=7&w=1100&at=6,59.6,62`.
+`docs/magic-sequence/conducted-show.jpg` is that page for the mood style on the Magical feel: the
+intro on its dim Nebula Drift bed, a verse on Aurora Curtain, the sweep
+into a new colour crossing the house a quarter and three quarters of the way (the white edge, the
+new colour behind it, the old colour still ahead), the chorus after it, and the second verse's bed.
+
+**Measured** there, shaders rendering (seed 7, the 32-model test layout, synthetic songs):
+
+| Fit | 80 BPM | 120 BPM | 150 BPM |
+|---|---|---|---|
+| show, before | 93 | 100 | 100 |
+| show, now | 88 | 97 | 93 |
+| mood, before | 91 | 87 | 81 |
+| mood, now | 96 | 100 | 82 |
+| classic, before | 85 | 94 | 91 |
+| classic, now | 86 | 90 | 85 |
+
+Every part clears its floor. What the show gives up is mostly the style part (0.59-0.71 from
+1.00): leaving out the corpus's twinkles and rings, and the bed taking the middle sections from
+the props, moves its mix away from the median sequence, which is what was asked. Classic's small
+beat dips come from the smooth shaders, which move between the beats as much as on them.
+
 ## Out of scope by this build's own terms
 
 `MAGIC-SEQUENCE-GOAL.md` builds phases 0-4 and says phase 5 (vocals, chat edits, learned picker)

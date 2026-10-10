@@ -286,6 +286,11 @@ async function ensureGroups(): Promise<void> {
       name: `Magic: ${ROLE_LABELS[role]}`,
       memberNames: allProps.value.filter((p) => p.key.startsWith("model:") && p.role === role).map((p) => p.name),
     }));
+  // The whole house as one canvas, for the shader beds and the sweeps across it.
+  if (!allProps.value.some((p) => p.key.startsWith("group:") && p.role === "whole_house")) {
+    const everyProp = allProps.value.filter((p) => p.key.startsWith("model:") && p.nodes > 0 && ROLE_EFFECTS[p.role].length && !excluded.value.has(p.role)).map((p) => p.name);
+    if (everyProp.length >= 3) wanted.push({ name: "Magic: Whole house", memberNames: everyProp });
+  }
   if (wanted.length === 0) return;
   await api.bulkUpsertModelGroups(props.layoutId, wanted);
   emit("layoutChanged");
@@ -297,15 +302,23 @@ async function ensureGroups(): Promise<void> {
 const generationProps = shallowRef<PropInfo[] | null>(null);
 const generationGroups = shallowRef<ModelGroupRecord[] | null>(null);
 
-let builtinShaders: Promise<MagicShader[]> | null = null;
-/** The library's built-in shaders, for the heroes and the whole house. Without them it still runs, shaderless. */
-function loadBuiltinShaders(): Promise<MagicShader[]> {
-  builtinShaders ??= (async () => {
-    const first = await api.listShaders({ kind: "builtin" });
-    const rest = await Promise.all(Array.from({ length: first.last_page - 1 }, (_, i) => api.listShaders({ kind: "builtin", page: i + 2 })));
+let libraryShaders: Promise<{ shaders: MagicShader[]; favourites: Set<number> }> | null = null;
+/**
+ * The library's built-in shaders and the ones the user starred, for the heroes and the whole house.
+ * Starring a shader is how to ask Magic for it. Without them it still runs, shaderless.
+ */
+function loadShaders(): Promise<{ shaders: MagicShader[]; favourites: Set<number> }> {
+  const all = async (params: Parameters<typeof api.listShaders>[0]) => {
+    const first = await api.listShaders(params);
+    const rest = await Promise.all(Array.from({ length: first.last_page - 1 }, (_, i) => api.listShaders({ ...params, page: i + 2 })));
     return [first, ...rest].flatMap((page) => page.data.map(({ id, name, source, inputs }) => ({ id, name, source, inputs })));
-  })().catch(() => ((builtinShaders = null), []));
-  return builtinShaders;
+  };
+  libraryShaders ??= (async () => {
+    const [builtins, starred] = await Promise.all([all({ kind: "builtin" }), all({ favourites: true }).catch(() => [])]);
+    const shaders = [...starred, ...builtins.filter((b) => !starred.some((s) => s.id === b.id))];
+    return { shaders, favourites: new Set(starred.map((s) => s.id)) };
+  })().catch(() => ((libraryShaders = null), { shaders: [], favourites: new Set<number>() }));
+  return libraryShaders;
 }
 
 /** Generates; `again` re-arranges in place of the last press, `override` with an edited plan. */
@@ -358,7 +371,7 @@ async function generate(again = false, override?: ShowPlan): Promise<void> {
       drawn.value = new Map([...drawn.value, ...made.pictures]);
       if (made.problems.length) notice.value = `${notice.value} Some lyric pictures weren't drawn: ${made.problems[0]}`.trim();
     }
-    const shaders = await loadBuiltinShaders();
+    const { shaders, favourites } = await loadShaders();
     // A few arrangements of the plan, each rendered and scored against the song, and the best
     // one kept (docs/MAGIC-SEQUENCE.md 2.6). Try another scores just the next one. Scoring a big
     // house takes a while, so it stops early rather than keep anyone waiting.
@@ -371,7 +384,7 @@ async function generate(again = false, override?: ShowPlan): Promise<void> {
       await new Promise((r) => setTimeout(r, 0));
       const placements = choreograph(song.value, scope, plan, {
         feel: feelSpec(feel.value, song.value), seed: candidateSeed, frameMs: store.sequence.frame_ms,
-        title: store.sequence.metadata?.song || store.sequence.name, shaders, ...(singing.value ? { singing: singing.value } : {}),
+        title: store.sequence.metadata?.song || store.sequence.name, shaders, favourites, ...(singing.value ? { singing: singing.value } : {}),
         ...(lyricLines.value ? { lyrics: lyricLines.value } : {}), drawn: drawn.value,
       });
       const applied = magicBody(base, placements, song.value, mode.value, newEffectId);
@@ -573,7 +586,7 @@ const strip = computed(() => {
             >{{ ROLE_LABELS[role] }} <span class="num">{{ count }}</span></button>
           </div>
           <div class="row">
-            <label><input v-model="createGroups" type="checkbox" /> Create groups for roles without one</label>
+            <label><input v-model="createGroups" type="checkbox" /> Create groups for roles without one, and the whole house</label>
             <button type="button" class="link" :aria-expanded="fixingRoles" @click="fixingRoles = !fixingRoles">Fix roles…</button>
           </div>
           <p v-if="wantsLyrics && !hasLyricTiming" class="note">

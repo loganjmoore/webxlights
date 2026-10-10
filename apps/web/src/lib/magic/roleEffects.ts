@@ -12,6 +12,14 @@ import { priors } from "./priors";
 const NEEDS_INPUT = new Set(["Pictures", "Shader", "Sketch", ...TIMING_TRACK_EFFECTS, ...CANVAS_ONLY_EFFECTS]);
 /** Effects that only read on a 2D buffer; never placed on a line of lights. */
 export const TWO_D_ONLY = new Set(["Pictures", "Text"]);
+/** Rings from a centre. Logan (2026-10-10) asked for fewer of them, so they weigh far less. */
+export const ROUND = new Set(["Shockwave", "Ripple", "Circles"]);
+/**
+ * Effects that flash at random places or at their own rate rather than on the music. The show
+ * and mood styles leave them out: every prop there moves because the music did (Logan,
+ * 2026-10-10: no random flashing across random props).
+ */
+export const RANDOM_FLASH = new Set(["Twinkle", "Strobe", "Lightning", "Fireworks", "Meteors", "Life", "Snow Storm", "Shimmer"]);
 
 function allowedFor(role: Role): string[] {
   // A moving head is a DMX fixture: pixel effects mean nothing to it.

@@ -84,6 +84,10 @@ describe("prop roles", () => {
     const arches = layout.models.filter((m) => m.name.startsWith("Arch")).map((m) => ({ id: m.id, name: m.name }));
     const misleading = propMap(layout.models, [{ id: 1, name: "EVERYTHING", buffer_style: "Default", members: arches }]);
     expect(misleading.find((p) => p.key === "group:1")!.role).toBe("arch");
+    // But a group of nearly every prop is the whole house, even on a yard that is mostly arches.
+    const yard = [...layout.models.filter((m) => !m.name.startsWith("Arch")).slice(0, 4), ...Array.from({ length: 12 }, (_, i) => ({ ...layout.models.find((m) => m.name === "Arch 1")!, id: 500 + i, name: `Arch ${10 + i}` }))];
+    const all = propMap(yard, [{ id: 2, name: "Magic: Whole house", buffer_style: "Default", members: yard.map((m) => ({ id: m.id, name: m.name })) }]);
+    expect(all.find((p) => p.key === "group:2")!.role).toBe("whole_house");
   });
 
   it("lets the user's role correction win", () => {

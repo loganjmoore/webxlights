@@ -168,6 +168,7 @@ export function propMap(models: readonly ModelRecord[], groups: readonly ModelGr
   const gap = bySize.findIndex((p, i) => i < 3 && i + 1 < bySize.length && p.nodes >= 1.5 * bySize[i + 1]!.nodes);
   if (gap >= 0) for (const prop of bySize.slice(0, gap + 1)) if (prop.role !== "whole_house") prop.tier = "hero";
 
+  const lit = props.filter((p) => p.key.startsWith("model:") && p.nodes > 0).length;
   for (const group of groups) {
     const members = group.members.map((m) => byModelId.get(m.id)).filter((p): p is PropInfo => !!p);
     const override = validOverride(group.params?.magicRole);
@@ -179,6 +180,9 @@ export function propMap(models: readonly ModelRecord[], groups: readonly ModelGr
     // majority is the whole house, whatever it is called.
     let role: Role;
     if (override) role = override;
+    // Nearly every prop, of more than one kind, is the whole house even when one kind is most of
+    // it: an "All" group on a yard of arches is not an arch.
+    else if (counts.size >= 2 && members.length >= Math.max(3, 0.8 * lit)) role = "whole_house";
     else if (topCount * 2 > members.length) role = top;
     else role = roleFromName(group.name) ?? (counts.size >= 3 ? "whole_house" : top);
     const x = members.length ? members.reduce((s, m) => s + m.x, 0) / members.length : 0.5;

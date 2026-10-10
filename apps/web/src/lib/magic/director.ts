@@ -4,7 +4,7 @@ import { FAVOUR, feelSpec, type FeelSpec } from "./feels";
 import type { Accents, Feel, MagicPlanResponse, Motion, SectionPlan, ShowPlan, Style } from "./plan";
 import { priors } from "./priors";
 import picker from "./picker.json";
-import { ROLE_EFFECTS } from "./roleEffects";
+import { RANDOM_FLASH, ROLE_EFFECTS, ROUND } from "./roleEffects";
 import { spriteById } from "./sprites";
 import type { SongMap } from "@webxlights/engine";
 
@@ -60,9 +60,12 @@ export function effectWeight(role: Role, name: string, feel: FeelSpec, intensity
   // What people kept and added in the Magic Sequences they shared (train-picker.mjs): 1 until
   // enough of them have.
   const learned = (picker.multipliers as Record<string, Record<string, number> | undefined>)[role]?.[name] ?? 1;
+  // Rings from a centre come up a quarter as often as the corpus would have them (a sixteenth of
+  // the weight once squared): Logan, 2026-10-10, "less of the circle shockwave effects".
+  const round = ROUND.has(name) ? 0.25 : 1;
   // Squared: a song only has a handful of looks, so sampling by plain share leaves too much to
   // chance and lands further from the corpus's mix than a typical real song does.
-  return Math.pow(share * Math.pow(lift, feel.character) * (feel.favours.includes(name) ? FAVOUR : 1) * intensityLift * learned, 2);
+  return Math.pow(share * Math.pow(lift, feel.character) * (feel.favours.includes(name) ? FAVOUR : 1) * intensityLift * learned * round, 2);
 }
 
 function sectionIntensity(song: SongMap, index: number, feel: FeelSpec): number {
@@ -88,6 +91,8 @@ export function rulesDirector({ song, props, feel: feelName, seed, palette, styl
   const mood = style === "mood", show = style === "show" || mood;
   const feel = feelSpec(feelName, song);
   const roles = [...new Set(props.filter((p) => !p.key.startsWith("submodel:")).map((p) => p.role))].filter((r) => ROLE_EFFECTS[r].length > 0);
+  const tierOf = (r: Role) => props.find((p) => p.role === r && !p.key.startsWith("submodel:"))!.tier;
+  const propsIn = (r: Role) => props.filter((p) => p.role === r && p.key.startsWith("model:")).length;
   const palettes: Record<string, string[]> = {};
   // A mood keeps one colour family all song.
   const paletteList = palette?.length ? [palette, ...feel.palettes] : mood ? [feel.mood] : feel.palettes;
@@ -108,14 +113,21 @@ export function rulesDirector({ song, props, feel: feelName, seed, palette, styl
       // Families are a property of the look, so the same section type gets the same effects;
       // intensity only nudges the weights through the corpus's loud-vs-quiet lift.
       const lookIntensity = Math.max(...song.sections.map((s, i) => (s.group === look ? sectionIntensity(song, i, feel) : 0)));
-      const ranked = weightedOrder(ROLE_EFFECTS[role], (name) => effectWeight(role, name, feel, lookIntensity), seed, `fam:${look}:${role}`);
+      // A show moves every prop because the music did, so the effects that flash at random are out.
+      const allowed = show ? ROLE_EFFECTS[role].filter((name) => !RANDOM_FLASH.has(name)) : ROLE_EFFECTS[role];
+      const ranked = weightedOrder(allowed, (name) => effectWeight(role, name, feel, lookIntensity), seed, `fam:${look}:${role}`);
       // A singing face sings: Faces needs a lyric track the generator can't make, and an
       // audio-level VU Meter is the nearest thing to it.
       if (role === "singing_face" && ranked.includes("VU Meter")) ranked.unshift(...ranked.splice(ranked.indexOf("VU Meter"), 1));
       families[role] = ranked.slice(0, 3);
     }
     const heroes = roles.filter((r) => HERO_ROLES.has(r));
-    const others = weightedOrder(roles.filter((r) => !HERO_ROLES.has(r) && r !== "whole_house"), (r) => priors.roles[r]?.coverage.p50 ?? 0.1, seed, `feat:${look}`);
+    // A show is conducted: the sections of the house that carry the beat are its biggest ensembles
+    // of features (the arches, the mini trees), taking turns look by look, never a draw.
+    const ensembles = roles.filter((r) => !HERO_ROLES.has(r) && r !== "whole_house" && tierOf(r) === "feature").sort((a, b) => propsIn(b) - propsIn(a) || a.localeCompare(b));
+    const others = show && ensembles.length
+      ? ensembles.map((_, i) => ensembles[(i + lookIndex) % ensembles.length]!)
+      : weightedOrder(roles.filter((r) => !HERO_ROLES.has(r) && r !== "whole_house"), (r) => priors.roles[r]?.coverage.p50 ?? 0.1, seed, `feat:${look}`);
     const featured = [...heroes, ...others.slice(0, intensity >= 0.66 ? 2 : intensity >= 0.35 ? 1 : 0)];
     const motionRoll = keyedRandom(seed, `motion:${look}`);
     // A show's loud parts move as one, changing colour together on the bar; elsewhere a sweep

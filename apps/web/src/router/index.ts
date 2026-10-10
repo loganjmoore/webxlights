@@ -50,12 +50,17 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     ...(import.meta.env.DEV
-      ? [{ path: "/dev/bench", component: () => import("../pages/DevBenchPage.vue") }]
+      ? [
+          { path: "/dev/bench", component: () => import("../pages/DevBenchPage.vue") },
+          { path: "/dev/magic", component: () => import("../pages/DevMagicPage.vue") },
+        ]
       : []),
   ],
 });
 
 router.beforeEach(async (to) => {
+  // The dev pages run on fixtures with no API behind them; asking who is signed in would throw.
+  if (to.path.startsWith("/dev/")) return true;
   const auth = useAuthStore();
   if (!auth.loaded) await auth.fetchMe();
   if (to.meta.requiresAuth && !auth.user) return "/auth";
