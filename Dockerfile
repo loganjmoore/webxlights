@@ -3,7 +3,7 @@
 
 # Pinned to the major CI tests on (.github/workflows/ci.yml). Dependabot bumped this to 26
 # once; nothing tested it, so the pin is deliberate and Dependabot is told not to.
-FROM node:22-alpine AS web-build
+FROM node:22.23.4-alpine AS web-build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
