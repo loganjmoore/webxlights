@@ -3,7 +3,9 @@
 
 # Pinned to the major CI tests on (.github/workflows/ci.yml). Dependabot bumped this to 26
 # once; nothing tested it, so the pin is deliberate and Dependabot is told not to.
-FROM node:22-alpine AS web-build
+FROM node:22.23.4-alpine AS web-build
+# Refresh the trust store before any application HTTPS requests (eMudhra advisory).
+RUN apk add --no-cache --upgrade ca-certificates && update-ca-certificates
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
@@ -17,6 +19,8 @@ COPY tools/sequence-corpus/priors.json tools/sequence-corpus/
 RUN npm run build -w apps/web
 
 FROM composer:2 AS vendor
+# Refresh the trust store before any application HTTPS requests (eMudhra advisory).
+RUN apk add --no-cache --upgrade ca-certificates && update-ca-certificates
 WORKDIR /app
 COPY apps/api/composer.json apps/api/composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
@@ -25,7 +29,10 @@ RUN composer dump-autoload --optimize --no-dev
 
 # 8.4 is the locked runtime (DECISIONS.md). Dependabot's bump to 8.5 broke the image build:
 # docker-php-ext-install opcache fails there, and it took production down until it was reverted.
-FROM php:8.4-fpm-alpine
+FROM php:8.4.27-fpm-alpine
+# Refresh the trust store before any application HTTPS requests (eMudhra advisory).
+RUN apk add --no-cache --upgrade ca-certificates && update-ca-certificates
+RUN php -r 'echo "PHP security runtime: ", PHP_VERSION, PHP_EOL; exit(PHP_VERSION_ID >= 80427 ? 0 : 1);'
 COPY apps/api/docker/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 RUN apk add --no-cache nginx supervisor postgresql-dev \
     && docker-php-ext-install pdo_pgsql opcache
