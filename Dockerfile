@@ -32,6 +32,8 @@ RUN composer dump-autoload --optimize --no-dev
 FROM php:8.4.27-fpm-alpine
 # Refresh the trust store before any application HTTPS requests (eMudhra advisory).
 RUN apk add --no-cache --upgrade ca-certificates && update-ca-certificates
+
+# CVE-2026-109618 / CVE-2026-109619: fail the build on an unpatched runtime.
 RUN php -r 'echo "PHP security runtime: ", PHP_VERSION, PHP_EOL; exit(PHP_VERSION_ID >= 80427 ? 0 : 1);'
 COPY apps/api/docker/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 RUN apk add --no-cache nginx supervisor postgresql-dev \
