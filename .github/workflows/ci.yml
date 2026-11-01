@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 22.23.4
           cache: npm
       - run: npm ci
       - run: npm run lint
@@ -48,6 +48,28 @@ jobs:
           $post = ini_parse_quantity(ini_get("post_max_size"));
           if ($upload < 50 * 1024 * 1024 || $post <= $upload) {
           fwrite(STDERR, "PHP must accept 50 MiB files with multipart overhead.\n"); exit(1); }'
+
+      - name: Verify production TLS certificate checks
+        run: |
+          tls_dir=$(mktemp -d "$RUNNER_TEMP/tls-fixture.XXXXXX")
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1 -keyout "$tls_dir/key.pem" -out "$tls_dir/cert.pem" >/dev/null 2>&1
+          openssl s_server -quiet -www -accept 127.0.0.1:18443 -cert "$tls_dir/cert.pem" -key "$tls_dir/key.pem" > "$tls_dir/server.log" 2>&1 &
+          tls_pid=$!
+          trap 'kill "$tls_pid" 2>/dev/null || true; rm -rf "$tls_dir"' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS --cacert "$tls_dir/cert.pem" https://127.0.0.1:18443/ >/dev/null 2>&1; then break; fi
+            sleep 0.2
+          done
+          curl -fsS --cacert "$tls_dir/cert.pem" https://127.0.0.1:18443/ >/dev/null
+          docker run --rm --network host --mount "type=bind,source=$tls_dir/cert.pem,target=/tls-fixture.pem,readonly" --entrypoint php webxlights:ci -r '
+          $errors = [];
+          set_error_handler(function ($level, $message) use (&$errors) { $errors[] = $message; return true; });
+          $response = file_get_contents("https://127.0.0.1:18443/", false, stream_context_create(["http" => ["timeout" => 5]]));
+          restore_error_handler();
+          if ($response !== false || !preg_match("/certificate verify failed/i", implode("\n", $errors))) { fwrite(STDERR, "Untrusted certificate must be rejected.\n"); exit(1); }
+          $response = file_get_contents("https://127.0.0.1:18443/", false, stream_context_create(["ssl" => ["cafile" => "/tls-fixture.pem"], "http" => ["timeout" => 5]]));
+          if ($response === false) { fwrite(STDERR, "Explicitly trusted fixture must connect.\n"); exit(1); }
+          echo "Production TLS verification fixtures passed.\n";'
 
   api:
     runs-on: ubuntu-latest
