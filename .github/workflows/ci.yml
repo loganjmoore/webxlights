@@ -97,6 +97,8 @@ jobs:
           php-version: "8.4"
           extensions: pdo_pgsql
       - run: composer install --prefer-dist --no-progress
+      - name: Audit locked PHP dependencies
+        run: composer audit --locked --no-interaction
       - run: cp .env.example .env
       - run: php artisan key:generate
       # phpunit.xml runs the suite against sqlite for speed; migrate against real
